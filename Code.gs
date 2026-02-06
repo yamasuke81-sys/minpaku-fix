@@ -3014,19 +3014,25 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     var staff = (staffName || '').trim() || (staffEmail || '').trim() || 'スタッフ';
     var dateStr = (checkoutDateStr || '').toString().trim() || '';
     var rid = 'r' + recruitRowIndex;
+    // 最優先: シートへの書き込み（最速で完了させる）
     var crSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CANCEL_REQUESTS);
     if (crSheet) {
       var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
       crSheet.appendRow([rid, staffName || staff, staffEmail || '', now]);
     }
-    addNotification_('出勤キャンセル要望', dateStr + ': ' + staff + ' が出勤キャンセルの要望を提出しました', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr });
-    var ownerRes = JSON.parse(getOwnerEmail());
-    var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-    if (ownerEmail) {
-      var subject = '【民泊】清掃スタッフの出勤キャンセル要望: ' + dateStr;
-      var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。';
-      GmailApp.sendEmail(ownerEmail, subject, body);
-    }
+    SpreadsheetApp.flush();
+    // 通知（シート書き込み）
+    try { addNotification_('出勤キャンセル要望', dateStr + ': ' + staff + ' が出勤キャンセルの要望を提出しました', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr }); } catch (ne) {}
+    // メール送信（最も遅い処理 - 失敗しても成功扱い）
+    try {
+      var ownerRes = JSON.parse(getOwnerEmail());
+      var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
+      if (ownerEmail) {
+        var subject = '【民泊】清掃スタッフの出勤キャンセル要望: ' + dateStr;
+        var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。';
+        GmailApp.sendEmail(ownerEmail, subject, body);
+      }
+    } catch (mailErr) {}
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

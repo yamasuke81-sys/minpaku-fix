@@ -1853,15 +1853,18 @@
                     cancelReqBtn.textContent = 'キャンセル申請';
                     cancelReqBtn.onclick = function() {
                       if (!confirm('出勤キャンセルの要望を提出します。\n\nよろしいですか？（OK=はい、キャンセル=いいえ）')) return;
+                      // 即座にUIフィードバック（サーバー応答を待たない）
+                      cancelReqBtn.disabled = true;
+                      cancelReqBtn.textContent = '申請中...';
+                      cancelReqBtn.className = 'btn btn-sm btn-secondary me-1';
                       google.script.run.withSuccessHandler(function(j) {
                         var res = JSON.parse(j);
                         if (res.success) {
-                          alert('要望を送信しました。折り返しご連絡いたします');
                           bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
-                        } else alert(res.error || '失敗');
-                      }).withFailureHandler(function(e) { alert(e.message); }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                        } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger me-1'; }
+                      }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger me-1'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                     };
                     centerArea.appendChild(cancelReqBtn);
                   }

@@ -1770,12 +1770,13 @@
               nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
             }
             if (statusEl && cachedRec) {
-              var cStatus = cachedRec.status || '';
+              var cachedStaffAssigned = (d.cleaningStaff || '').trim();
+              var cStatus = cachedStaffAssigned ? '選定済' : (cachedRec.status || '');
               statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : (cStatus === '選定済' ? '選定済' : '未募集');
               statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : (cStatus === '選定済' ? 'status-decided' : 'status-undecided'));
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
-              if ((cachedRec.status || '') === '募集中') {
+              if (!((d.cleaningStaff || '').trim()) && (cachedRec.status || '') === '募集中') {
                 volArea.style.display = 'block';
                 volList.textContent = cachedRec.volunteers.length ? cachedRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
               }
@@ -1797,23 +1798,28 @@
                 var dateDisp = fmtDateRange(nr.date);
                 nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
               }
+              var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
+              var staffAssigned = (d.cleaningStaff || '').trim();
+              // cleaningStaff設定済みなら実質「選定済」として扱う
+              var effectiveStatus = staffAssigned ? '選定済' : r.status;
               if (statusEl && r.success) {
-                statusEl.textContent = r.status === '募集中' ? '清掃募集中' : (r.status === '選定済' ? '選定済' : '未募集');
-                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (r.status === '募集中' ? 'status-recruiting' : (r.status === '選定済' ? 'status-decided' : 'status-undecided'));
+                statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : (effectiveStatus === '選定済' ? '選定済' : '未募集');
+                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : (effectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));
               }
               if (volArea && volList && r.success) {
-                if (r.status === '募集中') {
+                if (effectiveStatus === '募集中') {
                   volArea.style.display = 'block';
                   volList.textContent = (r.volunteers && r.volunteers.length) ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
                 } else {
                   volArea.style.display = 'none';
                 }
               }
-              var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
-              if (r.success && r.status === '選定済' && r.recruitRowIndex && r.selectedStaff && centerArea) {
+              // キャンセル申請: 選定済 or cleaningStaffが設定済みの場合、本人にのみ表示
+              if (r.success && r.recruitRowIndex && (r.status === '選定済' || staffAssigned) && centerArea) {
+                var assignedStaff = r.selectedStaff || staffAssigned;
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
-                var selectedParts = (r.selectedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
+                var selectedParts = (assignedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
                 var isSelected = selectedParts.some(function(part) {
                   var p = part.toLowerCase();
                   return (curName2 && curName2.toLowerCase() === p) || (curEmail2 && p.indexOf('@') >= 0 && p === curEmail2);
@@ -1838,7 +1844,7 @@
                   centerArea.appendChild(cancelReqBtn);
                 }
               }
-              if (r.success && r.status === '募集中' && r.recruitRowIndex) {
+              if (r.success && r.status === '募集中' && r.recruitRowIndex && !staffAssigned) {
                 var curName = (window.currentUserName || '').trim().toLowerCase();
                 var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
                 var hasVol = r.volunteers && r.volunteers.some(function(v) {
@@ -1901,12 +1907,14 @@
               } else if (nextEl) {
                 nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">－</span></div>';
               }
+              var ownerStaffAssigned = (d.cleaningStaff || '').trim();
+              var ownerEffectiveStatus = ownerStaffAssigned ? '選定済' : r.status;
               if (statusEl && r.success) {
-                statusEl.textContent = r.status === '募集中' ? '清掃募集中' : (r.status === '選定済' ? '選定済' : '未募集');
-                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (r.status === '募集中' ? 'status-recruiting' : (r.status === '選定済' ? 'status-decided' : 'status-undecided'));
+                statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : (ownerEffectiveStatus === '選定済' ? '選定済' : '未募集');
+                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : (ownerEffectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));
               }
               if (volArea && volList && r.success) {
-                if (r.status === '募集中') {
+                if (ownerEffectiveStatus === '募集中') {
                   volArea.style.display = 'block';
                   volList.textContent = (r.volunteers && r.volunteers.length) ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
                 } else {
@@ -1914,7 +1922,7 @@
                   if (r.volunteers && r.volunteers.length) volList.textContent = r.volunteers.map(function(v) { return v.staffName; }).join(', ');
                 }
               }
-              if (!(d.cleaningStaff || '').trim() && ownerCenterArea && r.success) {
+              if (!ownerStaffAssigned && ownerCenterArea && r.success) {
                 var rowNum = props.rowNumber;
                 var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
                 if (!r.recruitRowIndex) {

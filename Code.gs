@@ -3006,6 +3006,128 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
   }
 }
 
+/**
+ * オーナーがキャンセル申請を承認
+ * → cleaningStaff削除、募集状態に戻す、ボランティアレコード削除、申請レコード削除、スタッフに通知
+ */
+function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    var formSheet = ss.getSheetByName(SHEET_NAME);
+    var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
+    var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+    if (!recruitSheet || !formSheet) return JSON.stringify({ success: false, error: 'シートが見つかりません。' });
+
+    // 募集シートのステータスを '募集中' に戻し、選定スタッフをクリア
+    recruitSheet.getRange(recruitRowIndex, 4).setValue('募集中');
+    recruitSheet.getRange(recruitRowIndex, 5).setValue('');
+
+    // メインシートの cleaningStaff をクリア
+    var bookingRowNumber = Number(recruitSheet.getRange(recruitRowIndex, 2).getValue());
+    if (bookingRowNumber >= 2) {
+      var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+      var colMap = buildColumnMap(headers);
+      if (colMap.cleaningStaff >= 0) {
+        formSheet.getRange(bookingRowNumber, colMap.cleaningStaff + 1).setValue('');
+      }
+    }
+
+    // ボランティアレコードを削除（該当スタッフのみ）
+    var rid = 'r' + recruitRowIndex;
+    var sName = (staffName || '').trim();
+    var sEmail = (staffEmail || '').trim().toLowerCase();
+    if (volSheet && volSheet.getLastRow() >= 2) {
+      var volData = volSheet.getRange(2, 1, volSheet.getLastRow(), 4).getValues();
+      for (var i = volData.length - 1; i >= 0; i--) {
+        if (String(volData[i][0]).trim() !== rid) continue;
+        var matchName = sName && String(volData[i][1] || '').trim() === sName;
+        var matchEmail = sEmail && String(volData[i][2] || '').trim().toLowerCase() === sEmail;
+        if (matchName || matchEmail) {
+          volSheet.deleteRow(i + 2);
+          break;
+        }
+      }
+    }
+
+    // キャンセル申請レコードを削除
+    if (crSheet && crSheet.getLastRow() >= 2) {
+      var crData = crSheet.getRange(2, 1, crSheet.getLastRow(), 4).getValues();
+      for (var j = crData.length - 1; j >= 0; j--) {
+        if (String(crData[j][0]).trim() !== rid) continue;
+        var crMatchName = sName && String(crData[j][1] || '').trim() === sName;
+        var crMatchEmail = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
+        if (crMatchName || crMatchEmail) {
+          crSheet.deleteRow(j + 2);
+          break;
+        }
+      }
+    }
+
+    // 通知を追加
+    var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
+    var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
+    addNotification_('キャンセル承認', checkoutStr + ': ' + (sName || sEmail) + ' のキャンセルを承認しました');
+
+    // スタッフにメール通知
+    if (sEmail) {
+      try {
+        var subject = '【民泊】出勤キャンセルが承認されました: ' + checkoutStr;
+        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。';
+        GmailApp.sendEmail(sEmail, subject, body);
+      } catch (mailErr) {}
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * オーナーがキャンセル申請を却下（申請レコードを削除し、スタッフに通知）
+ */
+function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    var rid = 'r' + recruitRowIndex;
+    var sName = (staffName || '').trim();
+    var sEmail = (staffEmail || '').trim().toLowerCase();
+
+    // キャンセル申請レコードを削除
+    if (crSheet && crSheet.getLastRow() >= 2) {
+      var crData = crSheet.getRange(2, 1, crSheet.getLastRow(), 4).getValues();
+      for (var j = crData.length - 1; j >= 0; j--) {
+        if (String(crData[j][0]).trim() !== rid) continue;
+        var m1 = sName && String(crData[j][1] || '').trim() === sName;
+        var m2 = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
+        if (m1 || m2) { crSheet.deleteRow(j + 2); break; }
+      }
+    }
+
+    var checkoutCell = recruitSheet ? recruitSheet.getRange(recruitRowIndex, 1).getValue() : null;
+    var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
+    addNotification_('キャンセル却下', checkoutStr + ': ' + (sName || sEmail) + ' のキャンセル申請を却下しました');
+
+    // スタッフにメール通知
+    if (sEmail) {
+      try {
+        var subject = '【民泊】出勤キャンセルが却下されました: ' + checkoutStr;
+        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。';
+        GmailApp.sendEmail(sEmail, subject, body);
+      } catch (mailErr) {}
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 function getStaffNamesForSelection() {
   try {
     ensureSheetsExist();
@@ -3682,7 +3804,7 @@ function getRecruitmentForBooking(bookingRowNumber) {
           if (det.success && det.nextReservation) nextReservation = det.nextReservation;
         } catch (er) {}
         var selectedStaff = String(rows[i][4] || '').trim();
-        return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff });
+        return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested });
       }
     }
     var nextReservation = null;

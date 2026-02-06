@@ -1837,23 +1837,34 @@
                   return (curName2 && curName2.toLowerCase() === p) || (curEmail2 && p.indexOf('@') >= 0 && p === curEmail2);
                 });
                 if (isSelected) {
-                  var cancelReqBtn = document.createElement('button');
-                  cancelReqBtn.type = 'button';
-                  cancelReqBtn.className = 'btn btn-sm btn-danger me-1';
-                  cancelReqBtn.textContent = 'キャンセル申請';
-                  cancelReqBtn.onclick = function() {
-                    if (!confirm('出勤キャンセルの要望を提出します。\n\nよろしいですか？（OK=はい、キャンセル=いいえ）')) return;
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) {
-                        alert('要望を送信しました。折り返しご連絡いたします');
-                        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                        loadAndRender();
-                        if (window.staffMode) loadStaffSchedule();
-                      } else alert(res.error || '失敗');
-                    }).withFailureHandler(function(e) { alert(e.message); }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
-                  };
-                  centerArea.appendChild(cancelReqBtn);
+                  // 既にキャンセル申請済みかチェック
+                  var alreadyRequested = r.cancelRequested && r.cancelRequested.some(function(cr) {
+                    return (curName2 && cr.staffName === curName2) || (curEmail2 && cr.email === curEmail2);
+                  });
+                  if (alreadyRequested) {
+                    var pendingBadge = document.createElement('div');
+                    pendingBadge.className = 'alert alert-warning py-1 px-2 small mb-0';
+                    pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> キャンセル申請中（オーナーの承認待ち）';
+                    centerArea.appendChild(pendingBadge);
+                  } else {
+                    var cancelReqBtn = document.createElement('button');
+                    cancelReqBtn.type = 'button';
+                    cancelReqBtn.className = 'btn btn-sm btn-danger me-1';
+                    cancelReqBtn.textContent = 'キャンセル申請';
+                    cancelReqBtn.onclick = function() {
+                      if (!confirm('出勤キャンセルの要望を提出します。\n\nよろしいですか？（OK=はい、キャンセル=いいえ）')) return;
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) {
+                          alert('要望を送信しました。折り返しご連絡いたします');
+                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                          loadAndRender();
+                          if (window.staffMode) loadStaffSchedule();
+                        } else alert(res.error || '失敗');
+                      }).withFailureHandler(function(e) { alert(e.message); }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                    };
+                    centerArea.appendChild(cancelReqBtn);
+                  }
                 }
               }
               if (r.success && r.status === '募集中' && r.recruitRowIndex && !staffAssigned) {
@@ -2078,6 +2089,57 @@
                   openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim());
                 };
                 ownerCenterArea.appendChild(btnEditStaff);
+              }
+              // キャンセル申請がある場合、承認ボタンを表示
+              if (r.cancelRequested && r.cancelRequested.length && r.recruitRowIndex && ownerCenterArea) {
+                r.cancelRequested.forEach(function(cr) {
+                  var approveWrap = document.createElement('div');
+                  approveWrap.className = 'w-100 mt-2 p-2 border border-warning rounded bg-warning bg-opacity-10';
+                  approveWrap.innerHTML = '<div class="small fw-bold text-warning mb-1"><i class="bi bi-exclamation-triangle"></i> キャンセル申請: ' + escapeHtml(cr.staffName) + '</div>';
+                  var btnApprove = document.createElement('button');
+                  btnApprove.type = 'button';
+                  btnApprove.className = 'btn btn-sm btn-warning me-1';
+                  btnApprove.textContent = 'キャンセル承認';
+                  btnApprove.onclick = function() {
+                    if (!confirm(cr.staffName + ' のキャンセルを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。')) return;
+                    btnApprove.disabled = true;
+                    btnApprove.textContent = '処理中...';
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) {
+                        alert('キャンセルを承認しました。清掃担当が解除され、募集状態に戻りました。');
+                        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                        loadAndRender();
+                        loadRecruitList();
+                      } else {
+                        alert(res.error || '失敗');
+                        btnApprove.disabled = false;
+                        btnApprove.textContent = 'キャンセル承認';
+                      }
+                    }).withFailureHandler(function(e) {
+                      alert(e.message);
+                      btnApprove.disabled = false;
+                      btnApprove.textContent = 'キャンセル承認';
+                    }).approveCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
+                  };
+                  var btnReject = document.createElement('button');
+                  btnReject.type = 'button';
+                  btnReject.className = 'btn btn-sm btn-outline-secondary';
+                  btnReject.textContent = '却下';
+                  btnReject.onclick = function() {
+                    if (!confirm(cr.staffName + ' のキャンセル申請を却下しますか？')) return;
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) {
+                        approveWrap.remove();
+                        loadAndRender();
+                      } else alert(res.error || '失敗');
+                    }).withFailureHandler(function(e) { alert(e.message); }).rejectCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
+                  };
+                  approveWrap.appendChild(btnApprove);
+                  approveWrap.appendChild(btnReject);
+                  ownerCenterArea.appendChild(approveWrap);
+                });
               }
             } catch (e) {}
           }).getRecruitmentForBooking(props.rowNumber);
@@ -3273,7 +3335,7 @@
             var r = JSON.parse(jsonStr);
             if (r.success && r.list && r.list.length) {
               var html = r.list.map(function(n) {
-                var kindClass = (n.kind === '立候補') ? 'primary' : (n.kind === '立候補取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : 'secondary';
+                var kindClass = (n.kind === '立候補') ? 'primary' : (n.kind === '立候補取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : (n.kind === '出勤キャンセル要望') ? 'danger' : (n.kind === 'キャンセル承認') ? 'info' : (n.kind === 'キャンセル却下') ? 'secondary' : 'secondary';
                 return '<div class="border rounded p-2 mb-2 small"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span> ' + escapeHtml(n.message) + '</div>';
               }).join('');
               el.innerHTML = html;

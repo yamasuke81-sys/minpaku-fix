@@ -179,7 +179,7 @@ async function main() {
   const pushOnly = process.argv.includes('--push-only');
 
   console.log('1. コードをプッシュしています...');
-  run(`${clasp} push -f`);
+  run(`echo y | ${clasp} push -f`);
 
   if (pushOnly) {
     // ここから先は「プッシュのみ」用の軽量オートメーション
@@ -269,7 +269,7 @@ async function main() {
   console.log('3. スタッフ用デプロイを更新しています（同じURLのまま）...');
   console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
   setWebappConfig(STAFF_WEBAPP);
-  run(`${clasp} push -f`);
+  run(`echo y | ${clasp} push -f`);
   let staffResult = runCapture(`${clasp} deploy --deploymentId "${staffId}" --description "スタッフ用 ${today}"`);
   if (!staffResult.success) {
     const staffErr = (staffResult.stdout + staffResult.stderr).toLowerCase();

@@ -456,7 +456,12 @@ function saveCleaningNotice(rowNumber, noticeText) {
     if (!sheet || rowNumber < 2 || rowNumber > sheet.getLastRow()) return JSON.stringify({ success: false, error: '無効な行です。' });
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var colMap = buildColumnMap(headers);
-    if (colMap.cleaningNotice < 0) return JSON.stringify({ success: false, error: '連絡事項列が見つかりません。' });
+    if (colMap.cleaningNotice < 0) {
+      // 連絡事項列を自動作成
+      var newCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newCol).setValue('連絡事項');
+      colMap.cleaningNotice = newCol - 1;
+    }
     sheet.getRange(rowNumber, colMap.cleaningNotice + 1).setValue(noticeText || '');
     return JSON.stringify({ success: true });
   } catch (e) {

@@ -2794,7 +2794,9 @@ function deleteRecruitment(recruitRowIndex) {
  */
 function getRecruitmentCopyText(checkoutDateStr, bookingRowNumber, detail) {
   try {
-    var nextRes = detail && (detail.date || detail.guestCount || detail.bbq || detail.nationality);
+    // detail に有効な情報があるか（nationality デフォルト値のみは除外）
+    var hasDetail = detail && (detail.date || detail.guestCount || detail.bbq);
+    var nextRes = hasDetail ? detail : null;
     if (!nextRes) {
       var detStr = getBookingDetailsForRecruit(bookingRowNumber, null);
       var det = JSON.parse(detStr);
@@ -2900,7 +2902,7 @@ function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
   if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
 
   var lines = ['清掃募集', '', '作業日: ' + fmtDate, ''];
-  lines.push('次回の予約内容:');
+  lines.push('次回予約の情報（変更の可能性あり）:');
   var hasContent = false;
   if (nextReservation) {
     if (nextReservation.date) { var nd = nextReservation.date; var ndm = nd.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if (ndm) nd = ndm[1] + '年' + ('0' + ndm[2]).slice(-2) + '月' + ('0' + ndm[3]).slice(-2) + '日'; lines.push('・チェックイン: ' + nd); hasContent = true; }

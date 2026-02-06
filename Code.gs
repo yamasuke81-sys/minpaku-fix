@@ -409,6 +409,13 @@ function parseDate(str) {
   str = str.trim();
   if (!str) return null;
 
+  // ISO/スラッシュ区切り日付文字列を先にチェック（シリアル値誤認防止）
+  var m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) {
+    var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   // 数値（日付シリアル値）の場合
   const num = parseFloat(str);
   if (!isNaN(num) && num > 0) {
@@ -420,8 +427,8 @@ function parseDate(str) {
   }
 
   // 文字列としてパース
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? null : d;
+  const d2 = new Date(str);
+  return isNaN(d2.getTime()) ? null : d2;
 }
 
 /**
@@ -2486,9 +2493,22 @@ function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr,
   var bestColMap = null;
   if (formSheet && (colMap.checkIn >= 0 && colMap.checkOut >= 0)) {
     var data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    // 除外行のチェックイン日を取得（重複行スキップ用）
+    var excludeCi = '';
+    if (excludeRowNumber && excludeRowNumber >= 2 && (excludeRowNumber - 2) < data.length) {
+      var exCiVal = colMap.checkIn >= 0 ? data[excludeRowNumber - 2][colMap.checkIn] : null;
+      var exCi = parseDate(exCiVal);
+      if (exCi) excludeCi = toDateKeySafe_(exCi);
+    }
     for (var i = 0; i < data.length; i++) {
       var rowNum = i + 2;
       if (rowNum === excludeRowNumber) continue;
+      // 同一チェックイン日の重複行をスキップ（iCal+フォーム重複対策）
+      if (excludeCi) {
+        var rowCiVal = colMap.checkIn >= 0 ? data[i][colMap.checkIn] : null;
+        var rowCiParsed = parseDate(rowCiVal);
+        if (rowCiParsed && toDateKeySafe_(rowCiParsed) === excludeCi) continue;
+      }
       var row = data[i];
       var checkInVal = colMap.checkIn >= 0 ? row[colMap.checkIn] : null;
       var checkOutVal = colMap.checkOut >= 0 ? row[colMap.checkOut] : null;

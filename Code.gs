@@ -216,6 +216,7 @@ function getData() {
       const nationality = columnMap.nationality >= 0 ? String(row[columnMap.nationality] || '').trim() : '';
       const purpose = columnMap.purpose >= 0 ? String(row[columnMap.purpose] || '').trim() : '';
       const memo = columnMap.memo >= 0 ? String(row[columnMap.memo] || '').trim() : '';
+      const cleaningNotice = columnMap.cleaningNotice >= 0 ? String(row[columnMap.cleaningNotice] || '').trim() : '';
       // 宿泊者名一覧（複数カラム対応）と年齢
       var guestNames = [];
       if (columnMap.guestNameCols && columnMap.guestNameCols.length) {
@@ -250,6 +251,7 @@ function getData() {
         nationality: nationality,
         purpose: purpose,
         memo: memo,
+        cleaningNotice: cleaningNotice,
         guestNames: guestNames,
         isValidDates: isValidDates,
         nights: isValidDates ? Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24)) : 0
@@ -304,6 +306,7 @@ function buildColumnMap(headers) {
     carCols: [],
     purpose: -1,
     memo: -1,
+    cleaningNotice: -1,
     guestNameCols: [],
     ageCols: []
   };
@@ -318,6 +321,7 @@ function buildColumnMap(headers) {
     if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) map.ageCols.push(i);
     if ((h.indexOf('旅の目的') > -1 || h.indexOf('目的') > -1) && map.purpose < 0) map.purpose = i;
     if ((h === 'メモ' || h === '備考' || h.indexOf('メモ') > -1) && h.indexOf('オーナー') === -1 && h.indexOf('募集') === -1 && map.memo < 0) map.memo = i;
+    if ((h === '連絡事項' || h === '清掃連絡事項') && map.cleaningNotice < 0) map.cleaningNotice = i;
     if ((h === HEADERS.BOOKING_SITE || h.indexOf('どこでこのホテルを予約しましたか') > -1) && map.bookingSite < 0) map.bookingSite = i;
     if ((h.indexOf('バーベキュー') > -1 || h.toLowerCase().indexOf('bbq') > -1) && map.bbq < 0) map.bbq = i;
     if (h.indexOf(HEADERS.GUEST_COUNT_PREFIX) > -1 && h.indexOf('3才以下の乳幼児') === -1 && map.guestCount < 0) map.guestCount = i;
@@ -425,6 +429,41 @@ function parseDate(str) {
  * @param {number} rowNumber - スプレッドシートの行番号（1始まり）
  * @param {string} staffName - 清掃担当者名
  */
+/**
+ * 予約のメモを保存（オーナーのみ）
+ */
+function saveBookingMemo(rowNumber, memoText) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet || rowNumber < 2 || rowNumber > sheet.getLastRow()) return JSON.stringify({ success: false, error: '無効な行です。' });
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colMap = buildColumnMap(headers);
+    if (colMap.memo < 0) return JSON.stringify({ success: false, error: 'メモ列が見つかりません。' });
+    sheet.getRange(rowNumber, colMap.memo + 1).setValue(memoText || '');
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function saveCleaningNotice(rowNumber, noticeText) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet || rowNumber < 2 || rowNumber > sheet.getLastRow()) return JSON.stringify({ success: false, error: '無効な行です。' });
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colMap = buildColumnMap(headers);
+    if (colMap.cleaningNotice < 0) return JSON.stringify({ success: false, error: '連絡事項列が見つかりません。' });
+    sheet.getRange(rowNumber, colMap.cleaningNotice + 1).setValue(noticeText || '');
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 function updateCleaningStaff(rowNumber, staffName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();

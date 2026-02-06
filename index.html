@@ -1334,7 +1334,58 @@
         recruitMap = recruitMap || {};
         if (!data || !Array.isArray(data)) return events;
 
+        // 同一チェックイン・チェックアウト日の予約をマージ（iCal + スプシの重複排除）
+        var dateKeyMap = {};
+        var merged = [];
         data.forEach(function(b) {
+          if (!b.checkInParsed || !b.checkOutParsed) { merged.push(b); return; }
+          var key = b.checkInParsed + '|' + b.checkOutParsed;
+          if (dateKeyMap[key] !== undefined) {
+            var existing = merged[dateKeyMap[key]];
+            // 両方のデータをマージ（空でないフィールドを優先）
+            var fields = ['guestName','bbq','guestCountAdults','guestCountInfants','cleaningStaff','parking','bedChoice','tel1','tel2','email','email2','passportUrls','carDisplay','nationality','purpose','memo','cleaningNotice'];
+            fields.forEach(function(f) {
+              if (!existing[f] && b[f]) existing[f] = b[f];
+            });
+            // guestCountDisplayをスマートマージ
+            if (b.guestCountDisplay && b.guestCountDisplay !== existing.guestCountDisplay) {
+              var extractCnt = function(s) {
+                var m = s.match(/^(.+?)（(.+?)）$/);
+                return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: s, form: '-' };
+              };
+              var exC = extractCnt(existing.guestCountDisplay || '-（-）');
+              var nwC = extractCnt(b.guestCountDisplay || '-（-）');
+              var icalC = (exC.ical !== '-') ? exC.ical : nwC.ical;
+              var formC = (exC.form !== '-') ? exC.form : nwC.form;
+              existing.guestCountDisplay = icalC + '（' + formC + '）';
+            }
+            // bookingSiteをスマートマージ: iCal部分（）なしとスプシ部分（）ありを統合
+            if (b.bookingSite && b.bookingSite !== existing.bookingSite) {
+              // 既存と新規それぞれからiCal部分とform部分を抽出
+              var extractParts = function(bs) {
+                var m = bs.match(/^(.+?)（(.+?)）$/);
+                return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: bs, form: '-' };
+              };
+              var ex = extractParts(existing.bookingSite);
+              var nw = extractParts(b.bookingSite);
+              var icalPart = (ex.ical !== '-') ? ex.ical : nw.ical;
+              var formPart = (ex.form !== '-') ? ex.form : nw.form;
+              existing.bookingSite = icalPart + '（' + formPart + '）';
+            }
+            // guestNamesの結合
+            if (b.guestNames && b.guestNames.length && (!existing.guestNames || !existing.guestNames.length)) {
+              existing.guestNames = b.guestNames;
+            }
+            // mergedRowNumbersに追加行番号を記録
+            if (!existing.mergedRowNumbers) existing.mergedRowNumbers = [existing.rowNumber];
+            existing.mergedRowNumbers.push(b.rowNumber);
+          } else {
+            dateKeyMap[key] = merged.length;
+            merged.push(b);
+          }
+        });
+
+        merged.forEach(function(b) {
           const checkIn = b.checkInParsed;
           const checkOut = b.checkOutParsed;
           const isValid = b.isValidDates;
@@ -1422,6 +1473,48 @@
 
         function fmt(val) { var s = (val != null && val !== '') ? String(val) : '-'; return escapeHtml(s); }
         // 日付表示ヘルパー: "2026-02-13 ～ 2026-02-15" → "2026/2/13 ～ 2026/2/15"
+        // メモ保存（宿泊詳細）
+        window.saveBookingMemoUI = function() {
+          var ta = document.getElementById('bookingMemoTextarea');
+          if (!ta) return;
+          var btn = document.getElementById('btnSaveMemo');
+          if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
+          google.script.run.withSuccessHandler(function(res) {
+            var r = JSON.parse(res);
+            if (r.success) {
+              if (btn) { btn.textContent = '保存しました'; btn.classList.replace('btn-primary', 'btn-success'); }
+              setTimeout(function() { if (btn) { btn.disabled = false; btn.textContent = 'メモを保存'; btn.classList.replace('btn-success', 'btn-primary'); } }, 2000);
+            } else {
+              alert(r.error || '保存に失敗しました。');
+              if (btn) { btn.disabled = false; btn.textContent = 'メモを保存'; }
+            }
+          }).withFailureHandler(function(e) {
+            alert('保存に失敗しました: ' + e.message);
+            if (btn) { btn.disabled = false; btn.textContent = 'メモを保存'; }
+          }).saveBookingMemo(parseInt(ta.dataset.row), ta.value);
+        };
+
+        // 連絡事項保存（清掃詳細）
+        window.saveCleaningNoticeUI = function() {
+          var ta = document.getElementById('cleaningNoticeTextarea');
+          if (!ta) return;
+          var btn = document.getElementById('btnSaveNotice');
+          if (btn) { btn.disabled = true; btn.textContent = '保存中...'; }
+          google.script.run.withSuccessHandler(function(res) {
+            var r = JSON.parse(res);
+            if (r.success) {
+              if (btn) { btn.textContent = '保存しました'; btn.classList.replace('btn-primary', 'btn-success'); }
+              setTimeout(function() { if (btn) { btn.disabled = false; btn.textContent = '連絡事項を保存'; btn.classList.replace('btn-success', 'btn-primary'); } }, 2000);
+            } else {
+              alert(r.error || '保存に失敗しました。');
+              if (btn) { btn.disabled = false; btn.textContent = '連絡事項を保存'; }
+            }
+          }).withFailureHandler(function(e) {
+            alert('保存に失敗しました: ' + e.message);
+            if (btn) { btn.disabled = false; btn.textContent = '連絡事項を保存'; }
+          }).saveCleaningNotice(parseInt(ta.dataset.row), ta.value);
+        };
+
         function fmtDateRange(raw) {
           if (!raw) return '-';
           var s = String(raw);
@@ -1486,6 +1579,19 @@
             html += '<div class="mt-2"><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded">読み込み中…</span></div>';
             html += '<div id="eventModalVolunteersArea" class="mt-2" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
             html += '</div>';
+
+            // 連絡事項（オーナー: 編集可, スタッフ: 閲覧のみ）
+            if (d.cleaningNotice || !isStaffView) {
+              html += '<div class="modal-section-divider"></div>';
+              html += '<div class="modal-memo-area"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
+              if (!isStaffView) {
+                html += '<textarea id="cleaningNoticeTextarea" class="form-control form-control-sm" rows="3" data-row="' + props.rowNumber + '">' + fmt(d.cleaningNotice || '') + '</textarea>';
+                html += '<div class="text-end mt-1"><button id="btnSaveNotice" class="btn btn-sm btn-primary" onclick="saveCleaningNoticeUI()">連絡事項を保存</button></div>';
+              } else {
+                html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.cleaningNotice || '') + '</div>';
+              }
+              html += '</div>';
+            }
 
             // スタッフ用: 立候補エリア（条件欄+ボタン、body内に配置）
             html += '<div id="eventModalVolunteerBodyArea" class="mt-3"></div>';
@@ -1601,10 +1707,16 @@
               html += '<div class="mt-1"><span class="recruit-status-badge px-2 py-1 rounded ' + rClass + '">' + rLabel + '</span></div>';
             }
 
-            // メモ
-            if (!isStaffView) {
+            // メモ（オーナー: 編集可, スタッフ: 閲覧のみ）
+            if (d.memo || !isStaffView) {
               html += '<div class="modal-memo-area"><label><i class="bi bi-journal-text"></i> メモ</label>';
-              html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.memo || '') + '</div></div>';
+              if (!isStaffView) {
+                html += '<textarea id="bookingMemoTextarea" class="form-control form-control-sm" rows="3" data-row="' + props.rowNumber + '">' + fmt(d.memo || '') + '</textarea>';
+                html += '<div class="text-end mt-1"><button id="btnSaveMemo" class="btn btn-sm btn-primary" onclick="saveBookingMemoUI()">メモを保存</button></div>';
+              } else {
+                html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.memo || '') + '</div>';
+              }
+              html += '</div>';
             }
           }
         }
@@ -1698,7 +1810,7 @@
                 }
               }
               var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
-              if (r.success && r.status === '選定済' && r.recruitRowIndex && r.selectedStaff && volBodyArea) {
+              if (r.success && r.status === '選定済' && r.recruitRowIndex && r.selectedStaff && centerArea) {
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
                 var selectedParts = (r.selectedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
@@ -1723,7 +1835,7 @@
                       } else alert(res.error || '失敗');
                     }).withFailureHandler(function(e) { alert(e.message); }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                   };
-                  volBodyArea.appendChild(cancelReqBtn);
+                  centerArea.appendChild(cancelReqBtn);
                 }
               }
               if (r.success && r.status === '募集中' && r.recruitRowIndex) {
@@ -4110,7 +4222,7 @@
       // ログインユーザー情報（立候補・オーナー判定に使用）
       window.currentUserEmail = '';
       window.currentUserName = '';
-      window.isOwnerUser = false;
+      window.isOwnerUser = !window.staffMode; // デフォルト: オーナーURL→true, スタッフURL→false
       function populateStaffSelectOptions(targetId) {
         google.script.run.withSuccessHandler(function(sStr) {
           try {

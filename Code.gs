@@ -1006,7 +1006,7 @@ function ensureSheetsExist() {
     ensureVolunteerStatusColumns_();
   }
   if (!ss.getSheetByName(SHEET_CANCEL_REQUESTS)) {
-    ss.insertSheet(SHEET_CANCEL_REQUESTS).getRange(1, 1, 1, 4).setValues([['募集ID', 'スタッフ名', 'メール', '申請日時']]);
+    ss.insertSheet(SHEET_CANCEL_REQUESTS).getRange(1, 1, 1, 5).setValues([['募集ID', 'スタッフ名', 'メール', '申請日時', 'ステータス']]);
   }
 
   if (!ss.getSheetByName(SHEET_SYNC_SETTINGS)) {
@@ -3561,16 +3561,18 @@ function getRecruitmentStatusMap() {
     }
     var cancelByRid = {};
     if (crSheet && crSheet.getLastRow() >= 2) {
-      var crRows = crSheet.getRange(2, 1, crSheet.getLastRow(), 4).getValues();
+      var crLastCol = Math.max(crSheet.getLastColumn(), 5);
+      var crRows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, crLastCol).getValues();
       crRows.forEach(function(cr) {
         var rid = String(cr[0] || '').trim();
-        if (rid) {
-          if (!cancelByRid[rid]) cancelByRid[rid] = [];
-          cancelByRid[rid].push({
-            staffName: String(cr[1] || '').trim(),
-            email: String(cr[2] || '').trim().toLowerCase()
-          });
-        }
+        if (!rid) return;
+        var crStatus = String(cr[4] || '').trim();
+        if (crStatus === 'rejected') return; // 否認済みは除外
+        if (!cancelByRid[rid]) cancelByRid[rid] = [];
+        cancelByRid[rid].push({
+          staffName: String(cr[1] || '').trim(),
+          email: String(cr[2] || '').trim().toLowerCase()
+        });
       });
     }
 

@@ -3409,10 +3409,26 @@ function getRecruitmentStatusMap() {
     function findNextRes_(checkoutStr, excludeRowNum) {
       if (!checkoutStr) return null;
       var best = null;
-      // ソート済み配列から二分探索的に検索
+      // 除外行のチェックイン日・チェックアウト日を取得（重複行スキップ用）
+      var excludeCi = '', excludeCo = '';
+      if (excludeRowNum) {
+        for (var e = 0; e < sortedBookings.length; e++) {
+          if (sortedBookings[e].rowNum === excludeRowNum) {
+            excludeCi = sortedBookings[e].checkInStr;
+            if (formColMap.checkOut >= 0) {
+              var eCo = parseDate(sortedBookings[e].row[formColMap.checkOut]);
+              excludeCo = eCo ? toDateKeySafe_(eCo) : '';
+            }
+            break;
+          }
+        }
+      }
+      // ソート済み配列から検索（チェックアウト日以降で、現在の予約と同一でないもの）
       for (var k = 0; k < sortedBookings.length; k++) {
         if (sortedBookings[k].checkInStr < checkoutStr) continue;
         if (sortedBookings[k].rowNum === excludeRowNum) continue;
+        // 同一チェックイン日の重複行をスキップ（iCal+フォーム）
+        if (excludeCi && sortedBookings[k].checkInStr === excludeCi) continue;
         var sb = sortedBookings[k];
         var co = formColMap.checkOut >= 0 ? parseDate(sb.row[formColMap.checkOut]) : null;
         var coStr = co ? toDateKeySafe_(co) : '';
@@ -3560,10 +3576,13 @@ function getNextReservationsForRows(rowNumbers) {
       if (!coDate) continue;
       var coStr = toDateKeySafe_(coDate);
       if (!coStr) continue;
+      // 現在の予約のチェックイン日を取得（重複行スキップ用）
+      var currentCi = colMap.checkIn >= 0 ? toDateKeySafe_(parseDate(formData[i][colMap.checkIn])) : '';
       var best = null;
       for (var k = 0; k < sorted.length; k++) {
         if (sorted[k].checkInStr < coStr) continue;
         if (sorted[k].rowNum === rn) continue;
+        if (currentCi && sorted[k].checkInStr === currentCi) continue;
         var sb = sorted[k];
         var sco = colMap.checkOut >= 0 ? parseDate(sb.row[colMap.checkOut]) : null;
         var scoStr = sco ? toDateKeySafe_(sco) : '';

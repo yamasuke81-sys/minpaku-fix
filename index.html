@@ -1593,7 +1593,7 @@
             html += '</div>';
 
             // 連絡事項（オーナー: 編集可, スタッフ: 閲覧のみ）
-            if (d.cleaningNotice || !isStaffView) {
+            {
               html += '<div class="modal-section-divider"></div>';
               html += '<div class="modal-memo-area"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
               if (!isStaffView) {
@@ -2257,13 +2257,21 @@
           allBookings = res.data || [];
           // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
           window._recruitFullMap = recruitMap;
+          // 清掃担当が設定済みのチェックアウト日を収集（重複行対策）
+          var staffSetDates = {};
+          (res.data || []).forEach(function(b) {
+            if ((b.cleaningStaff || '').trim() && b.checkOutParsed) {
+              var d2 = new Date(b.checkOutParsed);
+              staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
+            }
+          });
           var recruitDates = {};
           (res.data || []).forEach(function(b) {
             var rec = recruitMap[b.rowNumber] || {};
             if ((rec.status || '') === '募集中' && b.checkOutParsed) {
               var d = new Date(b.checkOutParsed);
               var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-              recruitDates[key] = true;
+              if (!staffSetDates[key]) recruitDates[key] = true;
             }
           });
           window._recruitDates = recruitDates;

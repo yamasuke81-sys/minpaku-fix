@@ -1274,17 +1274,33 @@
         var btnEdit = document.getElementById('btnEditStaff');
         if (btnEdit) btnEdit.style.display = 'none';
         var btnDel = document.getElementById('btnDeleteBooking');
+        var btnDelParent = btnDel ? btnDel.parentElement : null;
         if (btnDel) {
-          btnDel.style.display = (type === 'booking' && window.isOwnerUser && !window.staffMode) ? 'inline-block' : 'none';
+          var showDel = (type === 'booking' && window.isOwnerUser && !window.staffMode);
+          btnDel.style.display = showDel ? 'inline-block' : 'none';
           btnDel.dataset.rowNumber = props.rowNumber;
           if (d) {
             btnDel.dataset.checkIn = (d.checkIn || '').toString();
             btnDel.dataset.checkOut = (d.checkOut || '').toString();
             btnDel.dataset.guestName = (d.guestName || '').toString();
           }
+          if (btnDelParent) {
+            if (showDel) {
+              btnDelParent.classList.add('flex-grow-1', 'justify-content-center');
+            } else {
+              btnDelParent.classList.remove('flex-grow-1', 'justify-content-center');
+            }
+          }
         }
         var centerArea = document.getElementById('eventModalVolunteerCenter');
-        if (centerArea) centerArea.innerHTML = '';
+        if (centerArea) {
+          centerArea.innerHTML = '';
+          if (type === 'booking') {
+            centerArea.style.display = 'none';
+          } else {
+            centerArea.style.display = '';
+          }
+        }
 
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
         modal.show();
@@ -1301,7 +1317,7 @@
                 var nr = r.nextReservation || {};
                 var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
                 var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
-                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td class="text-end">' + escapeHtml(dateDisp) + '</td></tr><tr><td class="text-nowrap">人数:</td><td class="text-end">' + fmt(nr.guestCount) + '</td></tr><tr><td class="text-nowrap">BBQ:</td><td class="text-end">' + fmt(nr.bbq) + '</td></tr><tr><td class="text-nowrap">国籍:</td><td class="text-end">' + fmt(nr.nationality || '日本') + '</td></tr><tr><td class="text-nowrap">ベッド数:</td><td class="text-end">' + fmt(nr.bedCount) + '</td></tr>';
+                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td>' + escapeHtml(dateDisp) + '</td></tr><tr><td class="text-nowrap">人数:</td><td>' + fmt(nr.guestCount) + '</td></tr><tr><td class="text-nowrap">BBQ:</td><td>' + fmt(nr.bbq) + '</td></tr><tr><td class="text-nowrap">国籍:</td><td>' + fmt(nr.nationality || '日本') + '</td></tr><tr><td class="text-nowrap">ベッド数:</td><td>' + fmt(nr.bedCount) + '</td></tr>';
               }
               if (statusEl && r.success) {
                 statusEl.textContent = r.status === '募集中' ? '清掃募集中' : (r.status === '選定済' ? '選定済' : '未募集');
@@ -1402,9 +1418,9 @@
                 var nr = r.nextReservation || {};
                 var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
                 var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
-                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td class="text-end">' + escapeHtml(dateDisp) + '</td></tr><tr><td class="text-nowrap">人数:</td><td class="text-end">' + fmt(nr.guestCount) + '</td></tr><tr><td class="text-nowrap">BBQ:</td><td class="text-end">' + fmt(nr.bbq) + '</td></tr><tr><td class="text-nowrap">国籍:</td><td class="text-end">' + fmt(nr.nationality || '日本') + '</td></tr><tr><td class="text-nowrap">ベッド数:</td><td class="text-end">' + fmt(nr.bedCount) + '</td></tr>';
+                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td>' + escapeHtml(dateDisp) + '</td></tr><tr><td class="text-nowrap">人数:</td><td>' + fmt(nr.guestCount) + '</td></tr><tr><td class="text-nowrap">BBQ:</td><td>' + fmt(nr.bbq) + '</td></tr><tr><td class="text-nowrap">国籍:</td><td>' + fmt(nr.nationality || '日本') + '</td></tr><tr><td class="text-nowrap">ベッド数:</td><td>' + fmt(nr.bedCount) + '</td></tr>';
               } else if (nextEl) {
-                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td class="text-end">－</td></tr><tr><td class="text-nowrap">人数:</td><td class="text-end">－</td></tr><tr><td class="text-nowrap">BBQ:</td><td class="text-end">－</td></tr><tr><td class="text-nowrap">国籍:</td><td class="text-end">－</td></tr><tr><td class="text-nowrap">ベッド数:</td><td class="text-end">－</td></tr>';
+                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td>－</td></tr><tr><td class="text-nowrap">人数:</td><td>－</td></tr><tr><td class="text-nowrap">BBQ:</td><td>－</td></tr><tr><td class="text-nowrap">国籍:</td><td>－</td></tr><tr><td class="text-nowrap">ベッド数:</td><td>－</td></tr>';
               }
               if (statusEl && r.success) {
                 statusEl.textContent = r.status === '募集中' ? '清掃募集中' : (r.status === '選定済' ? '選定済' : '未募集');

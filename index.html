@@ -1597,6 +1597,35 @@
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
         modal.show();
 
+        // キャッシュから次回予約情報を即時表示（サーバー応答を待たずに表示）
+        if (type === 'cleaning') {
+          var cachedRec = (window._recruitFullMap || {})[props.rowNumber];
+          var cachedNextRes = cachedRec ? cachedRec.nextReservation : ((window._nextResCache || {})[props.rowNumber] || null);
+          if (cachedNextRes || cachedRec) {
+            var nextEl = document.getElementById('eventModalStaffNextResContent');
+            var statusEl = document.getElementById('eventModalStaffRecruitStatus');
+            var volArea = document.getElementById('eventModalVolunteersArea');
+            var volList = document.getElementById('eventModalVolunteersList');
+            if (nextEl && cachedNextRes) {
+              var nr = cachedNextRes;
+              var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
+              var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
+              nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
+            }
+            if (statusEl && cachedRec) {
+              var cStatus = cachedRec.status || '';
+              statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : (cStatus === '選定済' ? '選定済' : '未募集');
+              statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : (cStatus === '選定済' ? 'status-decided' : 'status-undecided'));
+            }
+            if (volArea && volList && cachedRec && cachedRec.volunteers) {
+              if ((cachedRec.status || '') === '募集中') {
+                volArea.style.display = 'block';
+                volList.textContent = cachedRec.volunteers.length ? cachedRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
+              }
+            }
+          }
+        }
+
         if (isStaff && type === 'cleaning') {
           google.script.run.withSuccessHandler(function(rStr) {
             try {
@@ -2048,6 +2077,8 @@
             return;
           }
           allBookings = res.data || [];
+          // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
+          window._recruitFullMap = recruitMap;
           var recruitDates = {};
           (res.data || []).forEach(function(b) {
             var rec = recruitMap[b.rowNumber] || {};
@@ -2066,6 +2097,27 @@
             calendar.render();
           }
           if (window.isOwnerUser) updateNotificationBanner();
+
+          // 募集エントリのない清掃イベントの次回予約を一括プリロード
+          var nonRecruitRows = [];
+          (res.data || []).forEach(function(b) {
+            if (b.checkOutParsed && !recruitMap[b.rowNumber]) {
+              nonRecruitRows.push(b.rowNumber);
+            }
+          });
+          if (nonRecruitRows.length > 0) {
+            if (!window._nextResCache) window._nextResCache = {};
+            google.script.run.withSuccessHandler(function(j) {
+              try {
+                var r = JSON.parse(j);
+                if (r.success && r.map) {
+                  for (var rn in r.map) {
+                    window._nextResCache[rn] = r.map[rn];
+                  }
+                }
+              } catch (e) {}
+            }).getNextReservationsForRows(nonRecruitRows);
+          }
         });
       }
 

@@ -3249,7 +3249,9 @@ function getRecruitmentStatusMap() {
     const crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
     var map = {};
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return JSON.stringify({ success: true, map: map });
-    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), 5).getValues();
+    ensureRecruitDetailColumns_();
+    var recruitLastCol = Math.max(recruitSheet.getLastColumn(), 15);
+    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), recruitLastCol).getValues();
     var volunteersByRid = {};
     ensureVolunteerStatusColumns_();
     var volLastCol = Math.max(volSheet ? volSheet.getLastColumn() : 4, 7);
@@ -3285,6 +3287,103 @@ function getRecruitmentStatusMap() {
         }
       });
     }
+
+    // フォームシートを一括読み込み（次回予約の一括計算用）
+    var formSheet = ss.getSheetByName(SHEET_NAME);
+    var formData = null, formColMap = null;
+    if (formSheet && formSheet.getLastRow() >= 2) {
+      var fHeaders = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+      formColMap = buildColumnMap(fHeaders);
+      if (formColMap.checkIn < 0 || formColMap.checkOut < 0) formColMap = buildColumnMapFromSource_(fHeaders);
+      formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    }
+    // チェックイン日でソート済みの予約一覧を事前構築
+    var sortedBookings = [];
+    if (formData && formColMap && formColMap.checkIn >= 0) {
+      for (var j = 0; j < formData.length; j++) {
+        var ci = parseDate(formData[j][formColMap.checkIn]);
+        if (!ci) continue;
+        var ciStr = toDateKeySafe_(ci);
+        if (!ciStr) continue;
+        sortedBookings.push({ rowNum: j + 2, checkInStr: ciStr, row: formData[j] });
+      }
+      sortedBookings.sort(function(a, b) { return a.checkInStr < b.checkInStr ? -1 : (a.checkInStr > b.checkInStr ? 1 : 0); });
+    }
+    // スタッフ共有シートも一括読み込み
+    var staffSheet = ss.getSheetByName(SHEET_STAFF_SHARE);
+    var staffShareData = null, staffShareColMap = null;
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      var sHeaders = staffSheet.getRange(1, 1, 1, staffSheet.getLastColumn()).getValues()[0];
+      staffShareColMap = buildColumnMapFromSource_(sHeaders);
+      staffShareData = staffSheet.getRange(2, 1, staffSheet.getLastRow(), staffSheet.getLastColumn()).getValues();
+    }
+
+    // 次回予約を一括検索するヘルパー（シートを再読み込みしない）
+    function findNextRes_(checkoutStr, excludeRowNum) {
+      if (!checkoutStr) return null;
+      var best = null;
+      // ソート済み配列から二分探索的に検索
+      for (var k = 0; k < sortedBookings.length; k++) {
+        if (sortedBookings[k].checkInStr < checkoutStr) continue;
+        if (sortedBookings[k].rowNum === excludeRowNum) continue;
+        var sb = sortedBookings[k];
+        var co = formColMap.checkOut >= 0 ? parseDate(sb.row[formColMap.checkOut]) : null;
+        var coStr = co ? toDateKeySafe_(co) : '';
+        var ad = formColMap.guestCount >= 0 ? extractGuestCount_(String(sb.row[formColMap.guestCount] || '')) : '';
+        var inf = formColMap.guestCountInfants >= 0 ? extractGuestCount_(String(sb.row[formColMap.guestCountInfants] || '')) : '';
+        var fFmt = (ad || inf) ? (ad ? '大人' + ad + '名' : '') + (inf ? (ad ? '、' : '') + '3歳以下' + inf + '名' : '') : '';
+        var ical = formColMap.icalGuestCount >= 0 ? String(sb.row[formColMap.icalGuestCount] || '').trim() : '';
+        best = {
+          date: sb.checkInStr,
+          guestCount: (ical || '－') + '（' + (fFmt || '－') + '）',
+          bbq: formColMap.bbq >= 0 ? String(sb.row[formColMap.bbq] || '').trim() : '',
+          nationality: (formColMap.nationality >= 0 ? String(sb.row[formColMap.nationality] || '').trim() : '') || '日本',
+          memo: '',
+          bedCount: ''
+        };
+        break;
+      }
+      // フォームに無ければスタッフ共有シートから検索
+      if (!best && staffShareData && staffShareColMap && staffShareColMap.checkIn >= 0) {
+        var bestCi2 = '9999-12-31';
+        for (var m = 0; m < staffShareData.length; m++) {
+          var sCi = parseDate(staffShareData[m][staffShareColMap.checkIn]);
+          if (!sCi) continue;
+          var sCiStr = toDateKeySafe_(sCi);
+          if (!sCiStr || sCiStr < checkoutStr) continue;
+          if (sCiStr < bestCi2) {
+            bestCi2 = sCiStr;
+            var sCo = staffShareColMap.checkOut >= 0 ? parseDate(staffShareData[m][staffShareColMap.checkOut]) : null;
+            var sAd = staffShareColMap.guestCount >= 0 ? extractGuestCount_(String(staffShareData[m][staffShareColMap.guestCount] || '')) : '';
+            var sIn = staffShareColMap.guestCountInfants >= 0 ? extractGuestCount_(String(staffShareData[m][staffShareColMap.guestCountInfants] || '')) : '';
+            var sFmt = (sAd || sIn) ? (sAd ? '大人' + sAd + '名' : '') + (sIn ? (sAd ? '、' : '') + '3歳以下' + sIn + '名' : '') : '';
+            var sIcal = staffShareColMap.icalGuestCount >= 0 ? String(staffShareData[m][staffShareColMap.icalGuestCount] || '').trim() : '';
+            best = {
+              date: sCiStr,
+              guestCount: (sIcal || '－') + '（' + (sFmt || '－') + '）',
+              bbq: staffShareColMap.bbq >= 0 ? String(staffShareData[m][staffShareColMap.bbq] || '').trim() : '',
+              nationality: (staffShareColMap.nationality >= 0 ? String(staffShareData[m][staffShareColMap.nationality] || '').trim() : '') || '日本',
+              memo: '',
+              bedCount: staffShareColMap.bedCount >= 0 ? String(staffShareData[m][staffShareColMap.bedCount] || '').trim() : ''
+            };
+          }
+        }
+      }
+      // ベッド数をスタッフ共有シートから補完
+      if (best && !best.bedCount && staffShareData && staffShareColMap && staffShareColMap.checkIn >= 0) {
+        var targetCi = best.date;
+        for (var n = 0; n < staffShareData.length; n++) {
+          var nCi = parseDate(staffShareData[n][staffShareColMap.checkIn]);
+          if (!nCi) continue;
+          if (toDateKeySafe_(nCi) === targetCi && staffShareColMap.bedCount >= 0) {
+            best.bedCount = String(staffShareData[n][staffShareColMap.bedCount] || '').trim();
+            if (best.bedCount) break;
+          }
+        }
+      }
+      return best;
+    }
+
     for (var i = 0; i < rows.length; i++) {
       var rowNum = Number(rows[i][1]);
       var status = String(rows[i][3] || '').trim() || '募集中';
@@ -3292,9 +3391,130 @@ function getRecruitmentStatusMap() {
       var rid = 'r' + (i + 2);
       var volunteers = volunteersByRid[rid] || [];
       var cancelRequested = cancelByRid[rid] || [];
-      if (rowNum) map[rowNum] = { status: status, staff: staff, volunteers: volunteers, cancelRequested: cancelRequested };
+
+      // チェックアウト日
+      var rawDate = rows[i][0];
+      var checkoutDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(rawDate)) : '';
+
+      // 次回予約情報: 募集シートのキャッシュ列を優先、無ければ一括計算
+      var nextRes = null;
+      if (String(rows[i][9] || '').trim() || String(rows[i][10] || '').trim() || String(rows[i][11] || '').trim()) {
+        nextRes = {
+          date: String(rows[i][9] || '').trim(),
+          guestCount: String(rows[i][10] || '').trim(),
+          bbq: String(rows[i][11] || '').trim(),
+          nationality: String(rows[i][12] || '').trim() || '日本',
+          memo: String(rows[i][13] || '').trim(),
+          bedCount: String(rows[i][14] || '').trim()
+        };
+      }
+      if (!nextRes && checkoutDate) {
+        var normDate = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
+        nextRes = findNextRes_(normDate, rowNum);
+      }
+
+      if (rowNum) map[rowNum] = {
+        status: status,
+        staff: staff,
+        volunteers: volunteers,
+        cancelRequested: cancelRequested,
+        recruitRowIndex: i + 2,
+        checkoutDate: checkoutDate,
+        nextReservation: nextRes,
+        selectedStaff: staff
+      };
     }
     return JSON.stringify({ success: true, map: map });
+  } catch (e) {
+    return JSON.stringify({ success: false, map: {}, error: e.toString() });
+  }
+}
+
+/**
+ * 複数の予約行番号に対する次回予約情報を一括取得（フォームシートを1回だけ読む）
+ */
+function getNextReservationsForRows(rowNumbers) {
+  try {
+    if (!rowNumbers || !rowNumbers.length) return JSON.stringify({ success: true, map: {} });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var formSheet = ss.getSheetByName(SHEET_NAME);
+    if (!formSheet || formSheet.getLastRow() < 2) return JSON.stringify({ success: true, map: {} });
+    var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+    var colMap = buildColumnMap(headers);
+    if (colMap.checkIn < 0 || colMap.checkOut < 0) colMap = buildColumnMapFromSource_(headers);
+    var formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    // チェックイン日でソートした予約一覧
+    var sorted = [];
+    for (var j = 0; j < formData.length; j++) {
+      var ci = parseDate(formData[j][colMap.checkIn]);
+      if (!ci) continue;
+      var ciStr = toDateKeySafe_(ci);
+      if (!ciStr) continue;
+      sorted.push({ rowNum: j + 2, checkInStr: ciStr, row: formData[j] });
+    }
+    sorted.sort(function(a, b) { return a.checkInStr < b.checkInStr ? -1 : (a.checkInStr > b.checkInStr ? 1 : 0); });
+    // スタッフ共有シート
+    var staffSheet = ss.getSheetByName(SHEET_STAFF_SHARE);
+    var staffData = null, staffColMap = null;
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      var sh = staffSheet.getRange(1, 1, 1, staffSheet.getLastColumn()).getValues()[0];
+      staffColMap = buildColumnMapFromSource_(sh);
+      staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow(), staffSheet.getLastColumn()).getValues();
+    }
+    var resultMap = {};
+    var rowSet = {};
+    rowNumbers.forEach(function(rn) { rowSet[rn] = true; });
+    for (var i = 0; i < formData.length; i++) {
+      var rn = i + 2;
+      if (!rowSet[rn]) continue;
+      var coVal = colMap.checkOut >= 0 ? formData[i][colMap.checkOut] : null;
+      var coDate = parseDate(coVal);
+      if (!coDate) continue;
+      var coStr = toDateKeySafe_(coDate);
+      if (!coStr) continue;
+      var best = null;
+      for (var k = 0; k < sorted.length; k++) {
+        if (sorted[k].checkInStr < coStr) continue;
+        if (sorted[k].rowNum === rn) continue;
+        var sb = sorted[k];
+        var sco = colMap.checkOut >= 0 ? parseDate(sb.row[colMap.checkOut]) : null;
+        var ad = colMap.guestCount >= 0 ? extractGuestCount_(String(sb.row[colMap.guestCount] || '')) : '';
+        var inf = colMap.guestCountInfants >= 0 ? extractGuestCount_(String(sb.row[colMap.guestCountInfants] || '')) : '';
+        var fFmt = (ad || inf) ? (ad ? '大人' + ad + '名' : '') + (inf ? (ad ? '、' : '') + '3歳以下' + inf + '名' : '') : '';
+        var ical = colMap.icalGuestCount >= 0 ? String(sb.row[colMap.icalGuestCount] || '').trim() : '';
+        best = { date: sb.checkInStr, guestCount: (ical || '－') + '（' + (fFmt || '－') + '）', bbq: colMap.bbq >= 0 ? String(sb.row[colMap.bbq] || '').trim() : '', nationality: (colMap.nationality >= 0 ? String(sb.row[colMap.nationality] || '').trim() : '') || '日本', memo: '', bedCount: '' };
+        break;
+      }
+      if (!best && staffData && staffColMap && staffColMap.checkIn >= 0) {
+        var bestCi = '9999-12-31';
+        for (var m = 0; m < staffData.length; m++) {
+          var sCi = parseDate(staffData[m][staffColMap.checkIn]);
+          if (!sCi) continue;
+          var sCiStr = toDateKeySafe_(sCi);
+          if (!sCiStr || sCiStr < coStr) continue;
+          if (sCiStr < bestCi) {
+            bestCi = sCiStr;
+            var sAd = staffColMap.guestCount >= 0 ? extractGuestCount_(String(staffData[m][staffColMap.guestCount] || '')) : '';
+            var sIn = staffColMap.guestCountInfants >= 0 ? extractGuestCount_(String(staffData[m][staffColMap.guestCountInfants] || '')) : '';
+            var sFmt = (sAd || sIn) ? (sAd ? '大人' + sAd + '名' : '') + (sIn ? (sAd ? '、' : '') + '3歳以下' + sIn + '名' : '') : '';
+            var sIcal = staffColMap.icalGuestCount >= 0 ? String(staffData[m][staffColMap.icalGuestCount] || '').trim() : '';
+            best = { date: sCiStr, guestCount: (sIcal || '－') + '（' + (sFmt || '－') + '）', bbq: staffColMap.bbq >= 0 ? String(staffData[m][staffColMap.bbq] || '').trim() : '', nationality: (staffColMap.nationality >= 0 ? String(staffData[m][staffColMap.nationality] || '').trim() : '') || '日本', memo: '', bedCount: staffColMap.bedCount >= 0 ? String(staffData[m][staffColMap.bedCount] || '').trim() : '' };
+          }
+        }
+      }
+      if (best && !best.bedCount && staffData && staffColMap && staffColMap.checkIn >= 0) {
+        for (var n = 0; n < staffData.length; n++) {
+          var nCi = parseDate(staffData[n][staffColMap.checkIn]);
+          if (!nCi) continue;
+          if (toDateKeySafe_(nCi) === best.date && staffColMap.bedCount >= 0) {
+            best.bedCount = String(staffData[n][staffColMap.bedCount] || '').trim();
+            if (best.bedCount) break;
+          }
+        }
+      }
+      if (best) resultMap[rn] = best;
+    }
+    return JSON.stringify({ success: true, map: resultMap });
   } catch (e) {
     return JSON.stringify({ success: false, map: {}, error: e.toString() });
   }

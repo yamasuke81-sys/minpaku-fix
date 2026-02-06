@@ -13,7 +13,19 @@ const http = require('http');
 
 const configPath = path.join(__dirname, 'deploy-config.json');
 const claspJsonPath = path.join(__dirname, '.clasp.json');
+const appsscriptPath = path.join(__dirname, 'appsscript.json');
 const clasp = 'npx clasp';
+
+// オーナー用・スタッフ用の Webアプリ設定（appsscript.json の webapp セクション）
+const OWNER_WEBAPP = { access: 'ANYONE_ANONYMOUS', executeAs: 'USER_DEPLOYING' };
+const STAFF_WEBAPP  = { access: 'ANYONE',           executeAs: 'USER_DEPLOYING' };
+
+/** appsscript.json の webapp 設定を書き換える */
+function setWebappConfig(webappConfig) {
+  const manifest = JSON.parse(fs.readFileSync(appsscriptPath, 'utf8'));
+  manifest.webapp = webappConfig;
+  fs.writeFileSync(appsscriptPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+}
 
 function run(cmd, env = {}) {
   const opts = { stdio: 'inherit', shell: true, env: { ...process.env, ...env } };
@@ -253,8 +265,11 @@ async function main() {
     console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
     process.exit(1);
   }
-  // 3. スタッフ用デプロイ（既存IDで更新のみ。新規作成は行わない）
+  // 3. スタッフ用デプロイ（マニフェストをスタッフ設定に切り替えてからデプロイ）
   console.log('3. スタッフ用デプロイを更新しています（同じURLのまま）...');
+  console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
+  setWebappConfig(STAFF_WEBAPP);
+  run(`${clasp} push`);
   let staffResult = runCapture(`${clasp} deploy --deploymentId "${staffId}" --description "スタッフ用 ${today}"`);
   if (!staffResult.success) {
     const staffErr = (staffResult.stdout + staffResult.stderr).toLowerCase();
@@ -268,6 +283,10 @@ async function main() {
     console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
     process.exit(1);
   }
+
+  // マニフェストをオーナー用設定に戻す（ローカルファイルのみ。次回デプロイに備える）
+  setWebappConfig(OWNER_WEBAPP);
+  console.log('   マニフェストをオーナー用設定に戻しました。');
 
   const staffUrl = 'https://script.google.com/macros/s/' + currentStaffId + '/exec?staff=1';
   const ownerUrl = 'https://script.google.com/macros/s/' + currentOwnerId + '/exec';

@@ -2319,10 +2319,13 @@
           allBookings = res.data || [];
           // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
           window._recruitFullMap = recruitMap;
-          // 清掃担当が設定済みのチェックアウト日を収集（重複行対策）
+          // 清掃担当が設定済み or 選定済みのチェックアウト日を収集（重複行対策）
           var staffSetDates = {};
           (res.data || []).forEach(function(b) {
-            if ((b.cleaningStaff || '').trim() && b.checkOutParsed) {
+            var hasStaff = (b.cleaningStaff || '').trim();
+            var rec = recruitMap[b.rowNumber] || {};
+            var isDecided = (rec.status === '選定済') || (rec.staff && rec.staff.trim());
+            if ((hasStaff || isDecided) && b.checkOutParsed) {
               var d2 = new Date(b.checkOutParsed);
               staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
             }
@@ -3431,10 +3434,39 @@
               listEl.innerHTML = filtered.map(function(n) {
                 var line = '<div class="d-flex align-items-center justify-content-between gap-2 mb-1 notif-banner-row">';
                 line += '<span>' + escapeHtml(formatNotificationDate(n.at)) + '\u3000' + escapeHtml(n.message) + '</span>';
-                line += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-banner-read flex-shrink-0" data-row="' + n.rowIndex + '">既読</button>';
-                line += '</div>';
+                line += '<span class="d-flex gap-1 flex-shrink-0">';
+                if (n.data && n.data.bookingRowNumber) {
+                  line += '<button type="button" class="btn btn-sm btn-outline-primary py-0 btn-notif-open" data-brn="' + n.data.bookingRowNumber + '" data-codate="' + escapeHtml(n.data.checkoutDate || '') + '">開く</button>';
+                }
+                line += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-banner-read" data-row="' + n.rowIndex + '">既読</button>';
+                line += '</span></div>';
                 return line;
               }).join('');
+              listEl.querySelectorAll('.btn-notif-open').forEach(function(btn) {
+                btn.onclick = function() {
+                  var brn = parseInt(this.getAttribute('data-brn'), 10);
+                  var coDate = this.getAttribute('data-codate') || '';
+                  // カレンダーイベントから該当する清掃イベントを探して開く
+                  var found = false;
+                  if (calendar) {
+                    var allEvents = calendar.getEvents();
+                    for (var ei = 0; ei < allEvents.length; ei++) {
+                      var ev = allEvents[ei];
+                      var ep = ev.extendedProps || {};
+                      if (ep.type === 'cleaning' && ep.data) {
+                        var rn = ep.data.rowNumber;
+                        var mrn = ep.data.mergedRowNumbers || [];
+                        if (rn === brn || mrn.indexOf(brn) >= 0) {
+                          showEventModal(ev);
+                          found = true;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  if (!found) alert('該当する清掃イベントが見つかりません。カレンダーを確認してください。');
+                };
+              });
               listEl.querySelectorAll('.btn-notif-banner-read').forEach(function(btn) {
                 btn.onclick = function() {
                   var row = parseInt(this.getAttribute('data-row'), 10);

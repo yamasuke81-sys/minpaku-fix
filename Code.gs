@@ -1036,7 +1036,7 @@ function formatNotificationMessage_(kind, message) {
   return message;
 }
 
-function addNotification_(kind, message) {
+function addNotification_(kind, message, data) {
   try {
     ensureSheetsExist();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1045,11 +1045,13 @@ function addNotification_(kind, message) {
     const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     const nextRow = sheet.getLastRow() + 1;
     var lastCol = sheet.getLastColumn();
-    if (lastCol < 4) {
-      sheet.getRange(1, 4).setValue('既読');
-      lastCol = 4;
+    if (lastCol < 5) {
+      if (lastCol < 4) sheet.getRange(1, 4).setValue('既読');
+      sheet.getRange(1, 5).setValue('データ');
+      lastCol = 5;
     }
-    sheet.getRange(nextRow, 1, 1, lastCol).setValues([[now, kind, message, '']]);
+    var dataStr = data ? JSON.stringify(data) : '';
+    sheet.getRange(nextRow, 1, 1, 5).setValues([[now, kind, message, '', dataStr]]);
   } catch (e) {}
 }
 
@@ -1764,7 +1766,7 @@ function getNotifications(unreadOnly) {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
-    var lastCol = Math.max(sheet.getLastColumn(), 4);
+    var lastCol = Math.max(sheet.getLastColumn(), 5);
     const data = sheet.getRange(2, 1, sheet.getLastRow(), lastCol).getValues();
     var list = data.map(function(r, i) {
       var readVal = lastCol >= 4 ? String(r[3] || '').trim() : '';
@@ -1777,12 +1779,15 @@ function getNotifications(unreadOnly) {
       }
       var msg = String(r[2] || '');
       msg = formatNotificationMessage_(String(r[1] || ''), msg);
+      var nData = null;
+      try { var raw = String(r[4] || '').trim(); if (raw) nData = JSON.parse(raw); } catch (e) {}
       return {
         rowIndex: i + 2,
         at: atStr,
         kind: String(r[1] || ''),
         message: msg,
-        read: readVal === 'Y' || readVal === 'y'
+        read: readVal === 'Y' || readVal === 'y',
+        data: nData
       };
     }).reverse();
     if (unreadOnly) list = list.filter(function(n) { return !n.read; });
@@ -3014,7 +3019,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
       var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
       crSheet.appendRow([rid, staffName || staff, staffEmail || '', now]);
     }
-    addNotification_('出勤キャンセル要望', dateStr + ': ' + staff + ' が出勤キャンセルの要望を提出しました');
+    addNotification_('出勤キャンセル要望', dateStr + ': ' + staff + ' が出勤キャンセルの要望を提出しました', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr });
     var ownerRes = JSON.parse(getOwnerEmail());
     var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
     if (ownerEmail) {
@@ -3053,16 +3058,17 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
       var colMap = buildColumnMap(headers);
       if (colMap.cleaningStaff >= 0) {
         formSheet.getRange(bookingRowNumber, colMap.cleaningStaff + 1).setValue('');
-        // 同一チェックイン日の重複行もクリア
+        SpreadsheetApp.flush();
+        // 同一チェックイン日の重複行もクリア（無条件）
         if (colMap.checkIn >= 0) {
           var targetCi = toDateKeySafe_(formSheet.getRange(bookingRowNumber, colMap.checkIn + 1).getValue());
           if (targetCi) {
-            var allData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+            var allData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
             for (var di = 0; di < allData.length; di++) {
+              if ((di + 2) === bookingRowNumber) continue;
               var rowCi = toDateKeySafe_(allData[di][colMap.checkIn]);
-              if (rowCi === targetCi && (di + 2) !== bookingRowNumber) {
-                var rowStaff = String(allData[di][colMap.cleaningStaff] || '').trim();
-                if (rowStaff) formSheet.getRange(di + 2, colMap.cleaningStaff + 1).setValue('');
+              if (rowCi === targetCi) {
+                formSheet.getRange(di + 2, colMap.cleaningStaff + 1).setValue('');
               }
             }
           }

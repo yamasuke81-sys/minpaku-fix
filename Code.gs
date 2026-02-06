@@ -3147,14 +3147,16 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     var sName = (staffName || '').trim();
     var sEmail = (staffEmail || '').trim().toLowerCase();
 
-    // キャンセル申請レコードを削除
+    // キャンセル申請レコードを 'rejected' にマーク（5列目）
     if (crSheet && crSheet.getLastRow() >= 2) {
-      var crData = crSheet.getRange(2, 1, crSheet.getLastRow(), 4).getValues();
-      for (var j = crData.length - 1; j >= 0; j--) {
+      var lastCol = crSheet.getLastColumn();
+      if (lastCol < 5) { crSheet.getRange(1, 5).setValue('ステータス'); lastCol = 5; }
+      var crData = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, 5).getValues();
+      for (var j = 0; j < crData.length; j++) {
         if (String(crData[j][0]).trim() !== rid) continue;
         var m1 = sName && String(crData[j][1] || '').trim() === sName;
         var m2 = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
-        if (m1 || m2) { crSheet.deleteRow(j + 2); break; }
+        if (m1 || m2) { crSheet.getRange(j + 2, 5).setValue('rejected'); break; }
       }
     }
 
@@ -3171,6 +3173,32 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
       } catch (mailErr) {}
     }
 
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * スタッフがキャンセル否認を確認後、rejectedレコードを削除してボタンを復活させる
+ */
+function clearCancelRejection(recruitRowIndex, staffName, staffEmail) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+    if (!crSheet || crSheet.getLastRow() < 2) return JSON.stringify({ success: true });
+    var rid = 'r' + recruitRowIndex;
+    var sName = (staffName || '').trim();
+    var sEmail = (staffEmail || '').trim().toLowerCase();
+    var crData = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, Math.max(crSheet.getLastColumn(), 5)).getValues();
+    for (var j = crData.length - 1; j >= 0; j--) {
+      if (String(crData[j][0]).trim() !== rid) continue;
+      var status = String(crData[j][4] || '').trim();
+      if (status !== 'rejected') continue;
+      var m1 = sName && String(crData[j][1] || '').trim() === sName;
+      var m2 = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
+      if (m1 || m2) { crSheet.deleteRow(j + 2); break; }
+    }
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3836,13 +3864,21 @@ function getRecruitmentForBooking(bookingRowNumber) {
           });
         }
         var cancelRequested = [];
+        var cancelRejected = [];
         var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
         if (crSheet && crSheet.getLastRow() >= 2) {
-          var crRows = crSheet.getRange(2, 1, crSheet.getLastRow(), 4).getValues();
+          var crLastCol = Math.max(crSheet.getLastColumn(), 5);
+          var crRows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, crLastCol).getValues();
           var rid2 = 'r' + recruitRowIndex;
           crRows.forEach(function(cr) {
             if (String(cr[0] || '').trim() === rid2) {
-              cancelRequested.push({ staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() });
+              var crStatus = String(cr[4] || '').trim();
+              var entry = { staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() };
+              if (crStatus === 'rejected') {
+                cancelRejected.push(entry);
+              } else {
+                cancelRequested.push(entry);
+              }
             }
           });
         }
@@ -3853,7 +3889,7 @@ function getRecruitmentForBooking(bookingRowNumber) {
           if (det.success && det.nextReservation) nextReservation = det.nextReservation;
         } catch (er) {}
         var selectedStaff = String(rows[i][4] || '').trim();
-        return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested });
+        return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested, cancelRejected: cancelRejected });
       }
     }
     var nextReservation = null;

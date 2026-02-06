@@ -1837,11 +1837,42 @@
                   return (curName2 && curName2.toLowerCase() === p) || (curEmail2 && p.indexOf('@') >= 0 && p === curEmail2);
                 });
                 if (isSelected) {
+                  // キャンセル否認チェック
+                  var wasRejected = r.cancelRejected && r.cancelRejected.some(function(cr) {
+                    return (curName2 && cr.staffName === curName2) || (curEmail2 && cr.email === curEmail2);
+                  });
                   // 既にキャンセル申請済みかチェック
                   var alreadyRequested = r.cancelRequested && r.cancelRequested.some(function(cr) {
                     return (curName2 && cr.staffName === curName2) || (curEmail2 && cr.email === curEmail2);
                   });
-                  if (alreadyRequested) {
+                  if (wasRejected) {
+                    // 否認通知 + 確認ボタン → 確認後にキャンセル申請ボタン復活
+                    var rejWrap = document.createElement('div');
+                    rejWrap.className = 'mb-1';
+                    var rejBadge = document.createElement('div');
+                    rejBadge.className = 'alert alert-danger py-1 px-2 small mb-1';
+                    rejBadge.innerHTML = '<i class="bi bi-x-circle"></i> キャンセル申請が否認されました';
+                    rejWrap.appendChild(rejBadge);
+                    var rejConfirmBtn = document.createElement('button');
+                    rejConfirmBtn.type = 'button';
+                    rejConfirmBtn.className = 'btn btn-sm btn-outline-secondary';
+                    rejConfirmBtn.textContent = '確認';
+                    rejConfirmBtn.onclick = function() {
+                      rejConfirmBtn.disabled = true;
+                      rejConfirmBtn.textContent = '処理中...';
+                      google.script.run.withSuccessHandler(function(j) {
+                        // モーダルを再読み込み
+                        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                        loadAndRender();
+                        if (window.staffMode) loadStaffSchedule();
+                      }).withFailureHandler(function(e) {
+                        rejConfirmBtn.disabled = false;
+                        rejConfirmBtn.textContent = '確認';
+                      }).clearCancelRejection(r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                    };
+                    rejWrap.appendChild(rejConfirmBtn);
+                    centerArea.appendChild(rejWrap);
+                  } else if (alreadyRequested) {
                     var pendingBadge = document.createElement('div');
                     pendingBadge.className = 'alert alert-warning py-1 px-2 small mb-0';
                     pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> キャンセル申請中（オーナーの承認待ち）';

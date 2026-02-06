@@ -6,6 +6,8 @@
   <title>民泊予約・清掃管理</title>
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <!-- FullCalendar -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
   <style>
@@ -455,6 +457,204 @@
       flex: 1;
       word-break: break-word;
     }
+    /* --- モーダル リデザイン --- */
+    .modal-type-icon {
+      font-size: 1.3rem;
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+    .modal-header-cleaning {
+      background: linear-gradient(135deg, #d4edda 0%, #f8f9fa 100%);
+      border-bottom: 2px solid #198754;
+    }
+    .modal-header-booking {
+      background: linear-gradient(135deg, #cce5ff 0%, #f8f9fa 100%);
+      border-bottom: 2px solid #0d6efd;
+    }
+    .modal-prominent-date {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #333;
+      padding: 0.6rem 0 0.3rem;
+    }
+    .modal-prominent-date .bi {
+      color: #6c757d;
+      margin-right: 0.3rem;
+    }
+    .modal-date-pair {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+    }
+    .modal-date-pair .date-item {
+      flex: 1;
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      text-align: center;
+    }
+    .modal-date-pair .date-item .date-label {
+      font-size: 0.7rem;
+      color: #6c757d;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.15rem;
+    }
+    .modal-date-pair .date-item .date-val {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #333;
+    }
+    .modal-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+    }
+    .modal-info-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+    }
+    .modal-info-item .bi {
+      color: #6c757d;
+      font-size: 1rem;
+    }
+    .modal-info-item .info-label {
+      color: #6c757d;
+      font-size: 0.8rem;
+    }
+    .modal-info-item .info-value {
+      font-weight: 600;
+      color: #333;
+    }
+    .modal-badge-row {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      flex-wrap: wrap;
+    }
+    .modal-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .modal-badge-yes {
+      background: #d4edda;
+      color: #155724;
+    }
+    .modal-badge-no {
+      background: #f0f0f0;
+      color: #6c757d;
+    }
+    .modal-badge .bi {
+      font-size: 0.9rem;
+    }
+    .modal-staff-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0 0.2rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .modal-staff-label.staff-set {
+      color: #0d6efd;
+    }
+    .modal-staff-label.staff-unset {
+      color: #dc3545;
+    }
+    .modal-staff-name {
+      font-size: 0.95rem;
+      padding-left: 1.4rem;
+      margin-bottom: 0.3rem;
+    }
+    .modal-next-res-card {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 10px;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+    }
+    .modal-next-res-card .card-title-sm {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #6c757d;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .modal-next-res-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.3rem 0.75rem;
+    }
+    .modal-next-res-grid .nres-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+    }
+    .modal-next-res-grid .nres-label {
+      color: #6c757d;
+      font-size: 0.78rem;
+      min-width: 3.5em;
+    }
+    .modal-next-res-grid .nres-value {
+      font-weight: 600;
+      color: #333;
+    }
+    .modal-section-divider {
+      border-top: 1px solid #e9ecef;
+      margin: 0.5rem 0;
+    }
+    .modal-btn-full {
+      width: 100%;
+      margin-top: 0.3rem;
+    }
+    .modal-btn-row {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.3rem 0;
+    }
+    .modal-btn-row .btn {
+      flex: 1;
+    }
+    .modal-memo-area {
+      padding: 0.4rem 0;
+    }
+    .modal-memo-area label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #6c757d;
+      margin-bottom: 0.2rem;
+    }
+    .modal-footer-redesign {
+      flex-direction: column;
+      gap: 0.4rem;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid #e9ecef;
+    }
+    .modal-footer-redesign .footer-btn-row {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+    }
+    .modal-footer-redesign .footer-btn-row .btn {
+      flex: 1;
+    }
+    .modal-footer-redesign .footer-center {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+    /* --- モーダル リデザイン END --- */
     .loading-overlay {
       position: fixed;
       top: 0;
@@ -722,18 +922,19 @@
   <div class="modal fade" id="eventModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header">
+        <div class="modal-header" id="eventModalHeader">
           <h6 class="modal-title" id="eventModalTitle">予約詳細</h6>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body" id="eventModalBody"></div>
-        <div class="modal-footer d-flex flex-wrap justify-content-between align-items-center">
-          <div class="d-flex gap-1 order-2 order-md-1">
-            <button type="button" class="btn btn-outline-danger btn-delete-booking" id="btnDeleteBooking" style="display:none;">予約を削除</button>
+        <div class="modal-footer modal-footer-redesign" id="eventModalFooter">
+          <div class="footer-btn-row" id="eventModalActionBtns"></div>
+          <div id="eventModalVolunteerCenter" class="d-flex flex-wrap justify-content-center gap-1 w-100"></div>
+          <div class="footer-center" id="eventModalDeleteArea" style="display:none;">
+            <button type="button" class="btn btn-outline-danger btn-sm" id="btnDeleteBooking">予約を削除</button>
           </div>
-          <div id="eventModalVolunteerCenter" class="flex-grow-1 d-flex justify-content-center order-1 order-md-2"></div>
-          <div class="d-flex gap-1 order-3">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+          <div class="footer-center">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
           </div>
         </div>
       </div>
@@ -1211,7 +1412,10 @@
         const d = props.data;
         const type = props.type;
         const title = type === 'booking' ? '宿泊詳細' : '清掃詳細';
-        document.getElementById('eventModalTitle').textContent = title;
+        var titleIcon = type === 'booking' ? '<i class="bi bi-house-door-fill modal-type-icon"></i>' : '<i class="bi bi-brush-fill modal-type-icon"></i>';
+        var headerEl = document.getElementById('eventModalHeader');
+        document.getElementById('eventModalTitle').innerHTML = titleIcon + escapeHtml(title);
+        headerEl.className = 'modal-header ' + (type === 'cleaning' ? 'modal-header-cleaning' : 'modal-header-booking');
 
         function fmt(val) { var s = (val != null && val !== '') ? String(val) : '-'; return escapeHtml(s); }
         var staffBarEl = document.getElementById('staffSelectorBar');
@@ -1220,76 +1424,164 @@
         var hideForStaff = (type === 'cleaning' && isStaffView);
         var hideGuestInfoForStaff = isStaffView;
         var hideForOwnerCleaning = (type === 'cleaning' && !isStaffView);
+
+        // BBQバッジ判定
+        function bbqBadge(val) {
+          var flag = getBBQFlag(val);
+          if (flag === '有') return '<span class="modal-badge modal-badge-yes"><i class="bi bi-fire"></i>BBQ あり</span>';
+          if (flag === '無') return '<span class="modal-badge modal-badge-no"><i class="bi bi-x-circle"></i>BBQ なし</span>';
+          return '<span class="modal-badge modal-badge-no"><i class="bi bi-question-circle"></i>BBQ ' + fmt(val) + '</span>';
+        }
+        // 駐車場バッジ判定
+        function parkingBadge(val) {
+          var flag = getParkingFlag(val) || '';
+          if (flag === '不要') return '<span class="modal-badge modal-badge-no"><i class="bi bi-p-circle"></i>駐車場 不要</span>';
+          if (flag === '1台' || flag === '2台') return '<span class="modal-badge modal-badge-yes"><i class="bi bi-p-circle-fill"></i>駐車場 ' + flag + '</span>';
+          if (val) return '<span class="modal-badge modal-badge-no"><i class="bi bi-p-circle"></i>駐車場 ' + fmt(val) + '</span>';
+          return '';
+        }
+
         let html = '';
         if (d) {
-          if (type !== 'cleaning') html += '<div class="detail-row"><span class="detail-label"><strong>チェックイン:</strong></span><span class="detail-value">' + formatDateTimeDisplay(d.checkIn) + '</span></div>';
-          html += '<div class="detail-row"><span class="detail-label"><strong>チェックアウト:</strong></span><span class="detail-value">' + formatDateTimeDisplay(d.checkOut) + '</span></div>';
-          if (!hideGuestInfoForStaff && !hideForOwnerCleaning) {
-            html += '<div class="detail-row"><span class="detail-label"><strong>宿泊者名:</strong></span><span class="detail-value">' + fmt(d.guestName) + '</span></div>';
-          }
-          html += '<div class="detail-row"><span class="detail-label"><strong>宿泊人数:</strong></span><span class="detail-value">' + fmt(d.guestCountDisplay != null ? d.guestCountDisplay : formatGuestCount(d)) + '</span></div>';
-          var totalGuests = (parseInt(d.guestCountAdults, 10) || 0) + (parseInt(d.guestCountInfants, 10) || 0);
-          if (type === 'booking' && totalGuests === 2 && d.bedChoice && !hideForStaff && !hideForOwnerCleaning) {
-            html += '<div class="detail-row"><span class="detail-label"><strong>ベッド:</strong></span><span class="detail-value">' + fmt(d.bedChoice) + '</span></div>';
-          }
-          html += '<div class="detail-row"><span class="detail-label"><strong>BBQ:</strong></span><span class="detail-value">' + fmt(d.bbq) + '</span></div>';
-          if (type === 'booking' && !isStaffView) {
-            var carVal = (d.carDisplay || '-').toString().split('\n').map(function(p){ return escapeHtml(p); }).join('<br>');
-            html += '<div class="detail-row"><span class="detail-label"><strong>交通手段:</strong></span><span class="detail-value">' + (carVal || '-') + '</span></div>';
-          }
-          if (!hideGuestInfoForStaff || (type === 'cleaning' && isStaffView)) {
-            html += '<div class="detail-row"><span class="detail-label"><strong>有料駐車場:</strong></span><span class="detail-value">' + fmt(getParkingFlag(d.parking) || d.parking) + '</span></div>';
-          }
-          if (type === 'booking' && !isStaffView) {
-            if (!hideForOwnerCleaning) {
-              html += '<div class="detail-row"><span class="detail-label"><strong>予約サイト:</strong></span><span class="detail-value">' + fmt(d.bookingSite) + '</span></div>';
+          // === 清掃詳細 ===
+          if (type === 'cleaning') {
+            // チェックアウト日（目立つ表示）
+            html += '<div class="modal-prominent-date"><i class="bi bi-calendar-event"></i>' + formatDateTimeDisplay(d.checkOut) + '</div>';
+
+            // 人数
+            var guestDisp = d.guestCountDisplay != null ? d.guestCountDisplay : formatGuestCount(d);
+            html += '<div class="modal-info-grid">';
+            html += '<div class="modal-info-item"><i class="bi bi-people-fill"></i><span><span class="info-label">宿泊人数 </span><span class="info-value">' + fmt(guestDisp) + '</span></span></div>';
+            html += '</div>';
+
+            // BBQ・駐車場バッジ
+            html += '<div class="modal-badge-row">';
+            html += bbqBadge(d.bbq);
+            if (!hideGuestInfoForStaff || isStaffView) {
+              var pBadge = parkingBadge(d.parking);
+              if (pBadge) html += pBadge;
             }
-            if (d.tel1 || d.tel2) {
-              html += '<div class="detail-row"><span class="detail-label"><strong>TEL1:</strong></span><span class="detail-value">' + fmt(d.tel1) + '</span></div>';
-              html += '<div class="detail-row"><span class="detail-label"><strong>TEL2:</strong></span><span class="detail-value">' + fmt(d.tel2) + '</span></div>';
+            html += '</div>';
+
+            // 清掃担当
+            var staffVal = (d.cleaningStaff || '').trim();
+            var staffUndecided = !staffVal;
+            html += '<div class="modal-section-divider"></div>';
+            html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当:</div>';
+            html += '<div class="modal-staff-name" id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</div>';
+
+            // 次回予約の情報カード
+            html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
+            html += '<div class="card-title-sm"><i class="bi bi-info-circle"></i>次回予約の情報（変更の可能性あり）</div>';
+            html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1;"><span class="text-muted small">読み込み中…</span></div></div>';
+            html += '<div class="mt-2"><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded">読み込み中…</span></div>';
+            html += '<div id="eventModalVolunteersArea" class="mt-2" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
+            html += '</div>';
+
+            // LINE用テキスト（オーナーのみ）
+            if (!isStaffView) {
+              html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-outline-primary" id="eventModalCopyToClipboard">コピー</button></div>';
             }
-            var emailVal = (d.email || d.email2 || '').trim();
-            html += '<div class="detail-row"><span class="detail-label"><strong>メール:</strong></span><span class="detail-value">' + fmt(emailVal || '-') + '</span></div>';
           }
-          if (type === 'booking' && !isStaffView && d.passportUrls && d.passportUrls.length) {
-            html += '<div class="detail-row"><span class="detail-label"><strong>パスポート:</strong></span><span class="detail-value">';
-            d.passportUrls.forEach(function(url, idx) {
-              if (url) html += '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">写真' + (idx + 1) + '</a> ';
-            });
-            html += '</span></div>';
-          }
-          var staffVal = (d.cleaningStaff || '').trim();
-          var staffUndecided = !staffVal;
-          html += '<div class="detail-row"><span class="detail-label"><strong>清掃担当:</strong></span><span class="detail-value" id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
-          if (type === 'cleaning' && (isStaffView || !isStaffView)) {
-            html += '<div id="eventModalStaffNextResArea" class="mb-2"><p class="small fw-bold mb-1">次回予約の情報（変更の可能性あり）</p><table class="table table-sm table-borderless text-muted small mb-1"><tbody id="eventModalStaffNextResContent"><tr><td>読み込み中…</td></tr></tbody></table><p class="mb-1"><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded">読み込み中…</span></p><div id="eventModalVolunteersArea" class="mb-2" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div></div>';
-          }
-          if (type === 'cleaning' && !isStaffView) {
-            html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-outline-primary" id="eventModalCopyToClipboard">コピー</button></div>';
+
+          // === 宿泊詳細 ===
+          if (type === 'booking') {
+            // チェックイン・チェックアウト 横並び
+            html += '<div class="modal-date-pair">';
+            html += '<div class="date-item"><div class="date-label"><i class="bi bi-box-arrow-in-right"></i> チェックイン</div><div class="date-val">' + formatDateTimeDisplay(d.checkIn) + '</div></div>';
+            html += '<div class="date-item"><div class="date-label"><i class="bi bi-box-arrow-right"></i> チェックアウト</div><div class="date-val">' + formatDateTimeDisplay(d.checkOut) + '</div></div>';
+            html += '</div>';
+
+            // 宿泊者名（オーナーのみ）
+            if (!hideGuestInfoForStaff) {
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-person"></i> 宿泊者名:</strong></span><span class="detail-value">' + fmt(d.guestName) + '</span></div>';
+            }
+
+            // 人数
+            var guestDisp = d.guestCountDisplay != null ? d.guestCountDisplay : formatGuestCount(d);
+            html += '<div class="modal-info-grid">';
+            html += '<div class="modal-info-item"><i class="bi bi-people-fill"></i><span><span class="info-label">宿泊人数 </span><span class="info-value">' + fmt(guestDisp) + '</span></span></div>';
+            // ベッド（2名の場合のみ）
+            var totalGuests = (parseInt(d.guestCountAdults, 10) || 0) + (parseInt(d.guestCountInfants, 10) || 0);
+            if (totalGuests === 2 && d.bedChoice && !hideForStaff && !hideForOwnerCleaning) {
+              html += '<div class="modal-info-item"><i class="bi bi-lamp"></i><span><span class="info-label">ベッド </span><span class="info-value">' + fmt(d.bedChoice) + '</span></span></div>';
+            }
+            html += '</div>';
+
+            // 予約サイト・交通手段（オーナーのみ）横並び
+            if (!isStaffView) {
+              html += '<div class="modal-info-grid">';
+              html += '<div class="modal-info-item"><i class="bi bi-globe2"></i><span><span class="info-label">予約サイト </span><span class="info-value">' + fmt(d.bookingSite) + '</span></span></div>';
+              var carVal = (d.carDisplay || '-').toString().split('\n').map(function(p){ return escapeHtml(p); }).join('<br>');
+              html += '<div class="modal-info-item"><i class="bi bi-car-front"></i><span><span class="info-label">交通手段 </span><span class="info-value">' + (carVal || '-') + '</span></span></div>';
+              html += '</div>';
+            }
+
+            // BBQ・駐車場バッジ
+            html += '<div class="modal-badge-row">';
+            html += bbqBadge(d.bbq);
+            if (!hideGuestInfoForStaff) {
+              var pBadge = parkingBadge(d.parking);
+              if (pBadge) html += pBadge;
+            }
+            html += '</div>';
+
+            // 連絡先情報（オーナーのみ）
+            if (!isStaffView) {
+              if (d.tel1 || d.tel2) {
+                html += '<div class="modal-section-divider"></div>';
+                html += '<div class="modal-info-grid">';
+                html += '<div class="modal-info-item"><i class="bi bi-telephone"></i><span><span class="info-label">TEL1 </span><span class="info-value">' + fmt(d.tel1) + '</span></span></div>';
+                html += '<div class="modal-info-item"><i class="bi bi-telephone"></i><span><span class="info-label">TEL2 </span><span class="info-value">' + fmt(d.tel2) + '</span></span></div>';
+                html += '</div>';
+              }
+              var emailVal = (d.email || d.email2 || '').trim();
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-envelope"></i> メール:</strong></span><span class="detail-value">' + fmt(emailVal || '-') + '</span></div>';
+            }
+
+            // パスポート（オーナーのみ）
+            if (!isStaffView && d.passportUrls && d.passportUrls.length) {
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-card-image"></i> パスポート:</strong></span><span class="detail-value">';
+              d.passportUrls.forEach(function(url, idx) {
+                if (url) html += '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">写真' + (idx + 1) + '</a> ';
+              });
+              html += '</span></div>';
+            }
+
+            // 清掃担当
+            var staffVal = (d.cleaningStaff || '').trim();
+            var staffUndecided = !staffVal;
+            html += '<div class="modal-section-divider"></div>';
+            html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当:</div>';
+            html += '<div class="modal-staff-name" id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</div>';
+
+            // メモ（オーナーのみ）
+            if (!isStaffView && d.memo !== undefined) {
+              html += '<div class="modal-memo-area"><label><i class="bi bi-journal-text"></i> メモ</label>';
+              html += '<textarea class="form-control form-control-sm" rows="2" readonly>' + fmt(d.memo) + '</textarea></div>';
+            }
           }
         }
         document.getElementById('eventModalBody').innerHTML = html || '<p>データがありません。</p>';
 
         var isStaff = isStaffView;
-        var btnEdit = document.getElementById('btnEditStaff');
-        if (btnEdit) btnEdit.style.display = 'none';
+        // フッターボタン設定
+        var actionBtns = document.getElementById('eventModalActionBtns');
+        if (actionBtns) actionBtns.innerHTML = '';
+        var deleteArea = document.getElementById('eventModalDeleteArea');
         var btnDel = document.getElementById('btnDeleteBooking');
-        var btnDelParent = btnDel ? btnDel.parentElement : null;
         if (btnDel) {
           var showDel = (type === 'booking' && window.isOwnerUser && !window.staffMode);
-          btnDel.style.display = showDel ? 'inline-block' : 'none';
-          btnDel.dataset.rowNumber = props.rowNumber;
-          if (d) {
-            btnDel.dataset.checkIn = (d.checkIn || '').toString();
-            btnDel.dataset.checkOut = (d.checkOut || '').toString();
-            btnDel.dataset.guestName = (d.guestName || '').toString();
-          }
-          if (btnDelParent) {
-            if (showDel) {
-              btnDelParent.classList.add('flex-grow-1', 'justify-content-center');
-            } else {
-              btnDelParent.classList.remove('flex-grow-1', 'justify-content-center');
+          if (showDel) {
+            deleteArea.style.display = '';
+            btnDel.dataset.rowNumber = props.rowNumber;
+            if (d) {
+              btnDel.dataset.checkIn = (d.checkIn || '').toString();
+              btnDel.dataset.checkOut = (d.checkOut || '').toString();
+              btnDel.dataset.guestName = (d.guestName || '').toString();
             }
+          } else {
+            deleteArea.style.display = 'none';
           }
         }
         var centerArea = document.getElementById('eventModalVolunteerCenter');
@@ -1305,6 +1597,35 @@
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
         modal.show();
 
+        // キャッシュから次回予約情報を即時表示（サーバー応答を待たずに表示）
+        if (type === 'cleaning') {
+          var cachedRec = (window._recruitFullMap || {})[props.rowNumber];
+          var cachedNextRes = cachedRec ? cachedRec.nextReservation : ((window._nextResCache || {})[props.rowNumber] || null);
+          if (cachedNextRes || cachedRec) {
+            var nextEl = document.getElementById('eventModalStaffNextResContent');
+            var statusEl = document.getElementById('eventModalStaffRecruitStatus');
+            var volArea = document.getElementById('eventModalVolunteersArea');
+            var volList = document.getElementById('eventModalVolunteersList');
+            if (nextEl && cachedNextRes) {
+              var nr = cachedNextRes;
+              var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
+              var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
+              nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
+            }
+            if (statusEl && cachedRec) {
+              var cStatus = cachedRec.status || '';
+              statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : (cStatus === '選定済' ? '選定済' : '未募集');
+              statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : (cStatus === '選定済' ? 'status-decided' : 'status-undecided'));
+            }
+            if (volArea && volList && cachedRec && cachedRec.volunteers) {
+              if ((cachedRec.status || '') === '募集中') {
+                volArea.style.display = 'block';
+                volList.textContent = cachedRec.volunteers.length ? cachedRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
+              }
+            }
+          }
+        }
+
         if (isStaff && type === 'cleaning') {
           google.script.run.withSuccessHandler(function(rStr) {
             try {
@@ -1317,7 +1638,7 @@
                 var nr = r.nextReservation || {};
                 var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
                 var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
-                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td>' + escapeHtml(dateDisp) + '</td></tr><tr><td class="text-nowrap">人数:</td><td>' + fmt(nr.guestCount) + '</td></tr><tr><td class="text-nowrap">BBQ:</td><td>' + fmt(nr.bbq) + '</td></tr><tr><td class="text-nowrap">国籍:</td><td>' + fmt(nr.nationality || '日本') + '</td></tr><tr><td class="text-nowrap">ベッド数:</td><td>' + fmt(nr.bedCount) + '</td></tr>';
+                nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
               }
               if (statusEl && r.success) {
                 statusEl.textContent = r.status === '募集中' ? '清掃募集中' : (r.status === '選定済' ? '選定済' : '未募集');
@@ -1418,9 +1739,9 @@
                 var nr = r.nextReservation || {};
                 var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
                 var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
-                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td>' + escapeHtml(dateDisp) + '</td></tr><tr><td class="text-nowrap">人数:</td><td>' + fmt(nr.guestCount) + '</td></tr><tr><td class="text-nowrap">BBQ:</td><td>' + fmt(nr.bbq) + '</td></tr><tr><td class="text-nowrap">国籍:</td><td>' + fmt(nr.nationality || '日本') + '</td></tr><tr><td class="text-nowrap">ベッド数:</td><td>' + fmt(nr.bedCount) + '</td></tr>';
+                nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
               } else if (nextEl) {
-                nextEl.innerHTML = '<tr><td class="text-nowrap" style="width:4.5em;">日付:</td><td>－</td></tr><tr><td class="text-nowrap">人数:</td><td>－</td></tr><tr><td class="text-nowrap">BBQ:</td><td>－</td></tr><tr><td class="text-nowrap">国籍:</td><td>－</td></tr><tr><td class="text-nowrap">ベッド数:</td><td>－</td></tr>';
+                nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">－</span></div>';
               }
               if (statusEl && r.success) {
                 statusEl.textContent = r.status === '募集中' ? '清掃募集中' : (r.status === '選定済' ? '選定済' : '未募集');
@@ -1756,6 +2077,8 @@
             return;
           }
           allBookings = res.data || [];
+          // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
+          window._recruitFullMap = recruitMap;
           var recruitDates = {};
           (res.data || []).forEach(function(b) {
             var rec = recruitMap[b.rowNumber] || {};
@@ -1774,6 +2097,27 @@
             calendar.render();
           }
           if (window.isOwnerUser) updateNotificationBanner();
+
+          // 募集エントリのない清掃イベントの次回予約を一括プリロード
+          var nonRecruitRows = [];
+          (res.data || []).forEach(function(b) {
+            if (b.checkOutParsed && !recruitMap[b.rowNumber]) {
+              nonRecruitRows.push(b.rowNumber);
+            }
+          });
+          if (nonRecruitRows.length > 0) {
+            if (!window._nextResCache) window._nextResCache = {};
+            google.script.run.withSuccessHandler(function(j) {
+              try {
+                var r = JSON.parse(j);
+                if (r.success && r.map) {
+                  for (var rn in r.map) {
+                    window._nextResCache[rn] = r.map[rn];
+                  }
+                }
+              } catch (e) {}
+            }).getNextReservationsForRows(nonRecruitRows);
+          }
         });
       }
 

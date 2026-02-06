@@ -1334,55 +1334,67 @@
         recruitMap = recruitMap || {};
         if (!data || !Array.isArray(data)) return events;
 
-        // 同一チェックイン・チェックアウト日の予約をマージ（iCal + スプシの重複排除）
-        var dateKeyMap = {};
+        // 同一予約の重複排除マージ（iCal行 + Googleフォーム行）
+        // マッチ条件: チェックイン日が同じ、かつチェックアウト日が同じ or 片方が空
         var merged = [];
-        data.forEach(function(b) {
-          if (!b.checkInParsed || !b.checkOutParsed) { merged.push(b); return; }
-          var key = b.checkInParsed + '|' + b.checkOutParsed;
-          if (dateKeyMap[key] !== undefined) {
-            var existing = merged[dateKeyMap[key]];
-            // 両方のデータをマージ（空でないフィールドを優先）
-            var fields = ['guestName','bbq','guestCountAdults','guestCountInfants','cleaningStaff','parking','bedChoice','tel1','tel2','email','email2','passportUrls','carDisplay','nationality','purpose','memo','cleaningNotice'];
-            fields.forEach(function(f) {
-              if (!existing[f] && b[f]) existing[f] = b[f];
-            });
-            // guestCountDisplayをスマートマージ
-            if (b.guestCountDisplay && b.guestCountDisplay !== existing.guestCountDisplay) {
-              var extractCnt = function(s) {
-                var m = s.match(/^(.+?)（(.+?)）$/);
-                return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: s, form: '-' };
-              };
-              var exC = extractCnt(existing.guestCountDisplay || '-（-）');
-              var nwC = extractCnt(b.guestCountDisplay || '-（-）');
-              var icalC = (exC.ical !== '-') ? exC.ical : nwC.ical;
-              var formC = (exC.form !== '-') ? exC.form : nwC.form;
-              existing.guestCountDisplay = icalC + '（' + formC + '）';
-            }
-            // bookingSiteをスマートマージ: iCal部分（）なしとスプシ部分（）ありを統合
-            if (b.bookingSite && b.bookingSite !== existing.bookingSite) {
-              // 既存と新規それぞれからiCal部分とform部分を抽出
-              var extractParts = function(bs) {
-                var m = bs.match(/^(.+?)（(.+?)）$/);
-                return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: bs, form: '-' };
-              };
-              var ex = extractParts(existing.bookingSite);
-              var nw = extractParts(b.bookingSite);
-              var icalPart = (ex.ical !== '-') ? ex.ical : nw.ical;
-              var formPart = (ex.form !== '-') ? ex.form : nw.form;
-              existing.bookingSite = icalPart + '（' + formPart + '）';
-            }
-            // guestNamesの結合
-            if (b.guestNames && b.guestNames.length && (!existing.guestNames || !existing.guestNames.length)) {
-              existing.guestNames = b.guestNames;
-            }
-            // mergedRowNumbersに追加行番号を記録
-            if (!existing.mergedRowNumbers) existing.mergedRowNumbers = [existing.rowNumber];
-            existing.mergedRowNumbers.push(b.rowNumber);
-          } else {
-            dateKeyMap[key] = merged.length;
-            merged.push(b);
+        var ciKeyMap = {}; // checkInParsed → merged配列のindex
+
+        function mergeBookingData(existing, b) {
+          var fields = ['guestName','bbq','guestCountAdults','guestCountInfants','cleaningStaff','parking','bedChoice','tel1','tel2','email','email2','passportUrls','carDisplay','nationality','purpose','memo','cleaningNotice'];
+          fields.forEach(function(f) {
+            if (!existing[f] && b[f]) existing[f] = b[f];
+          });
+          // checkOutが片方だけある場合は補完
+          if (!existing.checkOutParsed && b.checkOutParsed) {
+            existing.checkOut = b.checkOut;
+            existing.checkOutParsed = b.checkOutParsed;
+            existing.isValidDates = true;
+            existing.nights = b.nights;
           }
+          // guestCountDisplayをスマートマージ
+          if (b.guestCountDisplay && b.guestCountDisplay !== existing.guestCountDisplay) {
+            var extractCnt = function(s) {
+              var m = s.match(/^(.+?)（(.+?)）$/);
+              return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: s, form: '-' };
+            };
+            var exC = extractCnt(existing.guestCountDisplay || '-（-）');
+            var nwC = extractCnt(b.guestCountDisplay || '-（-）');
+            existing.guestCountDisplay = ((exC.ical !== '-') ? exC.ical : nwC.ical) + '（' + ((exC.form !== '-') ? exC.form : nwC.form) + '）';
+          }
+          // bookingSiteをスマートマージ
+          if (b.bookingSite && b.bookingSite !== existing.bookingSite) {
+            var extractParts = function(bs) {
+              var m = bs.match(/^(.+?)（(.+?)）$/);
+              return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: bs, form: '-' };
+            };
+            var ex = extractParts(existing.bookingSite);
+            var nw = extractParts(b.bookingSite);
+            existing.bookingSite = ((ex.ical !== '-') ? ex.ical : nw.ical) + '（' + ((ex.form !== '-') ? ex.form : nw.form) + '）';
+          }
+          if (b.guestNames && b.guestNames.length && (!existing.guestNames || !existing.guestNames.length)) {
+            existing.guestNames = b.guestNames;
+          }
+          if (!existing.mergedRowNumbers) existing.mergedRowNumbers = [existing.rowNumber];
+          existing.mergedRowNumbers.push(b.rowNumber);
+        }
+
+        data.forEach(function(b) {
+          if (!b.checkInParsed) { merged.push(b); return; }
+          var ci = b.checkInParsed;
+          var co = b.checkOutParsed || '';
+          // 同一チェックイン日の既存エントリを探す
+          if (ciKeyMap[ci] !== undefined) {
+            var existIdx = ciKeyMap[ci];
+            var existing = merged[existIdx];
+            var existCo = existing.checkOutParsed || '';
+            // チェックアウト日が一致、または片方が空ならマージ
+            if (!co || !existCo || co === existCo) {
+              mergeBookingData(existing, b);
+              return;
+            }
+          }
+          ciKeyMap[ci] = merged.length;
+          merged.push(b);
         });
 
         merged.forEach(function(b) {

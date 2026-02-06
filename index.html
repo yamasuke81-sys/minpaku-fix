@@ -931,7 +931,7 @@
           <div class="footer-btn-row" id="eventModalActionBtns"></div>
           <div id="eventModalVolunteerCenter" class="d-flex flex-wrap justify-content-center gap-1 w-100"></div>
           <div class="footer-center" id="eventModalDeleteArea" style="display:none;">
-            <button type="button" class="btn btn-outline-danger btn-sm" id="btnDeleteBooking">予約を削除</button>
+            <button type="button" class="btn btn-danger btn-sm" id="btnDeleteBooking">予約を削除</button>
           </div>
           <div class="footer-center">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
@@ -1148,19 +1148,19 @@
           <p class="small mb-2" id="recruitEditVolunteers"></p>
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-sm btn-primary recruit-edit-owner-only" id="btnRecruitEditSave">保存</button>
-            <button type="button" class="btn btn-sm btn-outline-primary recruit-edit-owner-only" id="btnRecruitEditMail">メール送信</button>
-            <button type="button" class="btn btn-sm btn-outline-info recruit-edit-owner-only" id="btnRecruitEditCopy">テキストコピー</button>
-            <button type="button" class="btn btn-sm btn-outline-danger" id="btnRecruitEditCancel" style="display:none;">募集取消</button>
+            <button type="button" class="btn btn-sm btn-primary recruit-edit-owner-only" id="btnRecruitEditMail">メール送信</button>
+            <button type="button" class="btn btn-sm btn-info text-white recruit-edit-owner-only" id="btnRecruitEditCopy">テキストコピー</button>
+            <button type="button" class="btn btn-sm btn-danger" id="btnRecruitEditCancel" style="display:none;">募集取消</button>
           </div>
-          <div id="recruitEditSelectArea" class="mb-2" style="display:none;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnRecruitEditSelect">選定</button></div>
+          <div id="recruitEditSelectArea" class="mb-2" style="display:none;"><button type="button" class="btn btn-sm btn-primary" id="btnRecruitEditSelect">選定</button></div>
           <div id="recruitEditVolunteerArea" class="mb-2" style="display:none;">
-            <button type="button" class="btn btn-sm btn-outline-success" id="btnRecruitEditVolunteer">立候補する</button>
-            <button type="button" class="btn btn-sm btn-outline-warning" id="btnRecruitEditCancelVolunteer" style="display:none;">立候補を取り消す</button>
+            <button type="button" class="btn btn-sm btn-success" id="btnRecruitEditVolunteer">立候補する</button>
+            <button type="button" class="btn btn-sm btn-warning" id="btnRecruitEditCancelVolunteer" style="display:none;">立候補を取り消す</button>
           </div>
           <div id="recruitEditLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;">
             <p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p>
             <textarea id="recruitEditLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea>
-            <button type="button" class="btn btn-sm btn-outline-primary" id="btnRecruitEditCopyToClipboard">コピー</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnRecruitEditCopyToClipboard">コピー</button>
           </div>
           <div id="recruitEditError" class="text-danger small mt-2" style="display:none;"></div>
         </div>
@@ -1468,10 +1468,8 @@
             // BBQ・駐車場バッジ
             html += '<div class="modal-badge-row">';
             html += bbqBadge(d.bbq);
-            if (!hideGuestInfoForStaff || isStaffView) {
-              var pBadge = parkingBadge(d.parking);
-              if (pBadge) html += pBadge;
-            }
+            var pBadge = parkingBadge(d.parking);
+            if (pBadge) html += pBadge;
             html += '</div>';
 
             // 清掃担当
@@ -1489,9 +1487,12 @@
             html += '<div id="eventModalVolunteersArea" class="mt-2" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
             html += '</div>';
 
+            // スタッフ用: 立候補エリア（条件欄+ボタン、body内に配置）
+            html += '<div id="eventModalVolunteerBodyArea" class="mt-3"></div>';
+
             // LINE用テキスト（オーナーのみ）
             if (!isStaffView) {
-              html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-outline-primary" id="eventModalCopyToClipboard">コピー</button></div>';
+              html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-primary" id="eventModalCopyToClipboard">コピー</button></div>';
             }
           }
 
@@ -1696,7 +1697,8 @@
                   volArea.style.display = 'none';
                 }
               }
-              if (r.success && r.status === '選定済' && r.recruitRowIndex && r.selectedStaff && centerArea) {
+              var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
+              if (r.success && r.status === '選定済' && r.recruitRowIndex && r.selectedStaff && volBodyArea) {
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
                 var selectedParts = (r.selectedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
@@ -1707,7 +1709,7 @@
                 if (isSelected) {
                   var cancelReqBtn = document.createElement('button');
                   cancelReqBtn.type = 'button';
-                  cancelReqBtn.className = 'btn btn-sm btn-outline-danger me-1';
+                  cancelReqBtn.className = 'btn btn-sm btn-danger me-1';
                   cancelReqBtn.textContent = 'キャンセル申請';
                   cancelReqBtn.onclick = function() {
                     if (!confirm('出勤キャンセルの要望を提出します。\n\nよろしいですか？（OK=はい、キャンセル=いいえ）')) return;
@@ -1721,7 +1723,7 @@
                       } else alert(res.error || '失敗');
                     }).withFailureHandler(function(e) { alert(e.message); }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                   };
-                  centerArea.appendChild(cancelReqBtn);
+                  volBodyArea.appendChild(cancelReqBtn);
                 }
               }
               if (r.success && r.status === '募集中' && r.recruitRowIndex) {
@@ -1730,16 +1732,16 @@
                 var hasVol = r.volunteers && r.volunteers.some(function(v) {
                   return (v.staffName || '').trim().toLowerCase() === curName || (v.email || '').trim().toLowerCase() === curEmail;
                 });
-                if (centerArea) {
+                if (volBodyArea) {
                   if (!hasVol) {
                     var memoWrap = document.createElement('div');
                     memoWrap.className = 'mb-2';
                     memoWrap.innerHTML = '<label class="form-label small fw-bold">対応可能な条件（例：時間帯：10:00～、午後から可、13:00～可など）</label><input type="text" class="form-control form-control-sm" id="eventModalVolunteerMemo" placeholder="時間帯：10:00～" value="時間帯：10:00～">';
-                    centerArea.appendChild(memoWrap);
+                    volBodyArea.appendChild(memoWrap);
                   }
                   var btn = document.createElement('button');
                   btn.type = 'button';
-                  btn.className = 'btn btn-sm btn-' + (hasVol ? 'outline-warning' : 'success') + ' me-1';
+                  btn.className = 'btn btn-sm btn-' + (hasVol ? 'warning' : 'success') + ' w-100';
                   btn.textContent = hasVol ? '立候補の取消' : '立候補';
                   btn.onclick = function() {
                     if (hasVol) {
@@ -1763,7 +1765,7 @@
                       loadRecruitList();
                     }
                   };
-                  centerArea.appendChild(btn);
+                  volBodyArea.appendChild(btn);
                 }
               }
             } catch (e) {}
@@ -1817,7 +1819,7 @@
                         ownerCenterArea.innerHTML = '';
                         var emPopMail = document.createElement('button');
                         emPopMail.type = 'button';
-                        emPopMail.className = 'btn btn-sm btn-outline-primary me-1';
+                        emPopMail.className = 'btn btn-sm btn-primary me-1';
                         emPopMail.textContent = 'メール送信';
                         emPopMail.onclick = function() {
                           if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
@@ -1829,7 +1831,7 @@
                         };
                         var emPopCopy = document.createElement('button');
                         emPopCopy.type = 'button';
-                        emPopCopy.className = 'btn btn-sm btn-outline-info me-1';
+                        emPopCopy.className = 'btn btn-sm btn-info text-white me-1';
                         emPopCopy.textContent = 'テキストコピー';
                         emPopCopy.onclick = function() {
                           google.script.run.withSuccessHandler(function(t) {
@@ -1871,7 +1873,7 @@
                   var hasVol = r.volunteers && r.volunteers.length > 0;
                   var emBtnMail = document.createElement('button');
                   emBtnMail.type = 'button';
-                  emBtnMail.className = 'btn btn-sm btn-outline-primary me-1';
+                  emBtnMail.className = 'btn btn-sm btn-primary me-1';
                   emBtnMail.textContent = 'メール送信';
                   emBtnMail.onclick = function() {
                     if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
@@ -1883,7 +1885,7 @@
                   };
                   var emBtnCopy = document.createElement('button');
                   emBtnCopy.type = 'button';
-                  emBtnCopy.className = 'btn btn-sm btn-outline-info me-1';
+                  emBtnCopy.className = 'btn btn-sm btn-info text-white me-1';
                   emBtnCopy.textContent = 'テキストコピー';
                   emBtnCopy.onclick = function() {
                     google.script.run.withSuccessHandler(function(t) {
@@ -1906,7 +1908,7 @@
                   };
                   var emBtnCancel = document.createElement('button');
                   emBtnCancel.type = 'button';
-                  emBtnCancel.className = 'btn btn-sm btn-outline-danger me-1';
+                  emBtnCancel.className = 'btn btn-sm btn-danger me-1';
                   emBtnCancel.textContent = '募集取消';
                   emBtnCancel.onclick = function() {
                     var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
@@ -1923,7 +1925,7 @@
                   if (hasVol) {
                     var emBtnSelect = document.createElement('button');
                     emBtnSelect.type = 'button';
-                    emBtnSelect.className = 'btn btn-sm btn-outline-success me-1';
+                    emBtnSelect.className = 'btn btn-sm btn-success me-1';
                     emBtnSelect.textContent = 'スタッフ選定';
                     emBtnSelect.onclick = function() {
                       bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
@@ -1937,7 +1939,7 @@
               if ((d.cleaningStaff || '').trim() && ownerCenterArea) {
                 var btnEditStaff = document.createElement('button');
                 btnEditStaff.type = 'button';
-                btnEditStaff.className = 'btn btn-sm btn-outline-secondary me-1';
+                btnEditStaff.className = 'btn btn-sm btn-secondary me-1';
                 btnEditStaff.textContent = '清掃担当を編集';
                 btnEditStaff.onclick = function() {
                   bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
@@ -2754,7 +2756,7 @@
               if (ok.success && !ok.alreadyExists && ok.rowIndex) {
                 var popupArea = document.getElementById('recruitEditLineCopyArea');
                 if (popupArea) {
-                  popupArea.innerHTML = '<p class="small fw-bold mb-2">スタッフに共有してください</p><button type="button" class="btn btn-sm btn-outline-primary me-1" id="recNewMail">メール送信</button><button type="button" class="btn btn-sm btn-outline-info" id="recNewCopy">テキストコピー</button><div id="recNewCopyArea" class="mt-2" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="recNewCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-outline-primary" id="recNewCopyBtn">コピー</button></div>';
+                  popupArea.innerHTML = '<p class="small fw-bold mb-2">スタッフに共有してください</p><button type="button" class="btn btn-sm btn-primary me-1" id="recNewMail">メール送信</button><button type="button" class="btn btn-sm btn-info text-white" id="recNewCopy">テキストコピー</button><div id="recNewCopyArea" class="mt-2" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="recNewCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-primary" id="recNewCopyBtn">コピー</button></div>';
                   popupArea.style.display = 'block';
                   document.getElementById('recNewMail').onclick = function() {
                     if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;

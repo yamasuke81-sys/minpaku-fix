@@ -3701,19 +3701,9 @@ function getRecruitmentStatusMap() {
       var rawDate = rows[i][0];
       var checkoutDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(rawDate)) : '';
 
-      // 次回予約情報: 募集シートのキャッシュ列を優先、無ければ一括計算
+      // 次回予約情報: 常に最新データから計算（キャッシュは古くなる可能性があるため）
       var nextRes = null;
-      if (String(rows[i][9] || '').trim() || String(rows[i][10] || '').trim() || String(rows[i][11] || '').trim()) {
-        nextRes = {
-          date: String(rows[i][9] || '').trim(),
-          guestCount: String(rows[i][10] || '').trim(),
-          bbq: String(rows[i][11] || '').trim(),
-          nationality: String(rows[i][12] || '').trim() || '日本',
-          memo: String(rows[i][13] || '').trim(),
-          bedCount: String(rows[i][14] || '').trim()
-        };
-      }
-      if (!nextRes && checkoutDate) {
+      if (checkoutDate) {
         var normDate = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
         nextRes = findNextRes_(normDate, rowNum);
       }
@@ -3920,6 +3910,20 @@ function selectStaffForRecruitment(recruitRowIndex, selectedStaffComma) {
     const columnMap = buildColumnMap(headers);
     if (columnMap.cleaningStaff >= 0) {
       formSheet.getRange(bookingRowNumber, columnMap.cleaningStaff + 1).setValue(selectedStaffComma || '');
+      // 同一チェックイン日の重複行にもcleaningStaffを書き込む（iCal+フォーム重複対策）
+      if (columnMap.checkIn >= 0 && formSheet.getLastRow() >= 2) {
+        var targetCi = toDateKeySafe_(formSheet.getRange(bookingRowNumber, columnMap.checkIn + 1).getValue());
+        if (targetCi) {
+          var allData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+          for (var di = 0; di < allData.length; di++) {
+            if ((di + 2) === bookingRowNumber) continue;
+            var rowCi = toDateKeySafe_(allData[di][columnMap.checkIn]);
+            if (rowCi === targetCi) {
+              formSheet.getRange(di + 2, columnMap.cleaningStaff + 1).setValue(selectedStaffComma || '');
+            }
+          }
+        }
+      }
     }
     return JSON.stringify({ success: true });
   } catch (e) {

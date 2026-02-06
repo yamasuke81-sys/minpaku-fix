@@ -293,106 +293,24 @@ async function main() {
   const urlUpdateSecret = (config.urlUpdateSecret || '').trim();
   const updateUrl = ownerUrl + '?action=setStaffUrl&url=' + encodeURIComponent(staffUrl) + (urlUpdateSecret ? '&secret=' + encodeURIComponent(urlUpdateSecret) : '');
 
-  // スタッフ用URLの自動反映（リトライ付き）
+  // スタッフ用URLの自動反映
   console.log('4. スタッフ用URLをオーナー画面に自動反映しています...');
-  
-  // 新規デプロイが作成された場合は、設定手順を先に表示
-  if (ownerWasCreated) {
-    console.log('');
-    console.log('   【重要】オーナー用デプロイの設定を完了してください:');
-    console.log('   1. 下記のデプロイ管理画面が開きます');
-    console.log('   2. 左側の一覧から「オーナー用 ' + today + '」を選択');
-    console.log('   3. 右側の設定パネル上部の「編集」ボタン（鉛筆アイコン）をクリック');
-    console.log('   4. 編集画面で以下を設定:');
-    console.log('      - 「次のユーザーとして実行: アクセスしているユーザー」を選択');
-    console.log('      - 「アクセスできるユーザー: 全員」を選択');
-    console.log('   5. 「デプロイ」をクリック');
-    console.log('');
-    openDeploymentsPage();
-    console.log('');
-    console.log('   設定完了後、自動的にスタッフ用URLの反映を試みます...');
-    console.log('');
-  }
-  
+
   let urlReflected = false;
-  // 新規デプロイが作成された場合は、設定完了を待つためリトライ回数を増やす
-  const maxRetries = ownerWasCreated ? 10 : 3;
-  const retryDelay = 60000; // リトライ間隔を60秒 (60000ms) に設定
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const res = await fetchUrl(updateUrl);
-      const trimmed = (res || '').trim();
-      if (trimmed === 'OK') {
-        console.log('   スタッフ用URLを設定タブに反映しました。');
-        urlReflected = true;
-        break;
-      } else {
-        // HTMLエラーページが返された場合（設定未完了の可能性）
-        if (/<!DOCTYPE html|accounts\.google|Moved Temporarily/i.test(trimmed)) {
-          if (attempt < maxRetries) {
-            console.log(`   反映失敗（試行 ${attempt}/${maxRetries}）。設定が完了するまで待機中...`);
-            if (!ownerWasCreated && attempt === 1) {
-              // 既存デプロイの場合は設定手順を表示（初回のみ）
-              console.log('   ※ オーナー用デプロイの「アクセスできるユーザー」が「全員」になっているか確認してください。');
-              console.log('   設定方法:');
-              console.log('   1. デプロイ管理画面でオーナー用デプロイを選択');
-              console.log('   2. 「編集」ボタン（鉛筆アイコン）をクリック');
-              console.log('   3. 「アクセスできるユーザー: 全員」を選択');
-              console.log('   4. 「デプロイ」をクリック');
-              console.log('   デプロイ管理画面を開きます...');
-              openDeploymentsPage();
-            }
-            console.log(`   ${retryDelay / 1000}秒後に再試行します...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            console.log('   反映できませんでした（最大試行回数に達しました）。');
-            if (!ownerWasCreated) {
-              console.log('   ※ オーナー用デプロイの「アクセスできるユーザー」が「全員」になっているか確認してください。');
-              console.log('   設定方法:');
-              console.log('   1. デプロイ管理画面でオーナー用デプロイを選択');
-              console.log('   2. 「編集」ボタン（鉛筆アイコン）をクリック');
-              console.log('   3. 「アクセスできるユーザー: 全員」を選択');
-              console.log('   4. 「デプロイ」をクリック');
-              console.log('   デプロイ管理画面を開きます...');
-              openDeploymentsPage();
-            }
-          }
-        } else if (config.urlUpdateSecret) {
-          console.log('   ※ urlUpdateSecret が GAS 側と一致しているか確認してください。');
-        } else {
-          console.log('   反映できませんでした。');
-        }
-        console.log('   手動で設定する場合は、下記URLをオーナー画面の「設定」→「スタッフ用URL」に貼り付けてください:');
-        console.log('   ' + staffUrl);
-        const preview = trimmed.slice(0, 150);
-        if (preview) console.log('   サーバー応答:', preview + (trimmed.length > 150 ? '...' : ''));
-        break;
-      }
-    } catch (err) {
-      if (attempt < maxRetries) {
-        console.log(`   URL反映時にエラー（試行 ${attempt}/${maxRetries}）: ${err.message}`);
-        console.log(`   ${retryDelay / 1000}秒後に再試行します...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      } else {
-        console.log('   URL反映時にエラー:', err.message);
-      }
+  try {
+    const res = await fetchUrl(updateUrl);
+    const trimmed = (res || '').trim();
+    if (trimmed === 'OK') {
+      console.log('   スタッフ用URLを設定タブに反映しました。');
+      urlReflected = true;
     }
+  } catch (e) {
+    // 失敗しても続行
   }
-  
-  if (!urlReflected && !ownerWasCreated) {
-    console.log('');
-    console.log('   【注意】スタッフ用URLの自動反映に失敗しました。');
-    console.log('   オーナー用デプロイの設定を確認してください:');
-    console.log('   1. デプロイ管理画面でオーナー用デプロイを選択');
-    console.log('   2. 「編集」ボタン（鉛筆アイコン）をクリック');
-    console.log('   3. 「アクセスできるユーザー: 全員」を選択');
-    console.log('   4. 「デプロイ」をクリック');
-    console.log('   デプロイ管理画面を開きます...');
-    openDeploymentsPage();
-    console.log('');
-    console.log('   オーナー画面の「設定」→「スタッフ用URL」に手動で貼り付けてください:');
+
+  if (!urlReflected) {
+    console.log('   スタッフ用URLの自動反映はスキップされました（デプロイ自体は成功しています）。');
+    console.log('   必要に応じて、オーナー画面の「設定」→「スタッフ用URL」に以下を貼り付けてください:');
     console.log('   ' + staffUrl);
   }
 

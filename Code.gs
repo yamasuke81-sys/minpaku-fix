@@ -3024,15 +3024,30 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     recruitSheet.getRange(recruitRowIndex, 4).setValue('募集中');
     recruitSheet.getRange(recruitRowIndex, 5).setValue('');
 
-    // メインシートの cleaningStaff をクリア
+    // メインシートの cleaningStaff をクリア（重複行も含めて全行）
     var bookingRowNumber = Number(recruitSheet.getRange(recruitRowIndex, 2).getValue());
     if (bookingRowNumber >= 2) {
       var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
       var colMap = buildColumnMap(headers);
       if (colMap.cleaningStaff >= 0) {
         formSheet.getRange(bookingRowNumber, colMap.cleaningStaff + 1).setValue('');
+        // 同一チェックイン日の重複行もクリア
+        if (colMap.checkIn >= 0) {
+          var targetCi = toDateKeySafe_(formSheet.getRange(bookingRowNumber, colMap.checkIn + 1).getValue());
+          if (targetCi) {
+            var allData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+            for (var di = 0; di < allData.length; di++) {
+              var rowCi = toDateKeySafe_(allData[di][colMap.checkIn]);
+              if (rowCi === targetCi && (di + 2) !== bookingRowNumber) {
+                var rowStaff = String(allData[di][colMap.cleaningStaff] || '').trim();
+                if (rowStaff) formSheet.getRange(di + 2, colMap.cleaningStaff + 1).setValue('');
+              }
+            }
+          }
+        }
       }
     }
+    SpreadsheetApp.flush();
 
     // ボランティアレコードを削除（該当スタッフのみ）
     var rid = 'r' + recruitRowIndex;

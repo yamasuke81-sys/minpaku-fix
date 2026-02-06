@@ -1,0 +1,15 @@
+{
+  "name": "minpaku-gas-app",
+  "version": "1.0.0",
+  "description": "民泊予約・清掃管理 Webアプリ - GAS デプロイ自動化",
+  "scripts": {
+    "deploy": "node deploy.js",
+    "deploy:push": "node deploy.js -- --push-only",
+    "push": "clasp push",
+    "login": "clasp login",
+    "open": "clasp open"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.0.0"
+  }
+}

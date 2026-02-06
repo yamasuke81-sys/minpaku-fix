@@ -1,0 +1,8 @@
+**/node_modules/**
+**/*.sample
+**/deploy-config.json
+**/deploy.js
+**/package.json
+**/package-lock.json
+**/README.md
+**/.git/**

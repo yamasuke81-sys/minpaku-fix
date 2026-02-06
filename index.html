@@ -1417,7 +1417,18 @@
         document.getElementById('eventModalTitle').innerHTML = titleIcon + escapeHtml(title);
         headerEl.className = 'modal-header ' + (type === 'cleaning' ? 'modal-header-cleaning' : 'modal-header-booking');
 
+        // 非同期コールバックの競合防止用世代ID
+        var modalGen = (window._eventModalGen = (window._eventModalGen || 0) + 1);
+
         function fmt(val) { var s = (val != null && val !== '') ? String(val) : '-'; return escapeHtml(s); }
+        // 日付表示ヘルパー: "2026-02-13 ～ 2026-02-15" → "2026/2/13 ～ 2026/2/15"
+        function fmtDateRange(raw) {
+          if (!raw) return '-';
+          var s = String(raw);
+          return s.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(_, y, m, d) {
+            return y + '/' + parseInt(m, 10) + '/' + parseInt(d, 10);
+          }) || s;
+        }
         var staffBarEl = document.getElementById('staffSelectorBar');
         var staffBarVisible = staffBarEl && staffBarEl.style.display !== 'none';
         var isStaffView = window.staffMode || !window.isOwnerUser || staffBarVisible;
@@ -1435,9 +1446,9 @@
         // 駐車場バッジ判定
         function parkingBadge(val) {
           var flag = getParkingFlag(val) || '';
-          if (flag === '不要') return '<span class="modal-badge modal-badge-no"><i class="bi bi-p-circle"></i>駐車場 不要</span>';
-          if (flag === '1台' || flag === '2台') return '<span class="modal-badge modal-badge-yes"><i class="bi bi-p-circle-fill"></i>駐車場 ' + flag + '</span>';
-          if (val) return '<span class="modal-badge modal-badge-no"><i class="bi bi-p-circle"></i>駐車場 ' + fmt(val) + '</span>';
+          if (flag === '不要') return '<span class="modal-badge modal-badge-no"><i class="bi bi-p-circle"></i>有料駐車場 不要</span>';
+          if (flag === '1台' || flag === '2台') return '<span class="modal-badge modal-badge-yes"><i class="bi bi-p-circle-fill"></i>有料駐車場 ' + flag + '</span>';
+          if (val) return '<span class="modal-badge modal-badge-no"><i class="bi bi-p-circle"></i>有料駐車場 ' + fmt(val) + '</span>';
           return '';
         }
 
@@ -1492,9 +1503,23 @@
             html += '<div class="date-item"><div class="date-label"><i class="bi bi-box-arrow-right"></i> チェックアウト</div><div class="date-val">' + formatDateTimeDisplay(d.checkOut) + '</div></div>';
             html += '</div>';
 
-            // 宿泊者名（オーナーのみ）
+            // 宿泊者名（折りたたみ表示、代表者は常時表示）
             if (!hideGuestInfoForStaff) {
-              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-person"></i> 宿泊者名:</strong></span><span class="detail-value">' + fmt(d.guestName) + '</span></div>';
+              var gnList = d.guestNames && d.guestNames.length ? d.guestNames : (d.guestName ? [{ name: d.guestName, age: '' }] : []);
+              if (gnList.length > 0) {
+                var rep = gnList[0];
+                var repDisp = fmt(rep.name) + (rep.age ? ' <span class="text-muted small">(' + fmt(rep.age) + ')</span>' : '');
+                html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-person"></i> 宿泊者名:</strong></span><span class="detail-value">' + repDisp;
+                if (gnList.length > 1) {
+                  html += ' <a href="#" class="small text-decoration-none" data-bs-toggle="collapse" data-bs-target="#guestListCollapse" role="button">...他' + (gnList.length - 1) + '名 <i class="bi bi-chevron-down"></i></a>';
+                  html += '<div class="collapse mt-1" id="guestListCollapse">';
+                  for (var gni = 1; gni < gnList.length; gni++) {
+                    html += '<div>' + fmt(gnList[gni].name) + (gnList[gni].age ? ' <span class="text-muted small">(' + fmt(gnList[gni].age) + ')</span>' : '') + '</div>';
+                  }
+                  html += '</div>';
+                }
+                html += '</span></div>';
+              }
             }
 
             // 人数
@@ -1508,35 +1533,46 @@
             }
             html += '</div>';
 
-            // 予約サイト・交通手段（オーナーのみ）横並び
+            // 予約サイト（オーナーのみ）
             if (!isStaffView) {
-              html += '<div class="modal-info-grid">';
-              html += '<div class="modal-info-item"><i class="bi bi-globe2"></i><span><span class="info-label">予約サイト </span><span class="info-value">' + fmt(d.bookingSite) + '</span></span></div>';
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-globe2"></i> 予約サイト:</strong></span><span class="detail-value">' + fmt(d.bookingSite) + '</span></div>';
+              // 交通手段（予約サイトの下）
               var carVal = (d.carDisplay || '-').toString().split('\n').map(function(p){ return escapeHtml(p); }).join('<br>');
-              html += '<div class="modal-info-item"><i class="bi bi-car-front"></i><span><span class="info-label">交通手段 </span><span class="info-value">' + (carVal || '-') + '</span></span></div>';
-              html += '</div>';
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-car-front"></i> 交通手段:</strong></span><span class="detail-value">' + (carVal || '-') + '</span></div>';
             }
 
-            // BBQ・駐車場バッジ
+            // スタッフ用: 交通手段・有料駐車場・国籍を追加
+            if (isStaffView) {
+              var carValStaff = (d.carDisplay || '-').toString().split('\n').map(function(p){ return escapeHtml(p); }).join('<br>');
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-car-front"></i> 交通手段:</strong></span><span class="detail-value">' + (carValStaff || '-') + '</span></div>';
+            }
+
+            // BBQ・有料駐車場バッジ
             html += '<div class="modal-badge-row">';
             html += bbqBadge(d.bbq);
-            if (!hideGuestInfoForStaff) {
-              var pBadge = parkingBadge(d.parking);
-              if (pBadge) html += pBadge;
-            }
+            var pBadge = parkingBadge(d.parking);
+            if (pBadge) html += pBadge;
             html += '</div>';
+
+            // 国籍
+            if (d.nationality) {
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-globe"></i> 国籍:</strong></span><span class="detail-value">' + fmt(d.nationality) + '</span></div>';
+            }
 
             // 連絡先情報（オーナーのみ）
             if (!isStaffView) {
               if (d.tel1 || d.tel2) {
                 html += '<div class="modal-section-divider"></div>';
-                html += '<div class="modal-info-grid">';
-                html += '<div class="modal-info-item"><i class="bi bi-telephone"></i><span><span class="info-label">TEL1 </span><span class="info-value">' + fmt(d.tel1) + '</span></span></div>';
-                html += '<div class="modal-info-item"><i class="bi bi-telephone"></i><span><span class="info-label">TEL2 </span><span class="info-value">' + fmt(d.tel2) + '</span></span></div>';
-                html += '</div>';
+                if (d.tel1) html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-telephone"></i> TEL1:</strong></span><span class="detail-value" style="padding-left:0.5rem;">' + fmt(d.tel1) + '</span></div>';
+                if (d.tel2) html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-telephone"></i> TEL2:</strong></span><span class="detail-value" style="padding-left:0.5rem;">' + fmt(d.tel2) + '</span></div>';
               }
               var emailVal = (d.email || d.email2 || '').trim();
               html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-envelope"></i> メール:</strong></span><span class="detail-value">' + fmt(emailVal || '-') + '</span></div>';
+            }
+
+            // 目的（オーナーのみ）
+            if (!isStaffView && d.purpose) {
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-signpost-2"></i> 目的:</strong></span><span class="detail-value">' + fmt(d.purpose) + '</span></div>';
             }
 
             // パスポート（オーナーのみ）
@@ -1555,10 +1591,19 @@
             html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当:</div>';
             html += '<div class="modal-staff-name" id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</div>';
 
-            // メモ（オーナーのみ）
-            if (!isStaffView && d.memo !== undefined) {
+            // 募集状況バッジ（オーナーのみ）
+            if (!isStaffView) {
+              var recruitRec = (window._recruitFullMap || {})[props.rowNumber];
+              var rStatus = recruitRec ? (recruitRec.status || '') : '';
+              var rLabel = rStatus === '募集中' ? '清掃募集中' : (rStatus === '選定済' ? '選定済' : '未募集');
+              var rClass = rStatus === '募集中' ? 'status-recruiting' : (rStatus === '選定済' ? 'status-decided' : 'status-undecided');
+              html += '<div class="mt-1"><span class="recruit-status-badge px-2 py-1 rounded ' + rClass + '">' + rLabel + '</span></div>';
+            }
+
+            // メモ
+            if (!isStaffView) {
               html += '<div class="modal-memo-area"><label><i class="bi bi-journal-text"></i> メモ</label>';
-              html += '<textarea class="form-control form-control-sm" rows="2" readonly>' + fmt(d.memo) + '</textarea></div>';
+              html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.memo || '') + '</div></div>';
             }
           }
         }
@@ -1571,7 +1616,7 @@
         var deleteArea = document.getElementById('eventModalDeleteArea');
         var btnDel = document.getElementById('btnDeleteBooking');
         if (btnDel) {
-          var showDel = (type === 'booking' && window.isOwnerUser && !window.staffMode);
+          var showDel = (type === 'booking' && !isStaffView);
           if (showDel) {
             deleteArea.style.display = '';
             btnDel.dataset.rowNumber = props.rowNumber;
@@ -1608,8 +1653,7 @@
             var volList = document.getElementById('eventModalVolunteersList');
             if (nextEl && cachedNextRes) {
               var nr = cachedNextRes;
-              var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
-              var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
+              var dateDisp = fmtDateRange(nr.date);
               nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
             }
             if (statusEl && cachedRec) {
@@ -1628,6 +1672,7 @@
 
         if (isStaff && type === 'cleaning') {
           google.script.run.withSuccessHandler(function(rStr) {
+            if (modalGen !== window._eventModalGen) return; // 古いコールバックを無視
             try {
               var r = JSON.parse(rStr);
               var nextEl = document.getElementById('eventModalStaffNextResContent');
@@ -1636,8 +1681,7 @@
               var volList = document.getElementById('eventModalVolunteersList');
               if (nextEl && r.success) {
                 var nr = r.nextReservation || {};
-                var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
-                var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
+                var dateDisp = fmtDateRange(nr.date);
                 nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
               }
               if (statusEl && r.success) {
@@ -1728,6 +1772,7 @@
 
         if (type === 'cleaning' && !isStaff) {
           google.script.run.withSuccessHandler(function(rStr) {
+            if (modalGen !== window._eventModalGen) return; // 古いコールバックを無視
             try {
               var r = JSON.parse(rStr);
               var nextEl = document.getElementById('eventModalStaffNextResContent');
@@ -1737,8 +1782,7 @@
               var ownerCenterArea = centerArea;
               if (nextEl && r.success) {
                 var nr = r.nextReservation || {};
-                var dateVal = (nr.date || '').toString().split(/\s*～\s*/)[0].trim() || nr.date;
-                var dateDisp = dateVal ? (dateVal.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/, '$1/$2/$3') || dateVal) : '-';
+                var dateDisp = fmtDateRange(nr.date);
                 nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(nr.bbq) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
               } else if (nextEl) {
                 nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">－</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">－</span></div>';

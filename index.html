@@ -4510,9 +4510,9 @@
                 badge.textContent = r.displayName || (r.email ? r.email.split('@')[0] : '');
                 badge.style.display = badge.textContent ? '' : 'none';
               }
-            } else {
-              showStaffSelectorAndHideTabs();
             }
+            // オーナーURLでメールが取得できない場合（ANYONE_ANONYMOUS）は
+            // getOwnerAndSwitchUrl のコールバックでタブ表示を制御する
           }
         } catch (e) {}
       }).getCurrentUserEmail();

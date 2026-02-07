@@ -1762,7 +1762,6 @@ function addBookingManually(checkIn, checkOut, guestName, bookingSite, guestCoun
 
 function getNotifications(unreadOnly) {
   try {
-    if (!requireOwner()) return JSON.stringify({ success: false, list: [] });
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
@@ -1799,7 +1798,6 @@ function getNotifications(unreadOnly) {
 
 function markNotificationAsRead(rowIndex) {
   try {
-    if (!requireOwner()) return JSON.stringify({ success: false });
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
     if (!sheet || rowIndex < 2 || rowIndex > sheet.getLastRow()) return JSON.stringify({ success: false });
     var lastCol = Math.max(sheet.getLastColumn(), 4);
@@ -1808,6 +1806,21 @@ function markNotificationAsRead(rowIndex) {
       lastCol = 4;
     }
     sheet.getRange(rowIndex, 4).setValue('Y');
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 通知を一括削除（全行削除してヘッダーだけ残す）
+ */
+function clearAllNotifications() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NOTIFICATIONS);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true });
+    sheet.deleteRows(2, sheet.getLastRow() - 1);
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

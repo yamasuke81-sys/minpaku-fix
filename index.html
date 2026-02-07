@@ -710,7 +710,10 @@
       <a href="#" id="btnAccountSwitch" class="btn btn-sm btn-link text-muted p-0" style="display:none; font-size:0.85rem;">アカウント切り替え</a>
     </div>
     <div id="notificationBanner" class="alert alert-info py-2 mb-2 small" style="display:none;">
-      <span class="fw-bold">新着通知:</span>
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="fw-bold">新着通知:</span>
+        <button type="button" class="btn btn-sm btn-outline-danger py-0" id="btnClearAllNotifBanner">一括削除</button>
+      </div>
       <div id="notificationBannerList" class="mt-1"></div>
       <a href="#" id="notificationBannerLink" class="alert-link mt-1 d-block">すべて見る</a>
     </div>
@@ -755,6 +758,10 @@
       </div>
     </div>
     <div id="panelNotifications" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-bold small">通知一覧</span>
+        <button type="button" class="btn btn-sm btn-outline-danger py-0" id="btnClearAllNotifList">一括削除</button>
+      </div>
       <div id="notificationListMain"></div>
     </div>
     <div id="panelStaffTest" style="display:none;">
@@ -2381,7 +2388,7 @@
             calendar.addEventSource(events);
             calendar.render();
           }
-          if (window.isOwnerUser) updateNotificationBanner();
+          updateNotificationBanner();
 
           // 募集エントリのない清掃イベントの次回予約を一括プリロード
           var nonRecruitRows = [];
@@ -2651,8 +2658,7 @@
               } else if (btnSwitch) btnSwitch.style.display = 'none';
               var addBookingArea = document.getElementById('calendarAddBookingArea');
               if (addBookingArea) addBookingArea.style.display = r.isOwner ? '' : 'none';
-              if (r.isOwner && !window.staffMode) updateNotificationBanner();
-        else { var nb = document.getElementById('notificationBanner'); if (nb) nb.style.display = 'none'; }
+              updateNotificationBanner();
               var badge = document.getElementById('currentAccountBadge');
               if (badge && r.currentAccountName) {
                 badge.textContent = r.currentAccountName;
@@ -3429,6 +3435,20 @@
       function loadNotificationListMain() {
         var el = document.getElementById('notificationListMain');
         if (!el) return;
+        var clearListBtn = document.getElementById('btnClearAllNotifList');
+        if (clearListBtn) {
+          clearListBtn.onclick = function() {
+            if (!confirm('全ての通知を削除しますか？')) return;
+            clearListBtn.disabled = true;
+            clearListBtn.textContent = '削除中...';
+            google.script.run.withSuccessHandler(function(j) {
+              var res = JSON.parse(j);
+              clearListBtn.disabled = false;
+              clearListBtn.textContent = '一括削除';
+              if (res.success) { loadNotificationListMain(); updateNotificationBanner(); }
+            }).withFailureHandler(function() { clearListBtn.disabled = false; clearListBtn.textContent = '一括削除'; }).clearAllNotifications();
+          };
+        }
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
@@ -3455,7 +3475,6 @@
         }).withFailureHandler(function() { if (el) el.innerHTML = '<p class="text-danger small">エラー</p>'; }).getNotifications(false);
       }
       function updateNotificationBanner() {
-        if (!window.isOwnerUser) return;
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
@@ -3511,6 +3530,19 @@
                 };
               });
               banner.style.display = 'block';
+              var clearBtn = document.getElementById('btnClearAllNotifBanner');
+              if (clearBtn) {
+                clearBtn.onclick = function() {
+                  if (!confirm('全ての通知を削除しますか？')) return;
+                  clearBtn.disabled = true;
+                  clearBtn.textContent = '削除中...';
+                  google.script.run.withSuccessHandler(function(j) {
+                    var res = JSON.parse(j);
+                    if (res.success) { updateNotificationBanner(); loadNotificationListMain(); }
+                    else { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }
+                  }).withFailureHandler(function() { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }).clearAllNotifications();
+                };
+              }
             } else {
               listEl.innerHTML = '';
               banner.style.display = 'none';

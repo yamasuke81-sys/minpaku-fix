@@ -1402,15 +1402,9 @@
             existing.isValidDates = true;
             existing.nights = b.nights;
           }
-          // guestCountDisplayをスマートマージ
-          if (b.guestCountDisplay && b.guestCountDisplay !== existing.guestCountDisplay) {
-            var extractCnt = function(s) {
-              var m = s.match(/^(.+?)（(.+?)）$/);
-              return m ? { ical: m[1].trim(), form: m[2].trim() } : { ical: s, form: '-' };
-            };
-            var exC = extractCnt(existing.guestCountDisplay || '-（-）');
-            var nwC = extractCnt(b.guestCountDisplay || '-（-）');
-            existing.guestCountDisplay = ((exC.ical !== '-') ? exC.ical : nwC.ical) + '（' + ((exC.form !== '-') ? exC.form : nwC.form) + '）';
+          // guestCountDisplayをマージ（非空の値を優先）
+          if (b.guestCountDisplay && (!existing.guestCountDisplay || existing.guestCountDisplay === '-')) {
+            existing.guestCountDisplay = b.guestCountDisplay;
           }
           // bookingSiteをスマートマージ
           if (b.bookingSite && b.bookingSite !== existing.bookingSite) {
@@ -1485,8 +1479,8 @@
             var recStatus = rec.status || '';
             var recStaff = (rec.staff || '').trim();
             var bookStaff = (b.cleaningStaff || '').trim();
-            var isDecided = !!(recStaff || bookStaff);
             var isRecruiting = (recStatus === '募集中');
+            var isDecided = !isRecruiting && !!(recStaff || bookStaff);
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             var curStaff = (window.currentUserName || '').trim().toLowerCase();
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
@@ -2442,7 +2436,8 @@
             var hasStaff = (b.cleaningStaff || '').trim();
             var rec = recruitMap[b.rowNumber] || {};
             var isDecided = (rec.status === '選定済') || (rec.staff && rec.staff.trim());
-            if ((hasStaff || isDecided) && b.checkOutParsed) {
+            var isRecruiting = (rec.status === '募集中');
+            if ((hasStaff || isDecided) && !isRecruiting && b.checkOutParsed) {
               var d2 = new Date(b.checkOutParsed);
               staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
             }

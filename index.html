@@ -1862,9 +1862,20 @@
                 nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
               }
               var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
+              var staffDisplayEl = document.getElementById('eventModalStaffDisplay');
               var staffAssigned = (d.cleaningStaff || '').trim();
-              // cleaningStaff設定済みなら実質「選定済」として扱う
-              var effectiveStatus = staffAssigned ? '選定済' : r.status;
+              // 募集データの選定スタッフ or カレンダーデータの清掃担当を使用
+              var resolvedStaff = staffAssigned || (r.selectedStaff || '').trim();
+              if (staffDisplayEl && r.success) {
+                staffDisplayEl.textContent = resolvedStaff || '(未設定)';
+                var staffLabel = staffDisplayEl.closest('.modal-staff-label');
+                if (staffLabel) {
+                  staffLabel.classList.remove('staff-set', 'staff-unset');
+                  staffLabel.classList.add(resolvedStaff ? 'staff-set' : 'staff-unset');
+                }
+              }
+              // cleaningStaff or selectedStaff設定済みなら実質「選定済」として扱う
+              var effectiveStatus = resolvedStaff ? '選定済' : r.status;
               if (statusEl && r.success) {
                 statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : (effectiveStatus === '選定済' ? '選定済' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : (effectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));
@@ -1878,8 +1889,8 @@
                 }
               }
               // キャンセル申請: 選定済 or cleaningStaffが設定済みの場合、本人にのみ表示
-              if (r.success && r.recruitRowIndex && (r.status === '選定済' || staffAssigned) && volBodyArea) {
-                var assignedStaff = r.selectedStaff || staffAssigned;
+              if (r.success && r.recruitRowIndex && (r.status === '選定済' || resolvedStaff) && volBodyArea) {
+                var assignedStaff = resolvedStaff;
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
                 var selectedParts = (assignedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
@@ -2025,7 +2036,18 @@
                 nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
               }
               var ownerStaffAssigned = (d.cleaningStaff || '').trim();
-              var ownerEffectiveStatus = ownerStaffAssigned ? '選定済' : r.status;
+              var ownerResolvedStaff = ownerStaffAssigned || (r.selectedStaff || '').trim();
+              // 清掃担当表示を最新の選定結果で更新
+              var ownerStaffDisplayEl = document.getElementById('eventModalStaffDisplay');
+              if (ownerStaffDisplayEl && r.success) {
+                ownerStaffDisplayEl.textContent = ownerResolvedStaff || '(未設定)';
+                var ownerStaffLabel = ownerStaffDisplayEl.closest('.modal-staff-label');
+                if (ownerStaffLabel) {
+                  ownerStaffLabel.classList.remove('staff-set', 'staff-unset');
+                  ownerStaffLabel.classList.add(ownerResolvedStaff ? 'staff-set' : 'staff-unset');
+                }
+              }
+              var ownerEffectiveStatus = ownerResolvedStaff ? '選定済' : r.status;
               if (statusEl && r.success) {
                 statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : (ownerEffectiveStatus === '選定済' ? '選定済' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : (ownerEffectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));

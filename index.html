@@ -1733,15 +1733,34 @@
         return events;
       }
 
-      // 次回予約の折りたたみトグル
-      function toggleNextRes() {
-        var content = document.getElementById('eventModalStaffNextResContent');
+      // 次回予約の折りたたみトグル（windowに公開してonclickから呼べるようにする）
+      window.toggleNextRes = function() {
+        var wrapper = document.getElementById('eventModalStaffNextResWrapper');
         var chevron = document.querySelector('.next-res-chevron');
-        if (!content) return;
-        var isHidden = content.style.display === 'none';
-        content.style.display = isHidden ? '' : 'none';
-        if (chevron) chevron.style.transform = isHidden ? 'rotate(90deg)' : '';
-      }
+        if (!wrapper) return;
+        var isCollapsed = wrapper.style.gridTemplateRows === '0fr' || !wrapper.style.gridTemplateRows;
+        wrapper.style.gridTemplateRows = isCollapsed ? '1fr' : '0fr';
+        if (chevron) chevron.style.transform = isCollapsed ? 'rotate(90deg)' : '';
+      };
+
+      // 清掃担当表示: 名前ごとに改行し、備考があれば付与
+      window.formatStaffDisplayHtml = function(staffStr, volunteers) {
+        if (!staffStr) return escapeHtml('(未設定)');
+        var names = staffStr.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
+        if (!names.length) return escapeHtml('(未設定)');
+        var memoMap = {};
+        if (volunteers && volunteers.length) {
+          volunteers.forEach(function(v) {
+            if (v.memo) memoMap[v.staffName] = v.memo;
+          });
+        }
+        return names.map(function(name) {
+          var memo = memoMap[name] || '';
+          var line = escapeHtml(name);
+          if (memo) line += '<small class="text-muted">（' + escapeHtml(memo) + '）</small>';
+          return line;
+        }).join('<br>');
+      };
 
       // イベント詳細モーダル表示
       function showEventModal(event) {
@@ -1861,7 +1880,7 @@
             // 次回予約の情報カード（折りたたみ式、デフォルト閉じ）
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
             html += '<div class="card-title-sm next-res-toggle" onclick="toggleNextRes()" style="cursor:pointer;user-select:none;"><i class="bi bi-info-circle"></i>次回予約<i class="bi bi-chevron-right ms-auto next-res-chevron" style="transition:transform 0.2s;font-size:0.7rem;"></i></div>';
-            html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent" style="display:none;"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
+            html += '<div id="eventModalStaffNextResWrapper" style="display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.3s ease-out;"><div class="modal-next-res-grid" id="eventModalStaffNextResContent" style="overflow:hidden;"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div></div>';
             html += '</div>';
 
             // 連絡事項（次回予約と募集状況の間）
@@ -1881,7 +1900,7 @@
             // 1. 募集状況
             html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted" style="background:#e9ecef;">読み込み中…</span>';
             // 2. 清掃担当
-            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '" style="display:flex; align-items:flex-start;"><span style="white-space:nowrap;"><i class="bi bi-person-badge"></i> 清掃担当:&nbsp;</span><span id="eventModalStaffDisplay">' + formatStaffDisplayHtml(staffVal, null) + '</span></div>';
             // 3. ボタン/アクションエリア（メール送信・清掃担当を編集・対応可ボタンなど、JSで動的に追加）
             html += '<div id="eventModalVolunteerBodyArea" class="mt-2"></div>';
             // 4. 回答状況（ラベルなし）
@@ -2086,7 +2105,7 @@
               // 募集データの選定スタッフ or カレンダーデータの清掃担当を使用
               var resolvedStaff = staffAssigned || (r.selectedStaff || '').trim();
               if (staffDisplayEl && r.success) {
-                staffDisplayEl.textContent = resolvedStaff || '(未設定)';
+                staffDisplayEl.innerHTML = formatStaffDisplayHtml(resolvedStaff, r.volunteers);
                 var staffLabel = staffDisplayEl.closest('.modal-staff-label');
                 if (staffLabel) {
                   staffLabel.classList.remove('staff-set', 'staff-unset');
@@ -2351,7 +2370,7 @@
               // 清掃担当表示を最新の選定結果で更新
               var ownerStaffDisplayEl = document.getElementById('eventModalStaffDisplay');
               if (ownerStaffDisplayEl && r.success) {
-                ownerStaffDisplayEl.textContent = ownerResolvedStaff || '(未設定)';
+                ownerStaffDisplayEl.innerHTML = formatStaffDisplayHtml(ownerResolvedStaff, r.volunteers);
                 var ownerStaffLabel = ownerStaffDisplayEl.closest('.modal-staff-label');
                 if (ownerStaffLabel) {
                   ownerStaffLabel.classList.remove('staff-set', 'staff-unset');

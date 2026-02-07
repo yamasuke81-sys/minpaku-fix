@@ -430,8 +430,14 @@
       .modal-staff-label.staff-set {
         color: #6ea8fe !important;
       }
+      .modal-staff-label.staff-set #eventModalStaffDisplay {
+        background: #1a2d4a !important;
+      }
       .modal-staff-label.staff-unset {
         color: #ea868f !important;
+      }
+      .modal-staff-label.staff-unset #eventModalStaffDisplay {
+        background: #3d1a1e !important;
       }
     }
     /* 清掃セクション: 募集状況バッジ */
@@ -673,8 +679,18 @@
     .modal-staff-label.staff-set {
       color: #0d6efd;
     }
+    .modal-staff-label.staff-set #eventModalStaffDisplay {
+      background: #e7f1ff;
+      padding: 0.15rem 0.5rem;
+      border-radius: 0.25rem;
+    }
     .modal-staff-label.staff-unset {
       color: #dc3545;
+    }
+    .modal-staff-label.staff-unset #eventModalStaffDisplay {
+      background: #fde8ea;
+      padding: 0.15rem 0.5rem;
+      border-radius: 0.25rem;
     }
     .modal-staff-name {
       font-size: 0.95rem;
@@ -3061,7 +3077,7 @@
             if (dotColor) {
               var dot = document.createElement('span');
               dot.className = 'fc-event-status-dot';
-              dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
+              dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
               var titleEl = arg.el.querySelector('.fc-event-title') || arg.el.querySelector('.fc-event-main');
               if (titleEl) {
                 if (titleEl.firstChild) titleEl.insertBefore(dot, titleEl.firstChild);

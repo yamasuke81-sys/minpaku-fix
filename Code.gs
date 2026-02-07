@@ -3186,22 +3186,28 @@ function addRecruitmentManually(bookingRowNumber, checkoutDateStr) {
 }
 
 function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
-  // 作業日のフォーマット: YYYY-MM-DD → YYYY年MM月DD日
+  // 作業日 = チェックアウト日（清掃詳細最上部と同じ値）
   var fmtDate = (checkoutDateStr || '－');
   var dm = fmtDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
 
+  var nr = nextReservation || {};
+  // チェックイン期間: dateRange (YYYY-MM-DD ～ YYYY-MM-DD) があればそれを使う
+  var dateRange = nr.dateRange || '';
+  if (!dateRange && nr.date) dateRange = nr.date;
+  var checkinDisp = dateRange || 'ー';
+  var guestDisp = nr.guestCount || 'ー';
+  var bedDisp = nr.bedCount || 'ー';
+  var bbqDisp = nr.bbq || 'ー';
+  var natDisp = nr.nationality || 'ー';
+
   var lines = ['清掃募集', '', '作業日: ' + fmtDate, ''];
-  lines.push('次回予約の情報（変更の可能性あり）:');
-  var hasContent = false;
-  if (nextReservation) {
-    if (nextReservation.date) { var nd = nextReservation.date; var ndm = nd.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if (ndm) nd = ndm[1] + '年' + ('0' + ndm[2]).slice(-2) + '月' + ('0' + ndm[3]).slice(-2) + '日'; lines.push('・チェックイン: ' + nd); hasContent = true; }
-    if (nextReservation.guestCount) { lines.push('・人数: ' + nextReservation.guestCount); hasContent = true; }
-    if (nextReservation.bbq) { lines.push('・BBQ: ' + nextReservation.bbq); hasContent = true; }
-    if (nextReservation.nationality) { lines.push('・国籍: ' + nextReservation.nationality); hasContent = true; }
-    if (nextReservation.bedCount) { lines.push('・ベッド数: ' + nextReservation.bedCount); hasContent = true; }
-  }
-  if (!hasContent) lines.push('・（未確定）');
+  lines.push('次回予約（変更の可能性あり）:');
+  lines.push('・チェックイン: ' + checkinDisp);
+  lines.push('・人数:　　　　 ' + guestDisp);
+  lines.push('・ベッド数:　　 ' + bedDisp);
+  lines.push('・BBQ:　　　　  ' + bbqDisp);
+  lines.push('・国籍:　　　　 ' + natDisp);
   lines.push('');
   lines.push('※予約状況次第では変更となる場合があります。');
   lines.push('');

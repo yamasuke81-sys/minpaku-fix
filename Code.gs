@@ -1273,7 +1273,7 @@ function mergeFormResponseToExistingBooking_(e) {
         if (colMap.parking >= 0) updates.push({ col: colMap.parking + 1, val: String(newRowData[colMap.parking] || '').trim() });
         updates.forEach(function(u) { sheet.getRange(r, u.col).setValue(u.val); });
         sheet.deleteRow(newRow);
-        addNotification_('フォーム回答', newCheckInStr + '～' + newCheckOutStr + ': フォームの回答が入力されました');
+        addNotification_('フォーム回答', 'フォームの回答が入力されました（' + newCheckInStr + '～' + newCheckOutStr + '）');
         break;
       }
     }
@@ -1805,7 +1805,7 @@ function addBookingManually(checkIn, checkOut, guestName, bookingSite, guestCoun
 
     sheet.getRange(nextRow, 1, 1, lastCol).setValues([rowData]);
     sortFormResponses_();
-    addNotification_('予約追加', ciStr + '～' + coStr + ': 予約が追加されました' + (guestName ? ' (' + String(guestName).trim() + ')' : ''));
+    addNotification_('予約追加', '予約が追加されました' + (guestName ? ' (' + String(guestName).trim() + ')' : '') + '（' + ciStr + '～' + coStr + '）');
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3173,7 +3173,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     if (alreadyExists) return JSON.stringify({ success: true });
 
     // 通知（シート書き込み）
-    try { addNotification_('出勤キャンセル要望', dateStr + ': ' + staff + ' が出勤キャンセルの要望を提出しました', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr }); } catch (ne) {}
+    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr }); } catch (ne) {}
     // メール送信（最も遅い処理 - 失敗しても成功扱い）
     try {
       var ownerRes = JSON.parse(getOwnerEmail());
@@ -3267,7 +3267,7 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     // 通知を追加
     var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
     var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-    addNotification_('キャンセル承認', checkoutStr + ': ' + (sName || sEmail) + ' のキャンセルを承認しました');
+    addNotification_('キャンセル承認', (sName || sEmail) + ' のキャンセルを承認しました（' + checkoutStr + '）');
 
     // スタッフにメール通知
     if (sEmail) {
@@ -3312,7 +3312,7 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
 
     var checkoutCell = recruitSheet ? recruitSheet.getRange(recruitRowIndex, 1).getValue() : null;
     var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-    addNotification_('キャンセル却下', checkoutStr + ': ' + (sName || sEmail) + ' のキャンセル申請を却下しました');
+    addNotification_('キャンセル却下', (sName || sEmail) + ' のキャンセル申請を却下しました（' + checkoutStr + '）');
 
     // スタッフにメール通知
     if (sEmail) {
@@ -3626,7 +3626,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
         volSheet.getRange(i + 2, 6).setValue(response);
         var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
         var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-        addNotification_('回答', (checkoutStr || recruitId) + ': ' + staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : ''));
+        addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
         return JSON.stringify({ success: true, updated: true });
       }
     }
@@ -3637,7 +3637,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
     volSheet.getRange(nextRow, 6).setValue(response);
     var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
     var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-    addNotification_('回答', (checkoutStr || recruitId) + ': ' + staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : ''));
+    addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3671,7 +3671,7 @@ function requestResponseChange(recruitId, staffName, staffEmail, newResponse, me
     var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     var nextRow = crSheet.getLastRow() + 1;
     crSheet.getRange(nextRow, 1, 1, 7).setValues([[recruitId, staffName || '', staffEmail || '', newResponse, memo || '', now, 'pending']]);
-    addNotification_('回答変更要請', (checkoutStr || recruitId) + ': ' + (staffName || '不明') + ' が回答変更を要請（' + newResponse + '）' + (memo ? '（' + memo + '）' : ''));
+    addNotification_('回答変更要請', (staffName || '不明') + ' が回答変更を要請（' + newResponse + '）' + (memo ? '（' + memo + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3807,7 +3807,7 @@ function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmai
         deleted = true;
         var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
         var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-        addNotification_('回答取消', (checkoutStr || recruitId) + ': ' + (volData[i][1] || staffName) + ' が回答を取り消しました');
+        addNotification_('回答取消', (volData[i][1] || staffName) + ' が回答を取り消しました（' + (checkoutStr || recruitId) + '）');
         break;
       }
     }
@@ -3857,7 +3857,7 @@ function holdForRecruitment_legacy_(recruitId, staffNameFromClient, staffEmailFr
         if (lastCol >= 7) volSheet.getRange(i + 2, 7).setValue(holdReason);
         var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
         var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-        addNotification_('保留', (checkoutStr || recruitId) + ': ' + staffName + ' が保留しました' + (holdReason ? '（' + holdReason + '）' : ''));
+        addNotification_('保留', staffName + ' が保留しました' + (holdReason ? '（' + holdReason + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
         return JSON.stringify({ success: true, updated: true });
       }
     }
@@ -3868,7 +3868,7 @@ function holdForRecruitment_legacy_(recruitId, staffNameFromClient, staffEmailFr
     if (lastCol >= 7 && holdReason) volSheet.getRange(nextRow, 7).setValue(holdReason);
     var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
     var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-    addNotification_('保留', (checkoutStr || recruitId) + ': ' + staffName + ' が保留しました' + (holdReason ? '（' + holdReason + '）' : ''));
+    addNotification_('保留', staffName + ' が保留しました' + (holdReason ? '（' + holdReason + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

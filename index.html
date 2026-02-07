@@ -3840,29 +3840,23 @@
               el.innerHTML = r.list.map(function(item) {
                 var partnersHtml = (item.partners || []).length ? '<span class="text-muted">' + item.partners.map(function(p) { return escapeHtml(p); }).join('、') + '</span>、' : '';
                 var selfHtml = '<span class="fw-bold">' + escapeHtml(myName || 'あなた') + '</span>';
-                var btnHtml;
-                if (item.cancelPending) {
-                  btnHtml = '<span class="badge bg-warning text-dark">申請中</span>';
-                } else {
-                  btnHtml = '<button type="button" class="btn btn-sm btn-outline-warning py-0 flex-shrink-0" data-row="' + item.rowNumber + '" data-recruit="' + (item.recruitRowIndex || 0) + '" data-checkout="' + escapeHtml(item.checkoutDate || '') + '">取消申請</button>';
-                }
-                return '<div class="border rounded p-2 mb-2 small d-flex justify-content-between align-items-center gap-2"><div><strong>' + escapeHtml(item.checkoutDisplay) + '</strong> ' + partnersHtml + selfHtml + '</div>' + btnHtml + '</div>';
+                var statusHtml = item.cancelPending ? ' <span class="badge bg-warning text-dark">申請中</span>' : '';
+                var btnHtml = '<button type="button" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0 btn-open-cleaning" data-row="' + item.rowNumber + '" data-checkout="' + escapeHtml(item.checkoutDate || '') + '">開く</button>';
+                return '<div class="border rounded p-2 mb-2 small d-flex justify-content-between align-items-center gap-2"><div><strong>' + escapeHtml(item.checkoutDisplay) + '</strong> ' + partnersHtml + selfHtml + statusHtml + '</div>' + btnHtml + '</div>';
               }).join('');
-              el.querySelectorAll('[data-row]').forEach(function(btn) {
+              el.querySelectorAll('.btn-open-cleaning').forEach(function(btn) {
                 btn.onclick = function() {
-                  var row = this.getAttribute('data-row');
-                  var recruitRow = this.getAttribute('data-recruit');
+                  var rowNum = parseInt(this.getAttribute('data-row'), 10);
                   var checkout = this.getAttribute('data-checkout');
-                  if (!recruitRow || recruitRow === '0') { alert('この予約に対応する募集データが見つかりません。カレンダーの詳細画面から取り消し申請してください。'); return; }
-                  if (!confirm('出勤の取り消し申請を提出します。\nオーナーの承認後に取り消しが反映されます。\n\nよろしいですか？')) return;
-                  var thisBtn = this;
-                  thisBtn.disabled = true;
-                  thisBtn.textContent = '処理中...';
-                  google.script.run.withSuccessHandler(function(j) {
-                    var res = JSON.parse(j);
-                    if (res.success) { loadStaffSchedule(); loadAndRender(); }
-                    else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '取消申請'; }
-                  }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '取消申請'; }).submitStaffCancelRequest(recruitRow, row, checkout, window.currentUserName || '', window.currentUserEmail || '');
+                  if (calendar) {
+                    var calEvent = calendar.getEventById('c-' + rowNum);
+                    if (calEvent) {
+                      if (checkout) calendar.gotoDate(checkout);
+                      showEventModal(calEvent);
+                      return;
+                    }
+                  }
+                  alert('カレンダーにこの清掃データが見つかりません。カレンダータブから直接お探しください。');
                 };
               });
             } else {

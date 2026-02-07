@@ -602,7 +602,7 @@
     .modal-next-res-card .card-title-sm {
       font-size: 0.8rem;
       font-weight: 700;
-      color: #6c757d;
+      color: #333;
       margin-bottom: 0.5rem;
       display: flex;
       align-items: center;
@@ -622,7 +622,7 @@
     .modal-next-res-grid .nres-label {
       color: #6c757d;
       font-size: 0.78rem;
-      min-width: 3.5em;
+      min-width: 4.5em;
     }
     .modal-next-res-grid .nres-value {
       font-weight: 600;
@@ -1168,7 +1168,7 @@
         <div class="modal-body">
           <p class="small fw-bold mb-1">清掃日</p>
           <p class="small text-muted mb-2" id="recruitEditCleaningDate"></p>
-          <p class="small fw-bold mb-1">次回予約の情報（変更の可能性あり）</p>
+          <p class="small fw-bold mb-1">次回予約</p>
           <div class="mb-2">
             <label class="form-label small">日付</label><input type="text" class="form-control form-control-sm mb-1" id="recruitEditReserveDate" placeholder="例: 2026-02-01 ～ 2026-02-05">
             <label class="form-label small">人数</label><input type="text" class="form-control form-control-sm mb-1" id="recruitEditReserveGuestCount" placeholder="例: 大人4名、3歳以下1名">
@@ -1669,7 +1669,7 @@
 
             // 次回予約の情報カード
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
-            html += '<div class="card-title-sm"><i class="bi bi-info-circle"></i>次回予約の情報（変更の可能性あり）</div>';
+            html += '<div class="card-title-sm"><i class="bi bi-info-circle"></i>次回予約</div>';
             html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
             html += '</div>';
 

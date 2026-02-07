@@ -2690,14 +2690,7 @@ function getBookingDetailsForRecruit(bookingRowNumber, recruitRowIndex) {
       var rawDate = recruitRow[0];
       cleaningDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : toDateKeySafe_(rawDate) || String(rawDate).trim()) : '';
       cleaningStaff = String(recruitRow[4] || '').trim();
-      if (String(recruitRow[9] || '').trim() || String(recruitRow[10] || '').trim() || String(recruitRow[11] || '').trim() || String(recruitRow[12] || '').trim() || String(recruitRow[13] || '').trim() || String(recruitRow[14] || '').trim()) {
-        dateStr = String(recruitRow[9] || '').trim();
-        guestCount = String(recruitRow[10] || '').trim();
-        bbq = String(recruitRow[11] || '').trim();
-        nationality = String(recruitRow[12] || '').trim() || '日本';
-        memo = String(recruitRow[13] || '').trim();
-        bedCount = String(recruitRow[14] || '').trim();
-      }
+      // キャッシュ列(10-15)は使わない: 常にフォームシートから最新データを計算
     }
     if (formSheet && formSheet.getLastRow() >= bookingRowNumber) {
       const headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
@@ -2713,12 +2706,12 @@ function getBookingDetailsForRecruit(bookingRowNumber, recruitRowIndex) {
       var normCleaningDate = cd.match(/^\d{4}-\d{2}-\d{2}$/) ? cd : (toDateKeySafe_(parseDate(cd) || cd) || cd);
       var nextRes = getNextReservationAfterCheckout_(formSheet, colMap, normCleaningDate, bookingRowNumber, ss);
       if (nextRes) {
-        if (!dateStr) dateStr = nextRes.dateRange || nextRes.date || '';
-        if (!guestCount) guestCount = nextRes.guestCount || '';
-        if (!bbq) bbq = nextRes.bbq || '';
-        if (!nationality) nationality = nextRes.nationality || '日本';
-        if (!memo) memo = nextRes.memo || '';
-        if (!bedCount) bedCount = nextRes.bedCount || '';
+        dateStr = nextRes.dateRange || nextRes.date || '';
+        guestCount = nextRes.guestCount || '';
+        bbq = nextRes.bbq || '';
+        nationality = nextRes.nationality || '日本';
+        memo = nextRes.memo || '';
+        bedCount = nextRes.bedCount || '';
       }
     }
     return JSON.stringify({ success: true, cleaningDate: cleaningDate, cleaningStaff: cleaningStaff, nextReservation: { date: dateStr, guestCount: guestCount, bbq: bbq, nationality: nationality, memo: memo, bedCount: bedCount } });

@@ -376,6 +376,10 @@
       border-color: var(--invalid-color);
       color: var(--invalid-color);
     }
+    .fc-event-cancelled {
+      opacity: 0.45;
+      text-decoration: line-through;
+    }
     /* 宿泊イベント: 枠線なし（全ステータス共通） */
     .fc-event-booking,
     .fc-event-booking .fc-event-main,
@@ -1467,6 +1471,7 @@
           if (b.guestNames && b.guestNames.length && (!existing.guestNames || !existing.guestNames.length)) {
             existing.guestNames = b.guestNames;
           }
+          if (!existing.cancelledAt && b.cancelledAt) existing.cancelledAt = b.cancelledAt;
           if (!existing.mergedRowNumbers) existing.mergedRowNumbers = [existing.rowNumber];
           existing.mergedRowNumbers.push(b.rowNumber);
         }
@@ -1496,15 +1501,17 @@
           const isValid = b.isValidDates;
 
           // 宿泊イベント（チェックイン日〜チェックアウト前日まで跨ぐ）
+          var isCancelled = !!b.cancelledAt;
           if (checkIn) {
             var rosterAnswered = isRosterAnswered(b);
             var evtClasses = isValid ? ['fc-event-booking'] : ['fc-event-invalid'];
+            if (isCancelled) evtClasses.push('fc-event-cancelled');
             if (rosterAnswered) evtClasses.push('fc-event-roster-answered');
             else evtClasses.push('fc-event-roster-unanswered');
-            var bookingStatus = rosterAnswered ? 'form-answered' : 'form-unanswered';
+            var bookingStatus = isCancelled ? 'cancelled' : (rosterAnswered ? 'form-answered' : 'form-unanswered');
             events.push({
               id: 'b-' + b.rowNumber,
-              title: formatBookingTitle(b),
+              title: (isCancelled ? '[キャンセル] ' : '') + formatBookingTitle(b),
               start: checkIn,
               end: checkOut || undefined,
               allDay: true,
@@ -1515,7 +1522,7 @@
                 rosterAnswered: rosterAnswered,
                 statusDot: bookingStatus
               },
-              backgroundColor: isValid ? getPlatformColor(b.bookingSite) : INVALID_COLOR,
+              backgroundColor: isCancelled ? '#9e9e9e' : (isValid ? getPlatformColor(b.bookingSite) : INVALID_COLOR),
               borderColor: 'transparent',
               classNames: evtClasses
             });
@@ -1531,6 +1538,7 @@
             var isRecruiting = recStatus && !isConfirmed;
             var isDecided = isConfirmed;
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
+            if (isCancelled) cleaningClasses.push('fc-event-cancelled');
             var curStaff = (window.currentUserName || '').trim().toLowerCase();
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
             var volunteers = rec.volunteers || [];
@@ -1541,10 +1549,10 @@
             });
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
             if (window.staffMode && isVolunteeredByMe) cleaningClasses.push(isSelectedByMe ? 'fc-event-cleaning-selected-by-me' : 'fc-event-cleaning-volunteered-by-me');
-            var cleaningStatus = isDecided ? 'cleaning-decided' : (isRecruiting ? 'cleaning-recruiting' : 'cleaning-not-recruiting');
+            var cleaningStatus = isCancelled ? 'cancelled' : (isDecided ? 'cleaning-decided' : (isRecruiting ? 'cleaning-recruiting' : 'cleaning-not-recruiting'));
             events.push({
               id: 'c-' + b.rowNumber,
-              title: formatCleaningTitle(b),
+              title: (isCancelled ? '[キャンセル] ' : '') + formatCleaningTitle(b),
               start: checkOut,
               allDay: true,
               extendedProps: {
@@ -1554,7 +1562,7 @@
                 recruitStatus: recStatus,
                 statusDot: cleaningStatus
               },
-              backgroundColor: '#198754',
+              backgroundColor: isCancelled ? '#9e9e9e' : '#198754',
               borderColor: 'transparent',
               classNames: cleaningClasses
             });
@@ -1713,6 +1721,11 @@
             if (!isStaffView) {
               html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-primary" id="eventModalCopyToClipboard">コピー</button></div>';
             }
+          }
+
+          // === キャンセルバナー ===
+          if (d.cancelledAt) {
+            html += '<div class="alert alert-secondary py-2 mb-2"><i class="bi bi-x-circle-fill me-1"></i><strong>この予約はキャンセルされました</strong><br><small>キャンセル日時: ' + escapeHtml(d.cancelledAt) + '</small></div>';
           }
 
           // === 宿泊詳細 ===
@@ -3751,11 +3764,49 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.list && r.list.length) {
-              var html = r.list.map(function(n) {
-                var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : (n.kind === '出勤キャンセル要望') ? 'danger' : (n.kind === 'キャンセル承認') ? 'info' : (n.kind === 'キャンセル却下') ? 'secondary' : 'secondary';
-                return '<div class="border rounded p-2 mb-2 small"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span> ' + escapeHtml(n.message) + '</div>';
+              var html = r.list.map(function(n, idx) {
+                var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : (n.kind === '予約キャンセル') ? 'danger' : (n.kind === '予約復活') ? 'success' : (n.kind === '出勤キャンセル要望') ? 'danger' : (n.kind === 'キャンセル承認') ? 'info' : (n.kind === 'キャンセル却下') ? 'secondary' : 'secondary';
+                var actionHtml = '';
+                if (!isStaffMode && n.kind === '出勤キャンセル要望' && n.data && n.data.recruitRowIndex) {
+                  actionHtml = '<div class="mt-1"><button class="btn btn-sm btn-warning me-1 notif-approve" data-idx="' + idx + '">承認</button><button class="btn btn-sm btn-outline-secondary notif-reject" data-idx="' + idx + '">却下</button></div>';
+                }
+                return '<div class="border rounded p-2 mb-2 small" data-notif-idx="' + idx + '"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span> ' + escapeHtml(n.message) + actionHtml + '</div>';
               }).join('');
               el.innerHTML = html;
+              // キャンセル承認/却下ボタンのイベント
+              var notifList = r.list;
+              el.querySelectorAll('.notif-approve').forEach(function(btn) {
+                btn.onclick = function() {
+                  var ni = parseInt(this.getAttribute('data-idx'), 10);
+                  var nd = notifList[ni] && notifList[ni].data;
+                  if (!nd) return;
+                  if (!confirm(nd.staffName + ' の取り消しを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。')) return;
+                  var thisBtn = this;
+                  thisBtn.disabled = true; thisBtn.textContent = '処理中...';
+                  var actionDiv = thisBtn.closest('.mt-1');
+                  google.script.run.withSuccessHandler(function(j) {
+                    var res = JSON.parse(j);
+                    if (res.success) { if (actionDiv) actionDiv.innerHTML = '<span class="badge bg-info">承認済</span>'; loadAndRender(); }
+                    else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '承認'; }
+                  }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '承認'; }).approveCancelRequest(nd.recruitRowIndex, nd.staffName, nd.staffEmail);
+                };
+              });
+              el.querySelectorAll('.notif-reject').forEach(function(btn) {
+                btn.onclick = function() {
+                  var ni = parseInt(this.getAttribute('data-idx'), 10);
+                  var nd = notifList[ni] && notifList[ni].data;
+                  if (!nd) return;
+                  if (!confirm(nd.staffName + ' の取り消し申請を却下しますか？')) return;
+                  var thisBtn = this;
+                  thisBtn.disabled = true; thisBtn.textContent = '処理中...';
+                  var actionDiv = thisBtn.closest('.mt-1');
+                  google.script.run.withSuccessHandler(function(j) {
+                    var res = JSON.parse(j);
+                    if (res.success) { if (actionDiv) actionDiv.innerHTML = '<span class="badge bg-secondary">却下済</span>'; loadAndRender(); }
+                    else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '却下'; }
+                  }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '却下'; }).rejectCancelRequest(nd.recruitRowIndex, nd.staffName, nd.staffEmail);
+                };
+              });
             } else {
               el.innerHTML = '<p class="text-muted small">通知はまだありません。</p>';
             }
@@ -3787,7 +3838,7 @@
             if (r.success && r.list && r.list.length) {
               var myName = (window.currentUserName || '').trim();
               el.innerHTML = r.list.map(function(item) {
-                var partnersHtml = (item.partners || []).length ? '<span class="text-muted">' + item.partners.map(function(p) { return escapeHtml(p); }).join(', ') + '</span> ' : '';
+                var partnersHtml = (item.partners || []).length ? '<span class="text-muted">' + item.partners.map(function(p) { return escapeHtml(p); }).join('、') + '</span>、' : '';
                 var selfHtml = '<span class="fw-bold">' + escapeHtml(myName || 'あなた') + '</span>';
                 var btnHtml;
                 if (item.cancelPending) {

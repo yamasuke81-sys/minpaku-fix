@@ -61,6 +61,7 @@ const HEADERS = {
   CLEANING_STAFF: '清掃担当',
   ICAL_SYNC: 'iCal同期', // iCal取り込み行の識別用（この列が空でない＝iCal由来）
   ICAL_GUEST_COUNT: 'iCal宿泊人数',
+  CANCELLED_AT: 'キャンセル日時',
   // 駐車場: 「徒歩15分、有料駐車場を利用する方はお読みください」にマッチ（「お車は何台…」は除外）
 };
 
@@ -224,6 +225,12 @@ function getData() {
       const purpose = columnMap.purpose >= 0 ? String(row[columnMap.purpose] || '').trim() : '';
       const memo = columnMap.memo >= 0 ? String(row[columnMap.memo] || '').trim() : '';
       const cleaningNotice = columnMap.cleaningNotice >= 0 ? String(row[columnMap.cleaningNotice] || '').trim() : '';
+      var cancelledAtRaw = columnMap.cancelledAt >= 0 ? row[columnMap.cancelledAt] : '';
+      var cancelledAt = '';
+      if (cancelledAtRaw) {
+        if (cancelledAtRaw instanceof Date) cancelledAt = Utilities.formatDate(cancelledAtRaw, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+        else cancelledAt = String(cancelledAtRaw).trim();
+      }
       // 宿泊者名一覧（複数カラム対応）と年齢
       var guestNames = [];
       if (columnMap.guestNameCols && columnMap.guestNameCols.length) {
@@ -261,7 +268,8 @@ function getData() {
         cleaningNotice: cleaningNotice,
         guestNames: guestNames,
         isValidDates: isValidDates,
-        nights: isValidDates ? Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24)) : 0
+        nights: isValidDates ? Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24)) : 0,
+        cancelledAt: cancelledAt
       });
     }
 
@@ -315,7 +323,8 @@ function buildColumnMap(headers) {
     memo: -1,
     cleaningNotice: -1,
     guestNameCols: [],
-    ageCols: []
+    ageCols: [],
+    cancelledAt: -1
   };
 
   for (let i = 0; i < headers.length; i++) {
@@ -337,6 +346,7 @@ function buildColumnMap(headers) {
     if (h.indexOf('有料駐車場を利用する方') > -1 && map.parking < 0) map.parking = i;
     if ((h === HEADERS.ICAL_SYNC || (h.indexOf('iCal') >= 0 && h.indexOf('同期') >= 0)) && map.icalSync < 0) map.icalSync = i;
     if ((h === HEADERS.ICAL_GUEST_COUNT || (h.indexOf('iCal') >= 0 && h.indexOf('宿泊人数') >= 0)) && map.icalGuestCount < 0) map.icalGuestCount = i;
+    if ((h === HEADERS.CANCELLED_AT || h === 'キャンセル日時') && map.cancelledAt < 0) map.cancelledAt = i;
     if ((h.indexOf('国籍') > -1 || h.toLowerCase().indexOf('nationality') > -1) && map.nationality < 0) map.nationality = i;
     if (h.indexOf('宿泊人数2名のお客様のみお答えください') > -1 && h.indexOf('ベッド') > -1 && map.bedChoice < 0) map.bedChoice = i;
     if (h.indexOf('宿泊人数2名') > -1 && map.twoGuestChoice < 0) map.twoGuestChoice = i;
@@ -1134,6 +1144,99 @@ function deleteBooking(rowNumber) {
 }
 
 /**
+ * iCal同期で予約が消えた場合にキャンセルマークを付与し、スタッフ・オーナーに通知
+ */
+function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
+  try {
+    // 既にキャンセル済みならスキップ
+    if (colMap.cancelledAt >= 0) {
+      var existing = String(formSheet.getRange(rowNumber, colMap.cancelledAt + 1).getValue() || '').trim();
+      if (existing) return false;
+    }
+    // キャンセル日時列がなければ作成
+    ensureCancelledColumn_();
+    // 列マップを再構築
+    var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+    var newMap = buildColumnMap(headers);
+    if (newMap.cancelledAt < 0) return false;
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    formSheet.getRange(rowNumber, newMap.cancelledAt + 1).setValue(now);
+
+    // 予約情報を取得
+    var guestName = newMap.guestName >= 0 ? String(formSheet.getRange(rowNumber, newMap.guestName + 1).getValue() || '').trim() : '';
+    var cleaningStaff = newMap.cleaningStaff >= 0 ? String(formSheet.getRange(rowNumber, newMap.cleaningStaff + 1).getValue() || '').trim() : '';
+    var ciVal = newMap.checkIn >= 0 ? formSheet.getRange(rowNumber, newMap.checkIn + 1).getValue() : '';
+    var coVal = newMap.checkOut >= 0 ? formSheet.getRange(rowNumber, newMap.checkOut + 1).getValue() : '';
+    var ciStr = ciVal ? (ciVal instanceof Date ? Utilities.formatDate(ciVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(ciVal).trim()) : '';
+    var coStr = coVal ? (coVal instanceof Date ? Utilities.formatDate(coVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(coVal).trim()) : '';
+    var dateRange = ciStr + '～' + coStr;
+
+    // 募集ステータスを「キャンセル」に更新
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (recruitSheet && recruitSheet.getLastRow() >= 2) {
+      var rData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 4).getValues();
+      for (var ri = 0; ri < rData.length; ri++) {
+        var rn = parseInt(rData[ri][1], 10);
+        if (rn === rowNumber) {
+          recruitSheet.getRange(ri + 2, 4).setValue('キャンセル');
+        }
+      }
+    }
+
+    // オーナーに通知
+    var guestLabel = guestName || platformName || '不明';
+    addNotification_('予約キャンセル', guestLabel + ' の予約がキャンセルされました（' + dateRange + '）' + (cleaningStaff ? ' 清掃担当: ' + cleaningStaff : ''));
+
+    // 清掃スタッフが確定済みの場合、スタッフにも通知＋オーナーにメール
+    if (cleaningStaff) {
+      var staffNames = cleaningStaff.split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
+      // スタッフシートからメールアドレスを取得
+      var staffSheet = ss.getSheetByName(SHEET_STAFF);
+      var staffEmails = {};
+      if (staffSheet && staffSheet.getLastRow() >= 2) {
+        var sData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 3).getValues();
+        for (var si = 0; si < sData.length; si++) {
+          var sName = String(sData[si][0] || '').trim();
+          var sEmail = String(sData[si][2] || '').trim();
+          if (sName && sEmail) staffEmails[sName] = sEmail;
+        }
+      }
+      // 各スタッフにメール通知
+      for (var sni = 0; sni < staffNames.length; sni++) {
+        var name = staffNames[sni];
+        var email = staffEmails[name] || '';
+        if (email) {
+          try {
+            var subject = '【民泊】予約キャンセルのお知らせ: ' + coStr;
+            var body = name + ' 様\n\n' + dateRange + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。\n\nご確認ください。';
+            GmailApp.sendEmail(email, subject, body);
+          } catch (mailErr) {}
+        }
+      }
+      // オーナーにメールで督促
+      try {
+        var ownerRes = JSON.parse(getOwnerEmail());
+        var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
+        if (ownerEmail) {
+          var oSubject = '【民泊】予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
+          var oBody = '以下の予約がキャンセルされました。\n\n' +
+            '期間: ' + dateRange + '\n' +
+            'ゲスト: ' + guestLabel + '\n' +
+            '清掃担当: ' + cleaningStaff + '\n\n' +
+            '清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。';
+          GmailApp.sendEmail(ownerEmail, oSubject, oBody);
+        }
+      } catch (ownerMailErr) {}
+    }
+    return true;
+  } catch (e) {
+    Logger.log('cancelBookingFromICal_: ' + e.toString());
+    return false;
+  }
+}
+
+/**
  * 予約シートに「iCal同期」列があることを保証（iCal由来行の識別用）
  */
 function ensureICalSyncColumn_() {
@@ -1165,6 +1268,20 @@ function ensureICalGuestCountColumn_() {
     }
     sheet.insertColumnAfter(sheet.getLastColumn());
     sheet.getRange(1, sheet.getLastColumn()).setValue(HEADERS.ICAL_GUEST_COUNT);
+  } catch (e) {}
+}
+
+function ensureCancelledColumn_() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === HEADERS.CANCELLED_AT) return;
+    }
+    sheet.insertColumnAfter(sheet.getLastColumn());
+    sheet.getRange(1, sheet.getLastColumn()).setValue(HEADERS.CANCELLED_AT);
   } catch (e) {}
 }
 
@@ -1605,31 +1722,49 @@ function syncFromICal() {
         added++;
         platformAdded++;
       }
-      var platformRemoved = 0;
+      var platformCancelled = 0;
+      // 列マップを再取得（ensureCancelledColumn_で列が追加される可能性があるため）
+      ensureCancelledColumn_();
+      colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
       if (colMap.icalSync >= 0) {
         var formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
-        var toDel = [];
         for (var ri = 0; ri < formData.length; ri++) {
           var icalVal = String(formData[ri][colMap.icalSync] || '').trim();
           if (icalVal.toLowerCase() !== platformName.toLowerCase()) continue;
           var ciKey = toDateKeySafe_(formData[ri][colMap.checkIn]);
           var coKey = toDateKeySafe_(formData[ri][colMap.checkOut]);
           if (!ciKey || !coKey) continue;
-          if (!validPairs[ciKey + '|' + coKey]) toDel.push(ri + 2);
-        }
-        toDel.sort(function(a, b) { return b - a; });
-        for (var di = 0; di < toDel.length; di++) {
-          var res = JSON.parse(deleteBooking(toDel[di]));
-          if (res.success) { platformRemoved++; removed++; }
+          var cancelledVal = colMap.cancelledAt >= 0 ? String(formData[ri][colMap.cancelledAt] || '').trim() : '';
+          if (!validPairs[ciKey + '|' + coKey]) {
+            // iCalから消えた → キャンセルマーク（未キャンセルの場合のみ）
+            if (!cancelledVal) {
+              if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
+                platformCancelled++; removed++;
+              }
+            }
+          } else if (cancelledVal) {
+            // iCalに再出現 → キャンセル解除
+            formSheet.getRange(ri + 2, colMap.cancelledAt + 1).setValue('');
+            // 募集ステータスも募集中に戻す
+            var recruitSheet2 = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT);
+            if (recruitSheet2 && recruitSheet2.getLastRow() >= 2) {
+              var rData2 = recruitSheet2.getRange(2, 1, recruitSheet2.getLastRow() - 1, 4).getValues();
+              for (var ri2 = 0; ri2 < rData2.length; ri2++) {
+                if (parseInt(rData2[ri2][1], 10) === (ri + 2) && String(rData2[ri2][3] || '').trim() === 'キャンセル') {
+                  recruitSheet2.getRange(ri2 + 2, 4).setValue('募集中');
+                }
+              }
+            }
+            addNotification_('予約復活', '予約が復活しました（' + ciKey + '～' + coKey + '）');
+          }
         }
       }
       var statusStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' 取得' + events.length + '件';
       if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
-      if (platformRemoved > 0) statusStr += ' 削除' + platformRemoved;
+      if (platformCancelled > 0) statusStr += ' キャンセル' + platformCancelled;
       syncSheet.getRange(si + 2, 4).setValue(statusStr);
       if (platformAdded > 0) addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が追加されました');
-      if (platformRemoved > 0) addNotification_('予約削除', platformName + 'から' + platformRemoved + '件の予約が削除されました');
-      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformRemoved, error: '' });
+      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '' });
     }
 
     return JSON.stringify({ success: true, added: added, removed: removed, details: details });
@@ -3173,7 +3308,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     if (alreadyExists) return JSON.stringify({ success: true });
 
     // 通知（シート書き込み）
-    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr }); } catch (ne) {}
+    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) {}
     // メール送信（最も遅い処理 - 失敗しても成功扱い）
     try {
       var ownerRes = JSON.parse(getOwnerEmail());

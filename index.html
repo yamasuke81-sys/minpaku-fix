@@ -2725,7 +2725,7 @@
             var main = arg.el.querySelector('.fc-event-main');
             if (main) { main.style.border = 'none'; main.style.boxShadow = 'none'; }
             var sd = arg.event.extendedProps && arg.event.extendedProps.statusDot;
-            var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#ffc107' : sd === 'cleaning-decided' ? '#0d6efd' : sd === 'cleaning-not-recruiting' ? '#dc3545' : null;
+            var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#dc3545' : sd === 'cleaning-decided' ? '#198754' : null;
             if (dotColor) {
               var dot = document.createElement('span');
               dot.className = 'fc-event-status-dot';

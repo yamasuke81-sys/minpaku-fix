@@ -2507,6 +2507,46 @@ function getBedCountFromStaffShare_(ss, checkInStr) {
  * @param {number} excludeRowNumber - 除外する行（今回の予約行）
  * @param {Spreadsheet} [ss] - フォールバック用（スタッフ共有用・ベッド数取得）
  */
+/**
+ * デバッグ用: 次回予約の計算過程を返す
+ */
+function debugNextReservation(bookingRowNumber, recruitRowIndex) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var formSheet = ss.getSheetByName(SHEET_NAME);
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!formSheet || formSheet.getLastRow() < 2) return JSON.stringify({ error: 'フォームシートなし' });
+    var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+    var colMap = buildColumnMap(headers);
+    if (colMap.checkIn < 0 || colMap.checkOut < 0) colMap = buildColumnMapFromSource_(headers);
+    var cleaningDate = '';
+    if (recruitRowIndex && recruitSheet && recruitSheet.getLastRow() >= recruitRowIndex) {
+      var rawDate = recruitSheet.getRange(recruitRowIndex, 1).getValue();
+      cleaningDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : toDateKeySafe_(rawDate) || String(rawDate)) : '';
+    }
+    if (!cleaningDate && bookingRowNumber && formSheet.getLastRow() >= bookingRowNumber) {
+      var coVal = colMap.checkOut >= 0 ? formSheet.getRange(bookingRowNumber, colMap.checkOut + 1).getValue() : null;
+      cleaningDate = coVal ? (coVal instanceof Date ? Utilities.formatDate(coVal, 'Asia/Tokyo', 'yyyy-MM-dd') : toDateKeySafe_(coVal) || String(coVal)) : '';
+    }
+    var formLastRow = formSheet.getLastRow();
+    var data = formSheet.getRange(2, 1, formLastRow - 1, formSheet.getLastColumn()).getValues();
+    var allCheckIns = [];
+    for (var i = 0; i < data.length; i++) {
+      var ciRaw = data[i][colMap.checkIn];
+      var ciParsed = parseDate(ciRaw);
+      var ciStr = ciParsed ? toDateKeySafe_(ciParsed) : toDateKeySafe_(ciRaw);
+      allCheckIns.push({ row: i + 2, rawType: typeof ciRaw, rawStr: String(ciRaw).substring(0, 30), isDate: ciRaw instanceof Date, parsed: ciStr || '(unparseable)' });
+    }
+    var excludeCi = '';
+    if (bookingRowNumber && bookingRowNumber >= 2 && (bookingRowNumber - 2) < data.length) {
+      var exRaw = colMap.checkIn >= 0 ? data[bookingRowNumber - 2][colMap.checkIn] : null;
+      var exParsed = parseDate(exRaw);
+      excludeCi = exParsed ? toDateKeySafe_(exParsed) : toDateKeySafe_(exRaw);
+    }
+    return JSON.stringify({ cleaningDate: cleaningDate, excludeRow: bookingRowNumber, excludeCi: excludeCi, totalRows: data.length, checkIns: allCheckIns });
+  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
 function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr, excludeRowNumber, ss) {
   if (!currentCheckoutStr) return null;
   var best = null;
@@ -2524,7 +2564,7 @@ function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr,
     if (excludeRowNumber && excludeRowNumber >= 2 && (excludeRowNumber - 2) < data.length) {
       var exCiVal = colMap.checkIn >= 0 ? data[excludeRowNumber - 2][colMap.checkIn] : null;
       var exCi = parseDate(exCiVal);
-      if (exCi) excludeCi = toDateKeySafe_(exCi);
+      excludeCi = exCi ? toDateKeySafe_(exCi) : toDateKeySafe_(exCiVal);
     }
     for (var i = 0; i < data.length; i++) {
       var rowNum = i + 2;
@@ -2532,15 +2572,14 @@ function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr,
       // 同一チェックイン日の重複行をスキップ（iCal+フォーム重複対策）
       if (excludeCi) {
         var rowCiVal = colMap.checkIn >= 0 ? data[i][colMap.checkIn] : null;
-        var rowCiParsed = parseDate(rowCiVal);
-        if (rowCiParsed && toDateKeySafe_(rowCiParsed) === excludeCi) continue;
+        var rowCiStr = parseDate(rowCiVal) ? toDateKeySafe_(parseDate(rowCiVal)) : toDateKeySafe_(rowCiVal);
+        if (rowCiStr && rowCiStr === excludeCi) continue;
       }
       var row = data[i];
       var checkInVal = colMap.checkIn >= 0 ? row[colMap.checkIn] : null;
       var checkOutVal = colMap.checkOut >= 0 ? row[colMap.checkOut] : null;
       var checkIn = parseDate(checkInVal);
-      if (!checkIn) continue;
-      var checkInStr = toDateKeySafe_(checkIn);
+      var checkInStr = checkIn ? toDateKeySafe_(checkIn) : toDateKeySafe_(checkInVal);
       if (!checkInStr) continue;
       if (checkInStr < currentCheckoutStr) continue;
       if (!best || checkInStr < bestCheckInStr) {
@@ -3633,9 +3672,9 @@ function getRecruitmentStatusMap() {
     var sortedBookings = [];
     if (formData && formColMap && formColMap.checkIn >= 0) {
       for (var j = 0; j < formData.length; j++) {
-        var ci = parseDate(formData[j][formColMap.checkIn]);
-        if (!ci) continue;
-        var ciStr = toDateKeySafe_(ci);
+        var ciRaw = formData[j][formColMap.checkIn];
+        var ci = parseDate(ciRaw);
+        var ciStr = ci ? toDateKeySafe_(ci) : toDateKeySafe_(ciRaw);
         if (!ciStr) continue;
         sortedBookings.push({ rowNum: j + 2, checkInStr: ciStr, row: formData[j] });
       }
@@ -3785,9 +3824,9 @@ function getNextReservationsForRows(rowNumbers) {
     // チェックイン日でソートした予約一覧
     var sorted = [];
     for (var j = 0; j < formData.length; j++) {
-      var ci = parseDate(formData[j][colMap.checkIn]);
-      if (!ci) continue;
-      var ciStr = toDateKeySafe_(ci);
+      var ciRaw = formData[j][colMap.checkIn];
+      var ci = parseDate(ciRaw);
+      var ciStr = ci ? toDateKeySafe_(ci) : toDateKeySafe_(ciRaw);
       if (!ciStr) continue;
       sorted.push({ rowNum: j + 2, checkInStr: ciStr, row: formData[j] });
     }

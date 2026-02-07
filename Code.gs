@@ -4312,7 +4312,7 @@ function selectStaffForRecruitment(recruitRowIndex, selectedStaffComma) {
     const formSheet = ss.getSheetByName(SHEET_NAME);
     if (!recruitSheet || !formSheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
     const bookingRowNumber = recruitSheet.getRange(recruitRowIndex, 2).getValue();
-    recruitSheet.getRange(recruitRowIndex, 4).setValue('スタッフ確定済み');
+    // スタッフ選定時はステータスを変更しない（確定ボタンで別途変更）
     recruitSheet.getRange(recruitRowIndex, 5).setValue(selectedStaffComma || '');
     const headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     const columnMap = buildColumnMap(headers);
@@ -4333,6 +4333,25 @@ function selectStaffForRecruitment(recruitRowIndex, selectedStaffComma) {
         }
       }
     }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 募集を確定（募集締切）する。ステータスを「スタッフ確定済み」に変更。
+ */
+function confirmRecruitment(recruitRowIndex) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!recruitSheet || recruitSheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません' });
+    var staff = String(recruitSheet.getRange(recruitRowIndex, 5).getValue() || '').trim();
+    if (!staff) return JSON.stringify({ success: false, error: 'スタッフが選定されていません。先にスタッフを選定してください。' });
+    recruitSheet.getRange(recruitRowIndex, 4).setValue('スタッフ確定済み');
+    addNotification_('スタッフ確定', staff + ' をスタッフとして確定しました');
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

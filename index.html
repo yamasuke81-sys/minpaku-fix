@@ -1187,6 +1187,7 @@
             <button type="button" class="btn btn-sm btn-danger" id="btnRecruitEditCancel" style="display:none;">募集取消</button>
           </div>
           <div id="recruitEditSelectArea" class="mb-2" style="display:none;"><button type="button" class="btn btn-sm btn-primary" id="btnRecruitEditSelect">選定</button></div>
+          <div id="recruitEditConfirmArea" class="mb-2" style="display:none;"><button type="button" class="btn btn-sm btn-warning fw-bold" id="btnRecruitEditConfirm">確定（募集締切）</button></div>
           <div id="recruitEditVolunteerArea" class="mb-2" style="display:none;">
           </div>
           <div id="recruitEditLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;">
@@ -1676,18 +1677,10 @@
             html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
             html += '</div>';
 
-            // 清掃募集状況・回答状況・清掃担当・連絡事項・回答エリア（ひとくくり）
+            // 連絡事項（次回予約と募集状況の間）
             var staffVal = (d.cleaningStaff || '').trim();
             var staffUndecided = !staffVal;
-            html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
-            // 1. 清掃募集状況
-            html += '<div><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
-            // 2. 回答状況
-            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:none;"><strong><i class="bi bi-people"></i> 回答状況:</strong><div id="eventModalVolunteersList" class="mt-1"></div></div>';
-            // 3. 清掃担当
-            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
-            // 4. 連絡事項
-            html += '<div class="modal-memo-area mt-2"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
+            html += '<div class="modal-memo-area mt-2 mb-2"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
             if (!isStaffView) {
               html += '<textarea id="cleaningNoticeTextarea" class="form-control form-control-sm" rows="3" data-row="' + props.rowNumber + '">' + fmt(d.cleaningNotice || '') + '</textarea>';
               html += '<div class="text-end mt-1"><button id="btnSaveNotice" class="btn btn-sm btn-primary" onclick="saveCleaningNoticeUI()">連絡事項を保存</button></div>';
@@ -1695,8 +1688,17 @@
               html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.cleaningNotice || '') + '</div>';
             }
             html += '</div>';
-            // 5. 備考 + 6. 回答ボタン（スタッフ用、JSで動的に追加）
+
+            // 清掃募集状況カード: 募集状況→回答ボタン→備考→清掃担当→回答状況
+            html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
+            // 1. 募集状況
+            html += '<div><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
+            // 2. 回答ボタン + 備考入力欄（スタッフ用、JSで動的に追加）
             html += '<div id="eventModalVolunteerBodyArea" class="mt-2"></div>';
+            // 3. 清掃担当
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            // 4. 回答状況（ラベルなし）
+            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:none;"><div id="eventModalVolunteersList" class="mt-1"></div></div>';
             html += '</div>';
 
             // LINE用テキスト（オーナーのみ）
@@ -1852,7 +1854,7 @@
             }
             if (statusEl && cachedRec) {
               var cStatus = cachedRec.status || '';
-              statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
+              statusEl.textContent = cStatus === '募集中' ? 'スタッフ募集中' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
               statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
               statusEl.removeAttribute('style');
             }
@@ -1901,7 +1903,7 @@
               // 募集レコードの実際のステータスを使用（募集フロー経由の確定のみ反映）
               var effectiveStatus = r.status;
               if (statusEl && r.success) {
-                statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
+                statusEl.textContent = effectiveStatus === '募集中' ? 'スタッフ募集中' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
                 statusEl.removeAttribute('style');
               }
@@ -2015,10 +2017,6 @@
                     curBadge.innerHTML = '現在の回答: <strong>' + escapeHtml(myResponse) + '</strong>' + (myMemo ? '（' + escapeHtml(myMemo) + '）' : '');
                     volBodyArea.appendChild(curBadge);
                   }
-                  var changeMemoWrap = document.createElement('div');
-                  changeMemoWrap.className = 'mb-2';
-                  changeMemoWrap.innerHTML = '<label class="form-label small fw-bold">変更理由</label><input type="text" class="form-control form-control-sm" id="eventModalChangeMemo" placeholder="変更理由を記入">';
-                  volBodyArea.appendChild(changeMemoWrap);
                   var changeBtnRow = document.createElement('div');
                   changeBtnRow.className = 'd-flex gap-1 justify-content-center flex-wrap';
                   var changeOpts = [
@@ -2050,14 +2048,12 @@
                     changeBtnRow.appendChild(b);
                   });
                   volBodyArea.appendChild(changeBtnRow);
+                  var changeMemoWrap = document.createElement('div');
+                  changeMemoWrap.className = 'mt-2 mb-1';
+                  changeMemoWrap.innerHTML = '<label class="form-label small fw-bold">変更理由</label><input type="text" class="form-control form-control-sm" id="eventModalChangeMemo" placeholder="変更理由を記入">';
+                  volBodyArea.appendChild(changeMemoWrap);
                 } else if (volBodyArea && r.status === '募集中') {
-                  // 募集中: 通常の回答ボタン
-                  var memoWrap = document.createElement('div');
-                  memoWrap.className = 'mb-2';
-                  memoWrap.innerHTML = '<label class="form-label small fw-bold">備考（例：14時以降なら対応可能）</label><input type="text" class="form-control form-control-sm" id="eventModalResponseMemo" placeholder="何時からなら対応可能、など">';
-                  var memoInput = memoWrap.querySelector('input');
-                  if (memoInput && myMemo) memoInput.value = myMemo;
-                  volBodyArea.appendChild(memoWrap);
+                  // 募集中: 回答ボタン → 備考入力欄の順
                   if (myResponse && myResponse !== '未回答') {
                     var curBadge = document.createElement('div');
                     curBadge.className = 'small text-muted mb-1 text-center';
@@ -2093,6 +2089,12 @@
                     btnRow.appendChild(b);
                   });
                   volBodyArea.appendChild(btnRow);
+                  var memoWrap = document.createElement('div');
+                  memoWrap.className = 'mt-2 mb-1';
+                  memoWrap.innerHTML = '<label class="form-label small fw-bold">備考（例：14時以降なら対応可能）</label><input type="text" class="form-control form-control-sm" id="eventModalResponseMemo" placeholder="何時からなら対応可能、など">';
+                  var memoInput = memoWrap.querySelector('input');
+                  if (memoInput && myMemo) memoInput.value = myMemo;
+                  volBodyArea.appendChild(memoWrap);
                 }
               }
             } catch (e) {}
@@ -2140,7 +2142,7 @@
               }
               var ownerEffectiveStatus = r.status;
               if (statusEl && r.success) {
-                statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
+                statusEl.textContent = ownerEffectiveStatus === '募集中' ? 'スタッフ募集中' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
                 statusEl.removeAttribute('style');
               }
@@ -2282,6 +2284,25 @@
                     openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: r.checkoutDate || checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
                   };
                   btnRow.appendChild(emBtnSelect);
+                  // 確定（募集締切）ボタン: スタッフ選定済み + ステータスが募集中の場合のみ表示
+                  var hasSelectedStaff = (r.selectedStaff || '').trim() || (d.cleaningStaff || '').trim();
+                  if (hasSelectedStaff && r.status === '募集中') {
+                    var emBtnConfirm = document.createElement('button');
+                    emBtnConfirm.type = 'button';
+                    emBtnConfirm.className = 'btn btn-sm btn-warning fw-bold';
+                    emBtnConfirm.textContent = '確定（募集締切）';
+                    emBtnConfirm.onclick = function() {
+                      if (!confirm('スタッフを確定し、募集を締め切りますか？')) return;
+                      emBtnConfirm.disabled = true;
+                      emBtnConfirm.textContent = '処理中...';
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
+                        else { alert(res.error); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }
+                      }).withFailureHandler(function(e) { alert(e.message); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }).confirmRecruitment(r.recruitRowIndex);
+                    };
+                    btnRow.appendChild(emBtnConfirm);
+                  }
                   btnRow.appendChild(emBtnCancel);
                   ownerCenterArea.appendChild(btnRow);
                 }
@@ -3193,6 +3214,34 @@
         document.getElementById('btnRecruitEditCancel').style.display = (r.isNew || asStaff ? 'none' : (window.isOwnerUser ? '' : 'none'));
         var selectArea = document.getElementById('recruitEditSelectArea');
         selectArea.style.display = ((r.status === '募集中' || r.status === '選定済' || r.status === 'スタッフ確定済み') && !asStaff && !r.isNew && !r.asStaffTest) ? 'block' : 'none';
+        // 確定（募集締切）ボタン: スタッフ選定済み + ステータスが募集中の場合のみ表示
+        var confirmArea = document.getElementById('recruitEditConfirmArea');
+        var hasStaffSelected = (r.selectedStaff || r.cleaningStaff || '').trim();
+        if (confirmArea) {
+          confirmArea.style.display = (hasStaffSelected && r.status === '募集中' && !asStaff && !r.isNew) ? 'block' : 'none';
+        }
+        document.getElementById('btnRecruitEditConfirm').onclick = function() {
+          if (!confirm('スタッフを確定し、募集を締め切りますか？')) return;
+          var btn = document.getElementById('btnRecruitEditConfirm');
+          btn.disabled = true;
+          btn.textContent = '処理中...';
+          google.script.run.withSuccessHandler(function(j) {
+            var res = JSON.parse(j);
+            if (res.success) {
+              bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+              loadRecruitList();
+              loadAndRender();
+            } else {
+              alert(res.error);
+              btn.disabled = false;
+              btn.textContent = '確定（募集締切）';
+            }
+          }).withFailureHandler(function(e) {
+            alert(e.message);
+            btn.disabled = false;
+            btn.textContent = '確定（募集締切）';
+          }).confirmRecruitment(r.rowIndex);
+        };
         var volunteerArea = document.getElementById('recruitEditVolunteerArea');
         if (volunteerArea) {
           var isConfirmedStatus = (r.status === 'スタッフ確定済み' || r.status === '選定済');
@@ -4704,9 +4753,25 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
-              bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
-              loadRecruitList();
-              loadAndRender();
+              // スタッフ選定成功 → 確定するか確認
+              if (confirm('スタッフを選定しました。\n続けて募集を締め切り、確定しますか？\n\n「OK」→ 確定（募集締切）\n「キャンセル」→ 後で確定')) {
+                google.script.run.withSuccessHandler(function(cj) {
+                  var cr = JSON.parse(cj);
+                  bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
+                  loadRecruitList();
+                  loadAndRender();
+                  if (!cr.success) alert('確定に失敗しました: ' + (cr.error || ''));
+                }).withFailureHandler(function(ce) {
+                  bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
+                  loadRecruitList();
+                  loadAndRender();
+                  alert('確定に失敗しました: ' + ce.message);
+                }).confirmRecruitment(row);
+              } else {
+                bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
+                loadRecruitList();
+                loadAndRender();
+              }
             } else {
               errEl.textContent = r.error || '失敗';
               errEl.style.display = 'block';

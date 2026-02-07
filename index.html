@@ -1910,8 +1910,9 @@
                   if (volArea.style.display === 'block') volList.innerHTML = renderStaffResponses(r.volunteers);
                 }
               }
-              // キャンセル申請: スタッフ確定済み or cleaningStaffが設定済みの場合、本人にのみ表示
-              if (r.success && r.recruitRowIndex && (r.status === '選定済' || r.status === 'スタッフ確定済み' || resolvedStaff) && volBodyArea) {
+              // キャンセル申請: cleaningStaffが設定済みで募集中の場合のみ表示（スタッフ確定済みは回答変更要請で対応）
+              var isConfirmedForCancel = (r.status === 'スタッフ確定済み' || r.status === '選定済');
+              if (r.success && r.recruitRowIndex && !isConfirmedForCancel && resolvedStaff && volBodyArea) {
                 var assignedStaff = resolvedStaff;
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();

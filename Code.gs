@@ -3629,10 +3629,13 @@ function requestResponseChange(recruitId, staffName, staffEmail, newResponse, me
     if (['◎', '△', '×'].indexOf(newResponse) < 0) return JSON.stringify({ success: false, error: '無効な回答です' });
     var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
     var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-    // 回答変更要請シートに記録
+    // 回答変更要請シートに記録（既存のキャンセル申請シートに列を追加して共用）
     var crSheet = ss.getSheetByName('回答変更要請');
     if (!crSheet) {
       crSheet = ss.insertSheet('回答変更要請');
+      // セル数制限対策: デフォルトの行列数を最小にする
+      while (crSheet.getMaxColumns() > 7) crSheet.deleteColumn(crSheet.getMaxColumns());
+      while (crSheet.getMaxRows() > 2) crSheet.deleteRow(crSheet.getMaxRows());
       crSheet.getRange(1, 1, 1, 7).setValues([['募集ID', 'スタッフ名', 'メール', '変更後回答', '備考', '要請日時', 'ステータス']]);
     }
     var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');

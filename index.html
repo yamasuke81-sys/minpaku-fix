@@ -1663,12 +1663,12 @@
             var guestDisp = d.guestCountDisplay != null ? d.guestCountDisplay : formatGuestCount(d);
             html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-people-fill"></i> 宿泊人数:</strong></span><span class="detail-value">' + fmt(guestDisp) + '</span></div>';
 
-            // BBQ・駐車場バッジ
-            html += '<div class="modal-badge-row">';
-            html += bbqBadge(d.bbq);
-            var pBadge = parkingBadge(d.parking);
-            if (pBadge) html += pBadge;
-            html += '</div>';
+            // BBQ・駐車場（宿泊詳細と同じ縦並びレイアウト）
+            html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-fire"></i> BBQ:</strong></span><span class="detail-value">' + fmt(bbqAriNashi(d.bbq) || '-') + '</span></div>';
+            var parkDisp = parkingAriNashi(d.parking);
+            if (d.parking || parkDisp) {
+              html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-p-circle"></i> 有料駐車場:</strong></span><span class="detail-value">' + fmt(parkDisp || '-') + '</span></div>';
+            }
 
             // 次回予約の情報カード
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';

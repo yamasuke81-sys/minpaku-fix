@@ -1723,21 +1723,25 @@
               html += '</span></div>';
             }
 
-            // 清掃担当
+            // 清掃募集状況・立候補者・清掃担当（ひとくくり、清掃詳細と統一）
             var staffVal = (d.cleaningStaff || '').trim();
             var staffUndecided = !staffVal;
+            var recruitRec = (window._recruitFullMap || {})[props.rowNumber];
+            var rStatus = recruitRec ? (recruitRec.status || '') : '';
+            var rEffective = staffVal ? '選定済' : rStatus;
+            var rLabel = rEffective === '募集中' ? '清掃募集中' : (rEffective === '選定済' ? '選定済' : '未募集');
+            var rClass = rEffective === '募集中' ? 'status-recruiting' : (rEffective === '選定済' ? 'status-decided' : 'status-undecided');
             html += '<div class="modal-section-divider"></div>';
-            html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当:</div>';
-            html += '<div class="modal-staff-name" id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</div>';
-
-            // 募集状況バッジ（オーナーのみ）
-            if (!isStaffView) {
-              var recruitRec = (window._recruitFullMap || {})[props.rowNumber];
-              var rStatus = recruitRec ? (recruitRec.status || '') : '';
-              var rLabel = rStatus === '募集中' ? '清掃募集中' : (rStatus === '選定済' ? '選定済' : '未募集');
-              var rClass = rStatus === '募集中' ? 'status-recruiting' : (rStatus === '選定済' ? 'status-decided' : 'status-undecided');
-              html += '<div class="mt-1"><span class="recruit-status-badge px-2 py-1 rounded ' + rClass + '">' + rLabel + '</span></div>';
-            }
+            html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
+            // 1. 清掃募集状況
+            html += '<div><span class="recruit-status-badge px-2 py-1 rounded ' + rClass + '">' + rLabel + '</span></div>';
+            // 2. 立候補者
+            var volNames = (recruitRec && recruitRec.volunteers && recruitRec.volunteers.length) ? recruitRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : '';
+            var showVol = rEffective === '募集中' || (recruitRec && recruitRec.volunteers && recruitRec.volunteers.length);
+            html += '<div id="eventModalVolunteersArea" class="mt-1" style="display:' + (showVol ? 'block' : 'none') + ';"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList">' + fmt(volNames || 'なし') + '</span></div>';
+            // 3. 清掃担当
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            html += '</div>';
 
             // メモ（オーナー: 編集可, スタッフ: 閲覧のみ）
             if (d.memo || !isStaffView) {

@@ -263,7 +263,7 @@
       .recruit-status-badge { font-size: 0.95rem; font-weight: 600; }
       .recruit-status-badge.status-undecided { background: #dc3545; color: #fff; }
       .recruit-status-badge.status-recruiting { background: #ffc107; color: #000; }
-      .recruit-status-badge.status-decided { background: #0d6efd; color: #fff; }
+      .recruit-status-badge.status-decided { background: #198754; color: #fff; font-weight: 700; }
       .table {
         color: #e0e0e0 !important;
       }
@@ -359,7 +359,7 @@
     }
     .recruit-status-badge.status-undecided { background: #dc3545; color: #fff; }
     .recruit-status-badge.status-recruiting { background: #ffc107; color: #000; }
-    .recruit-status-badge.status-decided { background: #0d6efd; color: #fff; }
+    .recruit-status-badge.status-decided { background: #198754; color: #fff; font-weight: 700; }
     /* 清掃セクション: 回答状況 */
     .cleaning-section-volunteers {
       font-size: 0.85rem;
@@ -1387,10 +1387,12 @@
         return s + ' ' + name + (site ? ' ' + site : '');
       }
 
-      // 清掃イベントタイトル（フルネーム、カンマ区切り、省略なし）
+      // 清掃イベントタイトル（スタッフ名は頭1文字ずつ）
       function formatCleaningTitle(b) {
-        const staff = (b.cleaningStaff && String(b.cleaningStaff).trim()) ? String(b.cleaningStaff).trim() : '未定';
-        return '掃/' + staff;
+        var raw = (b.cleaningStaff && String(b.cleaningStaff).trim()) ? String(b.cleaningStaff).trim() : '';
+        if (!raw) return '掃/未定';
+        var initials = raw.split(/[,、]/).map(function(s) { return s.trim().charAt(0); }).filter(Boolean).join(',');
+        return '掃/' + initials;
       }
 
       // データ取得

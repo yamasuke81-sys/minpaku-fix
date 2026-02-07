@@ -1218,9 +1218,12 @@
       // staffModeはサーバー側のisStaffModeのみで判定（GAS iframe内のlocation.searchは信頼できない）
       window.staffMode = <?= isStaffMode ?>;
       // デバッグ: デプロイ確認用（タイトル横のバージョンにモード情報を追加）
+      // debugQueryString/debugStaffParam でサーバーが受け取ったクエリパラメータを表示
       try {
         var dv = document.getElementById('deployVersion');
-        if (dv) dv.textContent = 'v0207b ' + (window.staffMode ? 'STAFF' : 'OWNER');
+        var dbgQs = '<?= debugQueryString ?>';
+        var dbgSp = '<?= debugStaffParam ?>';
+        if (dv) dv.textContent = 'v0207c ' + (window.staffMode ? 'STAFF' : 'OWNER') + ' [qs=' + dbgQs + ' sp=' + dbgSp + ']';
       } catch(e) {}
 
       let calendar;
@@ -1610,30 +1613,28 @@
             html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
             html += '</div>';
 
-            // 清掃担当・募集状態セクション（ひとくくり）
+            // 清掃募集状況・立候補者・清掃担当・連絡事項・立候補エリア（ひとくくり）
             var staffVal = (d.cleaningStaff || '').trim();
             var staffUndecided = !staffVal;
             html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
-            html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
-            html += '<div class="mt-1"><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
+            // 1. 清掃募集状況
+            html += '<div><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
+            // 2. 立候補者
             html += '<div id="eventModalVolunteersArea" class="mt-1" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
-            html += '</div>';
-
-            // 連絡事項（オーナー: 編集可, スタッフ: 閲覧のみ）
-            {
-              html += '<div class="modal-section-divider"></div>';
-              html += '<div class="modal-memo-area"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
-              if (!isStaffView) {
-                html += '<textarea id="cleaningNoticeTextarea" class="form-control form-control-sm" rows="3" data-row="' + props.rowNumber + '">' + fmt(d.cleaningNotice || '') + '</textarea>';
-                html += '<div class="text-end mt-1"><button id="btnSaveNotice" class="btn btn-sm btn-primary" onclick="saveCleaningNoticeUI()">連絡事項を保存</button></div>';
-              } else {
-                html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.cleaningNotice || '') + '</div>';
-              }
-              html += '</div>';
+            // 3. 清掃担当
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            // 4. 連絡事項
+            html += '<div class="modal-memo-area mt-2"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
+            if (!isStaffView) {
+              html += '<textarea id="cleaningNoticeTextarea" class="form-control form-control-sm" rows="3" data-row="' + props.rowNumber + '">' + fmt(d.cleaningNotice || '') + '</textarea>';
+              html += '<div class="text-end mt-1"><button id="btnSaveNotice" class="btn btn-sm btn-primary" onclick="saveCleaningNoticeUI()">連絡事項を保存</button></div>';
+            } else {
+              html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.cleaningNotice || '') + '</div>';
             }
-
-            // スタッフ用: 立候補エリア（条件欄+ボタン、body内に配置）
-            html += '<div id="eventModalVolunteerBodyArea" class="mt-3"></div>';
+            html += '</div>';
+            // 5. 対応可能な条件 + 6. 立候補ボタン（スタッフ用、JSで動的に追加）
+            html += '<div id="eventModalVolunteerBodyArea" class="mt-2"></div>';
+            html += '</div>';
 
             // LINE用テキスト（オーナーのみ）
             if (!isStaffView) {

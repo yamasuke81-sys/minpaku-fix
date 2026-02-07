@@ -103,6 +103,9 @@ function doGet(e) {
   const template = HtmlService.createTemplateFromFile('index');
   template.baseUrl = ScriptApp.getService().getUrl();
   template.isStaffMode = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
+  // デバッグ用: クエリストリングをテンプレートに渡す（原因調査後に削除）
+  template.debugQueryString = String(e.queryString || '');
+  template.debugStaffParam = String(params.staff || '');
   const html = template.evaluate()
     .setTitle('民泊予約・清掃管理')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)

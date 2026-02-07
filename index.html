@@ -722,11 +722,11 @@
     </div>
     <ul class="nav nav-tabs mb-2" id="mainTabs">
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
-      <li class="nav-item" id="navRecruit"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
-      <li class="nav-item" id="navStaffSchedule" style="display:none;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
-      <li class="nav-item" id="navNotifications" style="display:none;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
-      <li class="nav-item" id="navSettings"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
-      <li class="nav-item" id="navStaffTest" style="display:none;"><a class="nav-link" href="#" data-tab="staffTest">スタッフ画面のテスト</a></li>
+      <li class="nav-item" id="navRecruit" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
+      <li class="nav-item" id="navStaffSchedule" style="display:<?= isStaffMode ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
+      <li class="nav-item" id="navNotifications" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
+      <li class="nav-item" id="navSettings" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
+      <li class="nav-item" id="navStaffTest" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="staffTest">スタッフ画面のテスト</a></li>
     </ul>
     <div id="panelCalendar">
       <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex flex-column gap-1">
@@ -742,7 +742,7 @@
           <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#0d6efd;border:1px solid #fff;"></span>決定済み</span>
         </div>
       </div>
-      <div id="calendarAddBookingArea" class="mb-2" style="display:none;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
+      <div id="calendarAddBookingArea" class="mb-2" style="display:<?= isStaffMode ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
     </div>
     <div id="panelRecruit" style="display:none;">
@@ -2441,6 +2441,35 @@
       }
 
       function init() {
+        // タブ表示をwindow.staffModeで即時設定（非同期コールバックに依存しない）
+        // オーナーURL = staffMode false → オーナータブ表示、スタッフURL = staffMode true → スタッフタブ表示
+        if (!window.staffMode) {
+          // オーナーモード: オーナータブを表示、スタッフ専用タブを非表示
+          window.isOwnerUser = true;
+          var ns = document.getElementById('navSettings');
+          if (ns) ns.style.display = '';
+          var nn = document.getElementById('navNotifications');
+          if (nn) nn.style.display = '';
+          var nst = document.getElementById('navStaffTest');
+          if (nst) nst.style.display = '';
+          var nss = document.getElementById('navStaffSchedule');
+          if (nss) nss.style.display = 'none';
+          var nr = document.getElementById('navRecruit');
+          if (nr) nr.style.display = '';
+        } else {
+          // スタッフモード: スタッフタブを表示、オーナー専用タブを非表示
+          window.isOwnerUser = false;
+          var ns2 = document.getElementById('navSettings');
+          if (ns2) ns2.style.display = 'none';
+          var nn2 = document.getElementById('navNotifications');
+          if (nn2) nn2.style.display = 'none';
+          var nst2 = document.getElementById('navStaffTest');
+          if (nst2) nst2.style.display = 'none';
+          var nss2 = document.getElementById('navStaffSchedule');
+          if (nss2) nss2.style.display = '';
+          var nr2 = document.getElementById('navRecruit');
+          if (nr2) nr2.style.display = 'none';
+        }
         if (window.staffMode) {
           var bar = document.getElementById('staffSelectorBar');
           if (bar) {

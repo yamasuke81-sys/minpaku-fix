@@ -684,7 +684,8 @@
 </head>
 <body>
   <div class="container-fluid py-2 py-md-3 px-2">
-    <div id="staffSelectOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="display:none !important; background:rgba(0,0,0,0.5); z-index:9999;">
+<? if (isStaffMode) { ?>
+    <div id="staffSelectOverlay" class="position-fixed top-0 start-0 w-100 h-100 align-items-center justify-content-center" style="display:none !important; background:rgba(0,0,0,0.5); z-index:9999;">
       <div class="bg-white rounded shadow p-4 m-2" style="max-width:320px;">
         <h6 class="mb-3">スタッフのお名前を選択してください</h6>
         <select class="form-select mb-3" id="staffSelectModalSelect">
@@ -693,6 +694,7 @@
         <button type="button" class="btn btn-primary w-100" id="staffSelectModalConfirm">決定</button>
       </div>
     </div>
+<? } ?>
     <div id="staffSelectorBar" class="alert alert-info py-2 mb-2" style="display:none;">
       <div class="d-flex gap-2 align-items-center flex-wrap align-items-center">
         <span class="small">スタッフ: <strong id="staffDisplayName"></strong></span>
@@ -4441,6 +4443,7 @@
         if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
       }
       function showStaffSelectOverlay() {
+        if (!window.staffMode) return;
         var ov = document.getElementById('staffSelectOverlay');
         if (ov) {
           ov.style.setProperty('display', 'flex', 'important');
@@ -4460,6 +4463,7 @@
         if (ov) ov.style.setProperty('display', 'none', 'important');
       }
       function showStaffSelectorAndHideTabs() {
+        if (!window.staffMode) return;
         window.isOwnerUser = false;
         var bar = document.getElementById('staffSelectorBar');
         if (bar) {
@@ -4485,9 +4489,10 @@
           }
         }
       }
-      if (!document.getElementById('staffSelectModalConfirm').dataset.listen) {
-        document.getElementById('staffSelectModalConfirm').dataset.listen = '1';
-        document.getElementById('staffSelectModalConfirm').addEventListener('click', function() {
+      var staffConfirmBtn = document.getElementById('staffSelectModalConfirm');
+      if (staffConfirmBtn && !staffConfirmBtn.dataset.listen) {
+        staffConfirmBtn.dataset.listen = '1';
+        staffConfirmBtn.addEventListener('click', function() {
           var sel = document.getElementById('staffSelectModalSelect');
           var v = (sel && sel.value || '').split('|');
           if (!v[0] && !v[1]) { alert('お名前を選択してください'); return; }

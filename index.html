@@ -1855,6 +1855,7 @@
               var cStatus = cachedStaffAssigned ? 'スタッフ確定済み' : (cachedRec.status || '');
               statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
               statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
+              statusEl.removeAttribute('style');
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
               if (!((d.cleaningStaff || '').trim()) && (cachedRec.status || '') === '募集中') {
@@ -1903,6 +1904,7 @@
               if (statusEl && r.success) {
                 statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
+                statusEl.removeAttribute('style');
               }
               if (volArea && volList && r.success) {
                 if (effectiveStatus === '募集中') {
@@ -2100,7 +2102,7 @@
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
-            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge px-2 py-1 rounded status-undecided'; }
+            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge px-2 py-1 rounded status-undecided'; sEl.removeAttribute('style'); }
           }).getRecruitmentForBooking(props.rowNumber);
         }
 
@@ -2141,6 +2143,7 @@
               if (statusEl && r.success) {
                 statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
+                statusEl.removeAttribute('style');
               }
               if (volArea && volList && r.success) {
                 volArea.style.display = 'block';
@@ -2392,7 +2395,7 @@
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
-            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge px-2 py-1 rounded status-undecided'; }
+            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge px-2 py-1 rounded status-undecided'; sEl.removeAttribute('style'); }
           }).getRecruitmentForBooking(props.rowNumber);
           setTimeout(function() {
             var addBtn = document.getElementById('eventModalAddStaff');

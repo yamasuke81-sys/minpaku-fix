@@ -987,6 +987,10 @@
             </select>
             <button type="button" class="btn btn-sm btn-outline-primary" id="btnStaffEditAdd">追加</button>
           </div>
+          <div id="staffEditOtherArea" class="d-flex gap-2 align-items-center mb-2" style="display:none !important;">
+            <input type="text" class="form-control form-control-sm flex-grow-1" id="staffEditOtherName" placeholder="名前を入力" style="max-width:200px;">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnStaffEditAddOther">追加</button>
+          </div>
           <input type="hidden" id="staffEditRowNumber">
           <div id="staffEditError" class="text-danger small mt-2" style="display:none;"></div>
         </div>
@@ -1209,6 +1213,10 @@
           <div class="d-flex gap-2 align-items-center mb-2">
             <select class="form-select form-select-sm flex-grow-1" id="recruitSelectStaffDropdown"></select>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddSelectStaff" title="追加">＋</button>
+          </div>
+          <div id="recruitSelectOtherArea" class="d-flex gap-2 align-items-center mb-2" style="display:none !important;">
+            <input type="text" class="form-control form-control-sm flex-grow-1" id="recruitSelectOtherName" placeholder="名前を入力">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAddSelectOther" title="追加">＋</button>
           </div>
           <input type="hidden" id="recruitSelectRowIndex">
           <div id="recruitSelectError" class="text-danger small mt-2" style="display:none;"></div>
@@ -2191,7 +2199,7 @@
                 btnEditStaff.textContent = '清掃担当を編集';
                 btnEditStaff.onclick = function() {
                   bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                  openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim());
+                  openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim(), r.volunteers || []);
                 };
                 ownerCenterArea.appendChild(btnEditStaff);
               }
@@ -2319,37 +2327,61 @@
       }
 
       // 清掃担当編集モーダルを開く
-      function openStaffEditModal(rowNumber, currentStaff) {
+      function openStaffEditModal(rowNumber, currentStaff, volunteers) {
         document.getElementById('staffEditRowNumber').value = rowNumber;
         document.getElementById('staffEditError').style.display = 'none';
         document.getElementById('staffEditError').textContent = '';
         var names = (currentStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
         window._staffEditNames = names;
         renderStaffEditList();
-        google.script.run.withSuccessHandler(function(sStr) {
-          try {
-            var s = JSON.parse(sStr);
-            var sel = document.getElementById('staffEditAddSelect');
-            if (sel && s.success && s.list && s.list.length) {
-              sel.innerHTML = '<option value="">追加するスタッフを選択</option>';
-              s.list.forEach(function(st) {
-                var label = (st.name || st.email) + (st.email ? ' (' + st.email + ')' : '');
-                sel.innerHTML += '<option value="' + escapeHtml(st.name || '') + '">' + escapeHtml(label) + '</option>';
-              });
+        var sel = document.getElementById('staffEditAddSelect');
+        var otherArea = document.getElementById('staffEditOtherArea');
+        var otherInput = document.getElementById('staffEditOtherName');
+        if (sel) {
+          sel.innerHTML = '<option value="">追加するスタッフを選択</option>';
+          var volList = volunteers || [];
+          volList.forEach(function(v) {
+            var name = (v.staffName || '').trim();
+            if (name) sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+          });
+          sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
+        }
+        if (otherArea) otherArea.style.setProperty('display', 'none', 'important');
+        if (otherInput) otherInput.value = '';
+        if (sel && !sel.dataset.listen) {
+          sel.dataset.listen = '1';
+          sel.addEventListener('change', function() {
+            if (sel.value === '__other__') {
+              if (otherArea) otherArea.style.setProperty('display', 'flex', 'important');
+              if (otherInput) otherInput.focus();
+            } else {
+              if (otherArea) otherArea.style.setProperty('display', 'none', 'important');
             }
-          } catch (e) {}
-        }).getStaffNamesForSelection();
+          });
+        }
         var addBtn = document.getElementById('btnStaffEditAdd');
         if (addBtn && !addBtn.dataset.listen) {
           addBtn.dataset.listen = '1';
           addBtn.onclick = function() {
-            var sel = document.getElementById('staffEditAddSelect');
             var v = (sel && sel.value || '').trim();
+            if (!v || v === '__other__') return;
+            if (!window._staffEditNames) window._staffEditNames = [];
+            if (window._staffEditNames.indexOf(v) >= 0) return;
+            window._staffEditNames.push(v);
+            renderStaffEditList();
+          };
+        }
+        var addOtherBtn = document.getElementById('btnStaffEditAddOther');
+        if (addOtherBtn && !addOtherBtn.dataset.listen) {
+          addOtherBtn.dataset.listen = '1';
+          addOtherBtn.onclick = function() {
+            var v = (otherInput && otherInput.value || '').trim();
             if (!v) return;
             if (!window._staffEditNames) window._staffEditNames = [];
             if (window._staffEditNames.indexOf(v) >= 0) return;
             window._staffEditNames.push(v);
             renderStaffEditList();
+            if (otherInput) otherInput.value = '';
           };
         }
         new bootstrap.Modal(document.getElementById('staffEditModal')).show();
@@ -3295,6 +3327,22 @@
           var name = (v.staffName || v.email || '').trim();
           if (name) sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
         });
+        sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
+        var rsOtherArea = document.getElementById('recruitSelectOtherArea');
+        var rsOtherInput = document.getElementById('recruitSelectOtherName');
+        if (rsOtherArea) rsOtherArea.style.setProperty('display', 'none', 'important');
+        if (rsOtherInput) rsOtherInput.value = '';
+        if (!sel.dataset.listen) {
+          sel.dataset.listen = '1';
+          sel.addEventListener('change', function() {
+            if (sel.value === '__other__') {
+              if (rsOtherArea) rsOtherArea.style.setProperty('display', 'flex', 'important');
+              if (rsOtherInput) rsOtherInput.focus();
+            } else {
+              if (rsOtherArea) rsOtherArea.style.setProperty('display', 'none', 'important');
+            }
+          });
+        }
         renderRecruitSelectStaffList();
         new bootstrap.Modal(document.getElementById('recruitSelectModal')).show();
       }
@@ -4453,11 +4501,21 @@
       document.getElementById('btnAddSelectStaff').addEventListener('click', function() {
         var sel = document.getElementById('recruitSelectStaffDropdown');
         var name = (sel.value || '').trim();
+        if (!name || name === '__other__') return;
+        window._recruitSelectStaffNames = window._recruitSelectStaffNames || [];
+        if (window._recruitSelectStaffNames.indexOf(name) >= 0) return;
+        window._recruitSelectStaffNames.push(name);
+        renderRecruitSelectStaffList();
+      });
+      document.getElementById('btnAddSelectOther').addEventListener('click', function() {
+        var input = document.getElementById('recruitSelectOtherName');
+        var name = (input && input.value || '').trim();
         if (!name) return;
         window._recruitSelectStaffNames = window._recruitSelectStaffNames || [];
         if (window._recruitSelectStaffNames.indexOf(name) >= 0) return;
         window._recruitSelectStaffNames.push(name);
         renderRecruitSelectStaffList();
+        if (input) input.value = '';
       });
 
       document.getElementById('btnConfirmSelect').addEventListener('click', function() {

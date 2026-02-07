@@ -2764,20 +2764,18 @@ function getBookingDetailsForRecruit(bookingRowNumber, recruitRowIndex) {
       ensureRecruitDetailColumns_();
       var maxRecruitCol = Math.max(recruitSheet.getLastColumn(), 15);
       var recruitRow = recruitSheet.getRange(recruitRowIndex, 1, 1, maxRecruitCol).getValues()[0];
-      var rawDate = recruitRow[0];
-      cleaningDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : toDateKeySafe_(rawDate) || String(rawDate).trim()) : '';
       cleaningStaff = String(recruitRow[4] || '').trim();
       // キャッシュ列(10-15)は使わない: 常にフォームシートから最新データを計算
+      // cleaningDate は募集シートではなくフォームシートから取得する（ソートで行番号がずれた場合の対策）
     }
     if (formSheet && formSheet.getLastRow() >= bookingRowNumber) {
       const headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
       var colMap = buildColumnMap(headers);
       if (colMap.checkIn < 0 || colMap.checkOut < 0) colMap = buildColumnMapFromSource_(headers);
       const row = formSheet.getRange(bookingRowNumber, 1, 1, formSheet.getLastColumn()).getValues()[0];
-      if (!cleaningDate) {
-        var checkOut = colMap.checkOut >= 0 ? row[colMap.checkOut] : null;
-        cleaningDate = checkOut ? (checkOut instanceof Date ? Utilities.formatDate(checkOut, 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(checkOut) || String(checkOut).trim())) : '';
-      }
+      // 常にフォームシートのチェックアウト日を基準にする（募集シートの値はソート後に古くなりうる）
+      var checkOut = colMap.checkOut >= 0 ? row[colMap.checkOut] : null;
+      cleaningDate = checkOut ? (checkOut instanceof Date ? Utilities.formatDate(checkOut, 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(checkOut) || String(checkOut).trim())) : '';
       if (!cleaningStaff && colMap.cleaningStaff >= 0) cleaningStaff = String(row[colMap.cleaningStaff] || '').trim();
       var cd = cleaningDate || '';
       var normCleaningDate = cd.match(/^\d{4}-\d{2}-\d{2}$/) ? cd : (toDateKeySafe_(parseDate(cd) || cd) || cd);
@@ -3789,8 +3787,18 @@ function getRecruitmentStatusMap() {
       return best;
     }
 
+    // チェックアウト日→現在のフォーム行番号のマッピングを構築（ソート後の行番号ずれ対策）
+    var coToCurrentRow = {};
+    if (formData && formColMap && formColMap.checkOut >= 0) {
+      for (var f = 0; f < formData.length; f++) {
+        var fCoRaw = formData[f][formColMap.checkOut];
+        var fCoStr = parseDate(fCoRaw) ? toDateKeySafe_(parseDate(fCoRaw)) : toDateKeySafe_(fCoRaw);
+        if (fCoStr && !coToCurrentRow[fCoStr]) coToCurrentRow[fCoStr] = f + 2;
+      }
+    }
+
     for (var i = 0; i < rows.length; i++) {
-      var rowNum = Number(rows[i][1]);
+      var staleRowNum = Number(rows[i][1]);
       var status = String(rows[i][3] || '').trim() || '募集中';
       var staff = String(rows[i][4] || '').trim();
       var rid = 'r' + (i + 2);
@@ -3800,15 +3808,18 @@ function getRecruitmentStatusMap() {
       // チェックアウト日
       var rawDate = rows[i][0];
       var checkoutDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(rawDate)) : '';
+      var normCo = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
+      // 現在のフォーム行番号に変換（ソート対策）、見つからなければ元の行番号を使用
+      var currentRowNum = (normCo && coToCurrentRow[normCo]) ? coToCurrentRow[normCo] : staleRowNum;
 
       // 次回予約情報: 常に最新データから計算（キャッシュは古くなる可能性があるため）
       var nextRes = null;
       if (checkoutDate) {
-        var normDate = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
-        nextRes = findNextRes_(normDate, rowNum);
+        var normDate = normCo;
+        nextRes = findNextRes_(normDate, currentRowNum);
       }
 
-      if (rowNum) map[rowNum] = {
+      if (currentRowNum) map[currentRowNum] = {
         status: status,
         staff: staff,
         volunteers: volunteers,
@@ -3932,57 +3943,86 @@ function getRecruitmentForBooking(bookingRowNumber) {
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return JSON.stringify({ success: true, recruitRowIndex: 0, volunteers: [], status: '', checkoutDate: '' });
     var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), 5).getValues();
+    // まず行番号で一致を試みる
+    var matchIdx = -1;
     for (var i = 0; i < rows.length; i++) {
       if (Number(rows[i][1]) === bookingRowNumber) {
-        var recruitRowIndex = i + 2;
-        var checkoutDate = rows[i][0] ? (rows[i][0] instanceof Date ? Utilities.formatDate(rows[i][0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(rows[i][0])) : '';
-        var status = String(rows[i][3] || '').trim() || '募集中';
-        var volunteers = [];
-        if (volSheet && volSheet.getLastRow() >= 2) {
-          ensureVolunteerStatusColumns_();
-          var volLastCol = Math.max(volSheet.getLastColumn(), 7);
-          var volRows = volSheet.getRange(2, 1, volSheet.getLastRow(), volLastCol).getValues();
-          var rid = 'r' + recruitRowIndex;
-          volRows.forEach(function(vr) {
-            if (String(vr[0] || '').trim() === rid) {
-              volunteers.push({
-                staffName: String(vr[1] || '').trim(),
-                email: String(vr[2] || '').trim(),
-                at: String(vr[3] || '').trim(),
-                volStatus: String(vr[5] || '').trim() || 'volunteered',
-                holdReason: String(vr[6] || '').trim()
-              });
-            }
-          });
-        }
-        var cancelRequested = [];
-        var cancelRejected = [];
-        var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
-        if (crSheet && crSheet.getLastRow() >= 2) {
-          var crLastCol = Math.max(crSheet.getLastColumn(), 5);
-          var crRows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, crLastCol).getValues();
-          var rid2 = 'r' + recruitRowIndex;
-          crRows.forEach(function(cr) {
-            if (String(cr[0] || '').trim() === rid2) {
-              var crStatus = String(cr[4] || '').trim();
-              var entry = { staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() };
-              if (crStatus === 'rejected') {
-                cancelRejected.push(entry);
-              } else {
-                cancelRequested.push(entry);
-              }
-            }
-          });
-        }
-        var nextReservation = null;
-        try {
-          var detStr = getBookingDetailsForRecruit(bookingRowNumber, recruitRowIndex);
-          var det = JSON.parse(detStr);
-          if (det.success && det.nextReservation) nextReservation = det.nextReservation;
-        } catch (er) {}
-        var selectedStaff = String(rows[i][4] || '').trim();
-        return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested, cancelRejected: cancelRejected });
+        matchIdx = i;
+        break;
       }
+    }
+    // 行番号で見つからなければ、チェックアウト日で一致を試みる（ソート後の行番号ずれ対策）
+    if (matchIdx < 0) {
+      var formSheet = ss.getSheetByName(SHEET_NAME);
+      if (formSheet && formSheet.getLastRow() >= bookingRowNumber) {
+        var fHeaders = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+        var fColMap = buildColumnMap(fHeaders);
+        if (fColMap.checkIn < 0 || fColMap.checkOut < 0) fColMap = buildColumnMapFromSource_(fHeaders);
+        var fRow = formSheet.getRange(bookingRowNumber, 1, 1, formSheet.getLastColumn()).getValues()[0];
+        var targetCo = fColMap.checkOut >= 0 ? fRow[fColMap.checkOut] : null;
+        var targetCoStr = targetCo ? (targetCo instanceof Date ? Utilities.formatDate(targetCo, 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(targetCo) || String(targetCo).trim())) : '';
+        if (targetCoStr) {
+          for (var j = 0; j < rows.length; j++) {
+            var rCo = rows[j][0] ? (rows[j][0] instanceof Date ? Utilities.formatDate(rows[j][0], 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(rows[j][0]) || String(rows[j][0]).trim())) : '';
+            if (rCo === targetCoStr) {
+              matchIdx = j;
+              // 募集シートの行番号を現在の値に自動修正（自己修復）
+              recruitSheet.getRange(j + 2, 2).setValue(bookingRowNumber);
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (matchIdx >= 0) {
+      var recruitRowIndex = matchIdx + 2;
+      var checkoutDate = rows[matchIdx][0] ? (rows[matchIdx][0] instanceof Date ? Utilities.formatDate(rows[matchIdx][0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(rows[matchIdx][0])) : '';
+      var status = String(rows[matchIdx][3] || '').trim() || '募集中';
+      var volunteers = [];
+      if (volSheet && volSheet.getLastRow() >= 2) {
+        ensureVolunteerStatusColumns_();
+        var volLastCol = Math.max(volSheet.getLastColumn(), 7);
+        var volRows = volSheet.getRange(2, 1, volSheet.getLastRow(), volLastCol).getValues();
+        var rid = 'r' + recruitRowIndex;
+        volRows.forEach(function(vr) {
+          if (String(vr[0] || '').trim() === rid) {
+            volunteers.push({
+              staffName: String(vr[1] || '').trim(),
+              email: String(vr[2] || '').trim(),
+              at: String(vr[3] || '').trim(),
+              volStatus: String(vr[5] || '').trim() || 'volunteered',
+              holdReason: String(vr[6] || '').trim()
+            });
+          }
+        });
+      }
+      var cancelRequested = [];
+      var cancelRejected = [];
+      var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+      if (crSheet && crSheet.getLastRow() >= 2) {
+        var crLastCol = Math.max(crSheet.getLastColumn(), 5);
+        var crRows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, crLastCol).getValues();
+        var rid2 = 'r' + recruitRowIndex;
+        crRows.forEach(function(cr) {
+          if (String(cr[0] || '').trim() === rid2) {
+            var crStatus = String(cr[4] || '').trim();
+            var entry = { staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() };
+            if (crStatus === 'rejected') {
+              cancelRejected.push(entry);
+            } else {
+              cancelRequested.push(entry);
+            }
+          }
+        });
+      }
+      var nextReservation = null;
+      try {
+        var detStr = getBookingDetailsForRecruit(bookingRowNumber, recruitRowIndex);
+        var det = JSON.parse(detStr);
+        if (det.success && det.nextReservation) nextReservation = det.nextReservation;
+      } catch (er) {}
+      var selectedStaff = String(rows[matchIdx][4] || '').trim();
+      return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested, cancelRejected: cancelRejected });
     }
     var nextReservation = null;
     try {

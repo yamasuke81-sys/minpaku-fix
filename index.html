@@ -708,6 +708,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0207a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
       </div>
       <a href="#" id="btnAccountSwitch" class="btn btn-sm btn-link text-muted p-0" style="display:none; font-size:0.85rem;">アカウント切り替え</a>
@@ -1216,6 +1217,11 @@
       'use strict';
       var staffParam = (typeof location !== 'undefined' && location.search) ? location.search : '';
       window.staffMode = <?= isStaffMode ?> || (staffParam.indexOf('staff=1') >= 0 || staffParam.indexOf('staff=true') >= 0);
+      // デバッグ: デプロイ確認用（タイトル横のバージョンにモード情報を追加）
+      try {
+        var dv = document.getElementById('deployVersion');
+        if (dv) dv.textContent = 'v0207a ' + (window.staffMode ? 'STAFF' : 'OWNER') + ' tpl=<?= isStaffMode ?>';
+      } catch(e) {}
 
       let calendar;
       let allBookings = [];
@@ -1602,16 +1608,16 @@
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
             html += '<div class="card-title-sm"><i class="bi bi-info-circle"></i>次回予約の情報（変更の可能性あり）</div>';
             html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
-            html += '<div class="mt-2"><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
-            html += '<div id="eventModalVolunteersArea" class="mt-2" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
             html += '</div>';
 
-            // 清掃担当（次回予約の下、連絡事項の上）
+            // 清掃担当・募集状態セクション（ひとくくり）
             var staffVal = (d.cleaningStaff || '').trim();
             var staffUndecided = !staffVal;
-            html += '<div class="modal-section-divider"></div>';
-            html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当:</div>';
-            html += '<div class="modal-staff-name" id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</div>';
+            html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
+            html += '<div class="modal-staff-label ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            html += '<div class="mt-1"><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
+            html += '<div id="eventModalVolunteersArea" class="mt-1" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
+            html += '</div>';
 
             // 連絡事項（オーナー: 編集可, スタッフ: 閲覧のみ）
             {

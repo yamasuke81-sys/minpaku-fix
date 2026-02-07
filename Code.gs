@@ -102,7 +102,10 @@ function doGet(e) {
   }
   const template = HtmlService.createTemplateFromFile('index');
   template.baseUrl = ScriptApp.getService().getUrl();
-  template.isStaffMode = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
+  var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
+  template.isStaffMode = isStaff;
+  // GASテンプレートでbooleanが正しく出力されない場合の対策: 明示的に文字列で渡す
+  template.staffModeStr = isStaff ? 'yes' : 'no';
   // デバッグ用: クエリストリングをテンプレートに渡す（原因調査後に削除）
   template.debugQueryString = String(e.queryString || '');
   template.debugStaffParam = String(params.staff || '');

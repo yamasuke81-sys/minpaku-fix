@@ -685,7 +685,7 @@
 </head>
 <body>
   <div class="container-fluid py-2 py-md-3 px-2">
-<? if (isStaffMode) { ?>
+<? if (staffModeStr === 'yes') { ?>
     <div id="staffSelectOverlay" class="position-fixed top-0 start-0 w-100 h-100 align-items-center justify-content-center" style="display:none !important; background:rgba(0,0,0,0.5); z-index:9999;">
       <div class="bg-white rounded shadow p-4 m-2" style="max-width:320px;">
         <h6 class="mb-3">スタッフのお名前を選択してください</h6>
@@ -723,11 +723,11 @@
     </div>
     <ul class="nav nav-tabs mb-2" id="mainTabs">
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
-      <li class="nav-item" id="navRecruit" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
-      <li class="nav-item" id="navStaffSchedule" style="display:<?= isStaffMode ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
-      <li class="nav-item" id="navNotifications" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
-      <li class="nav-item" id="navSettings" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
-      <li class="nav-item" id="navStaffTest" style="display:<?= isStaffMode ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="staffTest">スタッフ画面のテスト</a></li>
+      <li class="nav-item" id="navRecruit" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
+      <li class="nav-item" id="navStaffSchedule" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
+      <li class="nav-item" id="navNotifications" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
+      <li class="nav-item" id="navSettings" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
+      <li class="nav-item" id="navStaffTest" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="staffTest">スタッフ画面のテスト</a></li>
     </ul>
     <div id="panelCalendar">
       <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex flex-column gap-1">
@@ -743,7 +743,7 @@
           <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#0d6efd;border:1px solid #fff;"></span>決定済み</span>
         </div>
       </div>
-      <div id="calendarAddBookingArea" class="mb-2" style="display:<?= isStaffMode ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
+      <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
     </div>
     <div id="panelRecruit" style="display:none;">
@@ -1215,15 +1215,16 @@
   <script>
     (function() {
       'use strict';
-      // staffModeはサーバー側のisStaffModeのみで判定（GAS iframe内のlocation.searchは信頼できない）
-      window.staffMode = <?= isStaffMode ?>;
-      // デバッグ: デプロイ確認用（タイトル横のバージョンにモード情報を追加）
-      // debugQueryString/debugStaffParam でサーバーが受け取ったクエリパラメータを表示
+      // staffModeは文字列比較で確実に判定（GASテンプレートのboolean出力問題を回避）
+      window.staffMode = ('<?= staffModeStr ?>' === 'yes');
+      // デバッグ: デプロイ確認用
       try {
         var dv = document.getElementById('deployVersion');
         var dbgQs = '<?= debugQueryString ?>';
         var dbgSp = '<?= debugStaffParam ?>';
-        if (dv) dv.textContent = 'v0207c ' + (window.staffMode ? 'STAFF' : 'OWNER') + ' [qs=' + dbgQs + ' sp=' + dbgSp + ']';
+        var dbgRaw = '<?= isStaffMode ?>';
+        var dbgStr = '<?= staffModeStr ?>';
+        if (dv) dv.textContent = 'v0207d ' + (window.staffMode ? 'STAFF' : 'OWNER') + ' [qs=' + dbgQs + ' sp=' + dbgSp + ' raw=' + dbgRaw + ' str=' + dbgStr + ']';
       } catch(e) {}
 
       let calendar;

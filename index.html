@@ -1754,6 +1754,11 @@
               }
               html += '</div>';
             }
+
+            // 予約削除ボタン（オーナーのみ、body内に配置）
+            if (!isStaffView) {
+              html += '<div id="eventModalBookingActions" class="mt-3"></div>';
+            }
           }
         }
         document.getElementById('eventModalBody').innerHTML = html || '<p>データがありません。</p>';
@@ -1762,29 +1767,27 @@
         // フッターボタン設定
         var actionBtns = document.getElementById('eventModalActionBtns');
         if (actionBtns) actionBtns.innerHTML = '';
+        // フッターの削除ボタン・アクションボタンは常に非表示（body内に移動済み）
         var deleteArea = document.getElementById('eventModalDeleteArea');
-        var btnDel = document.getElementById('btnDeleteBooking');
-        if (btnDel) {
-          var showDel = (type === 'booking' && !isStaffView);
-          if (showDel) {
-            deleteArea.style.display = '';
-            btnDel.dataset.rowNumber = props.rowNumber;
-            if (d) {
-              btnDel.dataset.checkIn = (d.checkIn || '').toString();
-              btnDel.dataset.checkOut = (d.checkOut || '').toString();
-              btnDel.dataset.guestName = (d.guestName || '').toString();
-            }
-          } else {
-            deleteArea.style.display = 'none';
-          }
-        }
+        if (deleteArea) deleteArea.style.display = 'none';
         var centerArea = document.getElementById('eventModalVolunteerCenter');
-        if (centerArea) {
-          centerArea.innerHTML = '';
-          if (type === 'booking') {
-            centerArea.style.display = 'none';
-          } else {
-            centerArea.style.display = '';
+        if (centerArea) { centerArea.innerHTML = ''; centerArea.style.display = 'none'; }
+
+        // 宿泊詳細: 予約削除ボタンをbody内に配置（既存の確認モーダルを使用）
+        if (type === 'booking' && !isStaffView) {
+          var bookingActionsArea = document.getElementById('eventModalBookingActions');
+          if (bookingActionsArea) {
+            var btnDel = document.createElement('button');
+            btnDel.type = 'button';
+            btnDel.className = 'btn btn-sm btn-danger w-100';
+            btnDel.textContent = '予約を削除';
+            btnDel.onclick = function() {
+              document.getElementById('deleteBookingConfirmInfo').innerHTML = 'チェックイン: ' + escapeHtml((d.checkIn || '').toString()) + '<br>チェックアウト: ' + escapeHtml((d.checkOut || '').toString()) + (d.guestName ? '<br>宿泊者: ' + escapeHtml(d.guestName) : '');
+              document.getElementById('btnConfirmDeleteBooking').dataset.rowNumber = props.rowNumber;
+              bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+              new bootstrap.Modal(document.getElementById('deleteBookingConfirmModal')).show();
+            };
+            bookingActionsArea.appendChild(btnDel);
           }
         }
 
@@ -1857,7 +1860,7 @@
                 }
               }
               // キャンセル申請: 選定済 or cleaningStaffが設定済みの場合、本人にのみ表示
-              if (r.success && r.recruitRowIndex && (r.status === '選定済' || staffAssigned) && centerArea) {
+              if (r.success && r.recruitRowIndex && (r.status === '選定済' || staffAssigned) && volBodyArea) {
                 var assignedStaff = r.selectedStaff || staffAssigned;
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
@@ -1901,33 +1904,32 @@
                       }).clearCancelRejection(r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
                     };
                     rejWrap.appendChild(rejConfirmBtn);
-                    centerArea.appendChild(rejWrap);
+                    volBodyArea.appendChild(rejWrap);
                   } else if (alreadyRequested) {
                     var pendingBadge = document.createElement('div');
                     pendingBadge.className = 'alert alert-warning py-1 px-2 small mb-0';
                     pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> キャンセル申請中（オーナーの承認待ち）';
-                    centerArea.appendChild(pendingBadge);
+                    volBodyArea.appendChild(pendingBadge);
                   } else {
                     var cancelReqBtn = document.createElement('button');
                     cancelReqBtn.type = 'button';
-                    cancelReqBtn.className = 'btn btn-sm btn-danger me-1';
+                    cancelReqBtn.className = 'btn btn-sm btn-danger w-100';
                     cancelReqBtn.textContent = 'キャンセル申請';
                     cancelReqBtn.onclick = function() {
                       if (!confirm('出勤キャンセルの要望を提出します。\n\nよろしいですか？（OK=はい、キャンセル=いいえ）')) return;
-                      // 即座にUIフィードバック（サーバー応答を待たない）
                       cancelReqBtn.disabled = true;
                       cancelReqBtn.textContent = '申請中...';
-                      cancelReqBtn.className = 'btn btn-sm btn-secondary me-1';
+                      cancelReqBtn.className = 'btn btn-sm btn-secondary w-100';
                       google.script.run.withSuccessHandler(function(j) {
                         var res = JSON.parse(j);
                         if (res.success) {
                           bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
-                        } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger me-1'; }
-                      }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger me-1'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                        } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
+                      }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                     };
-                    centerArea.appendChild(cancelReqBtn);
+                    volBodyArea.appendChild(cancelReqBtn);
                   }
                 }
               }
@@ -1992,7 +1994,7 @@
               var statusEl = document.getElementById('eventModalStaffRecruitStatus');
               var volArea = document.getElementById('eventModalVolunteersArea');
               var volList = document.getElementById('eventModalVolunteersList');
-              var ownerCenterArea = centerArea;
+              var ownerCenterArea = document.getElementById('eventModalVolunteerBodyArea');
               if (nextEl && r.success) {
                 var nr = r.nextReservation || {};
                 if (nr.date) {

@@ -403,8 +403,15 @@ function toDateKeySafe_(val) {
  * 対応: ISO形式、スラッシュ区切り、ハイフン区切り
  */
 function parseDate(str) {
-  if (!str) return null;
+  if (!str && str !== 0) return null;
   if (str instanceof Date) return str;
+  // 数値型（Excelシリアル値）の場合も処理
+  if (typeof str === 'number') {
+    if (str > 0) {
+      try { return new Date((str - 25569) * 86400 * 1000); } catch (e) { return null; }
+    }
+    return null;
+  }
   if (typeof str !== 'string') return null;
   str = str.trim();
   if (!str) return null;
@@ -2509,8 +2516,9 @@ function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr,
 
   var bestFormRow = null;
   var bestColMap = null;
-  if (formSheet && (colMap.checkIn >= 0 && colMap.checkOut >= 0)) {
-    var data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+  var formLastRow = formSheet ? formSheet.getLastRow() : 0;
+  if (formSheet && formLastRow >= 2 && (colMap.checkIn >= 0 && colMap.checkOut >= 0)) {
+    var data = formSheet.getRange(2, 1, formLastRow - 1, formSheet.getLastColumn()).getValues();
     // 除外行のチェックイン日を取得（重複行スキップ用）
     var excludeCi = '';
     if (excludeRowNumber && excludeRowNumber >= 2 && (excludeRowNumber - 2) < data.length) {
@@ -2564,7 +2572,7 @@ function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr,
     if (staffSheet && staffSheet.getLastRow() >= 2) {
       usedColMap = buildColumnMapFromSource_(staffSheet.getRange(1, 1, 1, staffSheet.getLastColumn()).getValues()[0]);
       if (usedColMap.checkIn >= 0 && usedColMap.checkOut >= 0) {
-        var staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow(), staffSheet.getLastColumn()).getValues();
+        var staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, staffSheet.getLastColumn()).getValues();
         for (var j = 0; j < staffData.length; j++) {
           var sRow = staffData[j];
           var sCheckIn = parseDate(sRow[usedColMap.checkIn]);
@@ -3022,9 +3030,13 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     var rid = 'r' + recruitRowIndex;
     var sName = (staffName || staff).trim();
     var sEmail = (staffEmail || '').trim().toLowerCase();
-    // 最優先: シートへの書き込み（重複チェック付き）
-    var crSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CANCEL_REQUESTS);
-    if (crSheet) {
+
+    // 排他ロックで同時送信を防止
+    var lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      var crSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CANCEL_REQUESTS);
+      if (!crSheet) { lock.releaseLock(); return JSON.stringify({ success: true }); }
       // 既に同一スタッフの pending な申請があればスキップ
       var alreadyExists = false;
       if (crSheet.getLastRow() >= 2) {
@@ -3033,7 +3045,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
         for (var c = 0; c < crData.length; c++) {
           if (String(crData[c][0]).trim() !== rid) continue;
           var crStatus = String(crData[c][4] || '').trim();
-          if (crStatus === 'rejected') continue; // rejected は無視
+          if (crStatus === 'rejected') continue;
           var m1 = sName && String(crData[c][1] || '').trim() === sName;
           var m2 = sEmail && String(crData[c][2] || '').trim().toLowerCase() === sEmail;
           if (m1 || m2) { alreadyExists = true; break; }
@@ -3042,9 +3054,18 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
       if (!alreadyExists) {
         var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
         crSheet.appendRow([rid, staffName || staff, staffEmail || '', now, '']);
+        SpreadsheetApp.flush();
       }
+      lock.releaseLock();
+    } catch (lockErr) {
+      try { lock.releaseLock(); } catch (e2) {}
+      if (lockErr.toString().indexOf('Lock') >= 0) return JSON.stringify({ success: true });
+      throw lockErr;
     }
-    SpreadsheetApp.flush();
+
+    // 既に申請済みなら通知・メールも送らない
+    if (alreadyExists) return JSON.stringify({ success: true });
+
     // 通知（シート書き込み）
     try { addNotification_('出勤キャンセル要望', dateStr + ': ' + staff + ' が出勤キャンセルの要望を提出しました', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr }); } catch (ne) {}
     // メール送信（最も遅い処理 - 失敗しても成功扱い）
@@ -3606,7 +3627,7 @@ function getRecruitmentStatusMap() {
       var fHeaders = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
       formColMap = buildColumnMap(fHeaders);
       if (formColMap.checkIn < 0 || formColMap.checkOut < 0) formColMap = buildColumnMapFromSource_(fHeaders);
-      formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+      formData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     }
     // チェックイン日でソート済みの予約一覧を事前構築
     var sortedBookings = [];
@@ -3626,7 +3647,7 @@ function getRecruitmentStatusMap() {
     if (staffSheet && staffSheet.getLastRow() >= 2) {
       var sHeaders = staffSheet.getRange(1, 1, 1, staffSheet.getLastColumn()).getValues()[0];
       staffShareColMap = buildColumnMapFromSource_(sHeaders);
-      staffShareData = staffSheet.getRange(2, 1, staffSheet.getLastRow(), staffSheet.getLastColumn()).getValues();
+      staffShareData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, staffSheet.getLastColumn()).getValues();
     }
 
     // 次回予約を一括検索するヘルパー（シートを再読み込みしない）
@@ -3760,7 +3781,7 @@ function getNextReservationsForRows(rowNumbers) {
     var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     var colMap = buildColumnMap(headers);
     if (colMap.checkIn < 0 || colMap.checkOut < 0) colMap = buildColumnMapFromSource_(headers);
-    var formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    var formData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     // チェックイン日でソートした予約一覧
     var sorted = [];
     for (var j = 0; j < formData.length; j++) {
@@ -3777,7 +3798,7 @@ function getNextReservationsForRows(rowNumbers) {
     if (staffSheet && staffSheet.getLastRow() >= 2) {
       var sh = staffSheet.getRange(1, 1, 1, staffSheet.getLastColumn()).getValues()[0];
       staffColMap = buildColumnMapFromSource_(sh);
-      staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow(), staffSheet.getLastColumn()).getValues();
+      staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, staffSheet.getLastColumn()).getValues();
     }
     var resultMap = {};
     var rowSet = {};

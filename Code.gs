@@ -3409,6 +3409,22 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         if (rCheckout) recruitRowMap[toDateKeySafe_(rCheckout)] = ri + 2;
       }
     }
+    // キャンセル申請シートからpendingな申請を取得
+    var pendingCancelMap = {};
+    var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+    if (crSheet && crSheet.getLastRow() >= 2) {
+      var crLastCol = Math.max(crSheet.getLastColumn(), 5);
+      var crData = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, crLastCol).getValues();
+      for (var ci = 0; ci < crData.length; ci++) {
+        var crRid = String(crData[ci][0] || '').trim();
+        var crStaffName = String(crData[ci][1] || '').trim();
+        var crEmail = String(crData[ci][2] || '').trim().toLowerCase();
+        var crStatus = String(crData[ci][4] || '').trim();
+        if (crStatus === 'rejected') continue;
+        var isMe = (crStaffName && crStaffName.toLowerCase() === staff) || (crEmail && crEmail === staff);
+        if (isMe) pendingCancelMap[crRid] = true;
+      }
+    }
     for (var i = 0; i < data.length; i++) {
       var cleaningStaff = String(data[i][colMap.cleaningStaff] || '').trim();
       if (!cleaningStaff) continue;
@@ -3426,13 +3442,15 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
       var d = new Date(checkOut);
       if (d.getFullYear() !== targetYear || (d.getMonth() + 1) !== targetMonth) continue;
       var coKey = toDateKeySafe_(checkOut);
+      var rri = recruitRowMap[coKey] || 0;
+      var cancelPending = rri ? !!pendingCancelMap['r' + rri] : false;
       list.push({
         rowNumber: i + 2,
         checkoutDate: coKey,
         checkoutDisplay: Utilities.formatDate(checkOut, 'Asia/Tokyo', 'M/d'),
         partners: partners,
-        guestName: colMap.guestName >= 0 ? String(data[i][colMap.guestName] || '').trim() : '',
-        recruitRowIndex: recruitRowMap[coKey] || 0
+        recruitRowIndex: rri,
+        cancelPending: cancelPending
       });
     }
     list.sort(function(a, b) { return (a.checkoutDate || '').localeCompare(b.checkoutDate || ''); });

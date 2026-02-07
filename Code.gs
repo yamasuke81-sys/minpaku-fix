@@ -735,12 +735,6 @@ function getOwnerEmail() {
   }
 }
 
-/** パスワードをSHA-256でハッシュ化 */
-function hashPassword_(password) {
-  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(password || ''));
-  return Utilities.base64Encode(digest);
-}
-
 /** パスワード検証 */
 function verifyOwnerPassword_(password) {
   const stored = PropertiesService.getScriptProperties().getProperty('OWNER_PASSWORD_HASH');
@@ -3511,7 +3505,7 @@ function getStaffNamesForSelection() {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
     const lastCol = Math.max(sheet.getLastColumn(), 10);
-    const rows = sheet.getRange(2, 1, sheet.getLastRow(), lastCol).getValues();
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
     const list = rows
       .map(function(row) {
         var name = String(row[0] || '').trim();

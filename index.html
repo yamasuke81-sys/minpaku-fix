@@ -406,12 +406,12 @@
     .fc-event-cleaning-volunteered-by-me {
       border-color: #dc3545 !important;
       border-style: dashed !important;
-      border-width: 2px !important;
+      border-width: 3px !important;
     }
     .fc-event-cleaning-selected-by-me {
       border-color: #dc3545 !important;
       border-style: solid !important;
-      border-width: 2px !important;
+      border-width: 3px !important;
     }
     .fc-event-status-dot {
       border: 1px solid #fff !important;
@@ -2088,11 +2088,11 @@
                     volBodyArea.appendChild(curBadge);
                   }
                   var btnRow = document.createElement('div');
-                  btnRow.className = 'd-flex gap-2 justify-content-center';
+                  btnRow.className = 'd-flex gap-2 justify-content-center flex-wrap';
                   var responses = [
                     { val: '◎', label: '● 対応可', cls: 'success' },
                     { val: '△', label: '△ 条件付', cls: 'warning' },
-                    { val: '×', label: '☒ 対応不可', cls: 'danger' }
+                    { val: '×', label: '☒ 不可', cls: 'danger' }
                   ];
                   responses.forEach(function(opt) {
                     var b = document.createElement('button');
@@ -2115,21 +2115,12 @@
                     };
                     btnRow.appendChild(b);
                   });
-                  volBodyArea.appendChild(btnRow);
-                  var memoWrap = document.createElement('div');
-                  memoWrap.className = 'mt-2 mb-1';
-                  memoWrap.innerHTML = '<label class="form-label small fw-bold">備考（例：14時以降なら対応可能）</label><input type="text" class="form-control form-control-sm" id="eventModalResponseMemo" placeholder="何時からなら対応可能、など">';
-                  var memoInput = memoWrap.querySelector('input');
-                  if (memoInput && myMemo) memoInput.value = myMemo;
-                  volBodyArea.appendChild(memoWrap);
-                  // 回答済みの場合「回答を削除」ボタンを追加
+                  // 回答済みの場合「回答削除」ボタンを同じ行に追加
                   if (myResponse) {
-                    var delBtnWrap = document.createElement('div');
-                    delBtnWrap.className = 'text-center mt-2';
                     var delBtn = document.createElement('button');
                     delBtn.type = 'button';
-                    delBtn.className = 'btn btn-sm btn-outline-secondary';
-                    delBtn.textContent = '回答を削除';
+                    delBtn.className = 'btn btn-sm btn-outline-secondary fw-bold';
+                    delBtn.textContent = '回答削除';
                     delBtn.onclick = function() {
                       if (!confirm('回答を削除しますか？')) return;
                       delBtn.disabled = true; delBtn.textContent = '削除中...';
@@ -2140,12 +2131,18 @@
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
                           loadRecruitList();
-                        } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.textContent = '回答を削除'; }
-                      }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.textContent = '回答を削除'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                        } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.textContent = '回答削除'; }
+                      }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.textContent = '回答削除'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
                     };
-                    delBtnWrap.appendChild(delBtn);
-                    volBodyArea.appendChild(delBtnWrap);
+                    btnRow.appendChild(delBtn);
                   }
+                  volBodyArea.appendChild(btnRow);
+                  var memoWrap = document.createElement('div');
+                  memoWrap.className = 'mt-2 mb-1';
+                  memoWrap.innerHTML = '<label class="form-label small fw-bold">備考（例：14時以降なら対応可能）</label><input type="text" class="form-control form-control-sm" id="eventModalResponseMemo" placeholder="何時からなら対応可能、など">';
+                  var memoInput = memoWrap.querySelector('input');
+                  if (memoInput && myMemo) memoInput.value = myMemo;
+                  volBodyArea.appendChild(memoWrap);
                 }
               }
             } catch (e) {}
@@ -2649,10 +2646,12 @@
                   }
                 }
 
-                // allBookings の cleaningStaff を更新
+                // allBookings の cleaningStaff を更新（同一チェックイン日の重複行も含む）
                 if (typeof allBookings !== 'undefined') {
+                  var targetCheckIn = null;
+                  allBookings.forEach(function(b) { if (b.rowNumber === updatedRow && b.checkInParsed) targetCheckIn = b.checkInParsed; });
                   allBookings.forEach(function(b) {
-                    if (b.rowNumber === updatedRow) b.cleaningStaff = updatedStaff;
+                    if (b.rowNumber === updatedRow || (targetCheckIn && b.checkInParsed === targetCheckIn)) b.cleaningStaff = updatedStaff;
                   });
                 }
 
@@ -3967,7 +3966,19 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.list && r.list.length) {
-              var html = r.list.map(function(n) {
+              var notifItems = r.list;
+              // スタッフモード: 自分が行ったアクションの通知を除外
+              if (window.staffMode) {
+                var myNameNotif = (window.currentUserName || '').trim();
+                var selfKinds = ['回答', '回答取消', '出勤キャンセル要望', '保留', '回答変更要請'];
+                if (myNameNotif) {
+                  notifItems = notifItems.filter(function(n) {
+                    return !(selfKinds.indexOf(n.kind) >= 0 && (n.message || '').indexOf(myNameNotif + ' が') === 0);
+                  });
+                }
+              }
+              if (!notifItems.length) { el.innerHTML = '<p class="text-muted small">通知はまだありません。</p>'; return; }
+              var html = notifItems.map(function(n) {
                 var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : 'secondary';
                 var readBtn = n.read ? '' : ' <button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-1 btn-notif-read" data-row="' + n.rowIndex + '">既読</button>';
                 return '<div class="border rounded p-2 mb-2 small"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span>\u3000' + escapeHtml(n.message) + readBtn + '</div>';
@@ -3997,19 +4008,18 @@
             if (!banner || !listEl) return;
             if (r.success && r.list && r.list.length) {
               var filtered = r.list.filter(function(n) { return (n.message || '').trim() !== ''; });
-              // スタッフモード: 自分に関係ある通知のみ表示
+              // スタッフモード: 自分に関係ある通知のみ表示（自分が行ったアクションは除外）
               if (window.staffMode) {
                 var myName = (window.currentUserName || '').trim();
                 var myEmail = (window.currentUserEmail || '').trim().toLowerCase();
+                var bannerSelfKinds = ['回答', '回答取消', '出勤キャンセル要望', '保留', '回答変更要請'];
                 filtered = filtered.filter(function(n) {
                   var msg = (n.message || '');
                   var kind = (n.kind || '');
-                  // 自分の名前が含まれる通知
+                  // 自分が行ったアクションは除外
+                  if (myName && bannerSelfKinds.indexOf(kind) >= 0 && msg.indexOf(myName + ' が') === 0) return false;
+                  // 自分の名前が含まれる通知を表示
                   if (myName && msg.indexOf(myName) >= 0) return true;
-                  // 回答変更承認/否認は自分宛の可能性
-                  if (kind === '回答変更承認' || kind === '回答変更否認' || kind === 'キャンセル承認' || kind === 'キャンセル却下') {
-                    if (myName && msg.indexOf(myName) >= 0) return true;
-                  }
                   return false;
                 });
               }

@@ -32,6 +32,12 @@ function run(cmd, env = {}) {
   execSync(cmd, opts);
 }
 
+/** clasp push 専用: stdinに 'y\n' を渡してManifest確認を自動応答 */
+function runWithAutoYes(cmd, env = {}) {
+  const opts = { input: 'y\n', stdio: ['pipe', 'inherit', 'inherit'], shell: true, env: { ...process.env, ...env } };
+  execSync(cmd, opts);
+}
+
 /** コマンドを実行し標準出力・標準エラーを取得。成功時 success: true */
 function runCapture(cmd) {
   try {
@@ -179,7 +185,7 @@ async function main() {
   const pushOnly = process.argv.includes('--push-only');
 
   console.log('1. コードをプッシュしています...');
-  run(`echo y | ${clasp} push -f`);
+  runWithAutoYes(`${clasp} push -f`);
 
   if (pushOnly) {
     // ここから先は「プッシュのみ」用の軽量オートメーション
@@ -269,7 +275,7 @@ async function main() {
   console.log('3. スタッフ用デプロイを更新しています（同じURLのまま）...');
   console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
   setWebappConfig(STAFF_WEBAPP);
-  run(`echo y | ${clasp} push -f`);
+  runWithAutoYes(`${clasp} push -f`);
   let staffResult = runCapture(`${clasp} deploy --deploymentId "${staffId}" --description "スタッフ用 ${today}"`);
   if (!staffResult.success) {
     const staffErr = (staffResult.stdout + staffResult.stderr).toLowerCase();

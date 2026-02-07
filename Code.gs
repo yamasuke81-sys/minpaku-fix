@@ -2033,7 +2033,7 @@ function getStaffList() {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const lastCol = 9;
+    const lastCol = Math.max(sheet.getLastColumn(), 10);
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
     const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, lastCol).getValues() : [];
     const list = rows.map(function(row, i) {
@@ -2047,7 +2047,8 @@ function getStaffList() {
         accountType: String(row[5] || '').trim(),
         accountNumber: String(row[6] || '').trim(),
         accountHolder: String(row[7] || '').trim(),
-        active: String(row[8] || 'Y').trim()
+        active: String(row[8] || 'Y').trim(),
+        hasPassword: lastCol >= 10 ? !!String(row[9] || '').trim() : false
       };
     }).filter(function(item) { return item.name || item.email; });
     return JSON.stringify({ success: true, list: list });
@@ -3564,6 +3565,29 @@ function setStaffPassword(staffName, staffEmail, oldPassword, newPassword) {
         var stored = String(rows[i][9] || '').trim();
         if (stored && hashPassword_(oldPassword) !== stored) return JSON.stringify({ success: false, error: '現在のパスワードが正しくありません' });
         sheet.getRange(i + 2, 10).setValue(hashPassword_(newPassword));
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: 'スタッフが見つかりません' });
+  } catch (err) {
+    return JSON.stringify({ success: false, error: err.toString() });
+  }
+}
+
+/**
+ * オーナーがスタッフのパスワードをリセット
+ */
+function resetStaffPassword(staffName) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフが見つかりません' });
+    var lastCol = Math.max(sheet.getLastColumn(), 10);
+    if (lastCol < 10) { sheet.getRange(1, 10).setValue('パスワード'); lastCol = 10; }
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var n = String(rows[i][0] || '').trim();
+      if (n === staffName) {
+        sheet.getRange(i + 2, 10).setValue('');
         return JSON.stringify({ success: true });
       }
     }

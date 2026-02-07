@@ -1177,6 +1177,34 @@
     </div>
   </div>
 
+  <!-- カスタム確認モーダル（confirm()代替） -->
+  <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-body py-4 text-center">
+          <p id="customConfirmMessage" class="mb-0" style="white-space:pre-wrap;"></p>
+        </div>
+        <div class="modal-footer justify-content-center border-0 pt-0">
+          <button type="button" class="btn btn-primary px-4" id="customConfirmOk">OK</button>
+          <button type="button" class="btn btn-outline-secondary px-3" id="customConfirmCancel">キャンセル</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- カスタムアラートモーダル（alert()代替） -->
+  <div class="modal fade" id="customAlertModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-body py-4 text-center">
+          <p id="customAlertMessage" class="mb-0" style="white-space:pre-wrap;"></p>
+        </div>
+        <div class="modal-footer justify-content-center border-0 pt-0">
+          <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 募集編集モーダル -->
   <div class="modal fade" id="recruitEditModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1342,21 +1370,21 @@
       // スタッフ回答状況を表示するHTML生成
       function renderStaffResponses(volunteers, compact) {
         if (!volunteers || !volunteers.length) return 'スタッフなし';
-        // 記号変換: ◎→●、△→△、×→☒
+        // 記号変換: ◎→●、△→▲、×→✖
         function toDisplaySymbol(resp) {
           if (resp === '◎') return '●';
-          if (resp === '△') return '△';
-          if (resp === '×') return '☒';
+          if (resp === '△') return '▲';
+          if (resp === '×') return '✖';
           return '未回答';
         }
         if (compact) {
-          // コンパクト表示（募集一覧カード用）: ●2 △1 ☒0 未1
+          // コンパクト表示（募集一覧カード用）: ●2 ▲1 ✖0 未1
           var counts = { '◎': 0, '△': 0, '×': 0, '未回答': 0 };
           volunteers.forEach(function(v) { counts[v.response || '未回答'] = (counts[v.response || '未回答'] || 0) + 1; });
           var parts = [];
           if (counts['◎']) parts.push('<span class="text-success fw-bold">●' + counts['◎'] + '</span>');
-          if (counts['△']) parts.push('<span class="text-warning fw-bold">△' + counts['△'] + '</span>');
-          if (counts['×']) parts.push('<span class="text-danger fw-bold">☒' + counts['×'] + '</span>');
+          if (counts['△']) parts.push('<span class="text-warning fw-bold">▲' + counts['△'] + '</span>');
+          if (counts['×']) parts.push('<span class="text-danger fw-bold">✖' + counts['×'] + '</span>');
           if (counts['未回答']) parts.push('<span class="text-muted">未' + counts['未回答'] + '</span>');
           return parts.join(' ');
         }
@@ -2001,18 +2029,20 @@
                     cancelReqBtn.className = 'btn btn-sm btn-danger w-100';
                     cancelReqBtn.textContent = '取消申請';
                     cancelReqBtn.onclick = function() {
-                      if (!confirm('出勤の取り消し申請を提出します。\nオーナーの承認後に取り消しが反映されます。\n\nよろしいですか？')) return;
-                      cancelReqBtn.disabled = true;
-                      cancelReqBtn.textContent = '申請中...';
-                      cancelReqBtn.className = 'btn btn-sm btn-secondary w-100';
-                      google.script.run.withSuccessHandler(function(j) {
-                        var res = JSON.parse(j);
-                        if (res.success) {
-                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                          loadAndRender();
-                          if (window.staffMode) loadStaffSchedule();
-                        } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
-                      }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                      customConfirm('出勤の取り消し申請を提出します。\nオーナーの承認後に取り消しが反映されます。\n\nよろしいですか？').then(function(ok) {
+                        if (!ok) return;
+                        cancelReqBtn.disabled = true;
+                        cancelReqBtn.textContent = '申請中...';
+                        cancelReqBtn.className = 'btn btn-sm btn-secondary w-100';
+                        google.script.run.withSuccessHandler(function(j) {
+                          var res = JSON.parse(j);
+                          if (res.success) {
+                            bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                            loadAndRender();
+                            if (window.staffMode) loadStaffSchedule();
+                          } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
+                        }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                      });
                     };
                     volBodyArea.appendChild(cancelReqBtn);
                   }
@@ -2048,8 +2078,8 @@
                   changeBtnRow.className = 'd-flex gap-1 justify-content-center flex-wrap';
                   var changeOpts = [
                     { val: '◎', label: '● 対応可で要請', cls: 'outline-warning' },
-                    { val: '△', label: '△ 条件付で要請', cls: 'outline-warning' },
-                    { val: '×', label: '☒ 不可で要請', cls: 'outline-warning' }
+                    { val: '△', label: '▲ 条件付で要請', cls: 'outline-warning' },
+                    { val: '×', label: '✖ 不可で要請', cls: 'outline-warning' }
                   ];
                   changeOpts.forEach(function(opt) {
                     var b = document.createElement('button');
@@ -2091,8 +2121,8 @@
                   btnRow.className = 'd-flex gap-2 justify-content-center flex-wrap';
                   var responses = [
                     { val: '◎', label: '● 対応可', cls: 'success' },
-                    { val: '△', label: '△ 条件付', cls: 'warning' },
-                    { val: '×', label: '☒ 不可', cls: 'danger' }
+                    { val: '△', label: '▲ 条件付', cls: 'warning' },
+                    { val: '×', label: '✖ 不可', cls: 'danger' }
                   ];
                   responses.forEach(function(opt) {
                     var b = document.createElement('button');
@@ -2122,17 +2152,19 @@
                     delBtn.className = 'btn btn-sm btn-outline-secondary fw-bold';
                     delBtn.textContent = '回答削除';
                     delBtn.onclick = function() {
-                      if (!confirm('回答を削除しますか？')) return;
-                      delBtn.disabled = true; delBtn.textContent = '削除中...';
-                      google.script.run.withSuccessHandler(function(j) {
-                        var res = JSON.parse(j);
-                        if (res.success) {
-                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                          loadAndRender();
-                          if (window.staffMode) loadStaffSchedule();
-                          loadRecruitList();
-                        } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.textContent = '回答削除'; }
-                      }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.textContent = '回答削除'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                      customConfirm('回答を削除しますか？').then(function(ok) {
+                        if (!ok) return;
+                        delBtn.disabled = true; delBtn.textContent = '削除中...';
+                        google.script.run.withSuccessHandler(function(j) {
+                          var res = JSON.parse(j);
+                          if (res.success) {
+                            bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                            loadAndRender();
+                            if (window.staffMode) loadStaffSchedule();
+                            loadRecruitList();
+                          } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.textContent = '回答削除'; }
+                        }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.textContent = '回答削除'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                      });
                     };
                     btnRow.appendChild(delBtn);
                   }
@@ -2219,12 +2251,14 @@
                         emPopMail.className = 'btn btn-sm btn-primary me-1';
                         emPopMail.textContent = 'メール送信';
                         emPopMail.onclick = function() {
-                          if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
-                          google.script.run.withSuccessHandler(function(a) {
-                            var ann = JSON.parse(a);
-                            if (ann.success) { alert('募集を開始しました。メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
-                            else alert(ann.error || '失敗');
-                          }).announceRecruitment(res.rowIndex);
+                          customConfirm('登録者全員に一斉送信します。よろしいですか？').then(function(ok) {
+                            if (!ok) return;
+                            google.script.run.withSuccessHandler(function(a) {
+                              var ann = JSON.parse(a);
+                              if (ann.success) { alert('募集を開始しました。メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
+                              else alert(ann.error || '失敗');
+                            }).announceRecruitment(res.rowIndex);
+                          });
                         };
                         var emPopCopy = document.createElement('button');
                         emPopCopy.type = 'button';
@@ -2276,12 +2310,14 @@
                   emBtnMail.className = 'btn btn-sm btn-primary';
                   emBtnMail.textContent = 'メール送信';
                   emBtnMail.onclick = function() {
-                    if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
-                    google.script.run.withSuccessHandler(function(a) {
-                      var ann = JSON.parse(a);
-                      if (ann.success) { alert('メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
-                      else alert(ann.error || '失敗');
-                    }).announceRecruitment(r.recruitRowIndex);
+                    customConfirm('登録者全員に一斉送信します。よろしいですか？').then(function(ok) {
+                      if (!ok) return;
+                      google.script.run.withSuccessHandler(function(a) {
+                        var ann = JSON.parse(a);
+                        if (ann.success) { alert('メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
+                        else alert(ann.error || '失敗');
+                      }).announceRecruitment(r.recruitRowIndex);
+                    });
                   };
                   var emBtnCopy = document.createElement('button');
                   emBtnCopy.type = 'button';
@@ -2312,13 +2348,15 @@
                   emBtnCancel.textContent = '募集取消';
                   emBtnCancel.onclick = function() {
                     var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
-                    if (volCount > 0 && !confirm('回答済みスタッフが' + volCount + '名います。募集を取消しますか？')) return;
-                    if (volCount === 0 && !confirm('募集を取消しますか？')) return;
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
-                      else alert(res.error);
-                    }).deleteRecruitment(r.recruitRowIndex);
+                    var confirmMsg = volCount > 0 ? '回答済みスタッフが' + volCount + '名います。募集を取消しますか？' : '募集を取消しますか？';
+                    customConfirm(confirmMsg).then(function(ok) {
+                      if (!ok) return;
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
+                        else alert(res.error);
+                      }).deleteRecruitment(r.recruitRowIndex);
+                    });
                   };
                   var btnRow = document.createElement('div');
                   btnRow.className = 'd-flex flex-wrap justify-content-center gap-1 mt-2';
@@ -2341,14 +2379,16 @@
                     emBtnConfirm.className = 'btn btn-sm btn-warning fw-bold';
                     emBtnConfirm.textContent = '確定（募集締切）';
                     emBtnConfirm.onclick = function() {
-                      if (!confirm('スタッフを確定し、募集を締め切りますか？')) return;
-                      emBtnConfirm.disabled = true;
-                      emBtnConfirm.textContent = '処理中...';
-                      google.script.run.withSuccessHandler(function(j) {
-                        var res = JSON.parse(j);
-                        if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
-                        else { alert(res.error); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }
-                      }).withFailureHandler(function(e) { alert(e.message); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }).confirmRecruitment(r.recruitRowIndex);
+                      customConfirm('スタッフを確定し、募集を締め切りますか？').then(function(ok) {
+                        if (!ok) return;
+                        emBtnConfirm.disabled = true;
+                        emBtnConfirm.textContent = '処理中...';
+                        google.script.run.withSuccessHandler(function(j) {
+                          var res = JSON.parse(j);
+                          if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
+                          else { alert(res.error); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }
+                        }).withFailureHandler(function(e) { alert(e.message); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }).confirmRecruitment(r.recruitRowIndex);
+                      });
                     };
                     btnRow.appendChild(emBtnConfirm);
                   }
@@ -2378,40 +2418,44 @@
                   btnApprove.className = 'btn btn-sm btn-warning me-1';
                   btnApprove.textContent = '取り消し承認';
                   btnApprove.onclick = function() {
-                    if (!confirm(cr.staffName + ' の取り消しを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。')) return;
-                    btnApprove.disabled = true;
-                    btnApprove.textContent = '処理中...';
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) {
-                        alert('取り消しを承認しました。清掃担当が解除され、募集状態に戻りました。');
-                        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                        loadAndRender();
-                        loadRecruitList();
-                      } else {
-                        alert(res.error || '失敗');
+                    customConfirm(cr.staffName + ' の取り消しを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。').then(function(ok) {
+                      if (!ok) return;
+                      btnApprove.disabled = true;
+                      btnApprove.textContent = '処理中...';
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) {
+                          alert('取り消しを承認しました。清掃担当が解除され、募集状態に戻りました。');
+                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                          loadAndRender();
+                          loadRecruitList();
+                        } else {
+                          alert(res.error || '失敗');
+                          btnApprove.disabled = false;
+                          btnApprove.textContent = '取り消し承認';
+                        }
+                      }).withFailureHandler(function(e) {
+                        alert(e.message);
                         btnApprove.disabled = false;
                         btnApprove.textContent = '取り消し承認';
-                      }
-                    }).withFailureHandler(function(e) {
-                      alert(e.message);
-                      btnApprove.disabled = false;
-                      btnApprove.textContent = '取り消し承認';
-                    }).approveCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
+                      }).approveCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
+                    });
                   };
                   var btnReject = document.createElement('button');
                   btnReject.type = 'button';
                   btnReject.className = 'btn btn-sm btn-outline-secondary';
                   btnReject.textContent = '却下';
                   btnReject.onclick = function() {
-                    if (!confirm(cr.staffName + ' の取り消し申請を却下しますか？')) return;
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) {
-                        approveWrap.remove();
-                        loadAndRender();
-                      } else alert(res.error || '失敗');
-                    }).withFailureHandler(function(e) { alert(e.message); }).rejectCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
+                    customConfirm(cr.staffName + ' の取り消し申請を却下しますか？').then(function(ok) {
+                      if (!ok) return;
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) {
+                          approveWrap.remove();
+                          loadAndRender();
+                        } else alert(res.error || '失敗');
+                      }).withFailureHandler(function(e) { alert(e.message); }).rejectCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
+                    });
                   };
                   approveWrap.appendChild(btnApprove);
                   approveWrap.appendChild(btnReject);
@@ -2429,29 +2473,33 @@
                   btnRcApprove.className = 'btn btn-sm btn-info me-1';
                   btnRcApprove.textContent = '承認';
                   btnRcApprove.onclick = function() {
-                    if (!confirm(rcr.staffName + ' の回答変更（→' + rcr.newResponse + '）を承認しますか？')) return;
-                    btnRcApprove.disabled = true;
-                    btnRcApprove.textContent = '処理中...';
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) {
-                        alert('回答変更を承認しました。');
-                        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                        loadAndRender(); loadRecruitList();
-                      } else { alert(res.error || '失敗'); btnRcApprove.disabled = false; btnRcApprove.textContent = '承認'; }
-                    }).withFailureHandler(function(e) { alert(e.message); btnRcApprove.disabled = false; btnRcApprove.textContent = '承認'; }).approveResponseChange(rcr.rowIndex);
+                    customConfirm(rcr.staffName + ' の回答変更（→' + rcr.newResponse + '）を承認しますか？').then(function(ok) {
+                      if (!ok) return;
+                      btnRcApprove.disabled = true;
+                      btnRcApprove.textContent = '処理中...';
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) {
+                          alert('回答変更を承認しました。');
+                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                          loadAndRender(); loadRecruitList();
+                        } else { alert(res.error || '失敗'); btnRcApprove.disabled = false; btnRcApprove.textContent = '承認'; }
+                      }).withFailureHandler(function(e) { alert(e.message); btnRcApprove.disabled = false; btnRcApprove.textContent = '承認'; }).approveResponseChange(rcr.rowIndex);
+                    });
                   };
                   var btnRcReject = document.createElement('button');
                   btnRcReject.type = 'button';
                   btnRcReject.className = 'btn btn-sm btn-outline-secondary';
                   btnRcReject.textContent = '否認';
                   btnRcReject.onclick = function() {
-                    if (!confirm(rcr.staffName + ' の回答変更要請を否認しますか？')) return;
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) { rcWrap.remove(); loadAndRender(); }
-                      else alert(res.error || '失敗');
-                    }).withFailureHandler(function(e) { alert(e.message); }).rejectResponseChange(rcr.rowIndex);
+                    customConfirm(rcr.staffName + ' の回答変更要請を否認しますか？').then(function(ok) {
+                      if (!ok) return;
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) { rcWrap.remove(); loadAndRender(); }
+                        else alert(res.error || '失敗');
+                      }).withFailureHandler(function(e) { alert(e.message); }).rejectResponseChange(rcr.rowIndex);
+                    });
                   };
                   rcWrap.appendChild(btnRcApprove);
                   rcWrap.appendChild(btnRcReject);
@@ -2522,6 +2570,37 @@
           }, 100);
         }
       }
+
+      // --- カスタムダイアログ（GAS URL非表示） ---
+      function customConfirm(msg) {
+        return new Promise(function(resolve) {
+          var modal = document.getElementById('customConfirmModal');
+          var msgEl = document.getElementById('customConfirmMessage');
+          var okBtn = document.getElementById('customConfirmOk');
+          var cancelBtn = document.getElementById('customConfirmCancel');
+          msgEl.textContent = msg;
+          var bsModal = new bootstrap.Modal(modal);
+          var resolved = false;
+          function cleanup() { okBtn.onclick = null; cancelBtn.onclick = null; modal.removeEventListener('hidden.bs.modal', onHidden); }
+          function onOk() { if (resolved) return; resolved = true; cleanup(); bsModal.hide(); resolve(true); }
+          function onCancel() { if (resolved) return; resolved = true; cleanup(); bsModal.hide(); resolve(false); }
+          function onHidden() { if (!resolved) { resolved = true; cleanup(); resolve(false); } }
+          okBtn.onclick = onOk;
+          cancelBtn.onclick = onCancel;
+          modal.addEventListener('hidden.bs.modal', onHidden);
+          bsModal.show();
+        });
+      }
+      function customAlert(msg) {
+        var modal = document.getElementById('customAlertModal');
+        var msgEl = document.getElementById('customAlertMessage');
+        if (modal && msgEl) {
+          msgEl.textContent = msg;
+          var bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+          bsModal.show();
+        }
+      }
+      window.alert = function(msg) { customAlert(String(msg || '')); };
 
       function escapeHtml(s) {
         if (s == null) return '';
@@ -2848,10 +2927,17 @@
             showEventModal(info.event);
           },
           eventDidMount: function(arg) {
-            arg.el.style.border = 'none';
             arg.el.style.boxShadow = 'none';
             var main = arg.el.querySelector('.fc-event-main');
             if (main) { main.style.border = 'none'; main.style.boxShadow = 'none'; }
+            // スタッフ回答済み/確定済みの赤枠を明示的に設定（CSS !important との競合回避）
+            if (arg.el.classList.contains('fc-event-cleaning-selected-by-me')) {
+              arg.el.style.border = '3px solid #dc3545';
+            } else if (arg.el.classList.contains('fc-event-cleaning-volunteered-by-me')) {
+              arg.el.style.border = '3px dashed #dc3545';
+            } else {
+              arg.el.style.border = 'none';
+            }
             var sd = arg.event.extendedProps && arg.event.extendedProps.statusDot;
             var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#dc3545' : sd === 'cleaning-decided' ? '#198754' : null;
             if (dotColor) {
@@ -3329,26 +3415,28 @@
           confirmArea.style.display = (hasStaffSelected && !isEditConfirmed && !asStaff && !r.isNew) ? 'block' : 'none';
         }
         document.getElementById('btnRecruitEditConfirm').onclick = function() {
-          if (!confirm('スタッフを確定し、募集を締め切りますか？')) return;
-          var btn = document.getElementById('btnRecruitEditConfirm');
-          btn.disabled = true;
-          btn.textContent = '処理中...';
-          google.script.run.withSuccessHandler(function(j) {
-            var res = JSON.parse(j);
-            if (res.success) {
-              bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-              loadRecruitList();
-              loadAndRender();
-            } else {
-              alert(res.error);
+          customConfirm('スタッフを確定し、募集を締め切りますか？').then(function(ok) {
+            if (!ok) return;
+            var btn = document.getElementById('btnRecruitEditConfirm');
+            btn.disabled = true;
+            btn.textContent = '処理中...';
+            google.script.run.withSuccessHandler(function(j) {
+              var res = JSON.parse(j);
+              if (res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                loadRecruitList();
+                loadAndRender();
+              } else {
+                alert(res.error);
+                btn.disabled = false;
+                btn.textContent = '確定（募集締切）';
+              }
+            }).withFailureHandler(function(e) {
+              alert(e.message);
               btn.disabled = false;
               btn.textContent = '確定（募集締切）';
-            }
-          }).withFailureHandler(function(e) {
-            alert(e.message);
-            btn.disabled = false;
-            btn.textContent = '確定（募集締切）';
-          }).confirmRecruitment(r.rowIndex);
+            }).confirmRecruitment(r.rowIndex);
+          });
         };
         var volunteerArea = document.getElementById('recruitEditVolunteerArea');
         if (volunteerArea) {
@@ -3372,8 +3460,8 @@
                 '<div class="mb-2"><label class="form-label small fw-bold">変更後の回答と備考</label><input type="text" class="form-control form-control-sm mb-1" id="recruitEditChangeMemo" placeholder="変更理由を記入"></div>' +
                 '<div class="d-flex gap-2 justify-content-center">' +
                 '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="◎">● 対応可で変更要請</button>' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="△">△ 条件付で変更要請</button>' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="×">☒ 対応不可で変更要請</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="△">▲ 条件付で変更要請</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="×">✖ 不可で変更要請</button>' +
                 '</div>';
               volunteerArea.querySelectorAll('[data-change-resp]').forEach(function(btn) {
                 btn.onclick = function() {
@@ -3399,8 +3487,8 @@
                 (myResp !== '未回答' ? '<div class="small text-muted mb-1 text-center">現在の回答: ' + myResp + '</div>' : '') +
                 '<div class="d-flex gap-2 justify-content-center">' +
                 '<button type="button" class="btn btn-sm btn-' + (myResp === '◎' ? '' : 'outline-') + 'success fw-bold" data-resp="◎">● 対応可</button>' +
-                '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning fw-bold" data-resp="△">△ 条件付</button>' +
-                '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger fw-bold" data-resp="×">☒ 対応不可</button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning fw-bold" data-resp="△">▲ 条件付</button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger fw-bold" data-resp="×">✖ 不可</button>' +
                 '</div>';
               volunteerArea.querySelectorAll('[data-resp]').forEach(function(btn) {
                 btn.onclick = function() {
@@ -3487,12 +3575,14 @@
                   popupArea.innerHTML = '<p class="small fw-bold mb-2">スタッフに共有してください</p><button type="button" class="btn btn-sm btn-primary me-1" id="recNewMail">メール送信</button><button type="button" class="btn btn-sm btn-info text-white" id="recNewCopy">テキストコピー</button><div id="recNewCopyArea" class="mt-2" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="recNewCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-primary" id="recNewCopyBtn">コピー</button></div>';
                   popupArea.style.display = 'block';
                   document.getElementById('recNewMail').onclick = function() {
-                    if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
-                    google.script.run.withSuccessHandler(function(a) {
-                      var ann = JSON.parse(a);
-                      if (ann.success) { alert('募集を開始しました。メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide(); loadRecruitList(); loadAndRender(); }
-                      else document.getElementById('recruitEditError').textContent = ann.error || '失敗';
-                    }).announceRecruitment(ok.rowIndex);
+                    customConfirm('登録者全員に一斉送信します。よろしいですか？').then(function(confirmed) {
+                      if (!confirmed) return;
+                      google.script.run.withSuccessHandler(function(a) {
+                        var ann = JSON.parse(a);
+                        if (ann.success) { alert('募集を開始しました。メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide(); loadRecruitList(); loadAndRender(); }
+                        else document.getElementById('recruitEditError').textContent = ann.error || '失敗';
+                      }).announceRecruitment(ok.rowIndex);
+                    });
                   };
                   document.getElementById('recNewCopy').onclick = function() {
                     google.script.run.withSuccessHandler(function(t) {
@@ -3545,43 +3635,45 @@
           }
         };
         document.getElementById('btnRecruitEditMail').onclick = function() {
-          if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
-          document.getElementById('recruitEditError').style.display = 'none';
-          var detail = collectDetail();
-          detail.notifyMethod = 'メール';
-          function doAnnounce(rowIdx) {
-            google.script.run.withSuccessHandler(function(annStr) {
-              var ann = JSON.parse(annStr);
-              if (ann.success) {
-                alert('メールで送信しました。');
-                bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-                loadRecruitList();
-              } else {
-                document.getElementById('recruitEditError').textContent = ann.error || '失敗';
-                document.getElementById('recruitEditError').style.display = 'block';
-              }
-            }).withFailureHandler(function(err) {
-              document.getElementById('recruitEditError').textContent = err.message || 'エラー';
-              document.getElementById('recruitEditError').style.display = 'block';
-            }).announceRecruitment(rowIdx);
-          }
-          if (r.isNew) {
-            google.script.run.withSuccessHandler(function(resStr) {
-              var ok = JSON.parse(resStr);
-              if (ok.success && ok.rowIndex) {
-                if (ok.alreadyExists) {
-                  google.script.run.withSuccessHandler(function() { doAnnounce(ok.rowIndex); }).saveRecruitmentDetail(ok.rowIndex, r.bookingRowNumber, r.checkoutDate, detail);
+          customConfirm('登録者全員に一斉送信します。よろしいですか？').then(function(ok) {
+            if (!ok) return;
+            document.getElementById('recruitEditError').style.display = 'none';
+            var detail = collectDetail();
+            detail.notifyMethod = 'メール';
+            function doAnnounce(rowIdx) {
+              google.script.run.withSuccessHandler(function(annStr) {
+                var ann = JSON.parse(annStr);
+                if (ann.success) {
+                  alert('メールで送信しました。');
+                  bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                  loadRecruitList();
                 } else {
-                  doAnnounce(ok.rowIndex);
+                  document.getElementById('recruitEditError').textContent = ann.error || '失敗';
+                  document.getElementById('recruitEditError').style.display = 'block';
                 }
-              }
-            }).saveRecruitmentDetail(null, r.bookingRowNumber, r.checkoutDate, detail);
-          } else {
-            google.script.run.withSuccessHandler(function(resStr) {
-              var ok = JSON.parse(resStr);
-              if (ok.success) doAnnounce(r.rowIndex);
-            }).saveRecruitmentDetail(r.rowIndex, r.bookingRowNumber, r.checkoutDate, detail);
-          }
+              }).withFailureHandler(function(err) {
+                document.getElementById('recruitEditError').textContent = err.message || 'エラー';
+                document.getElementById('recruitEditError').style.display = 'block';
+              }).announceRecruitment(rowIdx);
+            }
+            if (r.isNew) {
+              google.script.run.withSuccessHandler(function(resStr) {
+                var res = JSON.parse(resStr);
+                if (res.success && res.rowIndex) {
+                  if (res.alreadyExists) {
+                    google.script.run.withSuccessHandler(function() { doAnnounce(res.rowIndex); }).saveRecruitmentDetail(res.rowIndex, r.bookingRowNumber, r.checkoutDate, detail);
+                  } else {
+                    doAnnounce(res.rowIndex);
+                  }
+                }
+              }).saveRecruitmentDetail(null, r.bookingRowNumber, r.checkoutDate, detail);
+            } else {
+              google.script.run.withSuccessHandler(function(resStr) {
+                var res = JSON.parse(resStr);
+                if (res.success) doAnnounce(r.rowIndex);
+              }).saveRecruitmentDetail(r.rowIndex, r.bookingRowNumber, r.checkoutDate, detail);
+            }
+          });
         };
         document.getElementById('btnRecruitEditCopy').onclick = function() {
           document.getElementById('recruitEditError').style.display = 'none';
@@ -3614,15 +3706,18 @@
           if (!r.isNew && r.rowIndex) {
             var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
             var msg = volCount > 0 ? '回答済みスタッフが' + volCount + '名います。募集を取消しますか？' : '募集を取消しますか？';
-            if (!confirm(msg)) return;
-            google.script.run.withSuccessHandler(function(resStr) {
-              var ok = JSON.parse(resStr);
-              if (ok.success) {
-                bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-                loadRecruitList();
-                loadAndRender();
-              } else alert(ok.error || '失敗');
-            }).deleteRecruitment(r.rowIndex);
+            customConfirm(msg).then(function(ok) {
+              if (!ok) return;
+              google.script.run.withSuccessHandler(function(resStr) {
+                var res = JSON.parse(resStr);
+                if (res.success) {
+                  bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                  loadRecruitList();
+                  loadAndRender();
+                } else alert(res.error || '失敗');
+              }).deleteRecruitment(r.rowIndex);
+            });
+            return;
           }
           if (r.isNew) {
             bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
@@ -3813,12 +3908,13 @@
             document.querySelectorAll('.btnDelSync').forEach(function(btn) {
               btn.addEventListener('click', function() {
                 var row = parseInt(this.getAttribute('data-row'), 10);
-                if (confirm('この連携を削除しますか？')) {
+                customConfirm('この連携を削除しますか？').then(function(ok) {
+                  if (!ok) return;
                   google.script.run.withSuccessHandler(function(j) {
                     var r = JSON.parse(j);
                     if (r.success) loadSyncList(); else alert(r.error);
                   }).withFailureHandler(function(e) { alert(e.message); }).deleteSyncSetting(row);
-                }
+                });
               });
             });
           } catch (e) { document.getElementById('syncList').innerHTML = '<p class="text-danger">読み込み失敗</p>'; }
@@ -3860,15 +3956,17 @@
                   var ni = parseInt(this.getAttribute('data-idx'), 10);
                   var nd = notifList[ni] && notifList[ni].data;
                   if (!nd) return;
-                  if (!confirm(nd.staffName + ' の取り消しを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。')) return;
                   var thisBtn = this;
-                  thisBtn.disabled = true; thisBtn.textContent = '処理中...';
-                  var actionDiv = thisBtn.closest('.mt-1');
-                  google.script.run.withSuccessHandler(function(j) {
-                    var res = JSON.parse(j);
-                    if (res.success) { if (actionDiv) actionDiv.innerHTML = '<span class="badge bg-info">承認済</span>'; loadAndRender(); }
-                    else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '承認'; }
-                  }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '承認'; }).approveCancelRequest(nd.recruitRowIndex, nd.staffName, nd.staffEmail);
+                  customConfirm(nd.staffName + ' の取り消しを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。').then(function(ok) {
+                    if (!ok) return;
+                    thisBtn.disabled = true; thisBtn.textContent = '処理中...';
+                    var actionDiv = thisBtn.closest('.mt-1');
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) { if (actionDiv) actionDiv.innerHTML = '<span class="badge bg-info">承認済</span>'; loadAndRender(); }
+                      else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '承認'; }
+                    }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '承認'; }).approveCancelRequest(nd.recruitRowIndex, nd.staffName, nd.staffEmail);
+                  });
                 };
               });
               el.querySelectorAll('.notif-reject').forEach(function(btn) {
@@ -3876,15 +3974,17 @@
                   var ni = parseInt(this.getAttribute('data-idx'), 10);
                   var nd = notifList[ni] && notifList[ni].data;
                   if (!nd) return;
-                  if (!confirm(nd.staffName + ' の取り消し申請を却下しますか？')) return;
                   var thisBtn = this;
-                  thisBtn.disabled = true; thisBtn.textContent = '処理中...';
-                  var actionDiv = thisBtn.closest('.mt-1');
-                  google.script.run.withSuccessHandler(function(j) {
-                    var res = JSON.parse(j);
-                    if (res.success) { if (actionDiv) actionDiv.innerHTML = '<span class="badge bg-secondary">却下済</span>'; loadAndRender(); }
-                    else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '却下'; }
-                  }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '却下'; }).rejectCancelRequest(nd.recruitRowIndex, nd.staffName, nd.staffEmail);
+                  customConfirm(nd.staffName + ' の取り消し申請を却下しますか？').then(function(ok) {
+                    if (!ok) return;
+                    thisBtn.disabled = true; thisBtn.textContent = '処理中...';
+                    var actionDiv = thisBtn.closest('.mt-1');
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) { if (actionDiv) actionDiv.innerHTML = '<span class="badge bg-secondary">却下済</span>'; loadAndRender(); }
+                      else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '却下'; }
+                    }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '却下'; }).rejectCancelRequest(nd.recruitRowIndex, nd.staffName, nd.staffEmail);
+                  });
                 };
               });
             } else {
@@ -3951,15 +4051,17 @@
         var clearListBtn = document.getElementById('btnClearAllNotifList');
         if (clearListBtn) {
           clearListBtn.onclick = function() {
-            if (!confirm('全ての通知を削除しますか？')) return;
-            clearListBtn.disabled = true;
-            clearListBtn.textContent = '削除中...';
-            google.script.run.withSuccessHandler(function(j) {
-              var res = JSON.parse(j);
-              clearListBtn.disabled = false;
-              clearListBtn.textContent = '一括削除';
-              if (res.success) { loadNotificationListMain(); updateNotificationBanner(); }
-            }).withFailureHandler(function() { clearListBtn.disabled = false; clearListBtn.textContent = '一括削除'; }).clearAllNotifications();
+            customConfirm('全ての通知を削除しますか？').then(function(ok) {
+              if (!ok) return;
+              clearListBtn.disabled = true;
+              clearListBtn.textContent = '削除中...';
+              google.script.run.withSuccessHandler(function(j) {
+                var res = JSON.parse(j);
+                clearListBtn.disabled = false;
+                clearListBtn.textContent = '一括削除';
+                if (res.success) { loadNotificationListMain(); updateNotificationBanner(); }
+              }).withFailureHandler(function() { clearListBtn.disabled = false; clearListBtn.textContent = '一括削除'; }).clearAllNotifications();
+            });
           };
         }
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -4073,14 +4175,16 @@
               var clearBtn = document.getElementById('btnClearAllNotifBanner');
               if (clearBtn) {
                 clearBtn.onclick = function() {
-                  if (!confirm('全ての通知を削除しますか？')) return;
-                  clearBtn.disabled = true;
-                  clearBtn.textContent = '削除中...';
-                  google.script.run.withSuccessHandler(function(j) {
-                    var res = JSON.parse(j);
-                    if (res.success) { updateNotificationBanner(); loadNotificationListMain(); }
-                    else { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }
-                  }).withFailureHandler(function() { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }).clearAllNotifications();
+                  customConfirm('全ての通知を削除しますか？').then(function(ok) {
+                    if (!ok) return;
+                    clearBtn.disabled = true;
+                    clearBtn.textContent = '削除中...';
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) { updateNotificationBanner(); loadNotificationListMain(); }
+                      else { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }
+                    }).withFailureHandler(function() { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }).clearAllNotifications();
+                  });
                 };
               }
             } else {
@@ -4298,7 +4402,9 @@
               res.list.forEach(function(s) {
                 html += '<div class="border rounded p-2 mb-2"><strong>' + escapeHtml(s.name) + '</strong> ' + escapeHtml(s.email);
                 html += ' <button type="button" class="btn btn-sm btn-outline-secondary btnEditStaff" data-row="' + s.rowIndex + '" data-name="' + escapeHtml(s.name) + '" data-address="' + escapeHtml(s.address) + '" data-email="' + escapeHtml(s.email) + '" data-bank="' + escapeHtml(s.bankName) + '" data-branch="' + escapeHtml(s.bankBranch) + '" data-atype="' + escapeHtml(s.accountType) + '" data-anum="' + escapeHtml(s.accountNumber) + '" data-holder="' + escapeHtml(s.accountHolder) + '">編集</button>';
-                html += ' <button type="button" class="btn btn-sm btn-outline-danger btnDelStaff" data-row="' + s.rowIndex + '">削除</button></div>';
+                html += ' <button type="button" class="btn btn-sm btn-outline-danger btnDelStaff" data-row="' + s.rowIndex + '">削除</button>';
+                if (s.hasPassword) html += ' <button type="button" class="btn btn-sm btn-outline-warning btnResetPw" data-name="' + escapeHtml(s.name) + '">PW\u30EA\u30BB\u30C3\u30C8</button>';
+                html += '</div>';
               });
             }
             document.getElementById('staffList').innerHTML = html || '<p class="text-muted">スタッフがいません。</p>';
@@ -4318,12 +4424,27 @@
             });
             document.querySelectorAll('.btnDelStaff').forEach(function(btn) {
               btn.addEventListener('click', function() {
-                if (!confirm('このスタッフを削除しますか？')) return;
                 var row = parseInt(this.getAttribute('data-row'), 10);
-                google.script.run.withSuccessHandler(function(jsonStr) {
-                  var r = JSON.parse(jsonStr);
-                  if (r.success) loadStaffList();
-                }).deleteStaff(row);
+                customConfirm('このスタッフを削除しますか？').then(function(ok) {
+                  if (!ok) return;
+                  google.script.run.withSuccessHandler(function(jsonStr) {
+                    var r = JSON.parse(jsonStr);
+                    if (r.success) loadStaffList();
+                  }).deleteStaff(row);
+                });
+              });
+            });
+            document.querySelectorAll('.btnResetPw').forEach(function(btn) {
+              btn.addEventListener('click', function() {
+                var staffName = this.getAttribute('data-name');
+                customConfirm(staffName + ' のパスワードをリセットしますか？\n次回ログイン時にパスワードなしでログインできるようになります。').then(function(ok) {
+                  if (!ok) return;
+                  google.script.run.withSuccessHandler(function(j) {
+                    var r = JSON.parse(j);
+                    if (r.success) { customAlert(staffName + ' のパスワードをリセットしました。'); loadStaffList(); }
+                    else customAlert(r.error || '失敗');
+                  }).resetStaffPassword(staffName);
+                });
               });
             });
           } catch (e) {}
@@ -4390,12 +4511,14 @@
             });
             document.querySelectorAll('.btnDelSubOwner').forEach(function(btn) {
               btn.addEventListener('click', function() {
-                if (!confirm('このサブオーナーを削除しますか？')) return;
                 var row = parseInt(this.getAttribute('data-row'), 10);
-                google.script.run.withSuccessHandler(function(jsonStr) {
-                  var r = JSON.parse(jsonStr);
-                  if (r.success) loadSubOwnerList();
-                }).deleteSubOwner(row);
+                customConfirm('このサブオーナーを削除しますか？').then(function(ok) {
+                  if (!ok) return;
+                  google.script.run.withSuccessHandler(function(jsonStr) {
+                    var r = JSON.parse(jsonStr);
+                    if (r.success) loadSubOwnerList();
+                  }).deleteSubOwner(row);
+                });
               });
             });
           } catch (e) {}
@@ -4509,8 +4632,11 @@
                 });
                 document.querySelectorAll('.btnDelJob').forEach(function(btn) {
                   btn.addEventListener('click', function() {
-                    if (!confirm('削除しますか？')) return;
-                    google.script.run.withSuccessHandler(function() { loadJobList(); }).deleteJobType(parseInt(btn.getAttribute('data-row'), 10));
+                    var rowToDelete = parseInt(btn.getAttribute('data-row'), 10);
+                    customConfirm('削除しますか？').then(function(ok) {
+                      if (!ok) return;
+                      google.script.run.withSuccessHandler(function() { loadJobList(); }).deleteJobType(rowToDelete);
+                    });
                   });
                 });
               }).getCompFormOptions();
@@ -4718,26 +4844,28 @@
       });
 
       document.getElementById('btnClearSynced').addEventListener('click', function() {
-        if (!confirm('iCal同期の紐付けを一括解除します。予約行・フォーム入力は残り、プラットフォーム表示のみクリアされます。実行しますか？')) return;
-        var btn = document.getElementById('btnClearSynced');
-        var resEl = document.getElementById('syncResult');
-        btn.disabled = true;
-        resEl.style.display = 'none';
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
+        customConfirm('iCal同期の紐付けを一括解除します。予約行・フォーム入力は残り、プラットフォーム表示のみクリアされます。実行しますか？').then(function(ok) {
+          if (!ok) return;
+          var btn = document.getElementById('btnClearSynced');
+          var resEl = document.getElementById('syncResult');
+          btn.disabled = true;
+          resEl.style.display = 'none';
+          google.script.run.withSuccessHandler(function(jsonStr) {
+            try {
+              var r = JSON.parse(jsonStr);
+              resEl.style.display = 'block';
+              resEl.className = 'small mt-2 ' + (r.success ? 'text-success' : 'text-danger');
+              resEl.textContent = r.success ? (r.cleared + '件のiCal紐付けを解除しました。') : (r.error || '失敗');
+              if (r.success && r.cleared > 0) loadAndRender();
+            } catch (e) { resEl.textContent = 'エラー'; }
+            btn.disabled = false;
+          }).withFailureHandler(function(err) {
             resEl.style.display = 'block';
-            resEl.className = 'small mt-2 ' + (r.success ? 'text-success' : 'text-danger');
-            resEl.textContent = r.success ? (r.cleared + '件のiCal紐付けを解除しました。') : (r.error || '失敗');
-            if (r.success && r.cleared > 0) loadAndRender();
-          } catch (e) { resEl.textContent = 'エラー'; }
-          btn.disabled = false;
-        }).withFailureHandler(function(err) {
-          resEl.style.display = 'block';
-          resEl.className = 'small mt-2 text-danger';
-          resEl.textContent = err.message || 'エラー';
-          btn.disabled = false;
-        }).clearSyncedBookings();
+            resEl.className = 'small mt-2 text-danger';
+            resEl.textContent = err.message || 'エラー';
+            btn.disabled = false;
+          }).clearSyncedBookings();
+        });
       });
       document.getElementById('btnImportSpreadsheet').addEventListener('click', function() {
         document.getElementById('importSpreadsheetUrl').value = '';
@@ -4922,24 +5050,26 @@
             var r = JSON.parse(jsonStr);
             if (r.success) {
               // スタッフ選定成功 → 確定するか確認
-              if (confirm('スタッフを選定しました。\n続けて募集を締め切り、確定しますか？\n\n「OK」→ 確定（募集締切）\n「キャンセル」→ 後で確定')) {
-                google.script.run.withSuccessHandler(function(cj) {
-                  var cr = JSON.parse(cj);
+              customConfirm('スタッフを選定しました。\n続けて募集を締め切り、確定しますか？\n\n「OK」→ 確定（募集締切）\n「キャンセル」→ 後で確定').then(function(ok) {
+                if (ok) {
+                  google.script.run.withSuccessHandler(function(cj) {
+                    var cr = JSON.parse(cj);
+                    bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
+                    loadRecruitList();
+                    loadAndRender();
+                    if (!cr.success) alert('確定に失敗しました: ' + (cr.error || ''));
+                  }).withFailureHandler(function(ce) {
+                    bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
+                    loadRecruitList();
+                    loadAndRender();
+                    alert('確定に失敗しました: ' + ce.message);
+                  }).confirmRecruitment(row);
+                } else {
                   bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
                   loadRecruitList();
                   loadAndRender();
-                  if (!cr.success) alert('確定に失敗しました: ' + (cr.error || ''));
-                }).withFailureHandler(function(ce) {
-                  bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
-                  loadRecruitList();
-                  loadAndRender();
-                  alert('確定に失敗しました: ' + ce.message);
-                }).confirmRecruitment(row);
-              } else {
-                bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
-                loadRecruitList();
-                loadAndRender();
-              }
+                }
+              });
             } else {
               errEl.textContent = r.error || '失敗';
               errEl.style.display = 'block';

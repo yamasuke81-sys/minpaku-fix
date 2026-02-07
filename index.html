@@ -1211,7 +1211,7 @@
     (function() {
       'use strict';
       var staffParam = (typeof location !== 'undefined' && location.search) ? location.search : '';
-      window.staffMode = (staffParam.indexOf('staff=1') >= 0 || staffParam.indexOf('staff=true') >= 0);
+      window.staffMode = <?= isStaffMode ?> || (staffParam.indexOf('staff=1') >= 0 || staffParam.indexOf('staff=true') >= 0);
 
       let calendar;
       let allBookings = [];
@@ -2420,10 +2420,10 @@
             bar.style.display = 'block';
             var saved = null;
             try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
-            if (!saved || !(saved.name || saved.email)) {
-              setTimeout(function() {
-                if (!window.currentUserName && !window.currentUserEmail) showStaffSelectOverlay();
-              }, 200);
+            if (saved && (saved.name || saved.email)) {
+              applyStaffSelection(saved.name, saved.email);
+            } else {
+              showStaffSelectOverlay();
             }
           }
         }
@@ -4503,9 +4503,6 @@
           if (r.success) {
             if (window.staffMode) {
               showStaffSelectorAndHideTabs();
-              if (!window.currentUserName && !window.currentUserEmail) {
-                setTimeout(function() { showStaffSelectOverlay(); }, 100);
-              }
             } else if (r.email) {
               window.currentUserEmail = r.email;
               var badge = document.getElementById('currentAccountBadge');

@@ -2646,31 +2646,34 @@
             if (r.success) {
               var staffBar = document.getElementById('staffSelectorBar');
               var staffBarVisible = staffBar && staffBar.style.display !== 'none';
+              // オーナーURL（ANYONE_ANONYMOUS）ではSession.getActiveUser()が空のためisOwner()がfalseを返す
+              // オーナーURLではURLそのものが認証の役割を果たすため、非スタッフモードなら常にオーナーとして扱う
+              var effectiveOwner = r.isOwner || (!window.staffMode && !staffBarVisible);
               if (window.staffMode || staffBarVisible) {
                 window.isOwnerUser = false;
               } else {
-                window.isOwnerUser = r.isOwner;
+                window.isOwnerUser = effectiveOwner;
               }
               window.ownerNotSet = r.ownerNotSet;
-              var showOwnerTabs = !window.staffMode && !staffBarVisible && (r.isOwner || r.ownerNotSet);
+              var showOwnerTabs = effectiveOwner && !staffBarVisible;
               var navSettings = document.getElementById('navSettings');
               if (navSettings) navSettings.style.display = showOwnerTabs ? '' : 'none';
               var navNotif = document.getElementById('navNotifications');
-              if (navNotif) navNotif.style.display = (showOwnerTabs && r.isOwner) ? '' : 'none';
+              if (navNotif) navNotif.style.display = showOwnerTabs ? '' : 'none';
               var navStaffTest = document.getElementById('navStaffTest');
-              if (navStaffTest) navStaffTest.style.display = (showOwnerTabs && r.isOwner) ? '' : 'none';
+              if (navStaffTest) navStaffTest.style.display = showOwnerTabs ? '' : 'none';
               var navStaffSched = document.getElementById('navStaffSchedule');
               if (navStaffSched) navStaffSched.style.display = (window.staffMode || staffBarVisible) ? '' : 'none';
               var navRecruit = document.getElementById('navRecruit');
               if (navRecruit) navRecruit.style.display = (window.staffMode || staffBarVisible) ? 'none' : '';
               var btnSwitch = document.getElementById('btnAccountSwitch');
-              if (btnSwitch && r.switchUrl && r.isOwner && !window.staffMode) {
+              if (btnSwitch && r.switchUrl && effectiveOwner && !window.staffMode) {
                 btnSwitch.href = r.switchUrl;
                 btnSwitch.textContent = '別のアカウントに切り替える';
                 btnSwitch.style.display = '';
               } else if (btnSwitch) btnSwitch.style.display = 'none';
               var addBookingArea = document.getElementById('calendarAddBookingArea');
-              if (addBookingArea) addBookingArea.style.display = (r.isOwner && !window.staffMode) ? '' : 'none';
+              if (addBookingArea) addBookingArea.style.display = (effectiveOwner && !window.staffMode) ? '' : 'none';
               updateNotificationBanner();
               var badge = document.getElementById('currentAccountBadge');
               if (badge && r.currentAccountName) {

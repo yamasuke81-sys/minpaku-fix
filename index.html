@@ -1519,8 +1519,8 @@
             var recStaff = (rec.staff || '').trim();
             var bookStaff = (b.cleaningStaff || '').trim();
             var isRecruiting = (recStatus === '募集中');
-            var isConfirmed = (recStatus === 'スタッフ確定済み');
-            var isDecided = isConfirmed || (!isRecruiting && !!(recStaff || bookStaff));
+            var isConfirmed = (recStatus === 'スタッフ確定済み') || (recStatus === '選定済');
+            var isDecided = isConfirmed;
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             var curStaff = (window.currentUserName || '').trim().toLowerCase();
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
@@ -1851,8 +1851,7 @@
               nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
             }
             if (statusEl && cachedRec) {
-              var cachedStaffAssigned = (d.cleaningStaff || '').trim();
-              var cStatus = cachedStaffAssigned ? 'スタッフ確定済み' : (cachedRec.status || '');
+              var cStatus = cachedRec.status || '';
               statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
               statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
               statusEl.removeAttribute('style');
@@ -1899,8 +1898,8 @@
                   staffLabel.classList.add(resolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              // cleaningStaff or selectedStaff設定済みなら実質「スタッフ確定済み」として扱う
-              var effectiveStatus = resolvedStaff ? 'スタッフ確定済み' : r.status;
+              // 募集レコードの実際のステータスを使用（募集フロー経由の確定のみ反映）
+              var effectiveStatus = r.status;
               if (statusEl && r.success) {
                 statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
@@ -2139,7 +2138,7 @@
                   ownerStaffLabel.classList.add(ownerResolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              var ownerEffectiveStatus = ownerResolvedStaff ? 'スタッフ確定済み' : r.status;
+              var ownerEffectiveStatus = r.status;
               if (statusEl && r.success) {
                 statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
@@ -2597,14 +2596,12 @@
           allBookings = res.data || [];
           // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
           window._recruitFullMap = recruitMap;
-          // 清掃担当が設定済み or 選定済みのチェックアウト日を収集（重複行対策）
+          // 募集ステータスが確定済みのチェックアウト日を収集（募集フロー経由の確定のみ）
           var staffSetDates = {};
           (res.data || []).forEach(function(b) {
-            var hasStaff = (b.cleaningStaff || '').trim();
             var rec = recruitMap[b.rowNumber] || {};
-            var isDecided = (rec.status === '選定済') || (rec.status === 'スタッフ確定済み') || (rec.staff && rec.staff.trim());
-            var isRecruiting = (rec.status === '募集中');
-            if ((hasStaff || isDecided) && !isRecruiting && b.checkOutParsed) {
+            var isConfirmed = (rec.status === '選定済') || (rec.status === 'スタッフ確定済み');
+            if (isConfirmed && b.checkOutParsed) {
               var d2 = new Date(b.checkOutParsed);
               staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
             }

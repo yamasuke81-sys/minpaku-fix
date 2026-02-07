@@ -756,9 +756,8 @@
         </div>
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span>【清掃】</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#dc3545;border:1px solid #fff;"></span>未募集</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#ffc107;border:1px solid #fff;"></span>募集中</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#0d6efd;border:1px solid #fff;"></span>決定済み</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#dc3545;border:1px solid #fff;"></span>募集中</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
         </div>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
@@ -1566,9 +1565,9 @@
         var dotColor = '';
         if (sd === 'form-answered') dotColor = '#28a745';
         else if (sd === 'form-unanswered') dotColor = '#dc3545';
-        else if (sd === 'cleaning-decided') dotColor = '#0d6efd';
-        else if (sd === 'cleaning-recruiting') dotColor = '#ffc107';
-        else if (sd === 'cleaning-not-recruiting') dotColor = '#dc3545';
+        else if (sd === 'cleaning-decided') dotColor = '#198754';
+        else if (sd === 'cleaning-recruiting') dotColor = '#dc3545';
+        else if (sd === 'cleaning-not-recruiting') dotColor = '';
         var dotHtml = dotColor ? '<span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:' + dotColor + ';vertical-align:middle;"></span>' : '';
         var headerEl = document.getElementById('eventModalHeader');
         document.getElementById('eventModalTitle').innerHTML = titleIcon + dotHtml + escapeHtml(title);
@@ -3789,6 +3788,22 @@
             if (!banner || !listEl) return;
             if (r.success && r.list && r.list.length) {
               var filtered = r.list.filter(function(n) { return (n.message || '').trim() !== ''; });
+              // スタッフモード: 自分に関係ある通知のみ表示
+              if (window.staffMode) {
+                var myName = (window.currentUserName || '').trim();
+                var myEmail = (window.currentUserEmail || '').trim().toLowerCase();
+                filtered = filtered.filter(function(n) {
+                  var msg = (n.message || '');
+                  var kind = (n.kind || '');
+                  // 自分の名前が含まれる通知
+                  if (myName && msg.indexOf(myName) >= 0) return true;
+                  // 回答変更承認/否認は自分宛の可能性
+                  if (kind === '回答変更承認' || kind === '回答変更否認' || kind === 'キャンセル承認' || kind === 'キャンセル却下') {
+                    if (myName && msg.indexOf(myName) >= 0) return true;
+                  }
+                  return false;
+                });
+              }
               if (filtered.length === 0) { listEl.innerHTML = ''; banner.style.display = 'none'; return; }
               listEl.innerHTML = filtered.map(function(n) {
                 var line = '<div class="d-flex align-items-center justify-content-between gap-2 mb-1 notif-banner-row">';

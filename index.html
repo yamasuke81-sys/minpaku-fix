@@ -351,6 +351,24 @@
         color: #7eb8ff !important;
       }
     }
+    /* 清掃セクション: 募集状況バッジ */
+    .recruit-status-badge {
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-block;
+    }
+    .recruit-status-badge.status-undecided { background: #dc3545; color: #fff; }
+    .recruit-status-badge.status-recruiting { background: #ffc107; color: #000; }
+    .recruit-status-badge.status-decided { background: #0d6efd; color: #fff; }
+    /* 清掃セクション: 立候補者 */
+    .cleaning-section-volunteers {
+      font-size: 0.85rem;
+      color: #555;
+      padding: 0.15rem 0;
+    }
+    .cleaning-section-volunteers strong {
+      color: #333;
+    }
     .fc-event-invalid {
       background-color: rgba(108, 117, 125, 0.15);
       border-color: var(--invalid-color);
@@ -558,10 +576,10 @@
     .modal-staff-label {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
-      padding: 0.5rem 0 0.2rem;
-      font-weight: 700;
-      font-size: 0.9rem;
+      gap: 0.3rem;
+      padding: 0.2rem 0;
+      font-weight: 600;
+      font-size: 0.85rem;
     }
     .modal-staff-label.staff-set {
       color: #0d6efd;
@@ -1621,9 +1639,9 @@
             // 1. 清掃募集状況
             html += '<div><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
             // 2. 立候補者
-            html += '<div id="eventModalVolunteersArea" class="mt-1" style="display:none;"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList"></span></div>';
+            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:none;"><strong><i class="bi bi-people"></i> 立候補者:</strong> <span id="eventModalVolunteersList"></span></div>';
             // 3. 清掃担当
-            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
             // 4. 連絡事項
             html += '<div class="modal-memo-area mt-2"><label><i class="bi bi-chat-left-text"></i> 連絡事項</label>';
             if (!isStaffView) {
@@ -1738,9 +1756,9 @@
             // 2. 立候補者
             var volNames = (recruitRec && recruitRec.volunteers && recruitRec.volunteers.length) ? recruitRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : '';
             var showVol = rEffective === '募集中' || (recruitRec && recruitRec.volunteers && recruitRec.volunteers.length);
-            html += '<div id="eventModalVolunteersArea" class="mt-1" style="display:' + (showVol ? 'block' : 'none') + ';"><span class="detail-label"><strong>立候補者:</strong></span> <span id="eventModalVolunteersList">' + fmt(volNames || 'なし') + '</span></div>';
+            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:' + (showVol ? 'block' : 'none') + ';"><strong><i class="bi bi-people"></i> 立候補者:</strong> <span id="eventModalVolunteersList">' + fmt(volNames || 'なし') + '</span></div>';
             // 3. 清掃担当
-            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i>清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
             html += '</div>';
 
             // メモ（オーナー: 編集可, スタッフ: 閲覧のみ）
@@ -2080,8 +2098,11 @@
                             } else if (!jt.success) alert(jt.error || 'コピーに失敗しました');
                           }).getRecruitmentCopyText(checkoutDate, rowNum, detail);
                         };
-                        ownerCenterArea.appendChild(emPopMail);
-                        ownerCenterArea.appendChild(emPopCopy);
+                        var popBtnRow = document.createElement('div');
+                        popBtnRow.className = 'd-flex flex-wrap justify-content-center gap-1 mt-2';
+                        popBtnRow.appendChild(emPopMail);
+                        popBtnRow.appendChild(emPopCopy);
+                        ownerCenterArea.appendChild(popBtnRow);
                       } else if (res.alreadyExists) {
                         alert('この予約は既に募集済みです。');
                       }
@@ -2092,7 +2113,7 @@
                   var hasVol = r.volunteers && r.volunteers.length > 0;
                   var emBtnMail = document.createElement('button');
                   emBtnMail.type = 'button';
-                  emBtnMail.className = 'btn btn-sm btn-primary me-1';
+                  emBtnMail.className = 'btn btn-sm btn-primary';
                   emBtnMail.textContent = 'メール送信';
                   emBtnMail.onclick = function() {
                     if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
@@ -2104,7 +2125,7 @@
                   };
                   var emBtnCopy = document.createElement('button');
                   emBtnCopy.type = 'button';
-                  emBtnCopy.className = 'btn btn-sm btn-info text-white me-1';
+                  emBtnCopy.className = 'btn btn-sm btn-info text-white';
                   emBtnCopy.textContent = 'テキストコピー';
                   emBtnCopy.onclick = function() {
                     google.script.run.withSuccessHandler(function(t) {
@@ -2127,7 +2148,7 @@
                   };
                   var emBtnCancel = document.createElement('button');
                   emBtnCancel.type = 'button';
-                  emBtnCancel.className = 'btn btn-sm btn-danger me-1';
+                  emBtnCancel.className = 'btn btn-sm btn-danger';
                   emBtnCancel.textContent = '募集取消';
                   emBtnCancel.onclick = function() {
                     var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
@@ -2139,26 +2160,29 @@
                       else alert(res.error);
                     }).deleteRecruitment(r.recruitRowIndex);
                   };
-                  ownerCenterArea.appendChild(emBtnMail);
-                  ownerCenterArea.appendChild(emBtnCopy);
+                  var btnRow = document.createElement('div');
+                  btnRow.className = 'd-flex flex-wrap justify-content-center gap-1 mt-2';
+                  btnRow.appendChild(emBtnMail);
+                  btnRow.appendChild(emBtnCopy);
                   if (hasVol) {
                     var emBtnSelect = document.createElement('button');
                     emBtnSelect.type = 'button';
-                    emBtnSelect.className = 'btn btn-sm btn-success me-1';
+                    emBtnSelect.className = 'btn btn-sm btn-success';
                     emBtnSelect.textContent = 'スタッフ選定';
                     emBtnSelect.onclick = function() {
                       bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                       openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: r.checkoutDate || checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
                     };
-                    ownerCenterArea.appendChild(emBtnSelect);
+                    btnRow.appendChild(emBtnSelect);
                   }
-                  ownerCenterArea.appendChild(emBtnCancel);
+                  btnRow.appendChild(emBtnCancel);
+                  ownerCenterArea.appendChild(btnRow);
                 }
               }
               if ((d.cleaningStaff || '').trim() && ownerCenterArea) {
                 var btnEditStaff = document.createElement('button');
                 btnEditStaff.type = 'button';
-                btnEditStaff.className = 'btn btn-sm btn-secondary me-1';
+                btnEditStaff.className = 'btn btn-sm btn-secondary w-100 mt-2';
                 btnEditStaff.textContent = '清掃担当を編集';
                 btnEditStaff.onclick = function() {
                   bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();

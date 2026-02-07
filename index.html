@@ -350,6 +350,89 @@
       .fc .fc-more-link {
         color: #7eb8ff !important;
       }
+      /* モーダル見出しグラデーション */
+      .modal-header-cleaning {
+        background: linear-gradient(135deg, #1a3d2a 0%, #242424 100%) !important;
+        border-bottom-color: #198754 !important;
+      }
+      .modal-header-booking {
+        background: linear-gradient(135deg, #1a2d4a 0%, #242424 100%) !important;
+        border-bottom-color: #0d6efd !important;
+      }
+      /* モーダル日付表示 */
+      .modal-prominent-date {
+        color: #e0e0e0 !important;
+      }
+      .modal-prominent-date .bi {
+        color: #adb5bd !important;
+      }
+      .modal-date-pair .date-item {
+        background: #2d2d2d !important;
+      }
+      .modal-date-pair .date-item .date-label {
+        color: #adb5bd !important;
+      }
+      .modal-date-pair .date-item .date-val {
+        color: #e0e0e0 !important;
+      }
+      /* モーダル情報項目 */
+      .modal-info-item .bi {
+        color: #adb5bd !important;
+      }
+      .modal-info-item .info-label {
+        color: #adb5bd !important;
+      }
+      .modal-info-item .info-value {
+        color: #e0e0e0 !important;
+      }
+      /* モーダルバッジ */
+      .modal-badge-yes {
+        background: #1a3d2a !important;
+        color: #a3d9b1 !important;
+      }
+      .modal-badge-no {
+        background: #2d2d2d !important;
+        color: #adb5bd !important;
+      }
+      /* 次回予約カード */
+      .modal-next-res-card {
+        background: #2d2d2d !important;
+        border-color: #495057 !important;
+      }
+      .modal-next-res-card .card-title-sm {
+        color: #e0e0e0 !important;
+      }
+      .modal-next-res-grid .nres-label {
+        color: #adb5bd !important;
+      }
+      .modal-next-res-grid .nres-value {
+        color: #e0e0e0 !important;
+      }
+      /* 備考・連絡事項エリア */
+      .modal-memo-area label {
+        color: #adb5bd !important;
+      }
+      /* 区切り線 */
+      .modal-section-divider {
+        border-top-color: #495057 !important;
+      }
+      .modal-footer-redesign {
+        border-top-color: #495057 !important;
+      }
+      /* 清掃セクション回答状況 */
+      .cleaning-section-volunteers {
+        color: #adb5bd !important;
+      }
+      .cleaning-section-volunteers strong {
+        color: #e0e0e0 !important;
+      }
+      /* 清掃担当ラベル */
+      .modal-staff-label.staff-set {
+        color: #6ea8fe !important;
+      }
+      .modal-staff-label.staff-unset {
+        color: #ea868f !important;
+      }
     }
     /* 清掃セクション: 募集状況バッジ */
     .recruit-status-badge {
@@ -649,6 +732,23 @@
     }
     .modal-btn-row .btn {
       flex: 1;
+    }
+    .btn-stacked {
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+      min-width: 3.5rem;
+      padding: 0.35rem 0.5rem !important;
+      line-height: 1.2;
+      gap: 0.1rem;
+    }
+    .btn-stacked .btn-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+    .btn-stacked .btn-label {
+      font-size: 0.7rem;
+      line-height: 1;
     }
     .modal-memo-area {
       padding: 0.4rem 0;
@@ -2077,15 +2177,15 @@
                   var changeBtnRow = document.createElement('div');
                   changeBtnRow.className = 'd-flex gap-1 justify-content-center flex-wrap';
                   var changeOpts = [
-                    { val: '◎', label: '● 対応可で要請', cls: 'outline-warning' },
-                    { val: '△', label: '▲ 条件付で要請', cls: 'outline-warning' },
-                    { val: '×', label: '✖ 不可で要請', cls: 'outline-warning' }
+                    { val: '◎', icon: '●', text: '対応可\n要請', cls: 'outline-warning' },
+                    { val: '△', icon: '▲', text: '条件付\n要請', cls: 'outline-warning' },
+                    { val: '×', icon: '✖', text: '不可\n要請', cls: 'outline-warning' }
                   ];
                   changeOpts.forEach(function(opt) {
                     var b = document.createElement('button');
                     b.type = 'button';
-                    b.className = 'btn btn-sm btn-' + opt.cls + ' fw-bold';
-                    b.textContent = opt.label;
+                    b.className = 'btn btn-sm btn-' + opt.cls + ' fw-bold btn-stacked';
+                    b.innerHTML = '<span class="btn-icon">' + opt.icon + '</span><span class="btn-label" style="white-space:pre-line;">' + opt.text + '</span>';
                     b.onclick = function() {
                       var memoEl = document.getElementById('eventModalChangeMemo');
                       var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
@@ -2120,15 +2220,15 @@
                   var btnRow = document.createElement('div');
                   btnRow.className = 'd-flex gap-2 justify-content-center flex-wrap';
                   var responses = [
-                    { val: '◎', label: '● 対応可', cls: 'success' },
-                    { val: '△', label: '▲ 条件付', cls: 'warning' },
-                    { val: '×', label: '✖ 不可', cls: 'danger' }
+                    { val: '◎', icon: '●', text: '対応可', cls: 'success' },
+                    { val: '△', icon: '▲', text: '条件付', cls: 'warning' },
+                    { val: '×', icon: '✖', text: '不可', cls: 'danger' }
                   ];
                   responses.forEach(function(opt) {
                     var b = document.createElement('button');
                     b.type = 'button';
-                    b.className = 'btn btn-sm btn-' + (myResponse === opt.val ? '' : 'outline-') + opt.cls + ' fw-bold';
-                    b.textContent = opt.label;
+                    b.className = 'btn btn-sm btn-' + (myResponse === opt.val ? '' : 'outline-') + opt.cls + ' fw-bold btn-stacked';
+                    b.innerHTML = '<span class="btn-icon">' + opt.icon + '</span><span class="btn-label">' + opt.text + '</span>';
                     b.onclick = function() {
                       var memoEl = document.getElementById('eventModalResponseMemo');
                       var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
@@ -2149,12 +2249,12 @@
                   if (myResponse) {
                     var delBtn = document.createElement('button');
                     delBtn.type = 'button';
-                    delBtn.className = 'btn btn-sm btn-outline-secondary fw-bold';
-                    delBtn.textContent = '回答削除';
+                    delBtn.className = 'btn btn-sm btn-outline-secondary fw-bold btn-stacked';
+                    delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">回答</span><span class="btn-label">削除</span>';
                     delBtn.onclick = function() {
                       customConfirm('回答を削除しますか？').then(function(ok) {
                         if (!ok) return;
-                        delBtn.disabled = true; delBtn.textContent = '削除中...';
+                        delBtn.disabled = true; delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">削除</span><span class="btn-label">中…</span>';
                         google.script.run.withSuccessHandler(function(j) {
                           var res = JSON.parse(j);
                           if (res.success) {
@@ -2162,8 +2262,8 @@
                             loadAndRender();
                             if (window.staffMode) loadStaffSchedule();
                             loadRecruitList();
-                          } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.textContent = '回答削除'; }
-                        }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.textContent = '回答削除'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                          } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">回答</span><span class="btn-label">削除</span>'; }
+                        }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">回答</span><span class="btn-label">削除</span>'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
                       });
                     };
                     btnRow.appendChild(delBtn);
@@ -3477,9 +3577,9 @@
                 (myResp !== '未回答' ? '<div class="small mb-2 text-center">現在の回答: <strong>' + myResp + '</strong>' + (myMemo ? '（' + escapeHtml(myMemo) + '）' : '') + '</div>' : '') +
                 '<div class="mb-2"><label class="form-label small fw-bold">変更後の回答と備考</label><input type="text" class="form-control form-control-sm mb-1" id="recruitEditChangeMemo" placeholder="変更理由を記入"></div>' +
                 '<div class="d-flex gap-2 justify-content-center">' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="◎">● 対応可で変更要請</button>' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="△">▲ 条件付で変更要請</button>' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="×">✖ 不可で変更要請</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-stacked" data-change-resp="◎"><span class="btn-icon">●</span><span class="btn-label" style="white-space:pre-line;">対応可\n要請</span></button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-stacked" data-change-resp="△"><span class="btn-icon">▲</span><span class="btn-label" style="white-space:pre-line;">条件付\n要請</span></button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-stacked" data-change-resp="×"><span class="btn-icon">✖</span><span class="btn-label" style="white-space:pre-line;">不可\n要請</span></button>' +
                 '</div>';
               volunteerArea.querySelectorAll('[data-change-resp]').forEach(function(btn) {
                 btn.onclick = function() {
@@ -3504,9 +3604,9 @@
               volunteerArea.innerHTML = '<div class="mb-2"><label class="form-label small fw-bold">備考</label><input type="text" class="form-control form-control-sm" id="recruitEditResponseMemo" placeholder="何時からなら対応可能、など" value="' + escapeHtml(myMemo) + '"></div>' +
                 (myResp !== '未回答' ? '<div class="small text-muted mb-1 text-center">現在の回答: ' + myResp + '</div>' : '') +
                 '<div class="d-flex gap-2 justify-content-center">' +
-                '<button type="button" class="btn btn-sm btn-' + (myResp === '◎' ? '' : 'outline-') + 'success fw-bold" data-resp="◎">● 対応可</button>' +
-                '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning fw-bold" data-resp="△">▲ 条件付</button>' +
-                '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger fw-bold" data-resp="×">✖ 不可</button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '◎' ? '' : 'outline-') + 'success fw-bold btn-stacked" data-resp="◎"><span class="btn-icon">●</span><span class="btn-label">対応可</span></button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning fw-bold btn-stacked" data-resp="△"><span class="btn-icon">▲</span><span class="btn-label">条件付</span></button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger fw-bold btn-stacked" data-resp="×"><span class="btn-icon">✖</span><span class="btn-label">不可</span></button>' +
                 '</div>';
               volunteerArea.querySelectorAll('[data-resp]').forEach(function(btn) {
                 btn.onclick = function() {
@@ -5212,8 +5312,9 @@
           if (!pwArea) return;
           var opt = this.options[this.selectedIndex];
           var hasPw = opt && opt.dataset.hasPw === '1';
-          pwArea.style.display = this.value ? 'block' : 'none';
-          if (setPwBtn) setPwBtn.style.display = this.value ? 'block' : 'none';
+          // パスワード機能一時無効化（将来的にオーナー設定で切り替え予定）
+          pwArea.style.display = 'none';
+          if (setPwBtn) setPwBtn.style.display = 'none';
           if (pwInput) { pwInput.value = ''; pwInput.placeholder = hasPw ? 'パスワードを入力' : '新しいパスワードを設定（4文字以上）'; }
           if (pwMsg) pwMsg.style.display = 'none';
         });
@@ -5226,51 +5327,12 @@
           var v = (sel && sel.value || '').split('|');
           if (!v[0] && !v[1]) { alert('お名前を選択してください'); return; }
           var opt = sel.options[sel.selectedIndex];
-          var hasPw = opt && opt.dataset.hasPw === '1';
-          var pwInput = document.getElementById('staffPasswordInput');
-          var pw = pwInput ? pwInput.value : '';
-          var pwMsg = document.getElementById('staffPasswordMsg');
-          var btn = this;
-          btn.disabled = true; btn.textContent = '確認中...';
-          if (hasPw) {
-            // パスワード検証
-            if (!pw) { if (pwMsg) { pwMsg.textContent = 'パスワードを入力してください'; pwMsg.style.display = 'block'; } btn.disabled = false; btn.textContent = '決定'; return; }
-            google.script.run.withSuccessHandler(function(j) {
-              var res = JSON.parse(j);
-              btn.disabled = false; btn.textContent = '決定';
-              if (res.success && res.verified) {
-                applyStaffSelection(v[0] || '', v[1] || '');
-                hideStaffSelectOverlay();
-                var disp = document.getElementById('staffDisplayName');
-                if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
-              } else {
-                if (pwMsg) { pwMsg.textContent = 'パスワードが正しくありません'; pwMsg.style.display = 'block'; }
-              }
-            }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '決定'; alert(e.message); }).verifyStaffPassword(v[0] || '', v[1] || '', pw);
-          } else {
-            // パスワード未設定: 新規設定
-            if (pw) {
-              if (pw.length < 4) { if (pwMsg) { pwMsg.textContent = 'パスワードは4文字以上で設定してください'; pwMsg.style.display = 'block'; } btn.disabled = false; btn.textContent = '決定'; return; }
-              google.script.run.withSuccessHandler(function(j) {
-                var res = JSON.parse(j);
-                btn.disabled = false; btn.textContent = '決定';
-                if (res.success) {
-                  applyStaffSelection(v[0] || '', v[1] || '');
-                  hideStaffSelectOverlay();
-                  var disp = document.getElementById('staffDisplayName');
-                  if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
-                  alert('パスワードを設定しました。次回以降はこのパスワードが必要です。');
-                } else { if (pwMsg) { pwMsg.textContent = res.error || '設定失敗'; pwMsg.style.display = 'block'; } }
-              }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '決定'; alert(e.message); }).setStaffPassword(v[0] || '', v[1] || '', '', pw);
-            } else {
-              // パスワードなしで続行
-              applyStaffSelection(v[0] || '', v[1] || '');
-              hideStaffSelectOverlay();
-              btn.disabled = false; btn.textContent = '決定';
-              var disp = document.getElementById('staffDisplayName');
-              if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
-            }
-          }
+          // パスワード機能一時無効化（将来的にオーナー設定で切り替え予定）
+          // パスワードなしで続行
+          applyStaffSelection(v[0] || '', v[1] || '');
+          hideStaffSelectOverlay();
+          var disp = document.getElementById('staffDisplayName');
+          if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
         });
       }
       // パスワード変更ボタン

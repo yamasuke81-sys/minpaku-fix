@@ -260,7 +260,7 @@
         color: #e0e0e0 !important;
       }
       #staffSelectOverlay h6 { color: #fff !important; }
-      .recruit-status-badge { font-size: 1rem; font-weight: 700; padding: 0.35rem 0.75rem; letter-spacing: 0.05em; }
+      .recruit-status-badge { font-size: 1rem; font-weight: 700; display: block; text-align: center; padding: 0.45rem 0.75rem; letter-spacing: 0.05em; margin: -0.75rem -0.75rem 0.5rem -0.75rem; border-radius: 10px 10px 0 0; }
       .recruit-status-badge.status-undecided { background: #dc3545; color: #fff; }
       .recruit-status-badge.status-recruiting { background: #ffc107; color: #000; }
       .recruit-status-badge.status-decided { background: #198754; color: #fff; }
@@ -444,9 +444,12 @@
     .recruit-status-badge {
       font-size: 1rem;
       font-weight: 700;
-      display: inline-block;
-      padding: 0.35rem 0.75rem;
+      display: block;
+      text-align: center;
+      padding: 0.45rem 0.75rem;
       letter-spacing: 0.05em;
+      margin: -0.75rem -0.75rem 0.5rem -0.75rem;
+      border-radius: 10px 10px 0 0;
     }
     .recruit-status-badge.status-undecided { background: #dc3545; color: #fff; }
     .recruit-status-badge.status-recruiting { background: #ffc107; color: #000; }
@@ -713,6 +716,15 @@
       align-items: center;
       gap: 0.3rem;
     }
+    .next-res-toggle {
+      margin-bottom: 0 !important;
+    }
+    .next-res-toggle:hover {
+      opacity: 0.7;
+    }
+    .next-res-toggle .next-res-chevron {
+      margin-left: auto;
+    }
     .modal-next-res-grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -885,13 +897,13 @@
       <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex flex-column gap-1">
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span>【宿泊】</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#dc3545;border:1px solid #fff;"></span>内容詳細なし</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#28a745;border:1px solid #fff;"></span>内容詳細あり</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>内容詳細なし</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#28a745;border:1px solid #fff;"></span>内容詳細あり</span>
         </div>
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span>【清掃】</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#dc3545;border:1px solid #fff;"></span>募集中</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>募集中</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
         </div>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
@@ -1721,6 +1733,16 @@
         return events;
       }
 
+      // 次回予約の折りたたみトグル
+      function toggleNextRes() {
+        var content = document.getElementById('eventModalStaffNextResContent');
+        var chevron = document.querySelector('.next-res-chevron');
+        if (!content) return;
+        var isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? '' : 'none';
+        if (chevron) chevron.style.transform = isHidden ? 'rotate(90deg)' : '';
+      }
+
       // イベント詳細モーダル表示
       function showEventModal(event) {
         const props = event.extendedProps;
@@ -1836,10 +1858,10 @@
               html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-p-circle"></i> 有料駐車場:</strong></span><span class="detail-value">' + fmt(parkDisp || '-') + '</span></div>';
             }
 
-            // 次回予約の情報カード
+            // 次回予約の情報カード（折りたたみ式、デフォルト閉じ）
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
-            html += '<div class="card-title-sm"><i class="bi bi-info-circle"></i>次回予約</div>';
-            html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
+            html += '<div class="card-title-sm next-res-toggle" onclick="toggleNextRes()" style="cursor:pointer;user-select:none;"><i class="bi bi-info-circle"></i>次回予約<i class="bi bi-chevron-right ms-auto next-res-chevron" style="transition:transform 0.2s;font-size:0.7rem;"></i></div>';
+            html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent" style="display:none;"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
             html += '</div>';
 
             // 連絡事項（次回予約と募集状況の間）
@@ -1857,7 +1879,7 @@
             // 清掃募集状況カード: 募集状況→清掃担当→ボタン/アクション→回答状況
             html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
             // 1. 募集状況
-            html += '<div><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
+            html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted" style="background:#e9ecef;">読み込み中…</span>';
             // 2. 清掃担当
             html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
             // 3. ボタン/アクションエリア（メール送信・清掃担当を編集・対応可ボタンなど、JSで動的に追加）
@@ -2026,7 +2048,7 @@
               var cStatus = cachedRec.status || '';
               var cIsConfirmed = (cStatus === 'スタッフ確定済み' || cStatus === '選定済');
               statusEl.textContent = cIsConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
-              statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cIsConfirmed ? 'status-decided' : 'status-recruiting');
+              statusEl.className = 'recruit-status-badge ' + (cIsConfirmed ? 'status-decided' : 'status-recruiting');
               statusEl.removeAttribute('style');
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
@@ -2076,7 +2098,7 @@
               var isEffConfirmed = (effectiveStatus === 'スタッフ確定済み' || effectiveStatus === '選定済');
               if (statusEl && r.success) {
                 statusEl.textContent = isEffConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
-                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (isEffConfirmed ? 'status-decided' : 'status-recruiting');
+                statusEl.className = 'recruit-status-badge ' + (isEffConfirmed ? 'status-decided' : 'status-recruiting');
                 statusEl.removeAttribute('style');
               }
               if (volArea && volList && r.success) {
@@ -2299,7 +2321,7 @@
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
-            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge px-2 py-1 rounded status-undecided'; sEl.removeAttribute('style'); }
+            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge status-undecided'; sEl.removeAttribute('style'); }
           }).getRecruitmentForBooking(props.rowNumber);
         }
 
@@ -2340,7 +2362,7 @@
               var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済');
               if (statusEl && r.success) {
                 statusEl.textContent = isOwnerConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
-                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (isOwnerConfirmed ? 'status-decided' : 'status-recruiting');
+                statusEl.className = 'recruit-status-badge ' + (isOwnerConfirmed ? 'status-decided' : 'status-recruiting');
                 statusEl.removeAttribute('style');
               }
               if (volArea && volList && r.success) {
@@ -2628,7 +2650,7 @@
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
-            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge px-2 py-1 rounded status-undecided'; sEl.removeAttribute('style'); }
+            if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge status-undecided'; sEl.removeAttribute('style'); }
           }).getRecruitmentForBooking(props.rowNumber);
           setTimeout(function() {
             var addBtn = document.getElementById('eventModalAddStaff');

@@ -592,8 +592,8 @@
     }
     .modal-next-res-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.3rem 0.75rem;
+      grid-template-columns: 1fr;
+      gap: 0.2rem;
     }
     .modal-next-res-grid .nres-item {
       display: flex;
@@ -1215,12 +1215,12 @@
   <script>
     (function() {
       'use strict';
-      var staffParam = (typeof location !== 'undefined' && location.search) ? location.search : '';
-      window.staffMode = <?= isStaffMode ?> || (staffParam.indexOf('staff=1') >= 0 || staffParam.indexOf('staff=true') >= 0);
+      // staffModeはサーバー側のisStaffModeのみで判定（GAS iframe内のlocation.searchは信頼できない）
+      window.staffMode = <?= isStaffMode ?>;
       // デバッグ: デプロイ確認用（タイトル横のバージョンにモード情報を追加）
       try {
         var dv = document.getElementById('deployVersion');
-        if (dv) dv.textContent = 'v0207a ' + (window.staffMode ? 'STAFF' : 'OWNER') + ' tpl=<?= isStaffMode ?>';
+        if (dv) dv.textContent = 'v0207b ' + (window.staffMode ? 'STAFF' : 'OWNER');
       } catch(e) {}
 
       let calendar;
@@ -1797,7 +1797,7 @@
             if (nextEl && cachedNextRes) {
               var nr = cachedNextRes;
               var dateDisp = fmtDateRange(nr.date);
-              nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
+              nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
             }
             if (statusEl && cachedRec) {
               var cachedStaffAssigned = (d.cleaningStaff || '').trim();
@@ -1827,7 +1827,7 @@
                 var nr = r.nextReservation || {};
                 if (nr.date) {
                   var dateDisp = fmtDateRange(nr.date);
-                  nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
+                  nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
                 } else {
                   nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">次回予約なし</span></div>';
                 }
@@ -1991,7 +1991,7 @@
                 var nr = r.nextReservation || {};
                 if (nr.date) {
                   var dateDisp = fmtDateRange(nr.date);
-                  nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div>';
+                  nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
                 } else {
                   nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">次回予約なし</span></div>';
                 }

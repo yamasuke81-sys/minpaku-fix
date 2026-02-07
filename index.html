@@ -723,7 +723,12 @@
         <select class="form-select mb-3" id="staffSelectModalSelect">
           <option value="">-- 選択 --</option>
         </select>
-        <button type="button" class="btn btn-primary w-100" id="staffSelectModalConfirm">決定</button>
+        <div id="staffPasswordArea" style="display:none;">
+          <input type="password" class="form-control mb-2" id="staffPasswordInput" placeholder="パスワードを入力">
+          <div id="staffPasswordMsg" class="small text-danger mb-2" style="display:none;"></div>
+        </div>
+        <button type="button" class="btn btn-primary w-100 mb-2" id="staffSelectModalConfirm">決定</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="staffSetPasswordBtn" style="display:none;">パスワードを変更</button>
       </div>
     </div>
 <? } ?>
@@ -2117,6 +2122,30 @@
                   var memoInput = memoWrap.querySelector('input');
                   if (memoInput && myMemo) memoInput.value = myMemo;
                   volBodyArea.appendChild(memoWrap);
+                  // 回答済みの場合「回答を削除」ボタンを追加
+                  if (myResponse) {
+                    var delBtnWrap = document.createElement('div');
+                    delBtnWrap.className = 'text-center mt-2';
+                    var delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'btn btn-sm btn-outline-secondary';
+                    delBtn.textContent = '回答を削除';
+                    delBtn.onclick = function() {
+                      if (!confirm('回答を削除しますか？')) return;
+                      delBtn.disabled = true; delBtn.textContent = '削除中...';
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) {
+                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                          loadAndRender();
+                          if (window.staffMode) loadStaffSchedule();
+                          loadRecruitList();
+                        } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.textContent = '回答を削除'; }
+                      }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.textContent = '回答を削除'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                    };
+                    delBtnWrap.appendChild(delBtn);
+                    volBodyArea.appendChild(delBtnWrap);
+                  }
                 }
               }
             } catch (e) {}
@@ -4894,8 +4923,8 @@
             if (el && s.success && s.list && s.list.length) {
               el.innerHTML = '<option value="">-- 選択 --</option>';
               s.list.forEach(function(st) {
-                var label = (st.name || st.email) + (st.email ? ' (' + st.email + ')' : '');
-                el.innerHTML += '<option value="' + escapeHtml(st.name || '') + '|' + escapeHtml(st.email || '') + '">' + escapeHtml(label) + '</option>';
+                var label = st.name || st.email;
+                el.innerHTML += '<option value="' + escapeHtml(st.name || '') + '|' + escapeHtml(st.email || '') + '" data-has-pw="' + (st.hasPassword ? '1' : '0') + '">' + escapeHtml(label) + '</option>';
               });
             }
           } catch (e) {}
@@ -4962,6 +4991,23 @@
           }
         }
       }
+      // スタッフ選択時にパスワード欄の表示切り替え
+      var staffModalSelect = document.getElementById('staffSelectModalSelect');
+      if (staffModalSelect) {
+        staffModalSelect.addEventListener('change', function() {
+          var pwArea = document.getElementById('staffPasswordArea');
+          var pwInput = document.getElementById('staffPasswordInput');
+          var pwMsg = document.getElementById('staffPasswordMsg');
+          var setPwBtn = document.getElementById('staffSetPasswordBtn');
+          if (!pwArea) return;
+          var opt = this.options[this.selectedIndex];
+          var hasPw = opt && opt.dataset.hasPw === '1';
+          pwArea.style.display = this.value ? 'block' : 'none';
+          if (setPwBtn) setPwBtn.style.display = this.value ? 'block' : 'none';
+          if (pwInput) { pwInput.value = ''; pwInput.placeholder = hasPw ? 'パスワードを入力' : '新しいパスワードを設定（4文字以上）'; }
+          if (pwMsg) pwMsg.style.display = 'none';
+        });
+      }
       var staffConfirmBtn = document.getElementById('staffSelectModalConfirm');
       if (staffConfirmBtn && !staffConfirmBtn.dataset.listen) {
         staffConfirmBtn.dataset.listen = '1';
@@ -4969,10 +5015,73 @@
           var sel = document.getElementById('staffSelectModalSelect');
           var v = (sel && sel.value || '').split('|');
           if (!v[0] && !v[1]) { alert('お名前を選択してください'); return; }
-          applyStaffSelection(v[0] || '', v[1] || '');
-          hideStaffSelectOverlay();
-          var disp = document.getElementById('staffDisplayName');
-          if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+          var opt = sel.options[sel.selectedIndex];
+          var hasPw = opt && opt.dataset.hasPw === '1';
+          var pwInput = document.getElementById('staffPasswordInput');
+          var pw = pwInput ? pwInput.value : '';
+          var pwMsg = document.getElementById('staffPasswordMsg');
+          var btn = this;
+          btn.disabled = true; btn.textContent = '確認中...';
+          if (hasPw) {
+            // パスワード検証
+            if (!pw) { if (pwMsg) { pwMsg.textContent = 'パスワードを入力してください'; pwMsg.style.display = 'block'; } btn.disabled = false; btn.textContent = '決定'; return; }
+            google.script.run.withSuccessHandler(function(j) {
+              var res = JSON.parse(j);
+              btn.disabled = false; btn.textContent = '決定';
+              if (res.success && res.verified) {
+                applyStaffSelection(v[0] || '', v[1] || '');
+                hideStaffSelectOverlay();
+                var disp = document.getElementById('staffDisplayName');
+                if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+              } else {
+                if (pwMsg) { pwMsg.textContent = 'パスワードが正しくありません'; pwMsg.style.display = 'block'; }
+              }
+            }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '決定'; alert(e.message); }).verifyStaffPassword(v[0] || '', v[1] || '', pw);
+          } else {
+            // パスワード未設定: 新規設定
+            if (pw) {
+              if (pw.length < 4) { if (pwMsg) { pwMsg.textContent = 'パスワードは4文字以上で設定してください'; pwMsg.style.display = 'block'; } btn.disabled = false; btn.textContent = '決定'; return; }
+              google.script.run.withSuccessHandler(function(j) {
+                var res = JSON.parse(j);
+                btn.disabled = false; btn.textContent = '決定';
+                if (res.success) {
+                  applyStaffSelection(v[0] || '', v[1] || '');
+                  hideStaffSelectOverlay();
+                  var disp = document.getElementById('staffDisplayName');
+                  if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+                  alert('パスワードを設定しました。次回以降はこのパスワードが必要です。');
+                } else { if (pwMsg) { pwMsg.textContent = res.error || '設定失敗'; pwMsg.style.display = 'block'; } }
+              }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '決定'; alert(e.message); }).setStaffPassword(v[0] || '', v[1] || '', '', pw);
+            } else {
+              // パスワードなしで続行
+              applyStaffSelection(v[0] || '', v[1] || '');
+              hideStaffSelectOverlay();
+              btn.disabled = false; btn.textContent = '決定';
+              var disp = document.getElementById('staffDisplayName');
+              if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+            }
+          }
+        });
+      }
+      // パスワード変更ボタン
+      var setPwBtn = document.getElementById('staffSetPasswordBtn');
+      if (setPwBtn) {
+        setPwBtn.addEventListener('click', function() {
+          var sel = document.getElementById('staffSelectModalSelect');
+          var v = (sel && sel.value || '').split('|');
+          if (!v[0]) { alert('まず名前を選択してください'); return; }
+          var opt = sel.options[sel.selectedIndex];
+          var hasPw = opt && opt.dataset.hasPw === '1';
+          var oldPw = hasPw ? prompt('現在のパスワードを入力してください') : '';
+          if (hasPw && oldPw === null) return;
+          var newPw = prompt('新しいパスワードを入力してください（4文字以上）');
+          if (!newPw) return;
+          if (newPw.length < 4) { alert('パスワードは4文字以上で設定してください'); return; }
+          google.script.run.withSuccessHandler(function(j) {
+            var res = JSON.parse(j);
+            if (res.success) { alert('パスワードを変更しました'); if (opt) opt.dataset.hasPw = '1'; }
+            else alert(res.error || '失敗');
+          }).withFailureHandler(function(e) { alert(e.message); }).setStaffPassword(v[0] || '', v[1] || '', oldPw || '', newPw);
         });
       }
       google.script.run.withSuccessHandler(function(jsonStr) {

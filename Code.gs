@@ -548,7 +548,7 @@ function updateCleaningStaff(rowNumber, staffName) {
         if (Number(rows[i][1]) === rowNumber) {
           var recruitRowIndex = i + 2;
           recruitSheet.getRange(recruitRowIndex, 5).setValue(value);
-          recruitSheet.getRange(recruitRowIndex, 4).setValue(value ? '選定済' : '募集中');
+          recruitSheet.getRange(recruitRowIndex, 4).setValue(value ? 'スタッフ確定済み' : '募集中');
           break;
         }
       }
@@ -1585,6 +1585,22 @@ function syncFromICal() {
         if (colMap.icalGuestCount >= 0) rowData[colMap.icalGuestCount] = ev.guestCount || '';
 
         formSheet.getRange(nextRow, 1, 1, formLastCol).setValues([rowData]);
+        // 自動で清掃募集を開始
+        try {
+          var coKey = ev.checkOut;
+          if (coKey) {
+            var rSheet = ss.getSheetByName(SHEET_RECRUIT);
+            if (rSheet) {
+              ensureRecruitDetailColumns_();
+              ensureRecruitNotifyMethodColumn_();
+              var rNextRow = rSheet.getLastRow() + 1;
+              var nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+              rSheet.getRange(rNextRow, 1, 1, 15).setValues([[coKey, nextRow, '', '募集中', '', '', nowStr, '', 'メール', '', '', '', '', '', '']]);
+            }
+          }
+        } catch (autoRecruitErr) {
+          Logger.log('Auto-recruit error: ' + autoRecruitErr.toString());
+        }
         nextRow++;
         added++;
         platformAdded++;
@@ -2852,7 +2868,7 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
       sheet.getRange(recruitRowIndexOrNull, 15).setValue(detail.bedCount || '');
       var staffVal = (detail.cleaningStaff || '').trim();
       sheet.getRange(recruitRowIndexOrNull, 5).setValue(staffVal);
-      if (staffVal) sheet.getRange(recruitRowIndexOrNull, 4).setValue('選定済');
+      if (staffVal) sheet.getRange(recruitRowIndexOrNull, 4).setValue('スタッフ確定済み');
       var formSheet = ss.getSheetByName(SHEET_NAME);
       if (formSheet && bookingRowNumber && formSheet.getLastRow() >= bookingRowNumber) {
         var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
@@ -2868,7 +2884,7 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
     var nextRow = sheet.getLastRow() + 1;
     var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     var staffVal = (detail.cleaningStaff || '').trim();
-    var status = staffVal ? '選定済' : '募集中';
+    var status = staffVal ? 'スタッフ確定済み' : '募集中';
     ensureRecruitDetailColumns_();
     sheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutDateStr, bookingRowNumber, '', status, staffVal, '', now, '', detail.notifyMethod || 'メール', detail.date || '', detail.guestCount || '', detail.bbq || '', detail.nationality || '', detail.memo || '', detail.bedCount || '']]);
     if (staffVal) {
@@ -3551,9 +3567,9 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
     if (isNaN(recruitRowIndex) || recruitRowIndex < 2) {
       return JSON.stringify({ success: false, error: '無効な募集ID' });
     }
-    const status = recruitSheet.getRange(recruitRowIndex, 4).getValue();
-    if (String(status).trim() === '選定済') {
-      return JSON.stringify({ success: false, error: 'この募集は選定済みです' });
+    const status = String(recruitSheet.getRange(recruitRowIndex, 4).getValue()).trim();
+    if (status === '選定済' || status === 'スタッフ確定済み') {
+      return JSON.stringify({ success: false, error: 'この募集はスタッフ確定済みです。回答を変更するには「回答変更要請」を使ってください。' });
     }
     if (['◎', '△', '×'].indexOf(response) < 0) {
       return JSON.stringify({ success: false, error: '無効な回答です。◎/△/×で回答してください。' });
@@ -3595,6 +3611,116 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * スタッフ確定済みの募集に対して回答変更を要請する
+ */
+function requestResponseChange(recruitId, staffName, staffEmail, newResponse, memo) {
+  try {
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    var recruitRowIndex = parseInt(String(recruitId).replace('r', ''), 10);
+    if (isNaN(recruitRowIndex) || recruitRowIndex < 2) return JSON.stringify({ success: false, error: '無効な募集ID' });
+    var status = String(recruitSheet.getRange(recruitRowIndex, 4).getValue()).trim();
+    if (status !== 'スタッフ確定済み' && status !== '選定済') return JSON.stringify({ success: false, error: '確定済みではありません' });
+    if (['◎', '△', '×'].indexOf(newResponse) < 0) return JSON.stringify({ success: false, error: '無効な回答です' });
+    var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
+    var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
+    // 回答変更要請シートに記録
+    var crSheet = ss.getSheetByName('回答変更要請');
+    if (!crSheet) {
+      crSheet = ss.insertSheet('回答変更要請');
+      crSheet.getRange(1, 1, 1, 7).setValues([['募集ID', 'スタッフ名', 'メール', '変更後回答', '備考', '要請日時', 'ステータス']]);
+    }
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var nextRow = crSheet.getLastRow() + 1;
+    crSheet.getRange(nextRow, 1, 1, 7).setValues([[recruitId, staffName || '', staffEmail || '', newResponse, memo || '', now, 'pending']]);
+    addNotification_('回答変更要請', (checkoutStr || recruitId) + ': ' + (staffName || '不明') + ' が回答変更を要請（' + newResponse + '）' + (memo ? '（' + memo + '）' : ''));
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 回答変更要請を承認する（オーナーのみ）
+ */
+function approveResponseChange(changeRequestRow) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var crSheet = ss.getSheetByName('回答変更要請');
+    if (!crSheet || crSheet.getLastRow() < changeRequestRow) return JSON.stringify({ success: false, error: '要請が見つかりません' });
+    var row = crSheet.getRange(changeRequestRow, 1, 1, 7).getValues()[0];
+    var recruitId = String(row[0]).trim();
+    var staffName = String(row[1]).trim();
+    var staffEmail = String(row[2]).trim();
+    var newResponse = String(row[3]).trim();
+    var memo = String(row[4]).trim();
+    crSheet.getRange(changeRequestRow, 7).setValue('approved');
+    // 募集ステータスを一時的に募集中に戻して回答を反映
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    var recruitRowIndex = parseInt(recruitId.replace('r', ''), 10);
+    var origStatus = recruitSheet.getRange(recruitRowIndex, 4).getValue();
+    recruitSheet.getRange(recruitRowIndex, 4).setValue('募集中');
+    var result = JSON.parse(respondToRecruitment(recruitId, staffName, staffEmail, newResponse, memo));
+    recruitSheet.getRange(recruitRowIndex, 4).setValue(origStatus);
+    if (result.success) {
+      addNotification_('回答変更承認', staffName + ' の回答変更を承認しました（' + newResponse + '）');
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 回答変更要請を否認する（オーナーのみ）
+ */
+function rejectResponseChange(changeRequestRow) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var crSheet = ss.getSheetByName('回答変更要請');
+    if (!crSheet || crSheet.getLastRow() < changeRequestRow) return JSON.stringify({ success: false, error: '要請が見つかりません' });
+    var staffName = String(crSheet.getRange(changeRequestRow, 2).getValue()).trim();
+    crSheet.getRange(changeRequestRow, 7).setValue('rejected');
+    addNotification_('回答変更否認', staffName + ' の回答変更要請を否認しました');
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 未処理の回答変更要請一覧を取得
+ */
+function getPendingResponseChanges(recruitId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var crSheet = ss.getSheetByName('回答変更要請');
+    if (!crSheet || crSheet.getLastRow() < 2) return JSON.stringify({ success: true, requests: [] });
+    var rows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, 7).getValues();
+    var list = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][6]).trim() !== 'pending') continue;
+      if (recruitId && String(rows[i][0]).trim() !== String(recruitId).trim()) continue;
+      list.push({
+        rowIndex: i + 2,
+        recruitId: String(rows[i][0]).trim(),
+        staffName: String(rows[i][1]).trim(),
+        email: String(rows[i][2]).trim(),
+        newResponse: String(rows[i][3]).trim(),
+        memo: String(rows[i][4]).trim(),
+        requestedAt: String(rows[i][5]).trim()
+      });
+    }
+    return JSON.stringify({ success: true, requests: list });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), requests: [] });
   }
 }
 
@@ -3676,8 +3802,8 @@ function holdForRecruitment_legacy_(recruitId, staffNameFromClient, staffEmailFr
       return JSON.stringify({ success: false, error: '無効な募集ID' });
     }
     var status = String(recruitSheet.getRange(recruitRowIndex, 4).getValue()).trim();
-    if (status === '選定済') {
-      return JSON.stringify({ success: false, error: 'この募集は選定済みです' });
+    if (status === '選定済' || status === 'スタッフ確定済み') {
+      return JSON.stringify({ success: false, error: 'この募集はスタッフ確定済みです' });
     }
     var staffEmail = (staffEmailFromClient || Session.getActiveUser().getEmail() || '').trim();
     var staffName = (staffNameFromClient || '').trim();
@@ -4147,7 +4273,21 @@ function getRecruitmentForBooking(bookingRowNumber) {
         if (det.success && det.nextReservation) nextReservation = det.nextReservation;
       } catch (er) {}
       var selectedStaff = String(rows[matchIdx][4] || '').trim();
-      return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested, cancelRejected: cancelRejected });
+      // 回答変更要請を取得
+      var responseChangeRequests = [];
+      try {
+        var rcSheet = ss.getSheetByName('回答変更要請');
+        if (rcSheet && rcSheet.getLastRow() >= 2) {
+          var rcRows = rcSheet.getRange(2, 1, rcSheet.getLastRow() - 1, 7).getValues();
+          var rid3 = 'r' + recruitRowIndex;
+          rcRows.forEach(function(rc, idx) {
+            if (String(rc[0]).trim() === rid3 && String(rc[6]).trim() === 'pending') {
+              responseChangeRequests.push({ rowIndex: idx + 2, staffName: String(rc[1]).trim(), email: String(rc[2]).trim(), newResponse: String(rc[3]).trim(), memo: String(rc[4]).trim(), requestedAt: String(rc[5]).trim() });
+            }
+          });
+        }
+      } catch (rcErr) {}
+      return JSON.stringify({ success: true, recruitRowIndex: recruitRowIndex, volunteers: volunteers, status: status, checkoutDate: checkoutDate, nextReservation: nextReservation, selectedStaff: selectedStaff, cancelRequested: cancelRequested, cancelRejected: cancelRejected, responseChangeRequests: responseChangeRequests });
     }
     var nextReservation = null;
     try {
@@ -4169,7 +4309,7 @@ function selectStaffForRecruitment(recruitRowIndex, selectedStaffComma) {
     const formSheet = ss.getSheetByName(SHEET_NAME);
     if (!recruitSheet || !formSheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
     const bookingRowNumber = recruitSheet.getRange(recruitRowIndex, 2).getValue();
-    recruitSheet.getRange(recruitRowIndex, 4).setValue('選定済');
+    recruitSheet.getRange(recruitRowIndex, 4).setValue('スタッフ確定済み');
     recruitSheet.getRange(recruitRowIndex, 5).setValue(selectedStaffComma || '');
     const headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     const columnMap = buildColumnMap(headers);

@@ -1323,24 +1323,31 @@
       // スタッフ回答状況を表示するHTML生成
       function renderStaffResponses(volunteers, compact) {
         if (!volunteers || !volunteers.length) return 'スタッフなし';
+        // 記号変換: ◎→●、△→△、×→☒
+        function toDisplaySymbol(resp) {
+          if (resp === '◎') return '●';
+          if (resp === '△') return '△';
+          if (resp === '×') return '☒';
+          return '未回答';
+        }
         if (compact) {
-          // コンパクト表示（募集一覧カード用）: ◎2 △1 ×0 未1
+          // コンパクト表示（募集一覧カード用）: ●2 △1 ☒0 未1
           var counts = { '◎': 0, '△': 0, '×': 0, '未回答': 0 };
           volunteers.forEach(function(v) { counts[v.response || '未回答'] = (counts[v.response || '未回答'] || 0) + 1; });
           var parts = [];
-          if (counts['◎']) parts.push('<span class="text-success fw-bold">◎' + counts['◎'] + '</span>');
+          if (counts['◎']) parts.push('<span class="text-success fw-bold">●' + counts['◎'] + '</span>');
           if (counts['△']) parts.push('<span class="text-warning fw-bold">△' + counts['△'] + '</span>');
-          if (counts['×']) parts.push('<span class="text-danger fw-bold">×' + counts['×'] + '</span>');
+          if (counts['×']) parts.push('<span class="text-danger fw-bold">☒' + counts['×'] + '</span>');
           if (counts['未回答']) parts.push('<span class="text-muted">未' + counts['未回答'] + '</span>');
           return parts.join(' ');
         }
-        // 詳細表示（モーダル用）: 各スタッフの回答を列記
-        return volunteers.map(function(v) {
+        // 詳細表示（モーダル用）: 名前 → 回答 の順で表示、未回答の頭揃え
+        return '<div style="display:grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size:0.85rem;">' + volunteers.map(function(v) {
           var respClass = v.response === '◎' ? 'text-success' : (v.response === '△' ? 'text-warning' : (v.response === '×' ? 'text-danger' : 'text-muted'));
-          var respText = v.response || '未回答';
+          var respText = toDisplaySymbol(v.response || '未回答');
           var memoText = v.memo ? ' <small class="text-muted">(' + escapeHtml(v.memo) + ')</small>' : '';
-          return '<div class="d-flex align-items-center gap-1 py-1" style="font-size:0.85rem;"><span class="' + respClass + ' fw-bold" style="min-width:1.5em;">' + respText + '</span><span>' + escapeHtml(v.staffName) + '</span>' + memoText + '</div>';
-        }).join('');
+          return '<div class="py-1">' + escapeHtml(v.staffName) + '</div><div class="py-1"><span class="' + respClass + ' fw-bold">' + respText + '</span>' + memoText + '</div>';
+        }).join('') + '</div>';
       }
 
       // 宿泊人数表示: 大人〇名、3歳以下〇名
@@ -1509,7 +1516,8 @@
             var recStaff = (rec.staff || '').trim();
             var bookStaff = (b.cleaningStaff || '').trim();
             var isRecruiting = (recStatus === '募集中');
-            var isDecided = !isRecruiting && !!(recStaff || bookStaff);
+            var isConfirmed = (recStatus === 'スタッフ確定済み');
+            var isDecided = isConfirmed || (!isRecruiting && !!(recStaff || bookStaff));
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             var curStaff = (window.currentUserName || '').trim().toLowerCase();
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
@@ -1841,9 +1849,9 @@
             }
             if (statusEl && cachedRec) {
               var cachedStaffAssigned = (d.cleaningStaff || '').trim();
-              var cStatus = cachedStaffAssigned ? '選定済' : (cachedRec.status || '');
-              statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : (cStatus === '選定済' ? '選定済' : '未募集');
-              statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : (cStatus === '選定済' ? 'status-decided' : 'status-undecided'));
+              var cStatus = cachedStaffAssigned ? 'スタッフ確定済み' : (cachedRec.status || '');
+              statusEl.textContent = cStatus === '募集中' ? '清掃募集中' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
+              statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (cStatus === '募集中' ? 'status-recruiting' : ((cStatus === '選定済' || cStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
               if (!((d.cleaningStaff || '').trim()) && (cachedRec.status || '') === '募集中') {
@@ -1887,11 +1895,11 @@
                   staffLabel.classList.add(resolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              // cleaningStaff or selectedStaff設定済みなら実質「選定済」として扱う
-              var effectiveStatus = resolvedStaff ? '選定済' : r.status;
+              // cleaningStaff or selectedStaff設定済みなら実質「スタッフ確定済み」として扱う
+              var effectiveStatus = resolvedStaff ? 'スタッフ確定済み' : r.status;
               if (statusEl && r.success) {
-                statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : (effectiveStatus === '選定済' ? '選定済' : '未募集');
-                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : (effectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));
+                statusEl.textContent = effectiveStatus === '募集中' ? '清掃募集中' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
+                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (effectiveStatus === '募集中' ? 'status-recruiting' : ((effectiveStatus === '選定済' || effectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
               }
               if (volArea && volList && r.success) {
                 if (effectiveStatus === '募集中') {
@@ -1902,8 +1910,8 @@
                   if (volArea.style.display === 'block') volList.innerHTML = renderStaffResponses(r.volunteers);
                 }
               }
-              // キャンセル申請: 選定済 or cleaningStaffが設定済みの場合、本人にのみ表示
-              if (r.success && r.recruitRowIndex && (r.status === '選定済' || resolvedStaff) && volBodyArea) {
+              // キャンセル申請: スタッフ確定済み or cleaningStaffが設定済みの場合、本人にのみ表示
+              if (r.success && r.recruitRowIndex && (r.status === '選定済' || r.status === 'スタッフ確定済み' || resolvedStaff) && volBodyArea) {
                 var assignedStaff = resolvedStaff;
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
@@ -1976,7 +1984,8 @@
                   }
                 }
               }
-              if (r.success && r.status === '募集中' && r.recruitRowIndex && !staffAssigned) {
+              var isEventConfirmed = r.success && r.recruitRowIndex && (r.status === 'スタッフ確定済み' || r.status === '選定済');
+              if (r.success && (r.status === '募集中' || isEventConfirmed) && r.recruitRowIndex && !staffAssigned) {
                 var curName = (window.currentUserName || '').trim().toLowerCase();
                 var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
                 var myResponse = '';
@@ -1989,33 +1998,78 @@
                     }
                   });
                 }
-                if (volBodyArea) {
-                  // 備考入力
+                if (volBodyArea && isEventConfirmed) {
+                  // スタッフ確定済み: 回答変更不可、変更要請ボタンのみ
+                  var confirmNotice = document.createElement('div');
+                  confirmNotice.className = 'small text-muted mb-2 text-center';
+                  confirmNotice.textContent = 'スタッフ確定済みのため回答変更はできません';
+                  volBodyArea.appendChild(confirmNotice);
+                  if (myResponse && myResponse !== '未回答') {
+                    var curBadge = document.createElement('div');
+                    curBadge.className = 'small mb-2 text-center';
+                    curBadge.innerHTML = '現在の回答: <strong>' + escapeHtml(myResponse) + '</strong>' + (myMemo ? '（' + escapeHtml(myMemo) + '）' : '');
+                    volBodyArea.appendChild(curBadge);
+                  }
+                  var changeMemoWrap = document.createElement('div');
+                  changeMemoWrap.className = 'mb-2';
+                  changeMemoWrap.innerHTML = '<label class="form-label small fw-bold">変更理由</label><input type="text" class="form-control form-control-sm" id="eventModalChangeMemo" placeholder="変更理由を記入">';
+                  volBodyArea.appendChild(changeMemoWrap);
+                  var changeBtnRow = document.createElement('div');
+                  changeBtnRow.className = 'd-flex gap-1 justify-content-center flex-wrap';
+                  var changeOpts = [
+                    { val: '◎', label: '● 対応可で要請', cls: 'outline-warning' },
+                    { val: '△', label: '△ 条件付で要請', cls: 'outline-warning' },
+                    { val: '×', label: '☒ 不可で要請', cls: 'outline-warning' }
+                  ];
+                  changeOpts.forEach(function(opt) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'btn btn-sm btn-' + opt.cls + ' fw-bold';
+                    b.textContent = opt.label;
+                    b.onclick = function() {
+                      var memoEl = document.getElementById('eventModalChangeMemo');
+                      var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
+                      if (!memoVal) { alert('変更理由を入力してください。'); return; }
+                      b.disabled = true;
+                      google.script.run.withSuccessHandler(function(j) {
+                        var res = JSON.parse(j);
+                        if (res.success) {
+                          alert('回答変更要請を送信しました。オーナーの承認をお待ちください。');
+                          bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                          loadAndRender();
+                          if (window.staffMode) loadStaffSchedule();
+                          loadRecruitList();
+                        } else { alert(res.error || '失敗'); b.disabled = false; }
+                      }).withFailureHandler(function(e) { alert(e.message); b.disabled = false; }).requestResponseChange('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '', opt.val, memoVal);
+                    };
+                    changeBtnRow.appendChild(b);
+                  });
+                  volBodyArea.appendChild(changeBtnRow);
+                } else if (volBodyArea && r.status === '募集中') {
+                  // 募集中: 通常の回答ボタン
                   var memoWrap = document.createElement('div');
                   memoWrap.className = 'mb-2';
                   memoWrap.innerHTML = '<label class="form-label small fw-bold">備考（例：14時以降なら対応可能）</label><input type="text" class="form-control form-control-sm" id="eventModalResponseMemo" placeholder="何時からなら対応可能、など">';
                   var memoInput = memoWrap.querySelector('input');
                   if (memoInput && myMemo) memoInput.value = myMemo;
                   volBodyArea.appendChild(memoWrap);
-                  // 現在の回答表示
                   if (myResponse && myResponse !== '未回答') {
                     var curBadge = document.createElement('div');
                     curBadge.className = 'small text-muted mb-1 text-center';
                     curBadge.textContent = '現在の回答: ' + myResponse + (myMemo ? '（' + myMemo + '）' : '');
                     volBodyArea.appendChild(curBadge);
                   }
-                  // ◎/△/× ボタン
                   var btnRow = document.createElement('div');
                   btnRow.className = 'd-flex gap-2 justify-content-center';
                   var responses = [
-                    { val: '◎', label: '◎ 対応可', cls: 'success' },
+                    { val: '◎', label: '● 対応可', cls: 'success' },
                     { val: '△', label: '△ 条件付', cls: 'warning' },
-                    { val: '×', label: '× 対応不可', cls: 'danger' }
+                    { val: '×', label: '☒ 対応不可', cls: 'danger' }
                   ];
                   responses.forEach(function(opt) {
                     var b = document.createElement('button');
                     b.type = 'button';
-                    b.className = 'btn btn-sm btn-' + (myResponse === opt.val ? '' : 'outline-') + opt.cls;
+                    b.className = 'btn btn-sm btn-' + (myResponse === opt.val ? '' : 'outline-') + opt.cls + ' fw-bold';
                     b.textContent = opt.label;
                     b.onclick = function() {
                       var memoEl = document.getElementById('eventModalResponseMemo');
@@ -2079,10 +2133,10 @@
                   ownerStaffLabel.classList.add(ownerResolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              var ownerEffectiveStatus = ownerResolvedStaff ? '選定済' : r.status;
+              var ownerEffectiveStatus = ownerResolvedStaff ? 'スタッフ確定済み' : r.status;
               if (statusEl && r.success) {
-                statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : (ownerEffectiveStatus === '選定済' ? '選定済' : '未募集');
-                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : (ownerEffectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));
+                statusEl.textContent = ownerEffectiveStatus === '募集中' ? '清掃募集中' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'スタッフ確定済み' : '未募集');
+                statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : ((ownerEffectiveStatus === '選定済' || ownerEffectiveStatus === 'スタッフ確定済み') ? 'status-decided' : 'status-undecided'));
               }
               if (volArea && volList && r.success) {
                 volArea.style.display = 'block';
@@ -2286,6 +2340,46 @@
                   approveWrap.appendChild(btnApprove);
                   approveWrap.appendChild(btnReject);
                   ownerCenterArea.appendChild(approveWrap);
+                });
+              }
+              // 回答変更要請がある場合、承認/否認ボタンを表示
+              if (r.responseChangeRequests && r.responseChangeRequests.length && ownerCenterArea) {
+                r.responseChangeRequests.forEach(function(rcr) {
+                  var rcWrap = document.createElement('div');
+                  rcWrap.className = 'w-100 mt-2 p-2 border border-info rounded bg-info bg-opacity-10';
+                  rcWrap.innerHTML = '<div class="small fw-bold text-info mb-1">回答変更要請: ' + escapeHtml(rcr.staffName) + ' → ' + escapeHtml(rcr.newResponse) + (rcr.memo ? '（' + escapeHtml(rcr.memo) + '）' : '') + '</div>';
+                  var btnRcApprove = document.createElement('button');
+                  btnRcApprove.type = 'button';
+                  btnRcApprove.className = 'btn btn-sm btn-info me-1';
+                  btnRcApprove.textContent = '承認';
+                  btnRcApprove.onclick = function() {
+                    if (!confirm(rcr.staffName + ' の回答変更（→' + rcr.newResponse + '）を承認しますか？')) return;
+                    btnRcApprove.disabled = true;
+                    btnRcApprove.textContent = '処理中...';
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) {
+                        alert('回答変更を承認しました。');
+                        bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                        loadAndRender(); loadRecruitList();
+                      } else { alert(res.error || '失敗'); btnRcApprove.disabled = false; btnRcApprove.textContent = '承認'; }
+                    }).withFailureHandler(function(e) { alert(e.message); btnRcApprove.disabled = false; btnRcApprove.textContent = '承認'; }).approveResponseChange(rcr.rowIndex);
+                  };
+                  var btnRcReject = document.createElement('button');
+                  btnRcReject.type = 'button';
+                  btnRcReject.className = 'btn btn-sm btn-outline-secondary';
+                  btnRcReject.textContent = '否認';
+                  btnRcReject.onclick = function() {
+                    if (!confirm(rcr.staffName + ' の回答変更要請を否認しますか？')) return;
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) { rcWrap.remove(); loadAndRender(); }
+                      else alert(res.error || '失敗');
+                    }).withFailureHandler(function(e) { alert(e.message); }).rejectResponseChange(rcr.rowIndex);
+                  };
+                  rcWrap.appendChild(btnRcApprove);
+                  rcWrap.appendChild(btnRcReject);
+                  ownerCenterArea.appendChild(rcWrap);
                 });
               }
             } catch (e) {}
@@ -2501,7 +2595,7 @@
           (res.data || []).forEach(function(b) {
             var hasStaff = (b.cleaningStaff || '').trim();
             var rec = recruitMap[b.rowNumber] || {};
-            var isDecided = (rec.status === '選定済') || (rec.staff && rec.staff.trim());
+            var isDecided = (rec.status === '選定済') || (rec.status === 'スタッフ確定済み') || (rec.staff && rec.staff.trim());
             var isRecruiting = (rec.status === '募集中');
             if ((hasStaff || isDecided) && !isRecruiting && b.checkOutParsed) {
               var d2 = new Date(b.checkOutParsed);
@@ -2888,7 +2982,7 @@
                 html += '<strong>' + escapeHtml(r.checkoutDate) + '</strong>';
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
-                html += r.status === '選定済' ? '<span class="badge bg-success">選定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
+                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
                 html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
@@ -3021,7 +3115,7 @@
                 html += '<strong>' + escapeHtml(r.checkoutDate) + '</strong>';
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
-                html += r.status === '選定済' ? '<span class="badge bg-success">選定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
+                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
                 html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
@@ -3081,7 +3175,7 @@
         document.getElementById('recruitEditReserveNationality').value = r.reserveNationality || '';
         document.getElementById('recruitEditReserveMemo').value = r.reserveMemo || '';
         window._recruitEditStaffNames = (r.selectedStaff || r.cleaningStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
-        document.getElementById('recruitEditStatus').innerHTML = (r.status === '選定済' ? '選定済: ' + escapeHtml(r.selectedStaff || '') : '募集中');
+        document.getElementById('recruitEditStatus').innerHTML = ((r.status === '選定済' || r.status === 'スタッフ確定済み') ? 'スタッフ確定済み: ' + escapeHtml(r.selectedStaff || '') : '募集中');
         document.getElementById('recruitEditVolunteers').innerHTML = '<strong>回答状況:</strong><div class="mt-1">' + renderStaffResponses(r.volunteers) + '</div>';
         document.getElementById('recruitEditError').style.display = 'none';
         var staffBar = document.getElementById('staffSelectorBar');
@@ -3094,10 +3188,11 @@
         });
         document.getElementById('btnRecruitEditCancel').style.display = (r.isNew || asStaff ? 'none' : (window.isOwnerUser ? '' : 'none'));
         var selectArea = document.getElementById('recruitEditSelectArea');
-        selectArea.style.display = ((r.status === '募集中' || r.status === '選定済') && !asStaff && !r.isNew && !r.asStaffTest) ? 'block' : 'none';
+        selectArea.style.display = ((r.status === '募集中' || r.status === '選定済' || r.status === 'スタッフ確定済み') && !asStaff && !r.isNew && !r.asStaffTest) ? 'block' : 'none';
         var volunteerArea = document.getElementById('recruitEditVolunteerArea');
         if (volunteerArea) {
-          if (r.status === '募集中' && asStaff && !r.isNew) {
+          var isConfirmedStatus = (r.status === 'スタッフ確定済み' || r.status === '選定済');
+          if ((r.status === '募集中' || isConfirmedStatus) && asStaff && !r.isNew) {
             volunteerArea.style.display = 'block';
             var curName = (window.currentUserName || '').trim().toLowerCase();
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
@@ -3109,29 +3204,60 @@
                 myMemo = v.memo || '';
               }
             });
-            volunteerArea.innerHTML = '<div class="mb-2"><label class="form-label small fw-bold">備考</label><input type="text" class="form-control form-control-sm" id="recruitEditResponseMemo" placeholder="何時からなら対応可能、など" value="' + escapeHtml(myMemo) + '"></div>' +
-              (myResp !== '未回答' ? '<div class="small text-muted mb-1 text-center">現在の回答: ' + myResp + '</div>' : '') +
-              '<div class="d-flex gap-2 justify-content-center">' +
-              '<button type="button" class="btn btn-sm btn-' + (myResp === '◎' ? '' : 'outline-') + 'success" data-resp="◎">◎ 対応可</button>' +
-              '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning" data-resp="△">△ 条件付</button>' +
-              '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger" data-resp="×">× 対応不可</button>' +
-              '</div>';
-            volunteerArea.querySelectorAll('[data-resp]').forEach(function(btn) {
-              btn.onclick = function() {
-                var resp = btn.getAttribute('data-resp');
-                var memoEl = document.getElementById('recruitEditResponseMemo');
-                var memoVal = memoEl ? memoEl.value.trim() : '';
-                btn.disabled = true;
-                google.script.run.withSuccessHandler(function(j) {
-                  var res = JSON.parse(j);
-                  if (res.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-                    loadAndRender(); loadRecruitList();
-                    if (r.asStaffTest) loadRecruitListStaffTest();
-                  } else { alert(res.error || '失敗'); btn.disabled = false; }
-                }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).respondToRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
-              };
-            });
+            if (isConfirmedStatus) {
+              // スタッフ確定済み: 回答変更不可、変更要請ボタンを表示
+              volunteerArea.innerHTML = '<div class="small text-muted mb-2 text-center">スタッフ確定済みのため回答変更はできません</div>' +
+                (myResp !== '未回答' ? '<div class="small mb-2 text-center">現在の回答: <strong>' + myResp + '</strong>' + (myMemo ? '（' + escapeHtml(myMemo) + '）' : '') + '</div>' : '') +
+                '<div class="mb-2"><label class="form-label small fw-bold">変更後の回答と備考</label><input type="text" class="form-control form-control-sm mb-1" id="recruitEditChangeMemo" placeholder="変更理由を記入"></div>' +
+                '<div class="d-flex gap-2 justify-content-center">' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="◎">● 対応可で変更要請</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="△">△ 条件付で変更要請</button>' +
+                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-change-resp="×">☒ 対応不可で変更要請</button>' +
+                '</div>';
+              volunteerArea.querySelectorAll('[data-change-resp]').forEach(function(btn) {
+                btn.onclick = function() {
+                  var resp = btn.getAttribute('data-change-resp');
+                  var memoEl = document.getElementById('recruitEditChangeMemo');
+                  var memoVal = memoEl ? memoEl.value.trim() : '';
+                  if (!memoVal) { alert('変更理由を入力してください。'); return; }
+                  btn.disabled = true;
+                  google.script.run.withSuccessHandler(function(j) {
+                    var res = JSON.parse(j);
+                    if (res.success) {
+                      alert('回答変更要請を送信しました。オーナーの承認をお待ちください。');
+                      bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                      loadAndRender(); loadRecruitList();
+                      if (r.asStaffTest) loadRecruitListStaffTest();
+                    } else { alert(res.error || '失敗'); btn.disabled = false; }
+                  }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).requestResponseChange(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
+                };
+              });
+            } else {
+              // 募集中: 通常の回答ボタン
+              volunteerArea.innerHTML = '<div class="mb-2"><label class="form-label small fw-bold">備考</label><input type="text" class="form-control form-control-sm" id="recruitEditResponseMemo" placeholder="何時からなら対応可能、など" value="' + escapeHtml(myMemo) + '"></div>' +
+                (myResp !== '未回答' ? '<div class="small text-muted mb-1 text-center">現在の回答: ' + myResp + '</div>' : '') +
+                '<div class="d-flex gap-2 justify-content-center">' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '◎' ? '' : 'outline-') + 'success fw-bold" data-resp="◎">● 対応可</button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning fw-bold" data-resp="△">△ 条件付</button>' +
+                '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger fw-bold" data-resp="×">☒ 対応不可</button>' +
+                '</div>';
+              volunteerArea.querySelectorAll('[data-resp]').forEach(function(btn) {
+                btn.onclick = function() {
+                  var resp = btn.getAttribute('data-resp');
+                  var memoEl = document.getElementById('recruitEditResponseMemo');
+                  var memoVal = memoEl ? memoEl.value.trim() : '';
+                  btn.disabled = true;
+                  google.script.run.withSuccessHandler(function(j) {
+                    var res = JSON.parse(j);
+                    if (res.success) {
+                      bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                      loadAndRender(); loadRecruitList();
+                      if (r.asStaffTest) loadRecruitListStaffTest();
+                    } else { alert(res.error || '失敗'); btn.disabled = false; }
+                  }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).respondToRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
+                };
+              });
+            }
           } else {
             volunteerArea.style.display = 'none';
           }

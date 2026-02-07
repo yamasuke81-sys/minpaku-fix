@@ -3399,6 +3399,16 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
     var ymParts = ym.split('-');
     var targetYear = parseInt(ymParts[0], 10) || new Date().getFullYear();
     var targetMonth = parseInt(ymParts[1], 10) || (new Date().getMonth() + 1);
+    // 募集シートから checkout → 募集行番号のマップを構築
+    var recruitRowMap = {};
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (recruitSheet && recruitSheet.getLastRow() >= 2) {
+      var rData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 2).getValues();
+      for (var ri = 0; ri < rData.length; ri++) {
+        var rCheckout = parseDate(rData[ri][0]);
+        if (rCheckout) recruitRowMap[toDateKeySafe_(rCheckout)] = ri + 2;
+      }
+    }
     for (var i = 0; i < data.length; i++) {
       var cleaningStaff = String(data[i][colMap.cleaningStaff] || '').trim();
       if (!cleaningStaff) continue;
@@ -3415,12 +3425,14 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
       if (!checkOut) continue;
       var d = new Date(checkOut);
       if (d.getFullYear() !== targetYear || (d.getMonth() + 1) !== targetMonth) continue;
+      var coKey = toDateKeySafe_(checkOut);
       list.push({
         rowNumber: i + 2,
-        checkoutDate: toDateKeySafe_(checkOut),
+        checkoutDate: coKey,
         checkoutDisplay: Utilities.formatDate(checkOut, 'Asia/Tokyo', 'M/d'),
         partners: partners,
-        guestName: colMap.guestName >= 0 ? String(data[i][colMap.guestName] || '').trim() : ''
+        guestName: colMap.guestName >= 0 ? String(data[i][colMap.guestName] || '').trim() : '',
+        recruitRowIndex: recruitRowMap[coKey] || 0
       });
     }
     list.sort(function(a, b) { return (a.checkoutDate || '').localeCompare(b.checkoutDate || ''); });

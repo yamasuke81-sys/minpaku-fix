@@ -753,8 +753,8 @@
       <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex flex-column gap-1">
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span>【宿泊】</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#dc3545;border:1px solid #fff;"></span>フォーム入力なし</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#28a745;border:1px solid #fff;"></span>フォーム入力あり</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#dc3545;border:1px solid #fff;"></span>内容詳細なし</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:6px;height:6px;background:#28a745;border:1px solid #fff;"></span>内容詳細あり</span>
         </div>
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span>【清掃】</span>
@@ -1250,7 +1250,8 @@
         var dbgSp = '<?= debugStaffParam ?>';
         var dbgRaw = '<?= isStaffMode ?>';
         var dbgStr = '<?= staffModeStr ?>';
-        if (dv) dv.textContent = 'v0207d ' + (window.staffMode ? 'STAFF' : 'OWNER') + ' [qs=' + dbgQs + ' sp=' + dbgSp + ' raw=' + dbgRaw + ' str=' + dbgStr + ']';
+        // デバッグ表示を非表示にする
+        if (dv) dv.style.display = 'none';
       } catch(e) {}
 
       let calendar;
@@ -1944,7 +1945,7 @@
                     rejWrap.className = 'mb-1';
                     var rejBadge = document.createElement('div');
                     rejBadge.className = 'alert alert-danger py-1 px-2 small mb-1';
-                    rejBadge.innerHTML = '<i class="bi bi-x-circle"></i> キャンセル申請が否認されました';
+                    rejBadge.innerHTML = '<i class="bi bi-x-circle"></i> 取り消し申請が否認されました';
                     rejWrap.appendChild(rejBadge);
                     var rejConfirmBtn = document.createElement('button');
                     rejConfirmBtn.type = 'button';
@@ -1968,15 +1969,15 @@
                   } else if (alreadyRequested) {
                     var pendingBadge = document.createElement('div');
                     pendingBadge.className = 'alert alert-warning py-1 px-2 small mb-0';
-                    pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> キャンセル申請中（オーナーの承認待ち）';
+                    pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> 取り消し申請中（オーナーの承認待ち）';
                     volBodyArea.appendChild(pendingBadge);
                   } else {
                     var cancelReqBtn = document.createElement('button');
                     cancelReqBtn.type = 'button';
                     cancelReqBtn.className = 'btn btn-sm btn-danger w-100';
-                    cancelReqBtn.textContent = 'キャンセル申請';
+                    cancelReqBtn.textContent = '取り消し申請';
                     cancelReqBtn.onclick = function() {
-                      if (!confirm('出勤キャンセルの要望を提出します。\n\nよろしいですか？（OK=はい、キャンセル=いいえ）')) return;
+                      if (!confirm('出勤の取り消し申請を提出します。\nオーナーの承認後に取り消しが反映されます。\n\nよろしいですか？')) return;
                       cancelReqBtn.disabled = true;
                       cancelReqBtn.textContent = '申請中...';
                       cancelReqBtn.className = 'btn btn-sm btn-secondary w-100';
@@ -1986,8 +1987,8 @@
                           bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
-                        } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
-                      }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = 'キャンセル申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                        } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取り消し申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
+                      }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取り消し申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                     };
                     volBodyArea.appendChild(cancelReqBtn);
                   }
@@ -2321,36 +2322,36 @@
                 };
                 ownerCenterArea.appendChild(btnEditStaff);
               }
-              // キャンセル申請がある場合、承認ボタンを表示
+              // 取り消し申請がある場合、承認ボタンを表示
               if (r.cancelRequested && r.cancelRequested.length && r.recruitRowIndex && ownerCenterArea) {
                 r.cancelRequested.forEach(function(cr) {
                   var approveWrap = document.createElement('div');
                   approveWrap.className = 'w-100 mt-2 p-2 border border-warning rounded bg-warning bg-opacity-10';
-                  approveWrap.innerHTML = '<div class="small fw-bold text-warning mb-1"><i class="bi bi-exclamation-triangle"></i> キャンセル申請: ' + escapeHtml(cr.staffName) + '</div>';
+                  approveWrap.innerHTML = '<div class="small fw-bold text-warning mb-1"><i class="bi bi-exclamation-triangle"></i> 取り消し申請: ' + escapeHtml(cr.staffName) + '</div>';
                   var btnApprove = document.createElement('button');
                   btnApprove.type = 'button';
                   btnApprove.className = 'btn btn-sm btn-warning me-1';
-                  btnApprove.textContent = 'キャンセル承認';
+                  btnApprove.textContent = '取り消し承認';
                   btnApprove.onclick = function() {
-                    if (!confirm(cr.staffName + ' のキャンセルを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。')) return;
+                    if (!confirm(cr.staffName + ' の取り消しを承認しますか？\n\n承認すると清掃担当が解除され、再度募集状態に戻ります。')) return;
                     btnApprove.disabled = true;
                     btnApprove.textContent = '処理中...';
                     google.script.run.withSuccessHandler(function(j) {
                       var res = JSON.parse(j);
                       if (res.success) {
-                        alert('キャンセルを承認しました。清掃担当が解除され、募集状態に戻りました。');
+                        alert('取り消しを承認しました。清掃担当が解除され、募集状態に戻りました。');
                         bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                         loadAndRender();
                         loadRecruitList();
                       } else {
                         alert(res.error || '失敗');
                         btnApprove.disabled = false;
-                        btnApprove.textContent = 'キャンセル承認';
+                        btnApprove.textContent = '取り消し承認';
                       }
                     }).withFailureHandler(function(e) {
                       alert(e.message);
                       btnApprove.disabled = false;
-                      btnApprove.textContent = 'キャンセル承認';
+                      btnApprove.textContent = '取り消し承認';
                     }).approveCancelRequest(r.recruitRowIndex, cr.staffName, cr.email);
                   };
                   var btnReject = document.createElement('button');
@@ -2358,7 +2359,7 @@
                   btnReject.className = 'btn btn-sm btn-outline-secondary';
                   btnReject.textContent = '却下';
                   btnReject.onclick = function() {
-                    if (!confirm(cr.staffName + ' のキャンセル申請を却下しますか？')) return;
+                    if (!confirm(cr.staffName + ' の取り消し申請を却下しますか？')) return;
                     google.script.run.withSuccessHandler(function(j) {
                       var res = JSON.parse(j);
                       if (res.success) {
@@ -2725,9 +2726,9 @@
           locale: 'ja',
           initialView: 'dayGridMonth',
           headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'listWeek,dayGridMonth'
+            left: 'prev',
+            center: 'title listWeek,dayGridMonth today',
+            right: 'next'
           },
           buttonText: {
             today: '今日',
@@ -3780,17 +3781,23 @@
             if (r.success && r.list && r.list.length) {
               el.innerHTML = r.list.map(function(item) {
                 var partners = (item.partners || []).length ? ' 相方: ' + item.partners.join(', ') : '';
-                return '<div class="border rounded p-2 mb-2 small d-flex justify-content-between align-items-center"><div><strong>' + escapeHtml(item.checkoutDisplay) + '</strong>' + escapeHtml(partners) + (item.guestName ? ' <span class="text-muted">' + escapeHtml(item.guestName) + '</span>' : '') + '</div><button type="button" class="btn btn-sm btn-outline-danger py-0" data-row="' + item.rowNumber + '">取り消し</button></div>';
+                return '<div class="border rounded p-2 mb-2 small d-flex justify-content-between align-items-center"><div><strong>' + escapeHtml(item.checkoutDisplay) + '</strong>' + escapeHtml(partners) + (item.guestName ? ' <span class="text-muted">' + escapeHtml(item.guestName) + '</span>' : '') + '</div><button type="button" class="btn btn-sm btn-outline-warning py-0" data-row="' + item.rowNumber + '" data-recruit="' + (item.recruitRowIndex || 0) + '" data-checkout="' + escapeHtml(item.checkoutDate || '') + '">取り消し申請</button></div>';
               }).join('');
               el.querySelectorAll('[data-row]').forEach(function(btn) {
                 btn.onclick = function() {
                   var row = this.getAttribute('data-row');
-                  if (!confirm('この日の出勤を取り消しますか？')) return;
+                  var recruitRow = this.getAttribute('data-recruit');
+                  var checkout = this.getAttribute('data-checkout');
+                  if (!recruitRow || recruitRow === '0') { alert('この予約に対応する募集データが見つかりません。カレンダーの詳細画面から取り消し申請してください。'); return; }
+                  if (!confirm('出勤の取り消し申請を提出します。\nオーナーの承認後に取り消しが反映されます。\n\nよろしいですか？')) return;
+                  var thisBtn = this;
+                  thisBtn.disabled = true;
+                  thisBtn.textContent = '申請中...';
                   google.script.run.withSuccessHandler(function(j) {
                     var res = JSON.parse(j);
-                    if (res.success) { loadStaffSchedule(); loadAndRender(); }
-                    else alert(res.error || '失敗');
-                  }).withFailureHandler(function(e) { alert(e.message); }).cancelStaffFromCleaning(row, staffId);
+                    if (res.success) { thisBtn.textContent = '申請済み'; thisBtn.className = 'btn btn-sm btn-secondary py-0'; loadAndRender(); }
+                    else { alert(res.error || '失敗'); thisBtn.disabled = false; thisBtn.textContent = '取り消し申請'; thisBtn.className = 'btn btn-sm btn-outline-warning py-0'; }
+                  }).withFailureHandler(function(e) { alert(e.message); thisBtn.disabled = false; thisBtn.textContent = '取り消し申請'; thisBtn.className = 'btn btn-sm btn-outline-warning py-0'; }).submitStaffCancelRequest(recruitRow, row, checkout, window.currentUserName || '', window.currentUserEmail || '');
                 };
               });
             } else {

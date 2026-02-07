@@ -360,7 +360,7 @@
     .recruit-status-badge.status-undecided { background: #dc3545; color: #fff; }
     .recruit-status-badge.status-recruiting { background: #ffc107; color: #000; }
     .recruit-status-badge.status-decided { background: #0d6efd; color: #fff; }
-    /* 清掃セクション: 立候補者 */
+    /* 清掃セクション: 回答状況 */
     .cleaning-section-volunteers {
       font-size: 0.85rem;
       color: #555;
@@ -396,7 +396,7 @@
       box-shadow: none !important;
       outline: none !important;
     }
-    /* スタッフ画面: 自分が立候補した清掃＝赤破線、正式決定＝赤実線 */
+    /* スタッフ画面: 自分が回答した清掃＝赤破線、正式決定＝赤実線 */
     .fc-event-cleaning-volunteered-by-me {
       border-color: #dc3545 !important;
       border-style: dashed !important;
@@ -883,7 +883,7 @@
         <div id="syncResult" class="small mt-2" style="display:none;"></div>
       </div>
       <div id="settingsNotifications" style="display:none;">
-        <p class="small text-muted mb-2">立候補・立候補取消・予約追加・予約削除・フォーム回答などの通知履歴です。</p>
+        <p class="small text-muted mb-2">回答・回答取消・予約追加・予約削除・フォーム回答などの通知履歴です。</p>
         <div id="notificationList"></div>
       </div>
     </div>
@@ -1187,8 +1187,6 @@
           </div>
           <div id="recruitEditSelectArea" class="mb-2" style="display:none;"><button type="button" class="btn btn-sm btn-primary" id="btnRecruitEditSelect">選定</button></div>
           <div id="recruitEditVolunteerArea" class="mb-2" style="display:none;">
-            <button type="button" class="btn btn-sm btn-success" id="btnRecruitEditVolunteer">立候補する</button>
-            <button type="button" class="btn btn-sm btn-warning" id="btnRecruitEditCancelVolunteer" style="display:none;">立候補を取り消す</button>
           </div>
           <div id="recruitEditLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;">
             <p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p>
@@ -1320,6 +1318,29 @@
         if (f === '1台' || f === '2台') return 'あり';
         if (f === '不要') return 'なし';
         return '';
+      }
+
+      // スタッフ回答状況を表示するHTML生成
+      function renderStaffResponses(volunteers, compact) {
+        if (!volunteers || !volunteers.length) return 'スタッフなし';
+        if (compact) {
+          // コンパクト表示（募集一覧カード用）: ◎2 △1 ×0 未1
+          var counts = { '◎': 0, '△': 0, '×': 0, '未回答': 0 };
+          volunteers.forEach(function(v) { counts[v.response || '未回答'] = (counts[v.response || '未回答'] || 0) + 1; });
+          var parts = [];
+          if (counts['◎']) parts.push('<span class="text-success fw-bold">◎' + counts['◎'] + '</span>');
+          if (counts['△']) parts.push('<span class="text-warning fw-bold">△' + counts['△'] + '</span>');
+          if (counts['×']) parts.push('<span class="text-danger fw-bold">×' + counts['×'] + '</span>');
+          if (counts['未回答']) parts.push('<span class="text-muted">未' + counts['未回答'] + '</span>');
+          return parts.join(' ');
+        }
+        // 詳細表示（モーダル用）: 各スタッフの回答を列記
+        return volunteers.map(function(v) {
+          var respClass = v.response === '◎' ? 'text-success' : (v.response === '△' ? 'text-warning' : (v.response === '×' ? 'text-danger' : 'text-muted'));
+          var respText = v.response || '未回答';
+          var memoText = v.memo ? ' <small class="text-muted">(' + escapeHtml(v.memo) + ')</small>' : '';
+          return '<div class="d-flex align-items-center gap-1 py-1" style="font-size:0.85rem;"><span class="' + respClass + ' fw-bold" style="min-width:1.5em;">' + respText + '</span><span>' + escapeHtml(v.staffName) + '</span>' + memoText + '</div>';
+        }).join('');
       }
 
       // 宿泊人数表示: 大人〇名、3歳以下〇名
@@ -1495,7 +1516,8 @@
             var volunteers = rec.volunteers || [];
             var selectedNames = (recStaff || bookStaff || '').split(/[,、]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
             var isVolunteeredByMe = curStaff && volunteers.some(function(v) {
-              return (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
+              var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
+              return isMe && v.response && v.response !== '未回答' && v.response !== '×';
             });
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
             if (window.staffMode && isVolunteeredByMe) cleaningClasses.push(isSelectedByMe ? 'fc-event-cleaning-selected-by-me' : 'fc-event-cleaning-volunteered-by-me');
@@ -1643,14 +1665,14 @@
             html += '<div class="modal-next-res-grid" id="eventModalStaffNextResContent"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div>';
             html += '</div>';
 
-            // 清掃募集状況・立候補者・清掃担当・連絡事項・立候補エリア（ひとくくり）
+            // 清掃募集状況・回答状況・清掃担当・連絡事項・回答エリア（ひとくくり）
             var staffVal = (d.cleaningStaff || '').trim();
             var staffUndecided = !staffVal;
             html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
             // 1. 清掃募集状況
             html += '<div><span id="eventModalStaffRecruitStatus" class="recruit-status-badge px-2 py-1 rounded text-muted" style="background:#e9ecef;">読み込み中…</span></div>';
-            // 2. 立候補者
-            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:none;"><strong><i class="bi bi-people"></i> 立候補者:</strong> <span id="eventModalVolunteersList"></span></div>';
+            // 2. 回答状況
+            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:none;"><strong><i class="bi bi-people"></i> 回答状況:</strong><div id="eventModalVolunteersList" class="mt-1"></div></div>';
             // 3. 清掃担当
             html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
             // 4. 連絡事項
@@ -1662,7 +1684,7 @@
               html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.cleaningNotice || '') + '</div>';
             }
             html += '</div>';
-            // 5. 対応可能な条件 + 6. 立候補ボタン（スタッフ用、JSで動的に追加）
+            // 5. 備考 + 6. 回答ボタン（スタッフ用、JSで動的に追加）
             html += '<div id="eventModalVolunteerBodyArea" class="mt-2"></div>';
             html += '</div>';
 
@@ -1826,7 +1848,7 @@
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
               if (!((d.cleaningStaff || '').trim()) && (cachedRec.status || '') === '募集中') {
                 volArea.style.display = 'block';
-                volList.textContent = cachedRec.volunteers.length ? cachedRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
+                volList.innerHTML = renderStaffResponses(cachedRec.volunteers);
               }
             }
           }
@@ -1874,9 +1896,10 @@
               if (volArea && volList && r.success) {
                 if (effectiveStatus === '募集中') {
                   volArea.style.display = 'block';
-                  volList.textContent = (r.volunteers && r.volunteers.length) ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
+                  volList.innerHTML = renderStaffResponses(r.volunteers);
                 } else {
-                  volArea.style.display = 'none';
+                  volArea.style.display = r.volunteers && r.volunteers.some(function(v) { return v.response && v.response !== '未回答'; }) ? 'block' : 'none';
+                  if (volArea.style.display === 'block') volList.innerHTML = renderStaffResponses(r.volunteers);
                 }
               }
               // キャンセル申請: 選定済 or cleaningStaffが設定済みの場合、本人にのみ表示
@@ -1956,43 +1979,61 @@
               if (r.success && r.status === '募集中' && r.recruitRowIndex && !staffAssigned) {
                 var curName = (window.currentUserName || '').trim().toLowerCase();
                 var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
-                var hasVol = r.volunteers && r.volunteers.some(function(v) {
-                  return (v.staffName || '').trim().toLowerCase() === curName || (v.email || '').trim().toLowerCase() === curEmail;
-                });
+                var myResponse = '';
+                var myMemo = '';
+                if (r.volunteers) {
+                  r.volunteers.forEach(function(v) {
+                    if ((v.staffName || '').trim().toLowerCase() === curName || (v.email || '').trim().toLowerCase() === curEmail) {
+                      myResponse = v.response || '未回答';
+                      myMemo = v.memo || '';
+                    }
+                  });
+                }
                 if (volBodyArea) {
-                  if (!hasVol) {
-                    var memoWrap = document.createElement('div');
-                    memoWrap.className = 'mb-2';
-                    memoWrap.innerHTML = '<label class="form-label small fw-bold">対応可能な条件（例：時間帯：10:00～、午後から可、13:00～可など）</label><input type="text" class="form-control form-control-sm" id="eventModalVolunteerMemo" placeholder="時間帯：10:00～" value="時間帯：10:00～">';
-                    volBodyArea.appendChild(memoWrap);
+                  // 備考入力
+                  var memoWrap = document.createElement('div');
+                  memoWrap.className = 'mb-2';
+                  memoWrap.innerHTML = '<label class="form-label small fw-bold">備考（例：14時以降なら対応可能）</label><input type="text" class="form-control form-control-sm" id="eventModalResponseMemo" placeholder="何時からなら対応可能、など">';
+                  var memoInput = memoWrap.querySelector('input');
+                  if (memoInput && myMemo) memoInput.value = myMemo;
+                  volBodyArea.appendChild(memoWrap);
+                  // 現在の回答表示
+                  if (myResponse && myResponse !== '未回答') {
+                    var curBadge = document.createElement('div');
+                    curBadge.className = 'small text-muted mb-1 text-center';
+                    curBadge.textContent = '現在の回答: ' + myResponse + (myMemo ? '（' + myMemo + '）' : '');
+                    volBodyArea.appendChild(curBadge);
                   }
-                  var btn = document.createElement('button');
-                  btn.type = 'button';
-                  btn.className = 'btn btn-sm btn-' + (hasVol ? 'warning' : 'success') + ' w-100';
-                  btn.textContent = hasVol ? '立候補の取消' : '立候補';
-                  btn.onclick = function() {
-                    if (hasVol) {
-                      if (!confirm('立候補を取り消しますか？')) return;
+                  // ◎/△/× ボタン
+                  var btnRow = document.createElement('div');
+                  btnRow.className = 'd-flex gap-2 justify-content-center';
+                  var responses = [
+                    { val: '◎', label: '◎ 対応可', cls: 'success' },
+                    { val: '△', label: '△ 条件付', cls: 'warning' },
+                    { val: '×', label: '× 対応不可', cls: 'danger' }
+                  ];
+                  responses.forEach(function(opt) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'btn btn-sm btn-' + (myResponse === opt.val ? '' : 'outline-') + opt.cls;
+                    b.textContent = opt.label;
+                    b.onclick = function() {
+                      var memoEl = document.getElementById('eventModalResponseMemo');
+                      var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
+                      b.disabled = true;
                       google.script.run.withSuccessHandler(function(j) {
                         var res = JSON.parse(j);
                         if (res.success) {
                           bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
-                          else loadRecruitList();
-                        } else alert(res.error || '失敗');
-                      }).withFailureHandler(function(e) { alert(e.message); }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
-                    } else {
-                      if (!confirm('立候補しますか？\n\nはい／いいえ')) return;
-                      var memoEl = document.getElementById('eventModalVolunteerMemo');
-                      var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
-                      volunteer('r' + r.recruitRowIndex, memoVal);
-                      bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                      loadAndRender();
-                      loadRecruitList();
-                    }
-                  };
-                  volBodyArea.appendChild(btn);
+                          loadRecruitList();
+                        } else { alert(res.error || '失敗'); b.disabled = false; }
+                      }).withFailureHandler(function(e) { alert(e.message); b.disabled = false; }).respondToRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '', opt.val, memoVal);
+                    };
+                    btnRow.appendChild(b);
+                  });
+                  volBodyArea.appendChild(btnRow);
                 }
               }
             } catch (e) {}
@@ -2044,13 +2085,8 @@
                 statusEl.className = 'recruit-status-badge px-2 py-1 rounded ' + (ownerEffectiveStatus === '募集中' ? 'status-recruiting' : (ownerEffectiveStatus === '選定済' ? 'status-decided' : 'status-undecided'));
               }
               if (volArea && volList && r.success) {
-                if (ownerEffectiveStatus === '募集中') {
-                  volArea.style.display = 'block';
-                  volList.textContent = (r.volunteers && r.volunteers.length) ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし';
-                } else {
-                  volArea.style.display = r.volunteers && r.volunteers.length ? 'block' : 'none';
-                  if (r.volunteers && r.volunteers.length) volList.textContent = r.volunteers.map(function(v) { return v.staffName; }).join(', ');
-                }
+                volArea.style.display = 'block';
+                volList.innerHTML = renderStaffResponses(r.volunteers);
               }
               if (!ownerStaffAssigned && ownerCenterArea && r.success) {
                 var rowNum = props.rowNumber;
@@ -2165,7 +2201,7 @@
                   emBtnCancel.textContent = '募集取消';
                   emBtnCancel.onclick = function() {
                     var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
-                    if (volCount > 0 && !confirm('立候補者が' + volCount + '名います。募集を取消しますか？')) return;
+                    if (volCount > 0 && !confirm('回答済みスタッフが' + volCount + '名います。募集を取消しますか？')) return;
                     if (volCount === 0 && !confirm('募集を取消しますか？')) return;
                     google.script.run.withSuccessHandler(function(j) {
                       var res = JSON.parse(j);
@@ -2177,17 +2213,15 @@
                   btnRow.className = 'd-flex flex-wrap justify-content-center gap-1 mt-2';
                   btnRow.appendChild(emBtnMail);
                   btnRow.appendChild(emBtnCopy);
-                  if (hasVol) {
-                    var emBtnSelect = document.createElement('button');
-                    emBtnSelect.type = 'button';
-                    emBtnSelect.className = 'btn btn-sm btn-success';
-                    emBtnSelect.textContent = 'スタッフ選定';
-                    emBtnSelect.onclick = function() {
-                      bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                      openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: r.checkoutDate || checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
-                    };
-                    btnRow.appendChild(emBtnSelect);
-                  }
+                  var emBtnSelect = document.createElement('button');
+                  emBtnSelect.type = 'button';
+                  emBtnSelect.className = 'btn btn-sm btn-success';
+                  emBtnSelect.textContent = 'スタッフ選定';
+                  emBtnSelect.onclick = function() {
+                    bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                    openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: r.checkoutDate || checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
+                  };
+                  btnRow.appendChild(emBtnSelect);
                   btnRow.appendChild(emBtnCancel);
                   ownerCenterArea.appendChild(btnRow);
                 }
@@ -2838,7 +2872,7 @@
             var list = (res.success && res.list && res.list.length) ? res.list : [];
             var pastCount = list.filter(function(r) { return (r.checkoutDate || '') < today; }).length;
             var html = '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">';
-            html += '<p class="small fw-bold mb-0">募集一覧（タップで' + (window.isOwnerUser ? '内容編集' : '詳細・立候補') + '）</p>';
+            html += '<p class="small fw-bold mb-0">募集一覧（タップで' + (window.isOwnerUser ? '内容編集' : '詳細・回答') + '）</p>';
             if (pastCount > 0) {
               html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="btnTogglePastRecruit">' + (hidePast ? '経過済みを表示' : '経過済みを非表示') + '</button>';
             }
@@ -2855,7 +2889,7 @@
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
                 html += r.status === '選定済' ? '<span class="badge bg-success">選定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
-                html += '<br><small>立候補: ' + (r.volunteers && r.volunteers.length ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし') + '</small>';
+                html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
               if (shownCount === 0) html += '<p class="text-muted small">経過済み以外の案件はありません。</p>';
@@ -2971,7 +3005,7 @@
             var list = (res.success && res.list && res.list.length) ? res.list : [];
             var pastCount = list.filter(function(r) { return (r.checkoutDate || '') < today; }).length;
             var html = '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">';
-            html += '<p class="small fw-bold mb-0">募集一覧（タップで詳細・立候補）</p>';
+            html += '<p class="small fw-bold mb-0">募集一覧（タップで詳細・回答）</p>';
             if (pastCount > 0) {
               html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="btnTogglePastRecruitStaffTest">' + (hidePast ? '経過済みを表示' : '経過済みを非表示') + '</button>';
             }
@@ -2988,7 +3022,7 @@
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
                 html += r.status === '選定済' ? '<span class="badge bg-success">選定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
-                html += '<br><small>立候補: ' + (r.volunteers && r.volunteers.length ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし') + '</small>';
+                html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
               if (shownCount === 0) html += '<p class="text-muted small">経過済み以外の案件はありません。</p>';
@@ -3048,7 +3082,7 @@
         document.getElementById('recruitEditReserveMemo').value = r.reserveMemo || '';
         window._recruitEditStaffNames = (r.selectedStaff || r.cleaningStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
         document.getElementById('recruitEditStatus').innerHTML = (r.status === '選定済' ? '選定済: ' + escapeHtml(r.selectedStaff || '') : '募集中');
-        document.getElementById('recruitEditVolunteers').textContent = '立候補: ' + (r.volunteers && r.volunteers.length ? r.volunteers.map(function(v) { return v.staffName; }).join(', ') : 'なし');
+        document.getElementById('recruitEditVolunteers').innerHTML = '<strong>回答状況:</strong><div class="mt-1">' + renderStaffResponses(r.volunteers) + '</div>';
         document.getElementById('recruitEditError').style.display = 'none';
         var staffBar = document.getElementById('staffSelectorBar');
         var staffBarVisible = staffBar && staffBar.style.display !== 'none';
@@ -3062,19 +3096,46 @@
         var selectArea = document.getElementById('recruitEditSelectArea');
         selectArea.style.display = ((r.status === '募集中' || r.status === '選定済') && !asStaff && !r.isNew && !r.asStaffTest) ? 'block' : 'none';
         var volunteerArea = document.getElementById('recruitEditVolunteerArea');
-        var btnVol = document.getElementById('btnRecruitEditVolunteer');
-        var btnCancelVol = document.getElementById('btnRecruitEditCancelVolunteer');
-        var hasVolunteered = false;
-        if (asStaff && r.status === '募集中' && !r.isNew && r.volunteers && r.volunteers.length) {
-          var curName = (window.currentUserName || '').trim().toLowerCase();
-          var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
-          hasVolunteered = r.volunteers.some(function(v) {
-            return (v.staffName || '').trim().toLowerCase() === curName || (v.email || '').trim().toLowerCase() === curEmail;
-          });
+        if (volunteerArea) {
+          if (r.status === '募集中' && asStaff && !r.isNew) {
+            volunteerArea.style.display = 'block';
+            var curName = (window.currentUserName || '').trim().toLowerCase();
+            var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
+            var myResp = '未回答';
+            var myMemo = '';
+            if (r.volunteers) r.volunteers.forEach(function(v) {
+              if ((v.staffName || '').trim().toLowerCase() === curName || (v.email || '').trim().toLowerCase() === curEmail) {
+                myResp = v.response || '未回答';
+                myMemo = v.memo || '';
+              }
+            });
+            volunteerArea.innerHTML = '<div class="mb-2"><label class="form-label small fw-bold">備考</label><input type="text" class="form-control form-control-sm" id="recruitEditResponseMemo" placeholder="何時からなら対応可能、など" value="' + escapeHtml(myMemo) + '"></div>' +
+              (myResp !== '未回答' ? '<div class="small text-muted mb-1 text-center">現在の回答: ' + myResp + '</div>' : '') +
+              '<div class="d-flex gap-2 justify-content-center">' +
+              '<button type="button" class="btn btn-sm btn-' + (myResp === '◎' ? '' : 'outline-') + 'success" data-resp="◎">◎ 対応可</button>' +
+              '<button type="button" class="btn btn-sm btn-' + (myResp === '△' ? '' : 'outline-') + 'warning" data-resp="△">△ 条件付</button>' +
+              '<button type="button" class="btn btn-sm btn-' + (myResp === '×' ? '' : 'outline-') + 'danger" data-resp="×">× 対応不可</button>' +
+              '</div>';
+            volunteerArea.querySelectorAll('[data-resp]').forEach(function(btn) {
+              btn.onclick = function() {
+                var resp = btn.getAttribute('data-resp');
+                var memoEl = document.getElementById('recruitEditResponseMemo');
+                var memoVal = memoEl ? memoEl.value.trim() : '';
+                btn.disabled = true;
+                google.script.run.withSuccessHandler(function(j) {
+                  var res = JSON.parse(j);
+                  if (res.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                    loadAndRender(); loadRecruitList();
+                    if (r.asStaffTest) loadRecruitListStaffTest();
+                  } else { alert(res.error || '失敗'); btn.disabled = false; }
+                }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).respondToRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
+              };
+            });
+          } else {
+            volunteerArea.style.display = 'none';
+          }
         }
-        if (volunteerArea) volunteerArea.style.display = (r.status === '募集中' && asStaff && !r.isNew) ? 'block' : 'none';
-        if (btnVol) btnVol.style.display = hasVolunteered ? 'none' : 'inline-block';
-        if (btnCancelVol) btnCancelVol.style.display = hasVolunteered ? 'inline-block' : 'none';
         window._recruitEditCurrent = r;
         if (!r.isNew) {
           google.script.run.withSuccessHandler(function(jsonStr) {
@@ -3265,7 +3326,7 @@
         document.getElementById('btnRecruitEditCancel').onclick = function() {
           if (!r.isNew && r.rowIndex) {
             var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
-            var msg = volCount > 0 ? '立候補者が' + volCount + '名います。募集を取消しますか？' : '募集を取消しますか？';
+            var msg = volCount > 0 ? '回答済みスタッフが' + volCount + '名います。募集を取消しますか？' : '募集を取消しますか？';
             if (!confirm(msg)) return;
             google.script.run.withSuccessHandler(function(resStr) {
               var ok = JSON.parse(resStr);
@@ -3284,37 +3345,11 @@
           bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
           openRecruitSelectModal(r);
         };
-        var volBtn = document.getElementById('btnRecruitEditVolunteer');
-        if (volBtn) volBtn.onclick = function() {
-          volunteer(r.id);
-          bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-          loadRecruitList();
-          if (r.asStaffTest) loadRecruitListStaffTest();
-        };
-        var cancelVolBtn = document.getElementById('btnRecruitEditCancelVolunteer');
-        if (cancelVolBtn) cancelVolBtn.onclick = function() {
-          if (!confirm('立候補を取り消しますか？')) return;
-          google.script.run.withSuccessHandler(function(jsonStr) {
-            try {
-              var res = JSON.parse(jsonStr);
-              if (res.success) {
-                alert('立候補を取り消しました。');
-                bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-                loadRecruitList();
-                if (r.asStaffTest) loadRecruitListStaffTest();
-              } else alert(res.error || '失敗');
-            } catch (e) { alert('エラー'); }
-          }).withFailureHandler(function(err) { alert(err.message || 'エラー'); }).cancelVolunteerForRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '');
-        };
         new bootstrap.Modal(document.getElementById('recruitEditModal')).show();
       }
 
       function openRecruitSelectModal(r) {
         var volList = (r.volunteers || []);
-        if (!volList.length) {
-          alert('立候補者がいません。立候補者が出るまでお待ちください。');
-          return;
-        }
         document.getElementById('recruitSelectRowIndex').value = r.rowIndex;
         document.getElementById('recruitSelectModalTitle').textContent = '清掃担当を選定';
         document.getElementById('recruitSelectDate').textContent = 'チェックアウト日: ' + (r.checkoutDate || '');
@@ -3322,10 +3357,11 @@
         document.getElementById('recruitSelectStaffList').innerHTML = '';
         document.getElementById('recruitSelectError').style.display = 'none';
         var sel = document.getElementById('recruitSelectStaffDropdown');
-        sel.innerHTML = '<option value="">立候補者を選択</option>';
+        sel.innerHTML = '<option value="">スタッフを選択</option>';
         volList.forEach(function(v) {
           var name = (v.staffName || v.email || '').trim();
-          if (name) sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+          var respLabel = v.response ? ' [' + v.response + ']' : '';
+          if (name) sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
         });
         sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
         var rsOtherArea = document.getElementById('recruitSelectOtherArea');
@@ -3439,32 +3475,22 @@
         }).addRecruitmentManually(rowNumber, checkoutDate);
       }
 
+      // 旧互換: volunteer() → respondToRecruitment('◎')
       function volunteer(recruitId, memoToSend) {
-        var staffBar = document.getElementById('staffSelectorBar');
-        var barVisible = staffBar && staffBar.style.display !== 'none';
-        if (barVisible && !window.currentUserName && !window.currentUserEmail) {
-          alert('立候補するには、上部でお名前を選択してください。');
-          return;
-        }
         var nameToSend = window.currentUserName || '';
         var emailToSend = window.currentUserEmail || '';
         if (!nameToSend && !emailToSend) {
-          alert('立候補するには、お名前を選択するかログインしてください。');
+          alert('回答するには、お名前を選択するかログインしてください。');
           return;
         }
         var memo = (memoToSend != null) ? String(memoToSend).trim() : '';
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            if (r.success) {
-              alert(r.already ? 'すでに立候補済みです。' : '立候補しました。');
-              loadRecruitList();
-              loadAndRender();
-            } else {
-              alert(r.error || '失敗しました。');
-            }
+            if (r.success) { loadRecruitList(); loadAndRender(); }
+            else alert(r.error || '失敗しました。');
           } catch (e) { alert('エラー'); }
-        }).withFailureHandler(function(err) { alert(err.message || 'エラー'); }).volunteerForRecruitment(recruitId, nameToSend, emailToSend, memo);
+        }).withFailureHandler(function(err) { alert(err.message || 'エラー'); }).respondToRecruitment(recruitId, nameToSend, emailToSend, '◎', memo);
       }
 
       function loadSyncList() {
@@ -3529,7 +3555,7 @@
             var r = JSON.parse(jsonStr);
             if (r.success && r.list && r.list.length) {
               var html = r.list.map(function(n) {
-                var kindClass = (n.kind === '立候補') ? 'primary' : (n.kind === '立候補取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : (n.kind === '出勤キャンセル要望') ? 'danger' : (n.kind === 'キャンセル承認') ? 'info' : (n.kind === 'キャンセル却下') ? 'secondary' : 'secondary';
+                var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : (n.kind === '出勤キャンセル要望') ? 'danger' : (n.kind === 'キャンセル承認') ? 'info' : (n.kind === 'キャンセル却下') ? 'secondary' : 'secondary';
                 return '<div class="border rounded p-2 mb-2 small"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span> ' + escapeHtml(n.message) + '</div>';
               }).join('');
               el.innerHTML = html;
@@ -3605,7 +3631,7 @@
             var r = JSON.parse(jsonStr);
             if (r.success && r.list && r.list.length) {
               var html = r.list.map(function(n) {
-                var kindClass = (n.kind === '立候補') ? 'primary' : (n.kind === '立候補取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : 'secondary';
+                var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : 'secondary';
                 var readBtn = n.read ? '' : ' <button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-1 btn-notif-read" data-row="' + n.rowIndex + '">既読</button>';
                 return '<div class="border rounded p-2 mb-2 small"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span>\u3000' + escapeHtml(n.message) + readBtn + '</div>';
               }).join('');
@@ -4568,7 +4594,7 @@
         });
       });
 
-      // ログインユーザー情報（立候補・オーナー判定に使用）
+      // ログインユーザー情報（回答・オーナー判定に使用）
       window.currentUserEmail = '';
       window.currentUserName = '';
       window.isOwnerUser = !window.staffMode; // デフォルト: オーナーURL→true, スタッフURL→false

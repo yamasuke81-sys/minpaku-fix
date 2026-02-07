@@ -1053,15 +1053,21 @@ function ensureSheetsExist() {
 
 function formatNotificationMessage_(kind, message) {
   if (!message) return message;
-  var m = String(message).match(/^(\d{4}-\d{1,2}-\d{1,2})\s*:\s*(.+?)\s+が立候補しました$/);
-  if (m && kind === '立候補') {
+  var m = String(message).match(/^(\d{4}-\d{1,2}-\d{1,2})\s*:\s*(.+?)\s+が\s*[◎△×]\s*と回答/);
+  if (m && kind === '回答') {
     var d = m[1].replace(/-/g, '/');
-    return m[2].trim() + ' が' + d + 'の清掃に立候補しました';
+    return m[2].trim() + ' が' + d + 'の清掃に回答しました';
   }
-  m = String(message).match(/^(\d{4}-\d{1,2}-\d{1,2})\s*:\s*(.+?)\s+が立候補を取り消しました$/);
-  if (m && kind === '立候補取消') {
+  m = String(message).match(/^(\d{4}-\d{1,2}-\d{1,2})\s*:\s*(.+?)\s+が回答を取り消しました$/);
+  if (m && kind === '回答取消') {
     var d2 = m[1].replace(/-/g, '/');
-    return m[2].trim() + ' が' + d2 + 'の清掃の立候補を取り消しました';
+    return m[2].trim() + ' が' + d2 + 'の清掃の回答を取り消しました';
+  }
+  // 旧形式の立候補通知にも対応
+  m = String(message).match(/^(\d{4}-\d{1,2}-\d{1,2})\s*:\s*(.+?)\s+が立候補しました$/);
+  if (m && kind === '立候補') {
+    var d3 = m[1].replace(/-/g, '/');
+    return m[2].trim() + ' が' + d3 + 'の清掃に回答しました';
   }
   return message;
 }
@@ -2347,7 +2353,7 @@ function setRecruitmentSettings(settings) {
 }
 
 /**********************************************
- * 募集・立候補・選定
+ * 募集・回答・選定
  **********************************************/
 
 function getRecruitmentList() {
@@ -2380,15 +2386,6 @@ function getRecruitmentList() {
       const reserveNationality = String(row[12] || '').trim();
       const reserveMemo = String(row[13] || '').trim();
       const reserveBedCount = String(row[14] || '').trim();
-      var volunteers = [];
-      if (volSheet && volSheet.getLastRow() >= 2) {
-        const volRows = volSheet.getRange(2, 1, volSheet.getLastRow(), 4).getValues();
-        volRows.forEach(function(vr) {
-          if (String(vr[0] || '').trim() === id) {
-            volunteers.push({ staffName: String(vr[1] || '').trim(), email: String(vr[2] || '').trim(), at: String(vr[3] || '').trim() });
-          }
-        });
-      }
       list.push({
         id: id,
         rowIndex: i + 2,
@@ -2407,9 +2404,42 @@ function getRecruitmentList() {
         reserveNationality: reserveNationality,
         reserveMemo: reserveMemo,
         reserveBedCount: reserveBedCount,
-        volunteers: volunteers
+        volunteers: [] // 後で一括マージ
       });
     }
+    // 全スタッフ一覧を取得して回答とマージ
+    var allStaff = getAllActiveStaff_(ss);
+    var volLastCol = (volSheet && volSheet.getLastColumn()) ? Math.max(volSheet.getLastColumn(), 7) : 7;
+    ensureVolunteerStatusColumns_();
+    var allVolRows = (volSheet && volSheet.getLastRow() >= 2) ? volSheet.getRange(2, 1, volSheet.getLastRow(), volLastCol).getValues() : [];
+    var responsesByRid = {};
+    allVolRows.forEach(function(vr) {
+      var rid = String(vr[0] || '').trim();
+      if (!rid) return;
+      if (!responsesByRid[rid]) responsesByRid[rid] = {};
+      var email = String(vr[2] || '').trim().toLowerCase();
+      var name = String(vr[1] || '').trim().toLowerCase();
+      var key = email || name;
+      responsesByRid[rid][key] = {
+        response: normalizeVolStatus_(String(vr[5] || '').trim()),
+        memo: String(vr[4] || '').trim(),
+        respondedAt: String(vr[3] || '').trim()
+      };
+    });
+    list.forEach(function(item) {
+      var ridResponses = responsesByRid[item.id] || {};
+      item.volunteers = allStaff.map(function(s) {
+        var key = s.email ? s.email.toLowerCase() : s.staffName.toLowerCase();
+        var resp = ridResponses[key] || ridResponses[s.staffName.toLowerCase()];
+        return {
+          staffName: s.staffName,
+          email: s.email,
+          response: resp ? resp.response : '未回答',
+          memo: resp ? resp.memo : '',
+          respondedAt: resp ? resp.respondedAt : ''
+        };
+      });
+    });
     list.sort(function(a, b) { return (b.checkoutDate || '').localeCompare(a.checkoutDate || ''); });
     return JSON.stringify({ success: true, list: list });
   } catch (e) {
@@ -3014,7 +3044,7 @@ function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
   lines.push('');
   lines.push('※予約状況次第では変更となる場合があります。');
   lines.push('');
-  if (appUrl) lines.push('Webアプリで立候補: ' + appUrl);
+  if (appUrl) lines.push('Webアプリで回答: ' + appUrl);
   return lines.join('\n');
 }
 
@@ -3077,7 +3107,7 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
 }
 
 /**
- * スタッフ選択用に名前・メール一覧を取得（権限不要・Execute as Me時の立候補用）
+ * スタッフ選択用に名前・メール一覧を取得（権限不要）
  */
 /**
  * スタッフの出勤キャンセル要望を送信（オーナーに通知・メール）
@@ -3473,7 +3503,7 @@ function createStaffInvoice(yearMonth, staffIdentifier, folderIdFromClient) {
 }
 
 /**
- * ログインユーザーが清掃スタッフリストにいれば名前を返す（立候補用）
+ * ログインユーザーが清掃スタッフリストにいれば名前を返す（回答用）
  */
 function getMyStaffName() {
   try {
@@ -3494,10 +3524,26 @@ function getMyStaffName() {
   }
 }
 
+/**
+ * 旧互換ラッパー: volunteerForRecruitment → respondToRecruitment('◎')
+ */
 function volunteerForRecruitment(recruitId, staffNameFromClient, staffEmailFromClient, staffMemoFromClient) {
+  return respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClient, '◎', staffMemoFromClient);
+}
+
+/**
+ * 清掃募集に対してスタッフが回答する（◎/△/×）
+ * @param {string} recruitId - 募集ID ('r' + row number)
+ * @param {string} staffNameFromClient - スタッフ名
+ * @param {string} staffEmailFromClient - メール
+ * @param {string} response - '◎', '△', '×'
+ * @param {string} memo - 備考（任意）
+ */
+function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClient, response, memo) {
   try {
     ensureSheetsExist();
     ensureVolunteerMemoColumn_();
+    ensureVolunteerStatusColumns_();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
@@ -3509,35 +3555,74 @@ function volunteerForRecruitment(recruitId, staffNameFromClient, staffEmailFromC
     if (String(status).trim() === '選定済') {
       return JSON.stringify({ success: false, error: 'この募集は選定済みです' });
     }
+    if (['◎', '△', '×'].indexOf(response) < 0) {
+      return JSON.stringify({ success: false, error: '無効な回答です。◎/△/×で回答してください。' });
+    }
     var staffEmail = (staffEmailFromClient || Session.getActiveUser().getEmail() || '').trim();
     var staffName = (staffNameFromClient || '').trim();
-    var staffMemo = (staffMemoFromClient || '').trim();
+    var staffMemo = (memo || '').trim();
     if (!staffName && staffEmail) {
       const nameRes = JSON.parse(getMyStaffName());
       if (nameRes.success && nameRes.name) staffName = nameRes.name;
       else staffName = staffEmail;
     }
     if (!staffName) staffName = '不明';
-    const existing = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow(), 4).getValues() : [];
-    for (var i = 0; i < existing.length; i++) {
-      if (String(existing[i][0]).trim() === String(recruitId).trim() && (String(existing[i][2]).trim().toLowerCase() === staffEmail.toLowerCase() || String(existing[i][1]).trim() === staffName)) {
-        return JSON.stringify({ success: true, already: true });
+    const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var lastCol = Math.max(volSheet.getLastColumn(), 7);
+    var volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow(), lastCol).getValues() : [];
+    // Upsert: 既存回答があれば更新、なければ新規挿入
+    for (var i = 0; i < volData.length; i++) {
+      if (String(volData[i][0]).trim() !== String(recruitId).trim()) continue;
+      var match = (staffEmail && String(volData[i][2] || '').trim().toLowerCase() === staffEmail.toLowerCase()) || String(volData[i][1] || '').trim() === staffName;
+      if (match) {
+        volSheet.getRange(i + 2, 4).setValue(now);
+        volSheet.getRange(i + 2, 5).setValue(staffMemo);
+        volSheet.getRange(i + 2, 6).setValue(response);
+        var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
+        var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
+        addNotification_('回答', (checkoutStr || recruitId) + ': ' + staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : ''));
+        return JSON.stringify({ success: true, updated: true });
       }
     }
-    const nextRow = volSheet.getLastRow() + 1;
-    const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
-    ensureVolunteerStatusColumns_();
-    var lastCol = Math.max(volSheet.getLastColumn(), 7);
+    // 新規挿入
+    var nextRow = volSheet.getLastRow() + 1;
     volSheet.getRange(nextRow, 1, 1, 4).setValues([[recruitId, staffName, staffEmail, now]]);
-    if (lastCol >= 5 && staffMemo) volSheet.getRange(nextRow, 5).setValue(staffMemo);
-    if (lastCol >= 6) volSheet.getRange(nextRow, 6).setValue('volunteered');
+    volSheet.getRange(nextRow, 5).setValue(staffMemo);
+    volSheet.getRange(nextRow, 6).setValue(response);
     var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
     var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-    addNotification_('立候補', (checkoutStr || recruitId) + ': ' + staffName + ' が立候補しました' + (staffMemo ? '（' + staffMemo + '）' : ''));
+    addNotification_('回答', (checkoutStr || recruitId) + ': ' + staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : ''));
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/**
+ * 旧ステータスを新回答形式に変換するヘルパー
+ */
+function normalizeVolStatus_(rawStatus) {
+  if (rawStatus === '◎' || rawStatus === '△' || rawStatus === '×') return rawStatus;
+  if (rawStatus === 'volunteered') return '◎';
+  if (rawStatus === 'hold') return '△';
+  return '未回答';
+}
+
+/**
+ * 全アクティブスタッフ一覧を取得するヘルパー
+ */
+function getAllActiveStaff_(ss) {
+  var staffSheet = ss.getSheetByName(SHEET_STAFF);
+  if (!staffSheet || staffSheet.getLastRow() < 2) return [];
+  var lastCol = Math.max(staffSheet.getLastColumn(), 9);
+  var rows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
+  return rows.map(function(row) {
+    var name = String(row[0] || '').trim();
+    var email = String(row[2] || '').trim();
+    var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
+    if (active === 'N' || (!name && !email)) return null;
+    return { staffName: name || email, email: email };
+  }).filter(Boolean);
 }
 
 function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmailFromClient) {
@@ -3563,7 +3648,7 @@ function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmai
         deleted = true;
         var checkoutCell = recruitSheet.getRange(recruitRowIndex, 1).getValue();
         var checkoutStr = checkoutCell ? (checkoutCell instanceof Date ? Utilities.formatDate(checkoutCell, 'Asia/Tokyo', 'yyyy-MM-dd') : String(checkoutCell)) : '';
-        addNotification_('立候補取消', (checkoutStr || recruitId) + ': ' + (volData[i][1] || staffName) + ' が立候補を取り消しました');
+        addNotification_('回答取消', (checkoutStr || recruitId) + ': ' + (volData[i][1] || staffName) + ' が回答を取り消しました');
         break;
       }
     }
@@ -3574,9 +3659,12 @@ function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmai
 }
 
 /**
- * スタッフが保留を設定（ボタン押下前に理由を入力）
+ * 旧互換: holdForRecruitment → respondToRecruitment('△')
  */
 function holdForRecruitment(recruitId, staffNameFromClient, staffEmailFromClient, holdReasonFromClient) {
+  return respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClient, '△', holdReasonFromClient);
+}
+function holdForRecruitment_legacy_(recruitId, staffNameFromClient, staffEmailFromClient, holdReasonFromClient) {
   try {
     ensureSheetsExist();
     ensureVolunteerStatusColumns_();
@@ -3651,18 +3739,18 @@ function getRecruitmentStatusMap() {
         var rid = String(vr[0] || '').trim();
         if (rid) {
           if (!volunteersByRid[rid]) volunteersByRid[rid] = [];
-          var volStatus = String(vr[5] || '').trim() || 'volunteered';
-          var holdReason = String(vr[6] || '').trim();
           volunteersByRid[rid].push({
             staffName: String(vr[1] || '').trim(),
             email: String(vr[2] || '').trim(),
-            at: String(vr[3] || '').trim(),
-            volStatus: volStatus,
-            holdReason: holdReason
+            respondedAt: String(vr[3] || '').trim(),
+            response: normalizeVolStatus_(String(vr[5] || '').trim()),
+            memo: String(vr[4] || '').trim()
           });
         }
       });
     }
+    // 全スタッフ一覧を取得（カレンダー用マージ）
+    var allStaffForMap = getAllActiveStaff_(ss);
     var cancelByRid = {};
     if (crSheet && crSheet.getLastRow() >= 2) {
       var crLastCol = Math.max(crSheet.getLastColumn(), 5);
@@ -3808,7 +3896,24 @@ function getRecruitmentStatusMap() {
       var status = String(rows[i][3] || '').trim() || '募集中';
       var staff = String(rows[i][4] || '').trim();
       var rid = 'r' + (i + 2);
-      var volunteers = volunteersByRid[rid] || [];
+      // 回答済みスタッフと全スタッフをマージ
+      var ridResponses = volunteersByRid[rid] || [];
+      var ridResponsesByKey = {};
+      ridResponses.forEach(function(r) {
+        var key = r.email ? r.email.toLowerCase() : r.staffName.toLowerCase();
+        ridResponsesByKey[key] = r;
+      });
+      var volunteers = allStaffForMap.map(function(s) {
+        var key = s.email ? s.email.toLowerCase() : s.staffName.toLowerCase();
+        var resp = ridResponsesByKey[key] || ridResponsesByKey[s.staffName.toLowerCase()];
+        return {
+          staffName: s.staffName,
+          email: s.email,
+          response: resp ? resp.response : '未回答',
+          memo: resp ? resp.memo : '',
+          respondedAt: resp ? resp.respondedAt : ''
+        };
+      });
       var cancelRequested = cancelByRid[rid] || [];
 
       // チェックアウト日
@@ -3940,7 +4045,7 @@ function getNextReservationsForRows(rowNumbers) {
 }
 
 /**
- * 予約行番号に対応する募集情報（立候補者含む）を取得
+ * 予約行番号に対応する募集情報（スタッフ回答含む）を取得
  */
 function getRecruitmentForBooking(bookingRowNumber) {
   try {
@@ -3984,7 +4089,9 @@ function getRecruitmentForBooking(bookingRowNumber) {
       var recruitRowIndex = matchIdx + 2;
       var checkoutDate = rows[matchIdx][0] ? (rows[matchIdx][0] instanceof Date ? Utilities.formatDate(rows[matchIdx][0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(rows[matchIdx][0])) : '';
       var status = String(rows[matchIdx][3] || '').trim() || '募集中';
-      var volunteers = [];
+      // 全スタッフと回答をマージ
+      var allStaff = getAllActiveStaff_(ss);
+      var responsesByKey = {};
       if (volSheet && volSheet.getLastRow() >= 2) {
         ensureVolunteerStatusColumns_();
         var volLastCol = Math.max(volSheet.getLastColumn(), 7);
@@ -3992,16 +4099,28 @@ function getRecruitmentForBooking(bookingRowNumber) {
         var rid = 'r' + recruitRowIndex;
         volRows.forEach(function(vr) {
           if (String(vr[0] || '').trim() === rid) {
-            volunteers.push({
-              staffName: String(vr[1] || '').trim(),
-              email: String(vr[2] || '').trim(),
-              at: String(vr[3] || '').trim(),
-              volStatus: String(vr[5] || '').trim() || 'volunteered',
-              holdReason: String(vr[6] || '').trim()
-            });
+            var email = String(vr[2] || '').trim().toLowerCase();
+            var name = String(vr[1] || '').trim().toLowerCase();
+            var key = email || name;
+            responsesByKey[key] = {
+              response: normalizeVolStatus_(String(vr[5] || '').trim()),
+              memo: String(vr[4] || '').trim(),
+              respondedAt: String(vr[3] || '').trim()
+            };
           }
         });
       }
+      var volunteers = allStaff.map(function(s) {
+        var key = s.email ? s.email.toLowerCase() : s.staffName.toLowerCase();
+        var resp = responsesByKey[key] || responsesByKey[s.staffName.toLowerCase()];
+        return {
+          staffName: s.staffName,
+          email: s.email,
+          response: resp ? resp.response : '未回答',
+          memo: resp ? resp.memo : '',
+          respondedAt: resp ? resp.respondedAt : ''
+        };
+      });
       var cancelRequested = [];
       var cancelRejected = [];
       var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
@@ -4165,7 +4284,7 @@ function checkAndSendReminders() {
           const to = [];
           emails.forEach(function(r) { if (r[0]) to.push(r[0]); });
           if (to.length) {
-            GmailApp.sendEmail(to.join(','), '【民泊】清掃スタッフ募集のリマインド: ' + rows[i][0], 'まだ立候補が少ないため、再度ご案内します。チェックアウト日: ' + rows[i][0]);
+            GmailApp.sendEmail(to.join(','), '【民泊】清掃スタッフ募集のリマインド: ' + rows[i][0], 'まだ回答が少ないため、再度ご案内します。チェックアウト日: ' + rows[i][0]);
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));

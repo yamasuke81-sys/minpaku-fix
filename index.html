@@ -1527,8 +1527,17 @@
         const type = props.type;
         const title = type === 'booking' ? '宿泊詳細' : '清掃詳細';
         var titleIcon = type === 'booking' ? '<i class="bi bi-house-door-fill modal-type-icon"></i>' : '<i class="bi bi-brush-fill modal-type-icon"></i>';
+        // ステータスドット（カレンダー凡例と同じ色）
+        var sd = props.statusDot || '';
+        var dotColor = '';
+        if (sd === 'form-answered') dotColor = '#28a745';
+        else if (sd === 'form-unanswered') dotColor = '#dc3545';
+        else if (sd === 'cleaning-decided') dotColor = '#0d6efd';
+        else if (sd === 'cleaning-recruiting') dotColor = '#ffc107';
+        else if (sd === 'cleaning-not-recruiting') dotColor = '#dc3545';
+        var dotHtml = dotColor ? '<span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:' + dotColor + ';vertical-align:middle;"></span>' : '';
         var headerEl = document.getElementById('eventModalHeader');
-        document.getElementById('eventModalTitle').innerHTML = titleIcon + escapeHtml(title);
+        document.getElementById('eventModalTitle').innerHTML = titleIcon + dotHtml + escapeHtml(title);
         headerEl.className = 'modal-header ' + (type === 'cleaning' ? 'modal-header-cleaning' : 'modal-header-booking');
 
         // 非同期コールバックの競合防止用世代ID
@@ -1740,26 +1749,6 @@
               });
               html += '</span></div>';
             }
-
-            // 清掃募集状況・立候補者・清掃担当（ひとくくり、清掃詳細と統一）
-            var staffVal = (d.cleaningStaff || '').trim();
-            var staffUndecided = !staffVal;
-            var recruitRec = (window._recruitFullMap || {})[props.rowNumber];
-            var rStatus = recruitRec ? (recruitRec.status || '') : '';
-            var rEffective = staffVal ? '選定済' : rStatus;
-            var rLabel = rEffective === '募集中' ? '清掃募集中' : (rEffective === '選定済' ? '選定済' : '未募集');
-            var rClass = rEffective === '募集中' ? 'status-recruiting' : (rEffective === '選定済' ? 'status-decided' : 'status-undecided');
-            html += '<div class="modal-section-divider"></div>';
-            html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
-            // 1. 清掃募集状況
-            html += '<div><span class="recruit-status-badge px-2 py-1 rounded ' + rClass + '">' + rLabel + '</span></div>';
-            // 2. 立候補者
-            var volNames = (recruitRec && recruitRec.volunteers && recruitRec.volunteers.length) ? recruitRec.volunteers.map(function(v) { return v.staffName; }).join(', ') : '';
-            var showVol = rEffective === '募集中' || (recruitRec && recruitRec.volunteers && recruitRec.volunteers.length);
-            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:' + (showVol ? 'block' : 'none') + ';"><strong><i class="bi bi-people"></i> 立候補者:</strong> <span id="eventModalVolunteersList">' + fmt(volNames || 'なし') + '</span></div>';
-            // 3. 清掃担当
-            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '"><i class="bi bi-person-badge"></i> 清掃担当: <span id="eventModalStaffDisplay">' + fmt(staffVal || '(未設定)') + '</span></div>';
-            html += '</div>';
 
             // メモ（オーナー: 編集可, スタッフ: 閲覧のみ）
             if (d.memo || !isStaffView) {

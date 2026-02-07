@@ -193,7 +193,7 @@ function getData() {
       const guestCountInfants = extractGuestCount_(guestCountInfantsRaw);
       const icalGuestCountRaw = columnMap.icalGuestCount >= 0 ? String(row[columnMap.icalGuestCount] || '').trim() : '';
       const formGuestCountFmt = (guestCountAdults || guestCountInfants) ? ((guestCountAdults ? '大人' + guestCountAdults + '名' : '') + (guestCountInfants ? (guestCountAdults ? '、' : '') + '3歳以下' + guestCountInfants + '名' : '')) : '';
-      const guestCountDisplay = (icalGuestCountRaw || '-') + '（' + (formGuestCountFmt || '-') + '）';
+      const guestCountDisplay = formGuestCountFmt || '-';
       const cleaningStaff = columnMap.cleaningStaff >= 0 ? String(row[columnMap.cleaningStaff] || '').trim() : '';
       const parking = columnMap.parking >= 0 ? String(row[columnMap.parking] || '').trim() : '';
       const bedChoice = columnMap.bedChoice >= 0 ? String(row[columnMap.bedChoice] || '').trim() : '';

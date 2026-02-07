@@ -520,8 +520,24 @@ function updateCleaningStaff(rowNumber, staffName) {
     const value = staffName ? String(staffName).trim() : '';
     sheet.getRange(rowNumber, colIndex).setValue(value);
 
+    // 同一チェックイン日の重複行にもcleaningStaffを書き込む（iCal+フォーム重複対策）
+    if (columnMap.checkIn >= 0 && lastRow >= 2) {
+      var targetCi = toDateKeySafe_(sheet.getRange(rowNumber, columnMap.checkIn + 1).getValue());
+      if (targetCi) {
+        var allData = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+        for (var di = 0; di < allData.length; di++) {
+          if ((di + 2) === rowNumber) continue;
+          var rowCi = toDateKeySafe_(allData[di][columnMap.checkIn]);
+          if (rowCi === targetCi) {
+            sheet.getRange(di + 2, colIndex).setValue(value);
+          }
+        }
+      }
+    }
+
     if (recruitSheet && recruitSheet.getLastRow() >= 2) {
-      var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), 5).getValues();
+      var rLastRow = recruitSheet.getLastRow();
+      var rows = recruitSheet.getRange(2, 1, rLastRow - 1, 5).getValues();
       for (var i = 0; i < rows.length; i++) {
         if (Number(rows[i][1]) === rowNumber) {
           var recruitRowIndex = i + 2;

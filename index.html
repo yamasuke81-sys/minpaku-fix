@@ -1178,7 +1178,7 @@
   </div>
 
   <!-- カスタム確認モーダル（confirm()代替） -->
-  <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static" style="z-index:1070;">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
         <div class="modal-body py-4 text-center">
@@ -1192,7 +1192,7 @@
     </div>
   </div>
   <!-- カスタムアラートモーダル（alert()代替） -->
-  <div class="modal fade" id="customAlertModal" tabindex="-1">
+  <div class="modal fade" id="customAlertModal" tabindex="-1" style="z-index:1070;">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content">
         <div class="modal-body py-4 text-center">
@@ -2572,6 +2572,16 @@
       }
 
       // --- カスタムダイアログ（GAS URL非表示） ---
+      // backdrop の z-index を調整して最前面に表示
+      function _fixDialogBackdrop(modalEl) {
+        setTimeout(function() {
+          var backdrops = document.querySelectorAll('.modal-backdrop');
+          if (backdrops.length > 0) {
+            var last = backdrops[backdrops.length - 1];
+            last.style.zIndex = '1065';
+          }
+        }, 10);
+      }
       function customConfirm(msg) {
         return new Promise(function(resolve) {
           var modal = document.getElementById('customConfirmModal');
@@ -2579,7 +2589,9 @@
           var okBtn = document.getElementById('customConfirmOk');
           var cancelBtn = document.getElementById('customConfirmCancel');
           msgEl.textContent = msg;
-          var bsModal = new bootstrap.Modal(modal);
+          var bsModal = bootstrap.Modal.getInstance(modal);
+          if (bsModal) bsModal.dispose();
+          bsModal = new bootstrap.Modal(modal);
           var resolved = false;
           function cleanup() { okBtn.onclick = null; cancelBtn.onclick = null; modal.removeEventListener('hidden.bs.modal', onHidden); }
           function onOk() { if (resolved) return; resolved = true; cleanup(); bsModal.hide(); resolve(true); }
@@ -2588,7 +2600,9 @@
           okBtn.onclick = onOk;
           cancelBtn.onclick = onCancel;
           modal.addEventListener('hidden.bs.modal', onHidden);
+          _fixDialogBackdrop(modal);
           bsModal.show();
+          _fixDialogBackdrop(modal);
         });
       }
       function customAlert(msg) {
@@ -2596,8 +2610,12 @@
         var msgEl = document.getElementById('customAlertMessage');
         if (modal && msgEl) {
           msgEl.textContent = msg;
-          var bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+          var bsModal = bootstrap.Modal.getInstance(modal);
+          if (bsModal) bsModal.dispose();
+          bsModal = new bootstrap.Modal(modal);
+          _fixDialogBackdrop(modal);
           bsModal.show();
+          _fixDialogBackdrop(modal);
         }
       }
       window.alert = function(msg) { customAlert(String(msg || '')); };

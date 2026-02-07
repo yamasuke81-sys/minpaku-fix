@@ -3007,11 +3007,29 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     var staff = (staffName || '').trim() || (staffEmail || '').trim() || 'スタッフ';
     var dateStr = (checkoutDateStr || '').toString().trim() || '';
     var rid = 'r' + recruitRowIndex;
-    // 最優先: シートへの書き込み（最速で完了させる）
+    var sName = (staffName || staff).trim();
+    var sEmail = (staffEmail || '').trim().toLowerCase();
+    // 最優先: シートへの書き込み（重複チェック付き）
     var crSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CANCEL_REQUESTS);
     if (crSheet) {
-      var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
-      crSheet.appendRow([rid, staffName || staff, staffEmail || '', now]);
+      // 既に同一スタッフの pending な申請があればスキップ
+      var alreadyExists = false;
+      if (crSheet.getLastRow() >= 2) {
+        var crLastCol = Math.max(crSheet.getLastColumn(), 5);
+        var crData = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, crLastCol).getValues();
+        for (var c = 0; c < crData.length; c++) {
+          if (String(crData[c][0]).trim() !== rid) continue;
+          var crStatus = String(crData[c][4] || '').trim();
+          if (crStatus === 'rejected') continue; // rejected は無視
+          var m1 = sName && String(crData[c][1] || '').trim() === sName;
+          var m2 = sEmail && String(crData[c][2] || '').trim().toLowerCase() === sEmail;
+          if (m1 || m2) { alreadyExists = true; break; }
+        }
+      }
+      if (!alreadyExists) {
+        var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+        crSheet.appendRow([rid, staffName || staff, staffEmail || '', now, '']);
+      }
     }
     SpreadsheetApp.flush();
     // 通知（シート書き込み）
@@ -3093,16 +3111,15 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
       }
     }
 
-    // キャンセル申請レコードを削除
+    // キャンセル申請レコードを全て削除（重複行対策: breakしない）
     if (crSheet && crSheet.getLastRow() >= 2) {
-      var crData = crSheet.getRange(2, 1, crSheet.getLastRow(), 4).getValues();
+      var crData = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, Math.max(crSheet.getLastColumn(), 5)).getValues();
       for (var j = crData.length - 1; j >= 0; j--) {
         if (String(crData[j][0]).trim() !== rid) continue;
         var crMatchName = sName && String(crData[j][1] || '').trim() === sName;
         var crMatchEmail = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
         if (crMatchName || crMatchEmail) {
           crSheet.deleteRow(j + 2);
-          break;
         }
       }
     }
@@ -3149,7 +3166,7 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
         if (String(crData[j][0]).trim() !== rid) continue;
         var m1 = sName && String(crData[j][1] || '').trim() === sName;
         var m2 = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
-        if (m1 || m2) { crSheet.getRange(j + 2, 5).setValue('rejected'); break; }
+        if (m1 || m2) { crSheet.getRange(j + 2, 5).setValue('rejected'); }
       }
     }
 
@@ -3190,7 +3207,7 @@ function clearCancelRejection(recruitRowIndex, staffName, staffEmail) {
       if (status !== 'rejected') continue;
       var m1 = sName && String(crData[j][1] || '').trim() === sName;
       var m2 = sEmail && String(crData[j][2] || '').trim().toLowerCase() === sEmail;
-      if (m1 || m2) { crSheet.deleteRow(j + 2); break; }
+      if (m1 || m2) { crSheet.deleteRow(j + 2); }
     }
     return JSON.stringify({ success: true });
   } catch (e) {

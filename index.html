@@ -2633,6 +2633,58 @@
             try {
               const res = JSON.parse(jsonStr);
               if (res.success) {
+                // --- Optimistic cache update: 即座にローカル状態を更新 ---
+                var updatedRow = res.rowNumber;
+                var updatedStaff = (res.cleaningStaff || '').trim();
+                var newStatus = updatedStaff ? 'スタッフ確定済み' : '募集中';
+
+                // recruitFullMap を更新
+                if (window._recruitFullMap) {
+                  if (window._recruitFullMap[updatedRow]) {
+                    window._recruitFullMap[updatedRow].status = newStatus;
+                    window._recruitFullMap[updatedRow].staff = updatedStaff;
+                    window._recruitFullMap[updatedRow].selectedStaff = updatedStaff;
+                  } else {
+                    window._recruitFullMap[updatedRow] = { status: newStatus, staff: updatedStaff, selectedStaff: updatedStaff, volunteers: [] };
+                  }
+                }
+
+                // allBookings の cleaningStaff を更新
+                if (typeof allBookings !== 'undefined') {
+                  allBookings.forEach(function(b) {
+                    if (b.rowNumber === updatedRow) b.cleaningStaff = updatedStaff;
+                  });
+                }
+
+                // recruitDates を再構築しカレンダーを即座に再描画
+                if (typeof allBookings !== 'undefined' && window._recruitFullMap && calendar) {
+                  var staffSetDates = {};
+                  allBookings.forEach(function(b) {
+                    var rec = window._recruitFullMap[b.rowNumber] || {};
+                    var isCnf = (rec.status === '選定済') || (rec.status === 'スタッフ確定済み');
+                    if (isCnf && b.checkOutParsed) {
+                      var d2 = new Date(b.checkOutParsed);
+                      staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
+                    }
+                  });
+                  var recruitDates = {};
+                  allBookings.forEach(function(b) {
+                    var rec = window._recruitFullMap[b.rowNumber] || {};
+                    if ((rec.status || '') === '募集中' && b.checkOutParsed) {
+                      var d = new Date(b.checkOutParsed);
+                      var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+                      if (!staffSetDates[key]) recruitDates[key] = true;
+                    }
+                  });
+                  window._recruitDates = recruitDates;
+                  var evts = buildCalendarEvents(allBookings, window._recruitFullMap);
+                  var sources = calendar.getEventSources();
+                  sources.forEach(function(s) { s.remove(); });
+                  calendar.addEventSource(evts);
+                  calendar.render();
+                }
+                // --- End optimistic update ---
+
                 bootstrap.Modal.getInstance(document.getElementById('staffEditModal')).hide();
                 loadAndRender();
                 loadRecruitList();

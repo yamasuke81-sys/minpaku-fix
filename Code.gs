@@ -3195,15 +3195,23 @@ function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
   // チェックイン期間: dateRange (YYYY-MM-DD ～ YYYY-MM-DD) があればそれを使う
   var dateRange = nr.dateRange || '';
   if (!dateRange && nr.date) dateRange = nr.date;
-  var checkinDisp = dateRange || 'ー';
+  // 日付表示を YYYY/M/D 形式に変換
+  var checkinDisp = (dateRange || 'ー').replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(_, y, m, d) {
+    return y + '/' + parseInt(m, 10) + '/' + parseInt(d, 10);
+  });
   var guestDisp = nr.guestCount || 'ー';
   var bedDisp = nr.bedCount || 'ー';
-  var bbqDisp = nr.bbq || 'ー';
+  // BBQ: yes/no → あり/なし
+  var bbqRaw = (nr.bbq || '').toString().trim().toLowerCase();
+  var bbqDisp = 'ー';
+  if (bbqRaw.indexOf('yes') >= 0 || bbqRaw.indexOf('はい') >= 0) bbqDisp = 'あり';
+  else if (bbqRaw.indexOf('no') >= 0 || bbqRaw.indexOf('いいえ') >= 0) bbqDisp = 'なし';
+  else if (nr.bbq) bbqDisp = nr.bbq;
   var natDisp = nr.nationality || 'ー';
 
   var lines = ['清掃募集', '', '作業日: ' + fmtDate, ''];
   lines.push('次回予約（変更の可能性あり）:');
-  lines.push('・チェックイン: ' + checkinDisp);
+  lines.push('・日付：　　　　' + checkinDisp);
   lines.push('・人数:　　　　 ' + guestDisp);
   lines.push('・ベッド数:　　 ' + bedDisp);
   lines.push('・BBQ:　　　　  ' + bbqDisp);

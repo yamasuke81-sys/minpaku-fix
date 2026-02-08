@@ -912,20 +912,17 @@
       </div>
     </div>
 <? } ?>
-    <div id="staffSelectorBar" class="alert alert-info py-2 mb-2" style="display:none;">
-      <div class="d-flex gap-2 align-items-center flex-wrap align-items-center">
-        <span class="small">スタッフ: <strong id="staffDisplayName"></strong></span>
-        <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange">変更</button>
-        <select class="form-select form-select-sm" id="staffNameSelect" style="max-width:200px; display:none;">
-          <option value="">-- 選択 --</option>
-        </select>
-      </div>
-    </div>
+    <div id="staffSelectorBar" style="display:none;"></div>
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
         <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0207a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
+        <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
+        <select class="form-select form-select-sm" id="staffNameSelect" style="max-width:200px; display:none;">
+          <option value="">-- 選択 --</option>
+        </select>
       </div>
       <a href="#" id="btnAccountSwitch" class="btn btn-sm btn-link text-muted p-0" style="display:none; font-size:0.85rem;">アカウント切り替え</a>
     </div>
@@ -3173,15 +3170,21 @@
         }
         if (window.staffMode) {
           var bar = document.getElementById('staffSelectorBar');
-          if (bar) {
-            bar.style.display = 'block';
-            var saved = null;
-            try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
-            if (saved && (saved.name || saved.email)) {
-              applyStaffSelection(saved.name, saved.email);
-            } else {
-              showStaffSelectOverlay();
+          if (bar) bar.style.display = 'block';
+          var changeBtn = document.getElementById('btnStaffChange');
+          if (changeBtn) {
+            changeBtn.style.display = '';
+            if (!changeBtn.dataset.listen) {
+              changeBtn.dataset.listen = '1';
+              changeBtn.addEventListener('click', showStaffSelectOverlay);
             }
+          }
+          var saved = null;
+          try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
+          if (saved && (saved.name || saved.email)) {
+            applyStaffSelection(saved.name, saved.email);
+          } else {
+            showStaffSelectOverlay();
           }
         }
         const calendarEl = document.getElementById('calendar');
@@ -3190,9 +3193,9 @@
           locale: 'ja',
           initialView: 'dayGridMonth',
           headerToolbar: {
-            left: 'prev',
-            center: 'title listWeek,dayGridMonth today',
-            right: 'next'
+            left: 'prev listWeek,dayGridMonth',
+            center: 'title',
+            right: 'today next'
           },
           buttonText: {
             today: '今日',
@@ -3304,6 +3307,10 @@
         function loadStaffTestContent() {
           var staffBar = document.getElementById('staffSelectorBar');
           if (staffBar) staffBar.style.display = 'block';
+          var changeBtnTest = document.getElementById('btnStaffChange');
+          if (changeBtnTest) changeBtnTest.style.display = '';
+          var dispTest = document.getElementById('staffDisplayName');
+          if (dispTest) dispTest.style.display = '';
           var calendarSec = document.getElementById('staffTestCalendarSection');
           var scheduleSec = document.getElementById('staffTestScheduleSection');
           var calPanel = document.getElementById('panelCalendar');
@@ -3343,6 +3350,14 @@
         }
         function restoreStaffTestPanels() {
           if (!window._staffTestMoved) return;
+          if (!window.staffMode) {
+            var staffBar2 = document.getElementById('staffSelectorBar');
+            if (staffBar2) staffBar2.style.display = 'none';
+            var changeBtn2 = document.getElementById('btnStaffChange');
+            if (changeBtn2) changeBtn2.style.display = 'none';
+            var disp2 = document.getElementById('staffDisplayName');
+            if (disp2) disp2.style.display = 'none';
+          }
           var calPanel = document.getElementById('panelCalendar');
           var schedPanel = document.getElementById('panelStaffSchedule');
           var calendarSec = document.getElementById('staffTestCalendarSection');
@@ -5420,7 +5435,10 @@
           badge.style.display = badge.textContent ? '' : 'none';
         }
         var disp = document.getElementById('staffDisplayName');
-        if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+        if (disp) {
+          disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+          disp.style.display = (window.currentUserName || window.currentUserEmail) ? '' : 'none';
+        }
       }
       function showStaffSelectOverlay() {
         if (!window.staffMode) return;
@@ -5446,27 +5464,30 @@
         if (!window.staffMode) return;
         window.isOwnerUser = false;
         var bar = document.getElementById('staffSelectorBar');
-        if (bar) {
-          bar.style.display = 'block';
-          var navSet = document.getElementById('navSettings');
-          var navTest = document.getElementById('navStaffTest');
-          if (navSet) navSet.style.display = 'none';
-          if (navTest) navTest.style.display = 'none';
-          populateStaffSelectOptions('staffNameSelect');
-          var disp = document.getElementById('staffDisplayName');
-          if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
-          var saved = null;
-          try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
-          if (saved && (saved.name || saved.email)) {
-            applyStaffSelection(saved.name, saved.email);
-          }
-          if (window.staffMode && !window.currentUserName && !window.currentUserEmail) {
-            showStaffSelectOverlay();
-          }
-          if (!document.getElementById('btnStaffChange').dataset.listen) {
-            document.getElementById('btnStaffChange').dataset.listen = '1';
-            document.getElementById('btnStaffChange').addEventListener('click', showStaffSelectOverlay);
-          }
+        if (bar) bar.style.display = 'block';
+        var navSet = document.getElementById('navSettings');
+        var navTest = document.getElementById('navStaffTest');
+        if (navSet) navSet.style.display = 'none';
+        if (navTest) navTest.style.display = 'none';
+        populateStaffSelectOptions('staffNameSelect');
+        var disp = document.getElementById('staffDisplayName');
+        if (disp) {
+          disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+          disp.style.display = '';
+        }
+        var changeBtn = document.getElementById('btnStaffChange');
+        if (changeBtn) changeBtn.style.display = '';
+        var saved = null;
+        try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
+        if (saved && (saved.name || saved.email)) {
+          applyStaffSelection(saved.name, saved.email);
+        }
+        if (window.staffMode && !window.currentUserName && !window.currentUserEmail) {
+          showStaffSelectOverlay();
+        }
+        if (changeBtn && !changeBtn.dataset.listen) {
+          changeBtn.dataset.listen = '1';
+          changeBtn.addEventListener('click', showStaffSelectOverlay);
         }
       }
       // スタッフ選択時にパスワード欄の表示切り替え

@@ -1929,7 +1929,7 @@
 
             // 次回予約の情報カード（折りたたみ式、デフォルト閉じ）
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
-            html += '<div class="card-title-sm next-res-toggle" onclick="toggleNextRes()" style="cursor:pointer;user-select:none;"><i class="bi bi-info-circle"></i>次回予約<i class="bi bi-chevron-right ms-auto next-res-chevron" style="transition:transform 0.2s;font-size:0.7rem;"></i></div>';
+            html += '<div class="card-title-sm next-res-toggle" onclick="toggleNextRes()" style="cursor:pointer;user-select:none;"><i class="bi bi-info-circle"></i>次回予約<span id="nextResHeaderStatus" class="text-muted small ms-2"><span class="spinner-border spinner-border-sm text-secondary me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</span><i class="bi bi-chevron-right ms-auto next-res-chevron" style="transition:transform 0.2s;font-size:0.7rem;"></i></div>';
             html += '<div id="eventModalStaffNextResWrapper" style="display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.3s ease-out;"><div class="modal-next-res-grid" id="eventModalStaffNextResContent" style="overflow:hidden;"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div></div>';
             html += '</div>';
 
@@ -2099,6 +2099,17 @@
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
         modal.show();
 
+        // ヘッダーの「読み込み中…」を更新するヘルパー
+        function updateNextResHeader(text) {
+          var hdr = document.getElementById('nextResHeaderStatus');
+          if (!hdr) return;
+          if (text) {
+            hdr.innerHTML = '<span class="ms-1">(' + escapeHtml(text) + ')</span>';
+          } else {
+            hdr.innerHTML = '';
+          }
+        }
+
         // キャッシュから次回予約情報を即時表示（サーバー応答を待たずに表示）
         if (type === 'cleaning') {
           var cachedRec = (window._recruitFullMap || {})[props.rowNumber];
@@ -2112,6 +2123,7 @@
               var nr = cachedNextRes;
               var dateDisp = fmtDateRange(nr.date);
               nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
+              updateNextResHeader(dateDisp);
             }
             if (statusEl && cachedRec) {
               var cStatus = cachedRec.status || '';
@@ -2143,11 +2155,14 @@
                 if (nr.date) {
                   var dateDisp = fmtDateRange(nr.date);
                   nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
+                  updateNextResHeader(dateDisp);
                 } else {
                   nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">次回予約なし</span></div>';
+                  updateNextResHeader('なし');
                 }
               } else if (nextEl) {
                 nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
+                updateNextResHeader(null);
               }
               var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
               var staffDisplayEl = document.getElementById('eventModalStaffDisplay');
@@ -2389,6 +2404,7 @@
             if (modalGen !== window._eventModalGen) return;
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
+            updateNextResHeader(null);
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
             if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge status-undecided'; sEl.removeAttribute('style'); }
           }).getRecruitmentForBooking(props.rowNumber);
@@ -2409,11 +2425,14 @@
                 if (nr.date) {
                   var dateDisp = fmtDateRange(nr.date);
                   nextEl.innerHTML = '<div class="nres-item"><span class="nres-label">日付:</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div><div class="nres-item"><span class="nres-label">人数:</span><span class="nres-value">' + fmt(nr.guestCount) + '</span></div><div class="nres-item"><span class="nres-label">ベッド数:</span><span class="nres-value">' + fmt(nr.bedCount) + '</span></div><div class="nres-item"><span class="nres-label">BBQ:</span><span class="nres-value">' + fmt(bbqAriNashi(nr.bbq)) + '</span></div><div class="nres-item"><span class="nres-label">国籍:</span><span class="nres-value">' + fmt(nr.nationality || '日本') + '</span></div>';
+                  updateNextResHeader(dateDisp);
                 } else {
                   nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">次回予約なし</span></div>';
+                  updateNextResHeader('なし');
                 }
               } else if (nextEl) {
                 nextEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
+                updateNextResHeader(null);
               }
               var ownerStaffAssigned = (d.cleaningStaff || '').trim();
               var ownerResolvedStaff = ownerStaffAssigned || (r.selectedStaff || '').trim();
@@ -2718,6 +2737,7 @@
             if (modalGen !== window._eventModalGen) return;
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
+            updateNextResHeader(null);
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
             if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge status-undecided'; sEl.removeAttribute('style'); }
           }).getRecruitmentForBooking(props.rowNumber);

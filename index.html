@@ -710,13 +710,12 @@
     /* 清掃担当: 個人カード風表示 */
     .staff-cards-wrap {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 0.35rem;
     }
     .staff-card-item {
       display: inline-flex;
       align-items: center;
-      flex-wrap: wrap;
       gap: 0.2rem;
       background: #e7f1ff;
       border: 1px solid #b6d4fe;
@@ -730,12 +729,10 @@
       font-size: 0.85rem;
     }
     .staff-card-memo {
-      width: 100%;
       font-size: 0.75rem;
       font-weight: 400;
       color: #6c757d;
-      margin-top: -0.1rem;
-      padding-left: 1.1rem;
+      margin-left: 0.4rem;
     }
     .staff-card-unset {
       display: inline-block;
@@ -1809,7 +1806,7 @@
         return '<div class="staff-cards-wrap">' + names.map(function(name) {
           var memo = memoMap[name] || '';
           var html = '<div class="staff-card-item"><i class="bi bi-person-fill"></i> ' + escapeHtml(name);
-          if (memo) html += '<div class="staff-card-memo">' + escapeHtml(memo) + '</div>';
+          if (memo) html += '<span class="staff-card-memo">(' + escapeHtml(memo) + ')</span>';
           html += '</div>';
           return html;
         }).join('') + '</div>';

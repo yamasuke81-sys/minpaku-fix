@@ -1727,6 +1727,12 @@ function syncFromICal() {
         } catch (autoRecruitErr) {
           Logger.log('Auto-recruit error: ' + autoRecruitErr.toString());
         }
+        // 1週間以内のチェックインなら即時リマインドメール送信
+        try {
+          sendImmediateReminderIfNeeded_(ss, ev.checkIn, ev.checkOut, platformName);
+        } catch (imErr) {
+          Logger.log('Immediate reminder error: ' + imErr.toString());
+        }
         nextRow++;
         added++;
         platformAdded++;
@@ -4788,6 +4794,275 @@ function checkAndSendReminders() {
     }
   } catch (e) {
     Logger.log('checkAndSendReminders: ' + e.toString());
+  }
+}
+
+/**********************************************
+ * オーナー向けリマインドメール設定・送信
+ **********************************************/
+
+/**
+ * 募集シートに「オーナーリマインド送信済」列を保証
+ */
+function ensureRecruitOwnerReminderColumn_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === 'オーナーリマインド送信済') return;
+    }
+    var nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue('オーナーリマインド送信済');
+  } catch (e) {}
+}
+
+/**
+ * オーナーリマインド送信済み列のインデックスを取得 (0-based)
+ */
+function getOwnerReminderColIndex_(sheet) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i] || '').trim() === 'オーナーリマインド送信済') return i;
+  }
+  return -1;
+}
+
+/**
+ * リマインドメール設定を取得
+ */
+function getReminderEmailSettings() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, 2).getValues() : [];
+    var settings = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) settings[key] = row[1];
+    });
+    var reminders = [];
+    try { reminders = JSON.parse(settings['リマインドメール設定'] || '[]'); } catch (e) { reminders = []; }
+    // デフォルト5件
+    while (reminders.length < 5) {
+      reminders.push({ daysBefore: reminders.length === 0 ? 7 : 0, time: '09:00', enabled: false });
+    }
+    var immediateNotify = String(settings['即時通知有効'] || 'yes');
+    return JSON.stringify({ success: true, reminders: reminders, immediateNotify: immediateNotify });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * リマインドメール設定を保存
+ */
+function setReminderEmailSettings(reminders, immediateNotify) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, 2).getValues() : [];
+    // 既存の行でリマインドメール設定と即時通知有効の行を探す
+    var reminderRow = -1, immediateRow = -1;
+    for (var i = 0; i < rows.length; i++) {
+      var key = String(rows[i][0] || '').trim();
+      if (key === 'リマインドメール設定') reminderRow = i + 2;
+      if (key === '即時通知有効') immediateRow = i + 2;
+    }
+    var jsonStr = JSON.stringify(reminders || []);
+    if (reminderRow > 0) {
+      sheet.getRange(reminderRow, 2).setValue(jsonStr);
+    } else {
+      var nr = sheet.getLastRow() + 1;
+      sheet.getRange(nr, 1).setValue('リマインドメール設定');
+      sheet.getRange(nr, 2).setValue(jsonStr);
+    }
+    var imVal = String(immediateNotify || 'yes');
+    if (immediateRow > 0) {
+      sheet.getRange(immediateRow, 2).setValue(imVal);
+    } else {
+      var nr2 = sheet.getLastRow() + 1;
+      sheet.getRange(nr2, 1).setValue('即時通知有効');
+      sheet.getRange(nr2, 2).setValue(imVal);
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * オーナー向けリマインドメールのチェック＆送信
+ * 時間ベースのトリガーから呼ばれる（1時間ごと推奨）
+ */
+function checkAndSendReminderEmails() {
+  try {
+    ensureSheetsExist();
+    ensureRecruitOwnerReminderColumn_();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // オーナーメール取得
+    var ownerSheet = ss.getSheetByName(SHEET_OWNER);
+    if (!ownerSheet || ownerSheet.getLastRow() < 2) return;
+    var ownerEmail = String(ownerSheet.getRange(2, 1).getValue() || '').trim();
+    if (!ownerEmail) return;
+    // リマインド設定を取得（requireOwnerを回避して直接読む）
+    var settingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!settingsSheet) return;
+    var sLastRow = Math.max(settingsSheet.getLastRow(), 1);
+    var sRows = sLastRow >= 2 ? settingsSheet.getRange(2, 1, sLastRow, 2).getValues() : [];
+    var settingsMap = {};
+    sRows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) settingsMap[key] = row[1];
+    });
+    var reminders = [];
+    try { reminders = JSON.parse(settingsMap['リマインドメール設定'] || '[]'); } catch (e) { return; }
+    var enabledReminders = reminders.filter(function(r, idx) { return r && r.enabled && r.daysBefore > 0; });
+    if (enabledReminders.length === 0) return;
+
+    // 募集シート
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!recruitSheet || recruitSheet.getLastRow() < 2) return;
+    var rLastCol = Math.max(recruitSheet.getLastColumn(), 16);
+    var rData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, rLastCol).getValues();
+    var reminderColIdx = getOwnerReminderColIndex_(recruitSheet);
+    if (reminderColIdx < 0) return;
+
+    // フォームシートからチェックイン日を取得するためのマップ
+    var formSheet = ss.getSheetByName(SHEET_NAME);
+    var checkinByCheckout = {};
+    if (formSheet && formSheet.getLastRow() >= 2) {
+      var fHeaders = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+      var colMap = buildColumnMap(fHeaders);
+      if (colMap.checkIn >= 0 && colMap.checkOut >= 0) {
+        var fData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+        for (var fi = 0; fi < fData.length; fi++) {
+          var ciKey = toDateKeySafe_(fData[fi][colMap.checkIn]);
+          var coKey = toDateKeySafe_(fData[fi][colMap.checkOut]);
+          if (ciKey && coKey && !checkinByCheckout[coKey]) {
+            checkinByCheckout[coKey] = ciKey;
+          }
+        }
+      }
+    }
+
+    var now = new Date();
+    var nowHour = now.getHours();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    for (var ri = 0; ri < rData.length; ri++) {
+      var status = String(rData[ri][3] || '').trim();
+      if (status !== '募集中') continue;
+
+      var checkoutDateStr = rData[ri][0] ? (rData[ri][0] instanceof Date ? Utilities.formatDate(rData[ri][0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(rData[ri][0])) : '';
+      if (!checkoutDateStr) continue;
+
+      // チェックイン日を取得
+      var checkinDateStr = checkinByCheckout[checkoutDateStr] || '';
+      if (!checkinDateStr) continue;
+      var checkinDate = parseDate(checkinDateStr);
+      if (!checkinDate) continue;
+      var checkinDay = new Date(checkinDate.getFullYear(), checkinDate.getMonth(), checkinDate.getDate());
+
+      // 既に送信済みのリマインドインデックスを取得
+      var sentStr = String(rData[ri][reminderColIdx] || '').trim();
+      var sentSet = {};
+      if (sentStr) {
+        sentStr.split(',').forEach(function(s) { var n = parseInt(s.trim(), 10); if (!isNaN(n)) sentSet[n] = true; });
+      }
+
+      var newSent = [];
+      for (var remIdx = 0; remIdx < reminders.length; remIdx++) {
+        var rem = reminders[remIdx];
+        if (!rem || !rem.enabled || !rem.daysBefore || rem.daysBefore <= 0) continue;
+        if (sentSet[remIdx]) continue;
+
+        // チェックイン日のX日前
+        var triggerDate = new Date(checkinDay);
+        triggerDate.setDate(triggerDate.getDate() - rem.daysBefore);
+        var triggerHour = parseInt((rem.time || '09:00').split(':')[0], 10) || 9;
+
+        // 現在がトリガー日時を過ぎているかチェック
+        if (today > triggerDate || (today.getTime() === triggerDate.getTime() && nowHour >= triggerHour)) {
+          // 未来のチェックインのみ（過去は送らない）
+          if (checkinDay >= today) {
+            var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
+            try {
+              var subject = '【民泊】清掃スタッフ未確定のリマインド: ' + checkinDateStr;
+              var body = '以下の予約について、清掃スタッフがまだ確定していません。\n\n'
+                + 'チェックイン: ' + checkinDateStr + '\n'
+                + 'チェックアウト: ' + checkoutDateStr + '\n'
+                + '残り日数: ' + daysLeft + '日\n\n'
+                + '早めに清掃スタッフの手配をお願いします。';
+              GmailApp.sendEmail(ownerEmail, subject, body);
+              newSent.push(remIdx);
+            } catch (mailErr) {
+              Logger.log('reminderEmail error: ' + mailErr.toString());
+            }
+          }
+        }
+      }
+
+      if (newSent.length > 0) {
+        var updatedSent = sentStr ? sentStr + ',' + newSent.join(',') : newSent.join(',');
+        recruitSheet.getRange(ri + 2, reminderColIdx + 1).setValue(updatedSent);
+      }
+    }
+  } catch (e) {
+    Logger.log('checkAndSendReminderEmails: ' + e.toString());
+  }
+}
+
+/**
+ * iCal取り込み時の即時リマインド送信（1週間以内のチェックイン）
+ */
+function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformName) {
+  try {
+    // 即時通知設定を確認
+    var settingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!settingsSheet) return;
+    var sLastRow = Math.max(settingsSheet.getLastRow(), 1);
+    var sRows = sLastRow >= 2 ? settingsSheet.getRange(2, 1, sLastRow, 2).getValues() : [];
+    var immediateEnabled = 'yes';
+    sRows.forEach(function(row) {
+      if (String(row[0] || '').trim() === '即時通知有効') immediateEnabled = String(row[1] || 'yes').trim();
+    });
+    if (immediateEnabled !== 'yes') return;
+
+    // チェックイン日が1週間以内かチェック
+    var checkinDate = parseDate(checkInStr);
+    if (!checkinDate) return;
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var oneWeekLater = new Date(today);
+    oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+    var checkinDay = new Date(checkinDate.getFullYear(), checkinDate.getMonth(), checkinDate.getDate());
+    if (checkinDay < today || checkinDay > oneWeekLater) return;
+
+    // オーナーメール取得
+    var ownerSheet = ss.getSheetByName(SHEET_OWNER);
+    if (!ownerSheet || ownerSheet.getLastRow() < 2) return;
+    var ownerEmail = String(ownerSheet.getRange(2, 1).getValue() || '').trim();
+    if (!ownerEmail) return;
+
+    var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
+    var subject = '【民泊】直前予約 - 清掃スタッフ手配が必要です: ' + checkInStr;
+    var body = '1週間以内にチェックインの予約が新たに追加されました。\n\n'
+      + 'チェックイン: ' + checkInStr + '\n'
+      + 'チェックアウト: ' + checkOutStr + '\n'
+      + 'プラットフォーム: ' + (platformName || '不明') + '\n'
+      + '残り日数: ' + daysLeft + '日\n\n'
+      + '早急に清掃スタッフの手配をお願いします。';
+    GmailApp.sendEmail(ownerEmail, subject, body);
+    addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
+  } catch (e) {
+    Logger.log('sendImmediateReminderIfNeeded_: ' + e.toString());
   }
 }
 

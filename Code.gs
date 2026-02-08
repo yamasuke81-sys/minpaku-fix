@@ -3217,11 +3217,20 @@ function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
 
   var lines = ['清掃募集', '', '作業日: ' + fmtDate, ''];
   lines.push('次回予約（変更の可能性あり）');
-  lines.push('・日付：　　　　' + checkinDisp);
-  lines.push('・人数:　　　　 ' + guestDisp);
-  lines.push('・ベッド数:　　 ' + bedDisp);
-  lines.push('・BBQ:　　　　  ' + bbqDisp);
-  lines.push('・国籍:　　　　 ' + natDisp);
+  lines.push('日付:\u3000\u3000' + checkinDisp);
+  lines.push('人数:\u3000\u3000 ' + guestDisp);
+  // ベッド数: 複数種類を改行で表示
+  var bedParts = String(bedDisp).split(/[,、\n]/).map(function(s) { return s.trim(); }).filter(Boolean);
+  if (bedParts.length <= 1) {
+    lines.push('ベッド数:\u3000' + bedDisp);
+  } else {
+    lines.push('ベッド数:\u3000' + bedParts[0]);
+    for (var bi = 1; bi < bedParts.length; bi++) {
+      lines.push('\u3000\u3000\u3000\u3000  ' + bedParts[bi]);
+    }
+  }
+  lines.push('BBQ:\u3000\u3000' + bbqDisp);
+  lines.push('国籍:\u3000\u3000' + natDisp);
   lines.push('');
   lines.push('※予約状況次第では変更となる場合があります。');
   lines.push('');

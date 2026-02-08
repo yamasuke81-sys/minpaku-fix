@@ -1950,7 +1950,7 @@
             // 1. 募集状況
             html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted" style="background:#e9ecef;">読み込み中…</span>';
             // 2. 清掃担当
-            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '" style="display:flex; align-items:flex-start;"><span style="white-space:nowrap;"><i class="bi bi-person-badge"></i> 清掃担当:&nbsp;</span><span id="eventModalStaffDisplay">' + formatStaffDisplayHtml(staffVal, null) + '</span></div>';
+            html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '" style="display:flex; align-items:center;"><span style="white-space:nowrap;"><i class="bi bi-person-badge"></i> 清掃担当:&nbsp;</span><span id="eventModalStaffDisplay">' + formatStaffDisplayHtml(staffVal, null) + '</span></div>';
             // 3. ボタン/アクションエリア（メール送信・清掃担当を編集・対応可ボタンなど、JSで動的に追加）
             html += '<div id="eventModalVolunteerBodyArea" class="mt-2"></div>';
             // 4. 回答状況（ラベルなし）

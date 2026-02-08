@@ -2103,11 +2103,7 @@
         function updateNextResHeader(text) {
           var hdr = document.getElementById('nextResHeaderStatus');
           if (!hdr) return;
-          if (text) {
-            hdr.innerHTML = '<span class="ms-1">(' + escapeHtml(text) + ')</span>';
-          } else {
-            hdr.innerHTML = '';
-          }
+          hdr.innerHTML = '';
         }
 
         // キャッシュから次回予約情報を即時表示（サーバー応答を待たずに表示）

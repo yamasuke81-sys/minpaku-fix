@@ -3210,7 +3210,7 @@ function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
   var natDisp = nr.nationality || 'ー';
 
   var lines = ['清掃募集', '', '作業日: ' + fmtDate, ''];
-  lines.push('次回予約（変更の可能性あり）:');
+  lines.push('次回予約（変更の可能性あり）');
   lines.push('・日付：　　　　' + checkinDisp);
   lines.push('・人数:　　　　 ' + guestDisp);
   lines.push('・ベッド数:　　 ' + bedDisp);

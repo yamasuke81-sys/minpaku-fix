@@ -402,6 +402,9 @@
       .modal-next-res-card .card-title-sm {
         color: #e0e0e0 !important;
       }
+      .modal-next-res-card #nextResHeaderStatus {
+        color: #adb5bd !important;
+      }
       .modal-next-res-grid .nres-label {
         color: #adb5bd !important;
       }
@@ -1929,7 +1932,7 @@
 
             // 次回予約の情報カード（折りたたみ式、デフォルト閉じ）
             html += '<div id="eventModalStaffNextResArea" class="modal-next-res-card">';
-            html += '<div class="card-title-sm next-res-toggle" onclick="toggleNextRes()" style="cursor:pointer;user-select:none;"><i class="bi bi-info-circle"></i>次回予約<span id="nextResHeaderStatus" class="text-muted small ms-2"><span class="spinner-border spinner-border-sm text-secondary me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</span><i class="bi bi-chevron-right ms-auto next-res-chevron" style="transition:transform 0.2s;font-size:0.7rem;"></i></div>';
+            html += '<div class="card-title-sm next-res-toggle" onclick="toggleNextRes()" style="cursor:pointer;user-select:none;"><i class="bi bi-info-circle"></i>次回予約<span id="nextResHeaderStatus" class="ms-2" style="font-weight:normal;font-size:0.75rem;color:#6c757d;"><span class="spinner-border spinner-border-sm me-1" style="width:0.75rem;height:0.75rem;border-width:0.13em;vertical-align:middle;" role="status"></span>読み込み中…</span><i class="bi bi-chevron-right ms-auto next-res-chevron" style="transition:transform 0.2s;font-size:0.7rem;"></i></div>';
             html += '<div id="eventModalStaffNextResWrapper" style="display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.3s ease-out;"><div class="modal-next-res-grid" id="eventModalStaffNextResContent" style="overflow:hidden;"><div class="nres-item" style="grid-column:1/-1; text-align:center; padding:0.5rem 0;"><span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span><span class="text-muted">読み込み中…</span></div></div></div>';
             html += '</div>';
 
@@ -2100,10 +2103,16 @@
         modal.show();
 
         // ヘッダーの「読み込み中…」を更新するヘルパー
-        function updateNextResHeader(text) {
+        function updateNextResHeader(text, loading) {
           var hdr = document.getElementById('nextResHeaderStatus');
           if (!hdr) return;
-          hdr.innerHTML = '';
+          if (loading) {
+            hdr.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:0.75rem;height:0.75rem;border-width:0.13em;vertical-align:middle;" role="status"></span>読み込み中…';
+          } else if (text) {
+            hdr.innerHTML = '(' + escapeHtml(text) + ')';
+          } else {
+            hdr.innerHTML = '';
+          }
         }
 
         // キャッシュから次回予約情報を即時表示（サーバー応答を待たずに表示）
@@ -2134,6 +2143,13 @@
                 volList.innerHTML = renderStaffResponses(cachedRec.volunteers);
               }
             }
+          }
+          // キャッシュに次回予約データがない場合、セクションを展開して読み込み中を見せる
+          if (!cachedNextRes) {
+            var wrapper = document.getElementById('eventModalStaffNextResWrapper');
+            var chevron = document.querySelector('.next-res-chevron');
+            if (wrapper) wrapper.style.gridTemplateRows = '1fr';
+            if (chevron) chevron.style.transform = 'rotate(90deg)';
           }
         }
 

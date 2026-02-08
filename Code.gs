@@ -2643,9 +2643,11 @@ function announceRecruitment(recruitRowIndex) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_RECRUIT);
     if (!sheet || sheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません。' });
-    var row = sheet.getRange(recruitRowIndex, 1, recruitRowIndex, 9).getValues()[0];
-    var checkoutDateStr = row[0] ? (row[0] instanceof Date ? Utilities.formatDate(row[0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(row[0])) : '';
+    var row = sheet.getRange(recruitRowIndex, 1, 1, 9).getValues()[0];
+    var recruitDateStr = row[0] ? (row[0] instanceof Date ? Utilities.formatDate(row[0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(row[0])) : '';
     var bookingRowNumber = row[1] ? Number(row[1]) : 0;
+    // フォームシートのチェックアウト日を正とする（募集シートの値はソート後に古くなりうる）
+    var checkoutDateStr = getCheckoutDateFromFormSheet_(bookingRowNumber, ss) || recruitDateStr;
     var notifyMethod = String(row[8] || '').trim() || 'メール';
     var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     sheet.getRange(recruitRowIndex, 3).setValue(now);
@@ -3092,6 +3094,9 @@ function deleteRecruitment(recruitRowIndex) {
  */
 function getRecruitmentCopyText(checkoutDateStr, bookingRowNumber, detail) {
   try {
+    // フォームシートのチェックアウト日を正とする（募集シートの値はソート後に古くなりうる）
+    var formDate = getCheckoutDateFromFormSheet_(bookingRowNumber);
+    if (formDate) checkoutDateStr = formDate;
     // detail に有効な情報があるか（nationality デフォルト値のみは除外）
     var hasDetail = detail && (detail.date || detail.guestCount || detail.bbq);
     var nextRes = hasDetail ? detail : null;
@@ -3191,6 +3196,24 @@ function addRecruitmentManually(bookingRowNumber, checkoutDateStr) {
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/**
+ * フォームシートから予約行のチェックアウト日を取得（募集シートの値はソート後に古くなりうるため）
+ */
+function getCheckoutDateFromFormSheet_(bookingRowNumber, ss) {
+  if (!bookingRowNumber) return '';
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var formSheet = ss.getSheetByName(SHEET_NAME);
+  if (!formSheet || formSheet.getLastRow() < bookingRowNumber) return '';
+  var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+  var colMap = buildColumnMap(headers);
+  if (colMap.checkOut < 0) colMap = buildColumnMapFromSource_(headers);
+  if (colMap.checkOut < 0) return '';
+  var val = formSheet.getRange(bookingRowNumber, colMap.checkOut + 1).getValue();
+  if (!val) return '';
+  if (val instanceof Date) return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM-dd');
+  return toDateKeySafe_(val) || String(val).trim();
 }
 
 function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
@@ -4774,8 +4797,10 @@ function getConfirmationCopyText(recruitRowIndex) {
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     if (!recruitSheet || recruitSheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません' });
     var row = recruitSheet.getRange(recruitRowIndex, 1, 1, 5).getValues()[0];
-    var checkoutDateStr = row[0] ? (row[0] instanceof Date ? Utilities.formatDate(row[0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(row[0])) : '';
+    var recruitDateStr = row[0] ? (row[0] instanceof Date ? Utilities.formatDate(row[0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(row[0])) : '';
     var bookingRowNumber = row[1] ? Number(row[1]) : 0;
+    // フォームシートのチェックアウト日を正とする
+    var checkoutDateStr = getCheckoutDateFromFormSheet_(bookingRowNumber, ss) || recruitDateStr;
     var selectedStaff = String(row[4] || '').trim();
 
     // 回答データ（備考取得用）
@@ -4816,8 +4841,10 @@ function notifyStaffConfirmation(recruitRowIndex) {
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     if (!recruitSheet || recruitSheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません' });
     var row = recruitSheet.getRange(recruitRowIndex, 1, 1, 5).getValues()[0];
-    var checkoutDateStr = row[0] ? (row[0] instanceof Date ? Utilities.formatDate(row[0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(row[0])) : '';
+    var recruitDateStr = row[0] ? (row[0] instanceof Date ? Utilities.formatDate(row[0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(row[0])) : '';
     var bookingRowNumber = row[1] ? Number(row[1]) : 0;
+    // フォームシートのチェックアウト日を正とする
+    var checkoutDateStr = getCheckoutDateFromFormSheet_(bookingRowNumber, ss) || recruitDateStr;
     var selectedStaff = String(row[4] || '').trim();
 
     // スタッフ全員のメールアドレスを取得

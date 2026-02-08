@@ -2108,8 +2108,6 @@
           if (!hdr) return;
           if (loading) {
             hdr.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:0.75rem;height:0.75rem;border-width:0.13em;vertical-align:middle;" role="status"></span>読み込み中…';
-          } else if (text) {
-            hdr.innerHTML = '(' + escapeHtml(text) + ')';
           } else {
             hdr.innerHTML = '';
           }

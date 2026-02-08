@@ -3687,6 +3687,76 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         cancelPending: cancelPending
       });
     }
+    // 募集_立候補シートから◎/△の回答も取得（確定前の予定）
+    var confirmedCheckouts = {};
+    list.forEach(function(item) { confirmedCheckouts[item.checkoutDate] = true; });
+    var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
+    if (volSheet && volSheet.getLastRow() >= 2 && recruitSheet && recruitSheet.getLastRow() >= 2) {
+      var volLastCol = Math.max(volSheet.getLastColumn(), 7);
+      var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
+      var rLastCol = Math.max(recruitSheet.getLastColumn(), 5);
+      var rAllData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, rLastCol).getValues();
+      // 募集ID → {checkoutDate, status, bookingRowNumber} マップ
+      var recruitInfoMap = {};
+      for (var ri2 = 0; ri2 < rAllData.length; ri2++) {
+        var rid = 'r' + (ri2 + 2);
+        var rCoDate = parseDate(rAllData[ri2][0]);
+        var rStatus = String(rAllData[ri2][3] || '').trim();
+        var rBookingRow = rAllData[ri2][1] ? Number(rAllData[ri2][1]) : 0;
+        if (rCoDate) {
+          recruitInfoMap[rid] = {
+            checkoutDate: toDateKeySafe_(rCoDate),
+            checkoutDisplay: Utilities.formatDate(rCoDate, 'Asia/Tokyo', 'M/d'),
+            status: rStatus,
+            bookingRowNumber: rBookingRow,
+            recruitRowIndex: ri2 + 2
+          };
+        }
+      }
+      for (var vi = 0; vi < volData.length; vi++) {
+        var vRid = String(volData[vi][0] || '').trim();
+        var vName = String(volData[vi][1] || '').trim();
+        var vEmail = String(volData[vi][2] || '').trim().toLowerCase();
+        var vStatus = String(volData[vi][5] || '').trim();
+        // ◎ or △ のみ
+        if (vStatus !== '◎' && vStatus !== '△') continue;
+        // 自分の回答かチェック
+        var isMyVol = (vName && vName.toLowerCase() === staff) || (vEmail && vEmail === staff);
+        if (!isMyVol) continue;
+        var rInfo = recruitInfoMap[vRid];
+        if (!rInfo) continue;
+        // キャンセルされた募集は除外
+        if (rInfo.status === 'キャンセル') continue;
+        // 対象月チェック
+        var coDate = parseDate(rInfo.checkoutDate);
+        if (!coDate) continue;
+        var cd = new Date(coDate);
+        if (cd.getFullYear() !== targetYear || (cd.getMonth() + 1) !== targetMonth) continue;
+        // 既に確定済みリストにあるものは重複しない
+        if (confirmedCheckouts[rInfo.checkoutDate]) continue;
+        // フォームシートから行番号を検索（checkoutDateで照合）
+        var formRowNum = rInfo.bookingRowNumber;
+        if (!formRowNum) {
+          for (var fi = 0; fi < data.length; fi++) {
+            var fCo = toDateKeySafe_(data[fi][colMap.checkOut]);
+            if (fCo === rInfo.checkoutDate) { formRowNum = fi + 2; break; }
+          }
+        }
+        list.push({
+          rowNumber: formRowNum || 0,
+          checkoutDate: rInfo.checkoutDate,
+          checkoutDisplay: rInfo.checkoutDisplay,
+          partners: [],
+          recruitRowIndex: rInfo.recruitRowIndex,
+          cancelPending: false,
+          volunteerStatus: vStatus,
+          confirmed: false
+        });
+        confirmedCheckouts[rInfo.checkoutDate] = true; // 重複防止
+      }
+    }
+    // 確定済みには confirmed: true をセット
+    list.forEach(function(item) { if (item.confirmed === undefined) item.confirmed = true; });
     list.sort(function(a, b) { return (a.checkoutDate || '').localeCompare(b.checkoutDate || ''); });
     return JSON.stringify({ success: true, list: list });
   } catch (e) {

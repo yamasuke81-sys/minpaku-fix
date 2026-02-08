@@ -1952,9 +1952,9 @@
             // 2. 清掃担当
             html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '" style="display:flex; align-items:center;"><span style="white-space:nowrap;"><i class="bi bi-person-badge"></i> 清掃担当:&nbsp;</span><span id="eventModalStaffDisplay">' + formatStaffDisplayHtml(staffVal, null) + '</span></div>';
             // 3. ボタン/アクションエリア（メール送信・清掃担当を編集・対応可ボタンなど、JSで動的に追加）
-            html += '<div id="eventModalVolunteerBodyArea" class="mt-2"></div>';
+            html += '<div id="eventModalVolunteerBodyArea" class="mt-2"><div class="text-muted small" id="volBodyLoading"><span class="spinner-border spinner-border-sm text-secondary me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div>';
             // 4. 回答状況（ラベルなし）
-            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1" style="display:none;"><div id="eventModalVolunteersList" class="mt-1"></div></div>';
+            html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1"><div id="eventModalVolunteersList" class="mt-1"><div class="text-muted small"><span class="spinner-border spinner-border-sm text-secondary me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div></div>';
             html += '</div>';
 
             // LINE用テキスト（オーナーのみ）
@@ -2161,6 +2161,7 @@
                 updateNextResHeader(null);
               }
               var volBodyArea = document.getElementById('eventModalVolunteerBodyArea');
+              if (volBodyArea) { var _bl = document.getElementById('volBodyLoading'); if (_bl) _bl.remove(); }
               var staffDisplayEl = document.getElementById('eventModalStaffDisplay');
               var staffAssigned = (d.cleaningStaff || '').trim();
               // 募集データの選定スタッフ or カレンダーデータの清掃担当を使用
@@ -2181,13 +2182,19 @@
                 statusEl.className = 'recruit-status-badge ' + (isEffConfirmed ? 'status-decided' : 'status-recruiting');
                 statusEl.removeAttribute('style');
               }
-              if (volArea && volList && r.success) {
-                if (effectiveStatus === '募集中') {
-                  volArea.style.display = 'block';
-                  volList.innerHTML = renderStaffResponses(r.volunteers);
+              if (volArea && volList) {
+                if (r.success) {
+                  if (effectiveStatus === '募集中') {
+                    volArea.style.display = 'block';
+                    volList.innerHTML = renderStaffResponses(r.volunteers);
+                  } else {
+                    volArea.style.display = r.volunteers && r.volunteers.some(function(v) { return v.response && v.response !== '未回答'; }) ? 'block' : 'none';
+                    if (volArea.style.display === 'block') volList.innerHTML = renderStaffResponses(r.volunteers);
+                    else volList.innerHTML = '';
+                  }
                 } else {
-                  volArea.style.display = r.volunteers && r.volunteers.some(function(v) { return v.response && v.response !== '未回答'; }) ? 'block' : 'none';
-                  if (volArea.style.display === 'block') volList.innerHTML = renderStaffResponses(r.volunteers);
+                  volArea.style.display = 'none';
+                  volList.innerHTML = '';
                 }
               }
               // 取り消し申請: cleaningStaffが設定済みかつ自分が担当の場合に表示
@@ -2403,6 +2410,9 @@
             updateNextResHeader(null);
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
             if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge status-undecided'; sEl.removeAttribute('style'); }
+            var _bl2 = document.getElementById('volBodyLoading'); if (_bl2) _bl2.remove();
+            var vA = document.getElementById('eventModalVolunteersArea'); if (vA) vA.style.display = 'none';
+            var vL = document.getElementById('eventModalVolunteersList'); if (vL) vL.innerHTML = '';
           }).getRecruitmentForBooking(props.rowNumber);
         }
 
@@ -2449,10 +2459,16 @@
                 statusEl.className = 'recruit-status-badge ' + (isOwnerConfirmed ? 'status-decided' : 'status-recruiting');
                 statusEl.removeAttribute('style');
               }
-              if (volArea && volList && r.success) {
-                volArea.style.display = 'block';
-                volList.innerHTML = renderStaffResponses(r.volunteers);
+              if (volArea && volList) {
+                if (r.success) {
+                  volArea.style.display = 'block';
+                  volList.innerHTML = renderStaffResponses(r.volunteers);
+                } else {
+                  volArea.style.display = 'none';
+                  volList.innerHTML = '';
+                }
               }
+              if (ownerCenterArea) { var _bl3 = document.getElementById('volBodyLoading'); if (_bl3) _bl3.remove(); }
               if (!ownerStaffAssigned && ownerCenterArea && r.success) {
                 var rowNum = props.rowNumber;
                 var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
@@ -2736,6 +2752,9 @@
             updateNextResHeader(null);
             var sEl = document.getElementById('eventModalStaffRecruitStatus');
             if (sEl) { sEl.textContent = '－'; sEl.className = 'recruit-status-badge status-undecided'; sEl.removeAttribute('style'); }
+            var _bl2 = document.getElementById('volBodyLoading'); if (_bl2) _bl2.remove();
+            var vA = document.getElementById('eventModalVolunteersArea'); if (vA) vA.style.display = 'none';
+            var vL = document.getElementById('eventModalVolunteersList'); if (vL) vL.innerHTML = '';
           }).getRecruitmentForBooking(props.rowNumber);
           setTimeout(function() {
             var addBtn = document.getElementById('eventModalAddStaff');

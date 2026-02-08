@@ -1116,6 +1116,27 @@
             </div>
           </div>
         </div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">メール文面テンプレート（定期リマインド）</label>
+        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックイン}</code> <code>{チェックアウト}</code> <code>{残り日数}</code> <code>{清掃詳細リンク}</code></p>
+        <div class="mb-2">
+          <label class="form-label small">件名</label>
+          <input type="text" class="form-control form-control-sm" id="reminderSubject" placeholder="例: 【民泊】清掃スタッフ未確定のリマインド: {チェックイン}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">本文</label>
+          <textarea class="form-control form-control-sm" id="reminderBody" rows="5" placeholder="例: 清掃スタッフがまだ確定していません。&#10;チェックイン: {チェックイン}&#10;残り日数: {残り日数}日&#10;詳細: {清掃詳細リンク}"></textarea>
+        </div>
+        <label class="form-label small fw-bold">メール文面テンプレート（即時リマインド）</label>
+        <p class="small text-muted mb-1">iCal取り込み時の直前予約通知用。プレースホルダー: <code>{チェックイン}</code> <code>{チェックアウト}</code> <code>{プラットフォーム}</code> <code>{残り日数}</code> <code>{清掃詳細リンク}</code></p>
+        <div class="mb-2">
+          <label class="form-label small">件名</label>
+          <input type="text" class="form-control form-control-sm" id="immediateSubject" placeholder="例: 【民泊】直前予約 - 清掃スタッフ手配が必要: {チェックイン}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">本文</label>
+          <textarea class="form-control form-control-sm" id="immediateBody" rows="5" placeholder="例: 直前予約が追加されました。&#10;チェックイン: {チェックイン}&#10;プラットフォーム: {プラットフォーム}&#10;詳細: {清掃詳細リンク}"></textarea>
+        </div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveReminderEmail">リマインド設定を保存</button>
         <p class="small text-muted mt-2">※ 送信には時間ベースのトリガー（1時間ごと）の設定が必要です。GASエディタで <code>checkAndSendReminderEmails</code> のトリガーを追加してください。</p>
       </div>
@@ -5343,6 +5364,11 @@
                 entry.querySelector('.reminder-days').value = rem.daysBefore || '';
                 entry.querySelector('.reminder-time').value = rem.time || '09:00';
               });
+              // テンプレートフィールド
+              document.getElementById('reminderSubject').value = r.reminderSubject || '';
+              document.getElementById('reminderBody').value = r.reminderBody || '';
+              document.getElementById('immediateSubject').value = r.immediateSubject || '';
+              document.getElementById('immediateBody').value = r.immediateBody || '';
             }
           } catch (e) {}
         }).getReminderEmailSettings();
@@ -5360,6 +5386,12 @@
           });
         });
         var immediateNotify = document.getElementById('reminderImmediate').checked ? 'yes' : 'no';
+        var templates = {
+          reminderSubject: document.getElementById('reminderSubject').value,
+          reminderBody: document.getElementById('reminderBody').value,
+          immediateSubject: document.getElementById('immediateSubject').value,
+          immediateBody: document.getElementById('immediateBody').value
+        };
         btn.disabled = true;
         var origText = btn.textContent;
         btn.textContent = '保存中...';
@@ -5372,7 +5404,7 @@
           btn.disabled = false;
           btn.textContent = origText;
           alert('保存に失敗しました。');
-        }).setReminderEmailSettings(reminders, immediateNotify);
+        }).setReminderEmailSettings(reminders, immediateNotify, templates);
       });
 
       document.getElementById('btnAddSync').addEventListener('click', function() {

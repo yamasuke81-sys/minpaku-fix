@@ -5038,7 +5038,15 @@ function getReminderEmailSettings() {
       reminders.push({ daysBefore: reminders.length === 0 ? 7 : 0, time: '09:00', enabled: false });
     }
     var immediateNotify = String(settings['即時通知有効'] || 'yes');
-    return JSON.stringify({ success: true, reminders: reminders, immediateNotify: immediateNotify });
+    var reminderSubject = String(settings['リマインド件名'] || '');
+    var reminderBody = String(settings['リマインド本文'] || '');
+    var immediateSubject = String(settings['即時リマインド件名'] || '');
+    var immediateBody = String(settings['即時リマインド本文'] || '');
+    return JSON.stringify({
+      success: true, reminders: reminders, immediateNotify: immediateNotify,
+      reminderSubject: reminderSubject, reminderBody: reminderBody,
+      immediateSubject: immediateSubject, immediateBody: immediateBody
+    });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -5047,7 +5055,7 @@ function getReminderEmailSettings() {
 /**
  * リマインドメール設定を保存
  */
-function setReminderEmailSettings(reminders, immediateNotify) {
+function setReminderEmailSettings(reminders, immediateNotify, templates) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
     ensureSheetsExist();
@@ -5055,33 +5063,62 @@ function setReminderEmailSettings(reminders, immediateNotify) {
     var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
     var lastRow = Math.max(sheet.getLastRow(), 1);
     var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, 2).getValues() : [];
-    // 既存の行でリマインドメール設定と即時通知有効の行を探す
-    var reminderRow = -1, immediateRow = -1;
+    // 既存の行を探す
+    var rowMap = {};
     for (var i = 0; i < rows.length; i++) {
       var key = String(rows[i][0] || '').trim();
-      if (key === 'リマインドメール設定') reminderRow = i + 2;
-      if (key === '即時通知有効') immediateRow = i + 2;
+      if (key) rowMap[key] = i + 2;
     }
-    var jsonStr = JSON.stringify(reminders || []);
-    if (reminderRow > 0) {
-      sheet.getRange(reminderRow, 2).setValue(jsonStr);
-    } else {
-      var nr = sheet.getLastRow() + 1;
-      sheet.getRange(nr, 1).setValue('リマインドメール設定');
-      sheet.getRange(nr, 2).setValue(jsonStr);
+    // 設定キーと値のペアを一括処理
+    var entries = [
+      ['リマインドメール設定', JSON.stringify(reminders || [])],
+      ['即時通知有効', String(immediateNotify || 'yes')]
+    ];
+    if (templates) {
+      entries.push(['リマインド件名', String(templates.reminderSubject || '')]);
+      entries.push(['リマインド本文', String(templates.reminderBody || '')]);
+      entries.push(['即時リマインド件名', String(templates.immediateSubject || '')]);
+      entries.push(['即時リマインド本文', String(templates.immediateBody || '')]);
     }
-    var imVal = String(immediateNotify || 'yes');
-    if (immediateRow > 0) {
-      sheet.getRange(immediateRow, 2).setValue(imVal);
-    } else {
-      var nr2 = sheet.getLastRow() + 1;
-      sheet.getRange(nr2, 1).setValue('即時通知有効');
-      sheet.getRange(nr2, 2).setValue(imVal);
+    for (var ei = 0; ei < entries.length; ei++) {
+      var eKey = entries[ei][0], eVal = entries[ei][1];
+      if (rowMap[eKey]) {
+        sheet.getRange(rowMap[eKey], 2).setValue(eVal);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(eKey);
+        sheet.getRange(nr, 2).setValue(eVal);
+        rowMap[eKey] = nr;
+      }
     }
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/**
+ * リマインドメールのテンプレート置換
+ * プレースホルダー: {チェックイン}, {チェックアウト}, {残り日数}, {プラットフォーム}, {清掃詳細リンク}
+ */
+function applyReminderTemplate_(template, vars) {
+  var result = template;
+  var keys = Object.keys(vars);
+  for (var i = 0; i < keys.length; i++) {
+    var val = vars[keys[i]];
+    result = result.split('{' + keys[i] + '}').join(val != null ? String(val) : '');
+  }
+  return result;
+}
+
+/**
+ * 清掃詳細のディープリンクURLを生成
+ */
+function buildCleaningDetailUrl_(checkoutDateStr) {
+  var base = '';
+  try { base = ScriptApp.getService().getUrl(); } catch (e) {}
+  if (!base) return '';
+  return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(checkoutDateStr);
 }
 
 /**
@@ -5112,6 +5149,10 @@ function checkAndSendReminderEmails() {
     try { reminders = JSON.parse(settingsMap['リマインドメール設定'] || '[]'); } catch (e) { return; }
     var enabledReminders = reminders.filter(function(r, idx) { return r && r.enabled && r.daysBefore > 0; });
     if (enabledReminders.length === 0) return;
+
+    // メールテンプレート
+    var tmplSubject = String(settingsMap['リマインド件名'] || '').trim();
+    var tmplBody = String(settingsMap['リマインド本文'] || '').trim();
 
     // 募集シート
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
@@ -5180,13 +5221,20 @@ function checkAndSendReminderEmails() {
           // 未来のチェックインのみ（過去は送らない）
           if (checkinDay >= today) {
             var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
+            var detailLink = buildCleaningDetailUrl_(checkoutDateStr);
+            var tmplVars = { 'チェックイン': checkinDateStr, 'チェックアウト': checkoutDateStr, '残り日数': daysLeft, '清掃詳細リンク': detailLink };
             try {
-              var subject = '【民泊】清掃スタッフ未確定のリマインド: ' + checkinDateStr;
-              var body = '以下の予約について、清掃スタッフがまだ確定していません。\n\n'
-                + 'チェックイン: ' + checkinDateStr + '\n'
-                + 'チェックアウト: ' + checkoutDateStr + '\n'
-                + '残り日数: ' + daysLeft + '日\n\n'
-                + '早めに清掃スタッフの手配をお願いします。';
+              var subject = tmplSubject
+                ? applyReminderTemplate_(tmplSubject, tmplVars)
+                : '【民泊】清掃スタッフ未確定のリマインド: ' + checkinDateStr;
+              var body = tmplBody
+                ? applyReminderTemplate_(tmplBody, tmplVars)
+                : '以下の予約について、清掃スタッフがまだ確定していません。\n\n'
+                  + 'チェックイン: ' + checkinDateStr + '\n'
+                  + 'チェックアウト: ' + checkoutDateStr + '\n'
+                  + '残り日数: ' + daysLeft + '日\n\n'
+                  + '清掃詳細: ' + detailLink + '\n\n'
+                  + '早めに清掃スタッフの手配をお願いします。';
               GmailApp.sendEmail(ownerEmail, subject, body);
               newSent.push(remIdx);
             } catch (mailErr) {
@@ -5239,13 +5287,27 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
     if (!ownerEmail) return;
 
     var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
-    var subject = '【民泊】直前予約 - 清掃スタッフ手配が必要です: ' + checkInStr;
-    var body = '1週間以内にチェックインの予約が新たに追加されました。\n\n'
-      + 'チェックイン: ' + checkInStr + '\n'
-      + 'チェックアウト: ' + checkOutStr + '\n'
-      + 'プラットフォーム: ' + (platformName || '不明') + '\n'
-      + '残り日数: ' + daysLeft + '日\n\n'
-      + '早急に清掃スタッフの手配をお願いします。';
+    var detailLink = buildCleaningDetailUrl_(checkOutStr);
+    var tmplVars = { 'チェックイン': checkInStr, 'チェックアウト': checkOutStr, 'プラットフォーム': platformName || '不明', '残り日数': daysLeft, '清掃詳細リンク': detailLink };
+    // テンプレート設定を取得
+    var imSubjectTmpl = '', imBodyTmpl = '';
+    sRows.forEach(function(row) {
+      var k = String(row[0] || '').trim();
+      if (k === '即時リマインド件名') imSubjectTmpl = String(row[1] || '').trim();
+      if (k === '即時リマインド本文') imBodyTmpl = String(row[1] || '').trim();
+    });
+    var subject = imSubjectTmpl
+      ? applyReminderTemplate_(imSubjectTmpl, tmplVars)
+      : '【民泊】直前予約 - 清掃スタッフ手配が必要です: ' + checkInStr;
+    var body = imBodyTmpl
+      ? applyReminderTemplate_(imBodyTmpl, tmplVars)
+      : '1週間以内にチェックインの予約が新たに追加されました。\n\n'
+        + 'チェックイン: ' + checkInStr + '\n'
+        + 'チェックアウト: ' + checkOutStr + '\n'
+        + 'プラットフォーム: ' + (platformName || '不明') + '\n'
+        + '残り日数: ' + daysLeft + '日\n\n'
+        + '清掃詳細: ' + detailLink + '\n\n'
+        + '早急に清掃スタッフの手配をお願いします。';
     GmailApp.sendEmail(ownerEmail, subject, body);
     addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
   } catch (e) {

@@ -1600,6 +1600,17 @@
         var min = d.getMinutes();
         return y + '年' + m + '月' + day + '日 ' + (h < 10 ? '0' : '') + h + ':' + (min < 10 ? '0' : '') + min;
       }
+      function formatDateDisplay(val) {
+        if (val == null || val === '') return '-';
+        var d;
+        if (val instanceof Date) {
+          d = val;
+        } else {
+          d = new Date(val);
+          if (isNaN(d.getTime())) return escapeHtml(String(val));
+        }
+        return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+      }
 
       // 宿泊イベントタイトル
       function formatBookingTitle(b) {
@@ -1917,7 +1928,7 @@
           // === 清掃詳細 ===
           if (type === 'cleaning') {
             // チェックアウト日（目立つ表示）
-            html += '<div class="modal-prominent-date"><i class="bi bi-calendar-event"></i>' + formatDateTimeDisplay(d.checkOut) + '</div>';
+            html += '<div class="modal-prominent-date"><i class="bi bi-calendar-event"></i>' + formatDateDisplay(d.checkOut) + '</div>';
 
             // 人数
             var guestDisp = d.guestCountDisplay != null ? d.guestCountDisplay : formatGuestCount(d);

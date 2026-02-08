@@ -2700,7 +2700,10 @@
                         emBtnConfirm.textContent = '処理中...';
                         google.script.run.withSuccessHandler(function(j) {
                           var res = JSON.parse(j);
-                          if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
+                          if (res.success) {
+                            loadAndRender(); loadRecruitList();
+                            showConfirmationNotifyUI(ownerCenterArea, r.recruitRowIndex, 'eventModal');
+                          }
                           else { alert(res.error); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }
                         }).withFailureHandler(function(e) { alert(e.message); emBtnConfirm.disabled = false; emBtnConfirm.textContent = '確定（募集締切）'; }).confirmRecruitment(r.recruitRowIndex);
                       });
@@ -3201,6 +3204,106 @@
             }
           }
         });
+      }
+
+      /**
+       * スタッフ確定後の通知UI（メール送信 / テキストコピー）
+       */
+      function showConfirmationNotifyUI(parentEl, recruitRowIndex, modalId) {
+        if (!parentEl) return;
+        parentEl.innerHTML = '<div class="alert alert-success py-2 mb-2"><i class="bi bi-check-circle-fill"></i> スタッフを確定しました</div>';
+        var btnRow = document.createElement('div');
+        btnRow.className = 'd-flex flex-wrap justify-content-center gap-1 mb-2';
+
+        var mailBtn = document.createElement('button');
+        mailBtn.type = 'button';
+        mailBtn.className = 'btn btn-sm btn-primary';
+        mailBtn.textContent = '確定メール送信';
+        mailBtn.onclick = function() {
+          customConfirm('登録者全員にスタッフ確定メールを送信します。よろしいですか？').then(function(ok) {
+            if (!ok) return;
+            mailBtn.disabled = true;
+            mailBtn.textContent = '送信中...';
+            google.script.run.withSuccessHandler(function(j) {
+              var res = JSON.parse(j);
+              if (res.success) {
+                alert('スタッフ確定メールを送信しました。');
+                bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+              } else {
+                alert(res.error || '送信に失敗しました');
+                mailBtn.disabled = false;
+                mailBtn.textContent = '確定メール送信';
+              }
+            }).withFailureHandler(function(e) {
+              alert(e.message || 'エラー');
+              mailBtn.disabled = false;
+              mailBtn.textContent = '確定メール送信';
+            }).notifyStaffConfirmation(recruitRowIndex);
+          });
+        };
+
+        var copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'btn btn-sm btn-info text-white';
+        copyBtn.textContent = 'テキストコピー';
+        copyBtn.onclick = function() {
+          copyBtn.disabled = true;
+          copyBtn.textContent = '取得中...';
+          google.script.run.withSuccessHandler(function(j) {
+            var res = JSON.parse(j);
+            copyBtn.disabled = false;
+            copyBtn.textContent = 'テキストコピー';
+            if (res.success && res.copyText) {
+              // テキストエリアを表示
+              var ta = parentEl.querySelector('.confirm-copy-area');
+              if (!ta) {
+                var wrap = document.createElement('div');
+                wrap.className = 'confirm-copy-area mt-2 p-2 border rounded bg-light';
+                wrap.innerHTML = '<p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p>';
+                var textarea = document.createElement('textarea');
+                textarea.className = 'form-control font-monospace small mb-2';
+                textarea.rows = 10;
+                textarea.value = res.copyText;
+                wrap.appendChild(textarea);
+                var clipBtn = document.createElement('button');
+                clipBtn.type = 'button';
+                clipBtn.className = 'btn btn-sm btn-primary';
+                clipBtn.textContent = 'コピー';
+                clipBtn.onclick = function() {
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(res.copyText).then(function() {
+                      alert('コピーしました。LINEに貼り付けて投稿してください。');
+                      bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+                    }).catch(function() { textarea.select(); document.execCommand('copy'); alert('コピーしました。'); });
+                  } else {
+                    textarea.select(); document.execCommand('copy'); alert('コピーしました。');
+                  }
+                };
+                wrap.appendChild(clipBtn);
+                parentEl.appendChild(wrap);
+              }
+            } else {
+              alert(res.error || 'テキスト取得に失敗しました');
+            }
+          }).withFailureHandler(function(e) {
+            copyBtn.disabled = false;
+            copyBtn.textContent = 'テキストコピー';
+            alert(e.message || 'エラー');
+          }).getConfirmationCopyText(recruitRowIndex);
+        };
+
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn btn-sm btn-outline-secondary';
+        closeBtn.textContent = '閉じる';
+        closeBtn.onclick = function() {
+          bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+        };
+
+        btnRow.appendChild(mailBtn);
+        btnRow.appendChild(copyBtn);
+        btnRow.appendChild(closeBtn);
+        parentEl.appendChild(btnRow);
       }
 
       function openCleaningModalByDate(dateStr) {
@@ -3807,9 +3910,10 @@
             google.script.run.withSuccessHandler(function(j) {
               var res = JSON.parse(j);
               if (res.success) {
-                bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
                 loadRecruitList();
                 loadAndRender();
+                var parentArea = document.getElementById('recruitEditConfirmArea');
+                showConfirmationNotifyUI(parentArea, r.rowIndex, 'recruitEditModal');
               } else {
                 alert(res.error);
                 btn.disabled = false;
@@ -5509,10 +5613,15 @@
                 if (ok) {
                   google.script.run.withSuccessHandler(function(cj) {
                     var cr = JSON.parse(cj);
-                    bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
                     loadRecruitList();
                     loadAndRender();
-                    if (!cr.success) alert('確定に失敗しました: ' + (cr.error || ''));
+                    if (cr.success) {
+                      var modalBody = document.querySelector('#recruitSelectModal .modal-body');
+                      showConfirmationNotifyUI(modalBody, row, 'recruitSelectModal');
+                    } else {
+                      bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
+                      alert('確定に失敗しました: ' + (cr.error || ''));
+                    }
                   }).withFailureHandler(function(ce) {
                     bootstrap.Modal.getInstance(document.getElementById('recruitSelectModal')).hide();
                     loadRecruitList();

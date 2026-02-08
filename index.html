@@ -431,13 +431,27 @@
         color: #6ea8fe !important;
       }
       .modal-staff-label.staff-set #eventModalStaffDisplay {
-        background: #1a2d4a !important;
+        background: transparent !important;
       }
       .modal-staff-label.staff-unset {
         color: #ea868f !important;
       }
       .modal-staff-label.staff-unset #eventModalStaffDisplay {
+        background: transparent !important;
+      }
+      /* 清掃担当: 個人カード（ダークモード） */
+      .staff-card-item {
+        background: #1a2d4a !important;
+        border-color: #2c5282 !important;
+        color: #6ea8fe !important;
+      }
+      .staff-card-unset {
         background: #3d1a1e !important;
+        border-color: #6b2530 !important;
+        color: #ea868f !important;
+      }
+      .staff-card-memo {
+        color: #9ca3af !important;
       }
     }
     /* 清掃セクション: 募集状況バッジ */
@@ -683,9 +697,6 @@
       color: #0d6efd;
     }
     .modal-staff-label.staff-set #eventModalStaffDisplay {
-      background: #e7f1ff;
-      padding: 0.15rem 0.5rem;
-      border-radius: 0.25rem;
       font-size: 0.95rem;
       font-weight: 700;
     }
@@ -693,11 +704,48 @@
       color: #dc3545;
     }
     .modal-staff-label.staff-unset #eventModalStaffDisplay {
-      background: #fde8ea;
-      padding: 0.15rem 0.5rem;
-      border-radius: 0.25rem;
       font-size: 0.95rem;
       font-weight: 700;
+    }
+    /* 清掃担当: 個人カード風表示 */
+    .staff-cards-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .staff-card-item {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.2rem;
+      background: #e7f1ff;
+      border: 1px solid #b6d4fe;
+      border-radius: 0.4rem;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #0a58ca;
+    }
+    .staff-card-item .bi-person-fill {
+      font-size: 0.85rem;
+    }
+    .staff-card-memo {
+      width: 100%;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: #6c757d;
+      margin-top: -0.1rem;
+      padding-left: 1.1rem;
+    }
+    .staff-card-unset {
+      display: inline-block;
+      background: #fde8ea;
+      border: 1px solid #f1aeb5;
+      border-radius: 0.4rem;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #dc3545;
     }
     .modal-staff-name {
       font-size: 0.95rem;
@@ -1747,23 +1795,24 @@
         if (chevron) chevron.style.transform = isCollapsed ? 'rotate(90deg)' : '';
       };
 
-      // 清掃担当表示: 名前ごとに改行し、備考があれば付与
+      // 清掃担当表示: 名前ごとに個別カード風の枠で表示
       window.formatStaffDisplayHtml = function(staffStr, volunteers) {
-        if (!staffStr) return escapeHtml('(未設定)');
+        if (!staffStr) return '<span class="staff-card-unset">(未設定)</span>';
         var names = staffStr.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
-        if (!names.length) return escapeHtml('(未設定)');
+        if (!names.length) return '<span class="staff-card-unset">(未設定)</span>';
         var memoMap = {};
         if (volunteers && volunteers.length) {
           volunteers.forEach(function(v) {
             if (v.memo) memoMap[v.staffName] = v.memo;
           });
         }
-        return names.map(function(name) {
+        return '<div class="staff-cards-wrap">' + names.map(function(name) {
           var memo = memoMap[name] || '';
-          var line = escapeHtml(name);
-          if (memo) line += '<small class="text-muted">（' + escapeHtml(memo) + '）</small>';
-          return line;
-        }).join('<br>');
+          var html = '<div class="staff-card-item"><i class="bi bi-person-fill"></i> ' + escapeHtml(name);
+          if (memo) html += '<div class="staff-card-memo">' + escapeHtml(memo) + '</div>';
+          html += '</div>';
+          return html;
+        }).join('') + '</div>';
       };
 
       // イベント詳細モーダル表示
@@ -3379,7 +3428,7 @@
                 html += '<strong>' + escapeHtml(r.checkoutDate) + '</strong>';
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
-                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
+                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : '<span class="badge bg-warning">募集中</span>';
                 html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
@@ -3512,7 +3561,7 @@
                 html += '<strong>' + escapeHtml(r.checkoutDate) + '</strong>';
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
-                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + escapeHtml(r.selectedStaff) : '<span class="badge bg-warning">募集中</span>';
+                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : '<span class="badge bg-warning">募集中</span>';
                 html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
@@ -3572,7 +3621,7 @@
         document.getElementById('recruitEditReserveNationality').value = r.reserveNationality || '';
         document.getElementById('recruitEditReserveMemo').value = r.reserveMemo || '';
         window._recruitEditStaffNames = (r.selectedStaff || r.cleaningStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
-        document.getElementById('recruitEditStatus').innerHTML = ((r.status === '選定済' || r.status === 'スタッフ確定済み') ? 'スタッフ確定済み: ' + escapeHtml(r.selectedStaff || '') : '募集中');
+        document.getElementById('recruitEditStatus').innerHTML = ((r.status === '選定済' || r.status === 'スタッフ確定済み') ? 'スタッフ確定済み: ' + formatStaffDisplayHtml(r.selectedStaff || '', r.volunteers) : '募集中');
         document.getElementById('recruitEditVolunteers').innerHTML = '<strong>回答状況:</strong><div class="mt-1">' + renderStaffResponses(r.volunteers) + '</div>';
         document.getElementById('recruitEditError').style.display = 'none';
         var staffBar = document.getElementById('staffSelectorBar');

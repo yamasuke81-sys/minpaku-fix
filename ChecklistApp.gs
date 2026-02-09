@@ -11,10 +11,10 @@ const SHEET_CL_PHOTOS = 'チェックリスト写真';
 const SHEET_CL_MEMOS = 'チェックリストメモ';
 const SHEET_CL_SUPPLIES = '要補充記録';
 
-// 予約管理スプレッドシートのシート名
-const SHEET_NAME = 'フォーム回答 1';
-const SHEET_OWNER = 'オーナー';
-const SHEET_STAFF = 'スタッフ';
+// 予約管理スプレッドシートのシート名（チェックリストアプリ用）
+const CL_BOOKING_SHEET = 'フォーム回答 1';
+const CL_OWNER_SHEET = 'オーナー';
+const CL_STAFF_SHEET = 'スタッフ';
 
 /**
  * Webアプリのエントリーポイント
@@ -98,7 +98,7 @@ function clSheet_(name) {
 function getNextBookingDetails(checkoutDate) {
   try {
     var bookingSs = getBookingSpreadsheet_();
-    var formSheet = bookingSs.getSheetByName(SHEET_NAME);
+    var formSheet = bookingSs.getSheetByName(CL_BOOKING_SHEET);
     if (!formSheet || formSheet.getLastRow() < 2) {
       return JSON.stringify({ success: false, error: '予約データがありません' });
     }
@@ -423,7 +423,7 @@ function addChecklistMemo(checkoutDate, text, staffName) {
 function notifyCleaningComplete(checkoutDate, staffName) {
   try {
     var bookingSs = getBookingSpreadsheet_();
-    var ownerSheet = bookingSs.getSheetByName(SHEET_OWNER);
+    var ownerSheet = bookingSs.getSheetByName(CL_OWNER_SHEET);
     if (!ownerSheet || ownerSheet.getLastRow() < 2) {
       return JSON.stringify({ success: false, error: 'オーナー情報が見つかりません' });
     }

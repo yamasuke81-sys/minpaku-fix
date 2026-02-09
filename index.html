@@ -1493,6 +1493,9 @@
         document.getElementById('eventModalTitle').innerHTML = titleIcon + escapeHtml(title);
         headerEl.className = 'modal-header ' + (type === 'cleaning' ? 'modal-header-cleaning' : 'modal-header-booking');
 
+        // 現在のモーダルのデータをグローバル変数に保存（openChecklist関数で使用）
+        window._currentEventModalData = d;
+
         // 非同期コールバックの競合防止用世代ID
         var modalGen = (window._eventModalGen = (window._eventModalGen || 0) + 1);
 
@@ -2178,6 +2181,13 @@
 
       // 清掃チェックリストを開く
       function openChecklist(checkoutDate, staffName) {
+        // 引数が渡されない場合は、現在のモーダルのデータから取得
+        if (!checkoutDate && window._currentEventModalData) {
+          var d = window._currentEventModalData;
+          checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+          staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
+        }
+
         google.script.run.withSuccessHandler(function(resStr) {
           try {
             var res = JSON.parse(resStr);

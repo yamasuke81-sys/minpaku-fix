@@ -6054,6 +6054,314 @@
         } catch (e) {}
       }).isOwner();
 
+      // ==============================
+      // 清掃チェックリスト機能
+      // ==============================
+      var _clCurrentDate = '';
+      var _clPollingTimer = null;
+      var _clGen = 0;
+
+      function openChecklist(checkoutDate) {
+        if (!checkoutDate) return;
+        _clCurrentDate = checkoutDate;
+        _clGen++;
+        document.getElementById('checklistScreen').style.display = 'block';
+        document.getElementById('clTitle').textContent = '清掃チェックリスト (' + checkoutDate + ')';
+        document.getElementById('clItemsContainer').innerHTML = '<div class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
+        document.getElementById('clPhotosContainer').innerHTML = '';
+        document.getElementById('clMemoList').innerHTML = '';
+        document.getElementById('clCompleteBar').style.display = 'none';
+        try { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); } catch(e){}
+        loadChecklistData();
+        startClPolling();
+      }
+
+      function closeChecklist() {
+        stopClPolling();
+        document.getElementById('checklistScreen').style.display = 'none';
+        _clCurrentDate = '';
+      }
+
+      function startClPolling() { stopClPolling(); _clPollingTimer = setInterval(loadChecklistData, 8000); }
+      function stopClPolling() { if (_clPollingTimer) { clearInterval(_clPollingTimer); _clPollingTimer = null; } }
+
+      function loadChecklistData() {
+        if (!_clCurrentDate) return;
+        var gen = _clGen;
+        google.script.run.withSuccessHandler(function(j) {
+          if (gen !== _clGen) return;
+          try { renderChecklist(JSON.parse(j)); } catch(e) { console.error(e); }
+        }).withFailureHandler(function(e) {
+          if (gen !== _clGen) return;
+          document.getElementById('clItemsContainer').innerHTML = '<div class="text-danger small">読み込み失敗: ' + e.message + '</div>';
+        }).getChecklistForDate(_clCurrentDate);
+      }
+
+      function renderChecklist(data) {
+        if (!data.success) { document.getElementById('clItemsContainer').innerHTML = '<div class="text-danger">' + escapeHtml(data.error) + '</div>'; return; }
+        var items = (data.items || []).filter(function(i) { return i.active === 'Y'; });
+        var records = data.records || [];
+        var spots = (data.spots || []).filter(function(s) { return s.active === 'Y'; });
+        var photos = data.photos || [];
+        var memos = data.memos || [];
+
+        document.getElementById('clProgressBadge').textContent = data.checkedCount + '/' + data.totalItems;
+        var pct = data.totalItems > 0 ? Math.round(data.checkedCount / data.totalItems * 100) : 0;
+        document.getElementById('clProgressBar').style.width = pct + '%';
+
+        var categories = {};
+        items.forEach(function(item) {
+          var cat = item.category || '未分類';
+          if (!categories[cat]) categories[cat] = [];
+          var rec = records.find(function(r) { return r.itemId === item.id; });
+          categories[cat].push({ item: item, checked: rec ? rec.checked : false, checkedBy: rec ? rec.checkedBy : '', timestamp: rec ? rec.timestamp : '' });
+        });
+        var html = '';
+        Object.keys(categories).forEach(function(cat) {
+          html += '<div class="cl-category">' + escapeHtml(cat) + '</div>';
+          categories[cat].forEach(function(entry) {
+            var chk = entry.checked ? ' checked' : '';
+            var who = entry.checkedBy ? '<span class="cl-who">' + escapeHtml(entry.checkedBy) + '</span>' : '';
+            html += '<div class="cl-item"><input type="checkbox" data-id="' + escapeHtml(entry.item.id) + '"' + chk + ' onchange="onClCheck(this)"><label onclick="this.previousElementSibling.click()">' + escapeHtml(entry.item.name) + '</label>' + who + '</div>';
+          });
+        });
+        if (!items.length) html = '<div class="text-muted small py-2">チェックリスト項目がありません。設定画面から追加してください。</div>';
+        document.getElementById('clItemsContainer').innerHTML = html;
+
+        var photoHtml = '';
+        ['チェックアウト直後', '清掃完了後'].forEach(function(timing) {
+          var tSpots = spots.filter(function(s) { return s.timing === timing; });
+          if (!tSpots.length) return;
+          photoHtml += '<div class="cl-section-title"><i class="bi bi-camera"></i> ' + escapeHtml(timing) + '</div><div class="cl-photo-grid">';
+          tSpots.forEach(function(spot) {
+            var spotPhotos = photos.filter(function(p) { return p.spotId === spot.id; });
+            photoHtml += '<div class="cl-photo-card">';
+            if (spotPhotos.length > 0) {
+              var p = spotPhotos[spotPhotos.length - 1];
+              photoHtml += '<img src="' + escapeHtml(p.thumbnailUrl) + '" onclick="previewPhoto(\'' + escapeHtml(p.thumbnailUrl.replace('w400','w800')) + '\',\'' + escapeHtml(spot.name) + '\')">';
+              photoHtml += '<button class="cl-photo-delete" onclick="deleteClPhoto(\'' + escapeHtml(p.fileId) + '\',\'' + escapeHtml(spot.id) + '\')">&times;</button>';
+            } else {
+              photoHtml += '<div class="cl-photo-upload" onclick="startClPhotoUpload(\'' + escapeHtml(spot.id) + '\')"><i class="bi bi-camera-fill"></i></div>';
+            }
+            photoHtml += '<div class="cl-photo-label">' + escapeHtml(spot.name);
+            if (spotPhotos.length > 0) photoHtml += ' <span class="text-muted" style="font-size:0.6rem;">(' + escapeHtml(spotPhotos[spotPhotos.length-1].uploadedBy) + ')</span>';
+            photoHtml += '</div>';
+            if (spot.exampleFileId) photoHtml += '<div class="cl-photo-example">撮影例: <img src="https://drive.google.com/thumbnail?id=' + escapeHtml(spot.exampleFileId) + '&sz=w120" onclick="previewPhoto(\'https://drive.google.com/thumbnail?id=' + escapeHtml(spot.exampleFileId) + '&sz=w800\',\'' + escapeHtml(spot.name) + ' (撮影例)\')"></div>';
+            photoHtml += '</div>';
+          });
+          photoHtml += '</div>';
+        });
+        document.getElementById('clPhotosContainer').innerHTML = photoHtml;
+
+        var memoHtml = '';
+        memos.forEach(function(m) {
+          memoHtml += '<div class="cl-memo-item"><span class="cl-memo-author">' + escapeHtml(m.author) + '</span> <span class="cl-memo-time">' + escapeHtml(m.timestamp) + '</span><div>' + escapeHtml(m.text) + '</div></div>';
+        });
+        document.getElementById('clMemoList').innerHTML = memoHtml || '<div class="text-muted small">メモはまだありません</div>';
+        document.getElementById('clCompleteBar').style.display = data.isComplete ? 'block' : 'none';
+      }
+
+      function onClCheck(cb) {
+        var itemId = cb.getAttribute('data-id');
+        var checked = cb.checked;
+        var staffName = window.currentUserName || window.currentUserEmail || '';
+        cb.disabled = true;
+        google.script.run.withSuccessHandler(function() { cb.disabled = false; loadChecklistData(); })
+          .withFailureHandler(function(e) { cb.disabled = false; cb.checked = !checked; alert(e.message); })
+          .toggleChecklistItem(_clCurrentDate, itemId, checked, staffName);
+      }
+
+      var _clUploadSpotId = '';
+      function startClPhotoUpload(spotId) { _clUploadSpotId = spotId; var fi = document.getElementById('clPhotoFileInput'); fi.value = ''; fi.click(); }
+
+      function compressAndUpload(file, callback) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var img = new Image();
+          img.onload = function() {
+            var canvas = document.createElement('canvas');
+            var maxW = 1024, w = img.width, h = img.height;
+            if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            callback(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      document.getElementById('clPhotoFileInput').addEventListener('change', function() {
+        var file = this.files[0]; if (!file || !_clUploadSpotId) return;
+        var spotId = _clUploadSpotId;
+        var staffName = window.currentUserName || window.currentUserEmail || '';
+        compressAndUpload(file, function(base64) {
+          google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) loadChecklistData(); else alert(r.error || '写真のアップロードに失敗'); })
+            .withFailureHandler(function(e) { alert(e.message); })
+            .uploadChecklistPhoto(_clCurrentDate, spotId, base64, staffName);
+        });
+      });
+
+      function deleteClPhoto(fileId, spotId) {
+        if (!confirm('この写真を削除しますか？')) return;
+        google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) loadChecklistData(); else alert(r.error); })
+          .deleteChecklistPhoto(_clCurrentDate, spotId, fileId);
+      }
+
+      function previewPhoto(url, title) {
+        document.getElementById('photoPreviewImg').src = url;
+        document.getElementById('photoPreviewTitle').textContent = title || '写真';
+        new bootstrap.Modal(document.getElementById('photoPreviewModal')).show();
+      }
+
+      document.getElementById('clBtnAddMemo').addEventListener('click', function() {
+        var input = document.getElementById('clMemoInput'), text = (input.value || '').trim();
+        if (!text) return;
+        input.value = '';
+        google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) loadChecklistData(); else alert(r.error); })
+          .addChecklistMemo(_clCurrentDate, text, window.currentUserName || window.currentUserEmail || '');
+      });
+      document.getElementById('clMemoInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('clBtnAddMemo').click(); } });
+
+      document.getElementById('clBtnComplete').addEventListener('click', function() {
+        if (!confirm('清掃完了としてオーナーに通知を送信しますか？')) return;
+        var btn = this; btn.disabled = true; btn.textContent = '送信中…';
+        google.script.run.withSuccessHandler(function(j) {
+          var r = JSON.parse(j); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle"></i> 清掃完了 - オーナーに通知';
+          if (r.success) { alert('清掃完了通知を送信しました！'); closeChecklist(); } else alert(r.error || '送信に失敗');
+        }).withFailureHandler(function(e) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle"></i> 清掃完了 - オーナーに通知'; alert(e.message); })
+          .notifyCleaningComplete(_clCurrentDate);
+      });
+
+      document.getElementById('clBtnBack').addEventListener('click', closeChecklist);
+
+      // --- 設定: チェックリストマスタ管理 ---
+      function loadChecklistMasterUI() {
+        var list = document.getElementById('checklistMasterList');
+        list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
+        google.script.run.withSuccessHandler(function(j) {
+          var r = JSON.parse(j);
+          if (!r.success) { list.innerHTML = '<div class="text-danger">' + escapeHtml(r.error) + '</div>'; return; }
+          var items = r.items || [];
+          if (!items.length) { list.innerHTML = '<div class="text-muted small">項目がありません。「項目を追加」から登録してください。</div>'; return; }
+          var html = '';
+          items.forEach(function(item) {
+            html += '<div class="cl-settings-item" data-row="' + item.rowIndex + '"><span class="cl-si-cat">' + escapeHtml(item.category || '-') + '</span><span class="cl-si-name">' + escapeHtml(item.name) + '</span><span class="cl-si-order">#' + item.sortOrder + '</span>';
+            if (item.active !== 'Y') html += '<span class="badge bg-secondary" style="font-size:0.6rem;">無効</span>';
+            html += '<button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editChecklistItem(' + item.rowIndex + ')"><i class="bi bi-pencil"></i></button></div>';
+          });
+          list.innerHTML = html;
+        }).getChecklistMaster();
+      }
+
+      var _clEditRow = null;
+      document.getElementById('btnAddChecklistItem').addEventListener('click', function() { openChecklistItemModal(null); });
+      function openChecklistItemModal(rowIndex) {
+        _clEditRow = rowIndex;
+        document.getElementById('checklistItemModalTitle').textContent = rowIndex ? 'チェックリスト項目を編集' : 'チェックリスト項目を追加';
+        document.getElementById('clItemCategory').value = '';
+        document.getElementById('clItemName').value = '';
+        document.getElementById('clItemOrder').value = '0';
+        document.getElementById('clItemActive').checked = true;
+        document.getElementById('clItemError').style.display = 'none';
+        document.getElementById('btnDeleteChecklistItem').style.display = rowIndex ? '' : 'none';
+        if (rowIndex) {
+          google.script.run.withSuccessHandler(function(j) {
+            var r = JSON.parse(j); if (!r.success) return;
+            var item = (r.items || []).find(function(i) { return i.rowIndex === rowIndex; });
+            if (item) { document.getElementById('clItemCategory').value = item.category; document.getElementById('clItemName').value = item.name; document.getElementById('clItemOrder').value = item.sortOrder; document.getElementById('clItemActive').checked = item.active === 'Y'; }
+          }).getChecklistMaster();
+        }
+        new bootstrap.Modal(document.getElementById('checklistItemModal')).show();
+      }
+      function editChecklistItem(rowIndex) { openChecklistItemModal(rowIndex); }
+
+      document.getElementById('btnSaveChecklistItem').addEventListener('click', function() {
+        var name = document.getElementById('clItemName').value.trim();
+        if (!name) { document.getElementById('clItemError').textContent = '項目名は必須です'; document.getElementById('clItemError').style.display = 'block'; return; }
+        var data = { category: document.getElementById('clItemCategory').value.trim(), name: name, sortOrder: parseInt(document.getElementById('clItemOrder').value, 10) || 0, active: document.getElementById('clItemActive').checked ? 'Y' : 'N' };
+        google.script.run.withSuccessHandler(function(j) {
+          var r = JSON.parse(j);
+          if (r.success) { bootstrap.Modal.getInstance(document.getElementById('checklistItemModal')).hide(); loadChecklistMasterUI(); }
+          else { document.getElementById('clItemError').textContent = r.error; document.getElementById('clItemError').style.display = 'block'; }
+        }).saveChecklistMasterItem(_clEditRow, data);
+      });
+
+      document.getElementById('btnDeleteChecklistItem').addEventListener('click', function() {
+        if (!_clEditRow || !confirm('この項目を削除しますか？')) return;
+        google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('checklistItemModal')).hide(); loadChecklistMasterUI(); } else alert(r.error); })
+          .deleteChecklistMasterItem(_clEditRow);
+      });
+
+      // --- 設定: 撮影箇所マスタ管理 ---
+      function loadPhotoSpotMasterUI() {
+        var list = document.getElementById('photoSpotMasterList');
+        list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
+        google.script.run.withSuccessHandler(function(j) {
+          var r = JSON.parse(j);
+          if (!r.success) { list.innerHTML = '<div class="text-danger">' + escapeHtml(r.error) + '</div>'; return; }
+          var items = r.items || [];
+          if (!items.length) { list.innerHTML = '<div class="text-muted small">撮影箇所がありません。「撮影箇所を追加」から登録してください。</div>'; return; }
+          var html = '';
+          items.forEach(function(item) {
+            html += '<div class="cl-settings-item" data-row="' + item.rowIndex + '"><span class="cl-si-cat">' + escapeHtml(item.timing) + '</span><span class="cl-si-name">' + escapeHtml(item.name) + '</span>';
+            if (item.exampleFileId) html += '<img src="https://drive.google.com/thumbnail?id=' + escapeHtml(item.exampleFileId) + '&sz=w60" style="width:30px;height:22px;object-fit:cover;border-radius:3px;">';
+            html += '<span class="cl-si-order">#' + item.sortOrder + '</span>';
+            if (item.active !== 'Y') html += '<span class="badge bg-secondary" style="font-size:0.6rem;">無効</span>';
+            html += '<button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editPhotoSpot(' + item.rowIndex + ')"><i class="bi bi-pencil"></i></button></div>';
+          });
+          list.innerHTML = html;
+        }).getPhotoSpotMaster();
+      }
+
+      var _psEditRow = null;
+      document.getElementById('btnAddPhotoSpot').addEventListener('click', function() { openPhotoSpotModal(null); });
+      function openPhotoSpotModal(rowIndex) {
+        _psEditRow = rowIndex;
+        document.getElementById('photoSpotModalTitle').textContent = rowIndex ? '撮影箇所を編集' : '撮影箇所を追加';
+        document.getElementById('psName').value = '';
+        document.getElementById('psTiming').value = 'チェックアウト直後';
+        document.getElementById('psOrder').value = '0';
+        document.getElementById('psActive').checked = true;
+        document.getElementById('psExamplePreview').innerHTML = '';
+        document.getElementById('psExampleFileInput').value = '';
+        document.getElementById('psError').style.display = 'none';
+        document.getElementById('btnDeletePhotoSpot').style.display = rowIndex ? '' : 'none';
+        if (rowIndex) {
+          google.script.run.withSuccessHandler(function(j) {
+            var r = JSON.parse(j); if (!r.success) return;
+            var item = (r.items || []).find(function(i) { return i.rowIndex === rowIndex; });
+            if (item) { document.getElementById('psName').value = item.name; document.getElementById('psTiming').value = item.timing; document.getElementById('psOrder').value = item.sortOrder; document.getElementById('psActive').checked = item.active === 'Y'; if (item.exampleFileId) document.getElementById('psExamplePreview').innerHTML = '<img src="https://drive.google.com/thumbnail?id=' + escapeHtml(item.exampleFileId) + '&sz=w200" style="max-width:100%;border-radius:6px;">'; }
+          }).getPhotoSpotMaster();
+        }
+        new bootstrap.Modal(document.getElementById('photoSpotModal')).show();
+      }
+      function editPhotoSpot(rowIndex) { openPhotoSpotModal(rowIndex); }
+
+      document.getElementById('btnSavePhotoSpot').addEventListener('click', function() {
+        var name = document.getElementById('psName').value.trim();
+        if (!name) { document.getElementById('psError').textContent = '箇所名は必須です'; document.getElementById('psError').style.display = 'block'; return; }
+        var data = { name: name, timing: document.getElementById('psTiming').value, sortOrder: parseInt(document.getElementById('psOrder').value, 10) || 0, active: document.getElementById('psActive').checked ? 'Y' : 'N' };
+        function doSave() {
+          google.script.run.withSuccessHandler(function(j) {
+            var r = JSON.parse(j);
+            if (r.success) {
+              var file = document.getElementById('psExampleFileInput').files[0];
+              if (file && r.rowIndex) { compressAndUpload(file, function(base64) { google.script.run.withSuccessHandler(function() { bootstrap.Modal.getInstance(document.getElementById('photoSpotModal')).hide(); loadPhotoSpotMasterUI(); }).uploadExamplePhoto(r.rowIndex, base64); }); }
+              else { bootstrap.Modal.getInstance(document.getElementById('photoSpotModal')).hide(); loadPhotoSpotMasterUI(); }
+            } else { document.getElementById('psError').textContent = r.error; document.getElementById('psError').style.display = 'block'; }
+          }).savePhotoSpotMasterItem(_psEditRow, data);
+        }
+        if (_psEditRow) { google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); var item = (r.items || []).find(function(i) { return i.rowIndex === _psEditRow; }); data.exampleFileId = item ? item.exampleFileId : ''; doSave(); }).getPhotoSpotMaster(); }
+        else { doSave(); }
+      });
+
+      document.getElementById('btnDeletePhotoSpot').addEventListener('click', function() {
+        if (!_psEditRow || !confirm('この撮影箇所を削除しますか？')) return;
+        google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('photoSpotModal')).hide(); loadPhotoSpotMasterUI(); } else alert(r.error); })
+          .deletePhotoSpotMasterItem(_psEditRow);
+      });
+
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
       } else {

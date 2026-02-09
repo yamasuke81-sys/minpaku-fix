@@ -2176,6 +2176,31 @@
         return div.innerHTML;
       }
 
+      // 清掃チェックリストを開く
+      function openChecklist(checkoutDate, staffName) {
+        google.script.run.withSuccessHandler(function(resStr) {
+          try {
+            var res = JSON.parse(resStr);
+            if (res.success && res.url) {
+              var date = checkoutDate || '';
+              var staff = staffName || 'スタッフ';
+              if (!date) {
+                alert('チェックアウト日が取得できません');
+                return;
+              }
+              var checklistUrl = res.url + '?date=' + encodeURIComponent(date) + '&staff=' + encodeURIComponent(staff);
+              window.open(checklistUrl, '_blank');
+            } else {
+              alert('チェックリストURLが設定されていません。Apps Scriptの「プロジェクトの設定」→「スクリプト プロパティ」でCHECKLIST_APP_URLを設定してください。');
+            }
+          } catch (e) {
+            alert('エラーが発生しました: ' + e.message);
+          }
+        }).withFailureHandler(function(e) {
+          alert('チェックリストURLの取得に失敗しました: ' + e.message);
+        }).getChecklistAppUrl();
+      }
+
       // 清掃担当編集モーダルを開く
       function openStaffEditModal(rowNumber, currentStaff) {
         document.getElementById('staffEditRowNumber').value = rowNumber;

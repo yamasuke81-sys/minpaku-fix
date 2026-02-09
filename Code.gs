@@ -1842,6 +1842,19 @@ function deleteAutoSyncTrigger_() {
 }
 
 /**
+ * チェックリストWebアプリのURLを取得
+ */
+function getChecklistAppUrl() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var url = props.getProperty('CHECKLIST_APP_URL') || '';
+    return JSON.stringify({ success: true, url: url });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * 別スプレッドシートから予約データを読み込み（オーナーのみ）
  * フォーム回答のバックアップや削除したスプシの復元用
  */

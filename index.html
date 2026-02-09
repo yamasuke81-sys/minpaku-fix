@@ -1777,6 +1777,32 @@
           }
         }
 
+        // チェックリストボタンを追加（清掃詳細の場合）
+        if (type === 'cleaning' && actionBtns) {
+          google.script.run.withSuccessHandler(function(resStr) {
+            try {
+              var res = JSON.parse(resStr);
+              if (res.success && res.url) {
+                var btnChecklist = document.createElement('button');
+                btnChecklist.type = 'button';
+                btnChecklist.className = 'btn btn-sm btn-primary';
+                btnChecklist.innerHTML = '<i class="bi bi-list-check"></i> チェックリスト';
+                btnChecklist.onclick = function() {
+                  var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+                  var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
+                  if (checkoutDate) {
+                    var checklistUrl = res.url + '?date=' + encodeURIComponent(checkoutDate) + '&staff=' + encodeURIComponent(staffName || 'スタッフ');
+                    window.open(checklistUrl, '_blank');
+                  } else {
+                    alert('チェックアウト日が取得できません');
+                  }
+                };
+                actionBtns.appendChild(btnChecklist);
+              }
+            } catch (e) {}
+          }).getChecklistAppUrl();
+        }
+
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
         modal.show();
 

@@ -81,6 +81,13 @@ const SHEET_NOTIFICATIONS = '通知履歴';
 const SHEET_STAFF_SHARE = 'スタッフ共有用';
 const SHEET_BED_COUNT_MASTER = 'ベッド数マスタ';
 
+// チェックリスト機能用シート名
+const SHEET_CL_MASTER = 'チェックリストマスタ';
+const SHEET_CL_PHOTO_SPOTS = '撮影箇所マスタ';
+const SHEET_CL_RECORDS = 'チェックリスト記録';
+const SHEET_CL_PHOTOS = 'チェックリスト写真';
+const SHEET_CL_MEMOS = 'チェックリストメモ';
+
 /**
  * Webアプリのメインエントリーポイント
  * ?action=setStaffUrl&url=xxx&secret=yyy でデプロイスクリプトからスタッフURLを自動保存
@@ -1054,6 +1061,27 @@ function ensureSheetsExist() {
   if (!ss.getSheetByName(SHEET_NOTIFICATIONS)) {
     const s = ss.insertSheet(SHEET_NOTIFICATIONS);
     s.getRange(1, 1, 1, 4).setValues([['日時', '種類', '内容', '既読']]);
+  }
+
+  if (!ss.getSheetByName(SHEET_CL_MASTER)) {
+    const s = ss.insertSheet(SHEET_CL_MASTER);
+    s.getRange(1, 1, 1, 5).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効']]);
+  }
+  if (!ss.getSheetByName(SHEET_CL_PHOTO_SPOTS)) {
+    const s = ss.insertSheet(SHEET_CL_PHOTO_SPOTS);
+    s.getRange(1, 1, 1, 6).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効']]);
+  }
+  if (!ss.getSheetByName(SHEET_CL_RECORDS)) {
+    const s = ss.insertSheet(SHEET_CL_RECORDS);
+    s.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', 'チェック済', 'チェック者', 'タイムスタンプ']]);
+  }
+  if (!ss.getSheetByName(SHEET_CL_PHOTOS)) {
+    const s = ss.insertSheet(SHEET_CL_PHOTOS);
+    s.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ']]);
+  }
+  if (!ss.getSheetByName(SHEET_CL_MEMOS)) {
+    const s = ss.insertSheet(SHEET_CL_MEMOS);
+    s.getRange(1, 1, 1, 4).setValues([['チェックアウト日', 'メモ内容', '記入者', 'タイムスタンプ']]);
   }
 }
 
@@ -5312,6 +5340,426 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
     addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
   } catch (e) {
     Logger.log('sendImmediateReminderIfNeeded_: ' + e.toString());
+  }
+}
+
+/**********************************************
+ * 清掃チェックリスト機能
+ **********************************************/
+
+// --- チェックリストマスタ CRUD ---
+
+function getChecklistMaster() {
+  try {
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_MASTER);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, items: [] });
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+    var items = rows.map(function(row, i) {
+      return {
+        rowIndex: i + 2,
+        id: String(row[0] || ''),
+        category: String(row[1] || ''),
+        name: String(row[2] || ''),
+        sortOrder: parseInt(row[3], 10) || 0,
+        active: String(row[4] || 'Y')
+      };
+    }).filter(function(item) { return item.id && item.name; });
+    items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+    return JSON.stringify({ success: true, items: items });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), items: [] });
+  }
+}
+
+function saveChecklistMasterItem(rowIndex, data) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (rowIndex && rowIndex >= 2 && rowIndex <= lastRow) {
+      var existingId = String(sheet.getRange(rowIndex, 1).getValue() || '');
+      sheet.getRange(rowIndex, 1, 1, 5).setValues([[
+        existingId, data.category || '', data.name || '',
+        parseInt(data.sortOrder, 10) || 0, data.active !== 'N' ? 'Y' : 'N'
+      ]]);
+      return JSON.stringify({ success: true, rowIndex: rowIndex });
+    }
+    var id = 'CL' + new Date().getTime();
+    var nextRow = lastRow + 1;
+    sheet.getRange(nextRow, 1, 1, 5).setValues([[
+      id, data.category || '', data.name || '',
+      parseInt(data.sortOrder, 10) || 0, 'Y'
+    ]]);
+    return JSON.stringify({ success: true, rowIndex: nextRow });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function deleteChecklistMasterItem(rowIndex) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ削除できます。' });
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_MASTER);
+    if (!sheet || rowIndex < 2) return JSON.stringify({ success: false, error: '無効な行' });
+    sheet.deleteRow(rowIndex);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- 撮影箇所マスタ CRUD ---
+
+function getPhotoSpotMaster() {
+  try {
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_PHOTO_SPOTS);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, items: [] });
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+    var items = rows.map(function(row, i) {
+      return {
+        rowIndex: i + 2,
+        id: String(row[0] || ''),
+        name: String(row[1] || ''),
+        timing: String(row[2] || 'チェックアウト直後'),
+        exampleFileId: String(row[3] || ''),
+        sortOrder: parseInt(row[4], 10) || 0,
+        active: String(row[5] || 'Y')
+      };
+    }).filter(function(item) { return item.id && item.name; });
+    items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+    return JSON.stringify({ success: true, items: items });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), items: [] });
+  }
+}
+
+function savePhotoSpotMasterItem(rowIndex, data) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_PHOTO_SPOTS);
+    var lastRow = sheet.getLastRow();
+    if (rowIndex && rowIndex >= 2 && rowIndex <= lastRow) {
+      var existingId = String(sheet.getRange(rowIndex, 1).getValue() || '');
+      sheet.getRange(rowIndex, 1, 1, 6).setValues([[
+        existingId, data.name || '', data.timing || 'チェックアウト直後',
+        data.exampleFileId || '', parseInt(data.sortOrder, 10) || 0,
+        data.active !== 'N' ? 'Y' : 'N'
+      ]]);
+      return JSON.stringify({ success: true, rowIndex: rowIndex });
+    }
+    var id = 'PS' + new Date().getTime();
+    var nextRow = lastRow + 1;
+    sheet.getRange(nextRow, 1, 1, 6).setValues([[
+      id, data.name || '', data.timing || 'チェックアウト直後',
+      '', parseInt(data.sortOrder, 10) || 0, 'Y'
+    ]]);
+    return JSON.stringify({ success: true, rowIndex: nextRow });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function deletePhotoSpotMasterItem(rowIndex) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ削除できます。' });
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_PHOTO_SPOTS);
+    if (!sheet || rowIndex < 2) return JSON.stringify({ success: false, error: '無効な行' });
+    sheet.deleteRow(rowIndex);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- 日次チェックリスト取得 ---
+
+function getChecklistForDate(checkoutDate) {
+  try {
+    var dateKey = String(checkoutDate || '').trim();
+    if (!dateKey) return JSON.stringify({ success: false, error: 'チェックアウト日が指定されていません。' });
+
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // マスタ項目
+    var masterRes = JSON.parse(getChecklistMaster());
+    var items = masterRes.items || [];
+
+    // 撮影箇所
+    var spotsRes = JSON.parse(getPhotoSpotMaster());
+    var spots = spotsRes.items || [];
+
+    // チェック記録
+    var records = [];
+    var recSheet = ss.getSheetByName(SHEET_CL_RECORDS);
+    if (recSheet && recSheet.getLastRow() >= 2) {
+      var recRows = recSheet.getRange(2, 1, recSheet.getLastRow() - 1, 5).getValues();
+      records = recRows.filter(function(r) { return String(r[0] || '') === dateKey; })
+        .map(function(r) {
+          return { itemId: String(r[1] || ''), checked: String(r[2] || '') === 'Y', checkedBy: String(r[3] || ''), timestamp: String(r[4] || '') };
+        });
+    }
+
+    // 写真
+    var photos = [];
+    var photoSheet = ss.getSheetByName(SHEET_CL_PHOTOS);
+    if (photoSheet && photoSheet.getLastRow() >= 2) {
+      var photoRows = photoSheet.getRange(2, 1, photoSheet.getLastRow() - 1, 5).getValues();
+      photos = photoRows.filter(function(r) { return String(r[0] || '') === dateKey; })
+        .map(function(r) {
+          var fid = String(r[2] || '');
+          return {
+            spotId: String(r[1] || ''),
+            fileId: fid,
+            thumbnailUrl: fid ? 'https://drive.google.com/thumbnail?id=' + fid + '&sz=w400' : '',
+            uploadedBy: String(r[3] || ''),
+            timestamp: String(r[4] || '')
+          };
+        });
+    }
+
+    // メモ
+    var memos = [];
+    var memoSheet = ss.getSheetByName(SHEET_CL_MEMOS);
+    if (memoSheet && memoSheet.getLastRow() >= 2) {
+      var memoRows = memoSheet.getRange(2, 1, memoSheet.getLastRow() - 1, 4).getValues();
+      memos = memoRows.filter(function(r) { return String(r[0] || '') === dateKey; })
+        .map(function(r) {
+          return { text: String(r[1] || ''), author: String(r[2] || ''), timestamp: String(r[3] || '') };
+        });
+    }
+
+    // 完了状態を計算
+    var activeItems = items.filter(function(i) { return i.active === 'Y'; });
+    var checkedCount = 0;
+    activeItems.forEach(function(item) {
+      var rec = records.find(function(r) { return r.itemId === item.id; });
+      if (rec && rec.checked) checkedCount++;
+    });
+    var activeSpots = spots.filter(function(s) { return s.active === 'Y'; });
+    var photoSpotsDone = 0;
+    activeSpots.forEach(function(spot) {
+      var hasPhoto = photos.some(function(p) { return p.spotId === spot.id; });
+      if (hasPhoto) photoSpotsDone++;
+    });
+    var isComplete = activeItems.length > 0 && checkedCount === activeItems.length;
+
+    return JSON.stringify({
+      success: true,
+      checkoutDate: dateKey,
+      items: items,
+      spots: spots,
+      records: records,
+      photos: photos,
+      memos: memos,
+      checkedCount: checkedCount,
+      totalItems: activeItems.length,
+      photoSpotsDone: photoSpotsDone,
+      totalPhotoSpots: activeSpots.length,
+      isComplete: isComplete
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- チェック項目ON/OFF ---
+
+function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
+  try {
+    var dateKey = String(checkoutDate || '').trim();
+    var iid = String(itemId || '').trim();
+    if (!dateKey || !iid) return JSON.stringify({ success: false, error: 'パラメータが不足しています。' });
+
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_RECORDS);
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+
+    if (sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '') === dateKey && String(rows[i][1] || '') === iid) {
+          sheet.getRange(i + 2, 3, 1, 3).setValues([[checked ? 'Y' : 'N', String(staffName || ''), now]]);
+          return JSON.stringify({ success: true });
+        }
+      }
+    }
+
+    var nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1, 1, 5).setValues([[dateKey, iid, checked ? 'Y' : 'N', String(staffName || ''), now]]);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- 写真アップロード ---
+
+function getOrCreateChecklistPhotoFolder_() {
+  var folderId = PropertiesService.getDocumentProperties().getProperty('CHECKLIST_PHOTO_FOLDER_ID');
+  if (folderId) {
+    try { return DriveApp.getFolderById(folderId); } catch (e) { /* deleted */ }
+  }
+  var folder = DriveApp.createFolder('清掃チェックリスト写真');
+  PropertiesService.getDocumentProperties().setProperty('CHECKLIST_PHOTO_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function uploadChecklistPhoto(checkoutDate, spotId, base64Data, staffName) {
+  try {
+    var dateKey = String(checkoutDate || '').trim();
+    var sid = String(spotId || '').trim();
+    if (!dateKey || !sid || !base64Data) return JSON.stringify({ success: false, error: 'パラメータが不足しています。' });
+
+    var decoded = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(decoded, 'image/jpeg', dateKey + '_' + sid + '_' + Date.now() + '.jpg');
+
+    var parentFolder = getOrCreateChecklistPhotoFolder_();
+    var dateFolder;
+    var dateFolders = parentFolder.getFoldersByName(dateKey);
+    if (dateFolders.hasNext()) { dateFolder = dateFolders.next(); }
+    else { dateFolder = parentFolder.createFolder(dateKey); }
+
+    var file = dateFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var fileId = file.getId();
+
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_PHOTOS);
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1, 1, 5).setValues([[dateKey, sid, fileId, String(staffName || ''), now]]);
+
+    return JSON.stringify({
+      success: true, fileId: fileId,
+      thumbnailUrl: 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400'
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function deleteChecklistPhoto(checkoutDate, spotId, fileId) {
+  try {
+    var fid = String(fileId || '').trim();
+    var dateKey = String(checkoutDate || '').trim();
+    if (!dateKey || !fid) return JSON.stringify({ success: false, error: 'パラメータが不足しています。' });
+
+    try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {}
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_PHOTOS);
+    if (sheet && sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+      for (var i = rows.length - 1; i >= 0; i--) {
+        if (String(rows[i][0] || '') === dateKey && String(rows[i][2] || '') === fid) {
+          sheet.deleteRow(i + 2);
+          break;
+        }
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- 撮影例写真アップロード ---
+
+function uploadExamplePhoto(spotRowIndex, base64Data) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    if (!base64Data) return JSON.stringify({ success: false, error: '写真データがありません。' });
+
+    var decoded = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(decoded, 'image/jpeg', 'example_' + Date.now() + '.jpg');
+
+    var parentFolder = getOrCreateChecklistPhotoFolder_();
+    var exampleFolder;
+    var ef = parentFolder.getFoldersByName('撮影例');
+    if (ef.hasNext()) { exampleFolder = ef.next(); } else { exampleFolder = parentFolder.createFolder('撮影例'); }
+
+    var file = exampleFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var fileId = file.getId();
+
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_PHOTO_SPOTS);
+    if (sheet && spotRowIndex >= 2) {
+      var oldFileId = String(sheet.getRange(spotRowIndex, 4).getValue() || '');
+      if (oldFileId) { try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) {} }
+      sheet.getRange(spotRowIndex, 4).setValue(fileId);
+    }
+
+    return JSON.stringify({
+      success: true, fileId: fileId,
+      thumbnailUrl: 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400'
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- メモ ---
+
+function addChecklistMemo(checkoutDate, text, staffName) {
+  try {
+    var dateKey = String(checkoutDate || '').trim();
+    var memoText = String(text || '').trim();
+    if (!dateKey || !memoText) return JSON.stringify({ success: false, error: 'パラメータが不足しています。' });
+
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CL_MEMOS);
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1, 1, 4).setValues([[dateKey, memoText, String(staffName || ''), now]]);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// --- 清掃完了通知 ---
+
+function notifyCleaningComplete(checkoutDate) {
+  try {
+    var dateKey = String(checkoutDate || '').trim();
+    if (!dateKey) return JSON.stringify({ success: false, error: 'チェックアウト日が指定されていません。' });
+
+    var clRes = JSON.parse(getChecklistForDate(dateKey));
+    if (!clRes.success) return JSON.stringify({ success: false, error: clRes.error });
+    if (!clRes.isComplete) return JSON.stringify({ success: false, error: 'まだ未完了の項目があります。' });
+
+    var ownerRes = JSON.parse(getOwnerEmail());
+    var ownerEmail = (ownerRes.email || '').trim();
+
+    var fmtDate = dateKey;
+    var dm = dateKey.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
+
+    addNotification_('清掃完了', fmtDate + ' の清掃が完了しました（' + clRes.checkedCount + '/' + clRes.totalItems + '項目）');
+
+    if (ownerEmail) {
+      var subject = '【民泊】清掃完了: ' + fmtDate;
+      var body = fmtDate + ' の清掃が完了しました。\n\n'
+        + 'チェックリスト: ' + clRes.checkedCount + '/' + clRes.totalItems + ' 項目完了\n'
+        + '写真: ' + clRes.photoSpotsDone + '/' + clRes.totalPhotoSpots + ' 箇所撮影済み\n';
+
+      if (clRes.memos && clRes.memos.length > 0) {
+        body += '\n--- 特記事項 ---\n';
+        clRes.memos.forEach(function(m) {
+          body += '・' + m.text + '（' + m.author + ' ' + m.timestamp + '）\n';
+        });
+      }
+
+      GmailApp.sendEmail(ownerEmail, subject, body);
+    }
+
+    return JSON.stringify({ success: true, message: '清掃完了通知を送信しました。' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
   }
 }
 

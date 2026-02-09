@@ -1782,28 +1782,44 @@
 
         // チェックリストボタンを追加（清掃詳細の場合）
         if (type === 'cleaning' && actionBtns) {
-          google.script.run.withSuccessHandler(function(resStr) {
-            try {
-              var res = JSON.parse(resStr);
-              if (res.success && res.url) {
-                var btnChecklist = document.createElement('button');
-                btnChecklist.type = 'button';
-                btnChecklist.className = 'btn btn-sm btn-primary';
-                btnChecklist.innerHTML = '<i class="bi bi-list-check"></i> チェックリスト';
-                btnChecklist.onclick = function() {
-                  var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
-                  var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
-                  if (checkoutDate) {
-                    var checklistUrl = res.url + '?date=' + encodeURIComponent(checkoutDate) + '&staff=' + encodeURIComponent(staffName || 'スタッフ');
-                    window.open(checklistUrl, '_blank');
-                  } else {
-                    alert('チェックアウト日が取得できません');
-                  }
-                };
-                actionBtns.appendChild(btnChecklist);
+          google.script.run
+            .withSuccessHandler(function(resStr) {
+              try {
+                console.log('getChecklistAppUrl response:', resStr);
+                var res = JSON.parse(resStr);
+                if (res.success && res.url) {
+                  console.log('Creating checklist button with URL:', res.url);
+                  var btnChecklist = document.createElement('button');
+                  btnChecklist.type = 'button';
+                  btnChecklist.className = 'btn btn-sm btn-primary';
+                  btnChecklist.innerHTML = '<i class="bi bi-list-check"></i> チェックリスト';
+                  btnChecklist.onclick = function() {
+                    var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+                    var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
+                    console.log('Checklist button clicked. Date:', checkoutDate, 'Staff:', staffName);
+                    if (checkoutDate) {
+                      var checklistUrl = res.url + '?date=' + encodeURIComponent(checkoutDate) + '&staff=' + encodeURIComponent(staffName || 'スタッフ');
+                      console.log('Opening checklist URL:', checklistUrl);
+                      window.open(checklistUrl, '_blank');
+                    } else {
+                      alert('チェックアウト日が取得できません');
+                    }
+                  };
+                  actionBtns.appendChild(btnChecklist);
+                } else {
+                  console.error('getChecklistAppUrl failed or no URL:', res);
+                  alert('チェックリストURLが設定されていません。Script Propertiesを確認してください。');
+                }
+              } catch (e) {
+                console.error('Error creating checklist button:', e);
+                alert('チェックリストボタンの作成に失敗しました: ' + e.message);
               }
-            } catch (e) {}
-          }).getChecklistAppUrl();
+            })
+            .withFailureHandler(function(error) {
+              console.error('getChecklistAppUrl failed:', error);
+              alert('チェックリストURLの取得に失敗しました: ' + error.message);
+            })
+            .getChecklistAppUrl();
         }
 
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));

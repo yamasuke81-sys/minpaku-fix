@@ -1848,6 +1848,9 @@ function getChecklistAppUrl() {
   try {
     var props = PropertiesService.getScriptProperties();
     var url = props.getProperty('CHECKLIST_APP_URL') || '';
+    if (!url) {
+      return JSON.stringify({ success: false, error: 'CHECKLIST_APP_URL is not set in Script Properties' });
+    }
     return JSON.stringify({ success: true, url: url });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

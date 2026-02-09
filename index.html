@@ -1083,35 +1083,35 @@
               <div class="col-auto"><input class="form-check-input reminder-enabled" type="checkbox"></div>
               <div class="col"><input type="number" class="form-control form-control-sm reminder-days" min="1" max="90" placeholder="日前" style="width:70px;"></div>
               <div class="col-auto small">日前</div>
-              <div class="col"><input type="time" class="form-control form-control-sm reminder-time" value="09:00" style="width:110px;"></div>
+              <div class="col"><select class="form-control form-control-sm reminder-time" style="width:110px;"></select></div>
               <div class="col-auto small">に送信</div>
             </div>
             <div class="row g-2 align-items-center mb-2 reminder-entry" data-idx="1">
               <div class="col-auto"><input class="form-check-input reminder-enabled" type="checkbox"></div>
               <div class="col"><input type="number" class="form-control form-control-sm reminder-days" min="1" max="90" placeholder="日前" style="width:70px;"></div>
               <div class="col-auto small">日前</div>
-              <div class="col"><input type="time" class="form-control form-control-sm reminder-time" value="09:00" style="width:110px;"></div>
+              <div class="col"><select class="form-control form-control-sm reminder-time" style="width:110px;"></select></div>
               <div class="col-auto small">に送信</div>
             </div>
             <div class="row g-2 align-items-center mb-2 reminder-entry" data-idx="2">
               <div class="col-auto"><input class="form-check-input reminder-enabled" type="checkbox"></div>
               <div class="col"><input type="number" class="form-control form-control-sm reminder-days" min="1" max="90" placeholder="日前" style="width:70px;"></div>
               <div class="col-auto small">日前</div>
-              <div class="col"><input type="time" class="form-control form-control-sm reminder-time" value="09:00" style="width:110px;"></div>
+              <div class="col"><select class="form-control form-control-sm reminder-time" style="width:110px;"></select></div>
               <div class="col-auto small">に送信</div>
             </div>
             <div class="row g-2 align-items-center mb-2 reminder-entry" data-idx="3">
               <div class="col-auto"><input class="form-check-input reminder-enabled" type="checkbox"></div>
               <div class="col"><input type="number" class="form-control form-control-sm reminder-days" min="1" max="90" placeholder="日前" style="width:70px;"></div>
               <div class="col-auto small">日前</div>
-              <div class="col"><input type="time" class="form-control form-control-sm reminder-time" value="09:00" style="width:110px;"></div>
+              <div class="col"><select class="form-control form-control-sm reminder-time" style="width:110px;"></select></div>
               <div class="col-auto small">に送信</div>
             </div>
             <div class="row g-2 align-items-center mb-2 reminder-entry" data-idx="4">
               <div class="col-auto"><input class="form-check-input reminder-enabled" type="checkbox"></div>
               <div class="col"><input type="number" class="form-control form-control-sm reminder-days" min="1" max="90" placeholder="日前" style="width:70px;"></div>
               <div class="col-auto small">日前</div>
-              <div class="col"><input type="time" class="form-control form-control-sm reminder-time" value="09:00" style="width:110px;"></div>
+              <div class="col"><select class="form-control form-control-sm reminder-time" style="width:110px;"></select></div>
               <div class="col-auto small">に送信</div>
             </div>
           </div>
@@ -5349,6 +5349,19 @@
         }).setRecruitmentSettings(settings);
       });
 
+      // リマインド時刻selectに0〜23時のオプションを生成
+      (function() {
+        document.querySelectorAll('select.reminder-time').forEach(function(sel) {
+          for (var h = 0; h <= 23; h++) {
+            var opt = document.createElement('option');
+            opt.value = ('0' + h).slice(-2) + ':00';
+            opt.textContent = h + '時';
+            sel.appendChild(opt);
+          }
+          sel.value = '09:00';
+        });
+      })();
+
       function loadReminderEmailSettings() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -5362,7 +5375,10 @@
                 var entry = entries[idx];
                 entry.querySelector('.reminder-enabled').checked = !!rem.enabled;
                 entry.querySelector('.reminder-days').value = rem.daysBefore || '';
-                entry.querySelector('.reminder-time').value = rem.time || '09:00';
+                // 既存データ "HH:MM" → "HH:00" に正規化してselectに反映
+                var t = rem.time || '09:00';
+                var hour = ('0' + parseInt(t.split(':')[0], 10)).slice(-2);
+                entry.querySelector('.reminder-time').value = hour + ':00';
               });
               // テンプレートフィールド
               document.getElementById('reminderSubject').value = r.reminderSubject || '';

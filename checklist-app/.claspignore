@@ -4,3 +4,4 @@
 **/*.bat
 **/*.md
 **/*.txt
+deploy-checklist.js

@@ -5324,9 +5324,26 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
 }
 
 /**********************************************
- * 清掃チェックリスト機能
- * ※ 予約管理スプシとは別のスプレッドシートで管理（パフォーマンス分離）
- *    初回アクセス時に自動作成し、IDをDocumentPropertiesに保存
+ * 清掃チェックリスト（別アプリ連携）
+ * Script Properties に CHECKLIST_APP_URL を設定して使用
+ **********************************************/
+function getChecklistAppUrl() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var url = props.getProperty('CHECKLIST_APP_URL') || '';
+    if (!url) {
+      return JSON.stringify({ success: false, error: 'CHECKLIST_APP_URL が Script Properties に設定されていません' });
+    }
+    return JSON.stringify({ success: true, url: url });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/* --- 以下、統合型チェックリストのコード（別アプリに移行済み、後方互換のため残置） --- */
+
+/**********************************************
+ * [非推奨] 統合型チェックリスト機能（別アプリ版を使用してください）
  **********************************************/
 
 function getOrCreateChecklistSpreadsheet_() {

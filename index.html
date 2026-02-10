@@ -2185,8 +2185,8 @@
             html += '<div id="eventModalVolunteersArea" class="cleaning-section-volunteers mt-1"><div id="eventModalVolunteersList" class="mt-1"><div class="text-muted small"><span class="spinner-border spinner-border-sm text-secondary me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div></div>';
             html += '</div>';
 
-            // チェックリストを開くボタン
-            html += '<div class="mt-2 mb-2"><button type="button" class="btn btn-outline-success btn-sm w-100" onclick="openChecklist(\'' + escapeHtml(d.checkOut || '') + '\')"><i class="bi bi-check2-square"></i> 清掃チェックリストを開く</button></div>';
+            // チェックリストを開くボタン（別アプリに遷移）
+            html += '<div class="mt-2 mb-2" id="checklistBtnArea"></div>';
 
             // LINE用テキスト（オーナーのみ）
             if (!isStaffView) {
@@ -2324,6 +2324,37 @@
               new bootstrap.Modal(document.getElementById('deleteBookingConfirmModal')).show();
             };
             bookingActionsArea.appendChild(btnDel);
+          }
+        }
+
+        // チェックリストボタンを追加（清掃詳細の場合）
+        if (type === 'cleaning') {
+          var clBtnArea = document.getElementById('checklistBtnArea');
+          if (clBtnArea) {
+            google.script.run
+              .withSuccessHandler(function(resStr) {
+                try {
+                  var res = JSON.parse(resStr);
+                  if (res.success && res.url) {
+                    var btnCl = document.createElement('button');
+                    btnCl.type = 'button';
+                    btnCl.className = 'btn btn-outline-success btn-sm w-100';
+                    btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリストを開く';
+                    btnCl.onclick = function() {
+                      var checkoutDate = (d && d.checkOut) ? String(d.checkOut).slice(0,10) : '';
+                      var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
+                      if (checkoutDate) {
+                        window.open(res.url + '?date=' + encodeURIComponent(checkoutDate) + '&staff=' + encodeURIComponent(staffName || 'スタッフ'), '_blank');
+                      } else {
+                        alert('チェックアウト日が取得できません');
+                      }
+                    };
+                    clBtnArea.appendChild(btnCl);
+                  }
+                } catch (e) { console.error('checklist button error:', e); }
+              })
+              .withFailureHandler(function(e) { console.error('getChecklistAppUrl failed:', e); })
+              .getChecklistAppUrl();
           }
         }
 

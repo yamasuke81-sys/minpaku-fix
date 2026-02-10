@@ -51,13 +51,26 @@ function getBookingSpreadsheet_() {
 
 /**
  * チェックリスト管理スプレッドシートを取得または作成
+ * Script Properties の CHECKLIST_SS_ID にスプレッドシートIDを設定してください
  */
 function getOrCreateChecklistSpreadsheet_() {
-  var props = PropertiesService.getDocumentProperties();
+  var props = PropertiesService.getScriptProperties();
   var ssId = props.getProperty('CHECKLIST_SS_ID');
   if (ssId) {
     try { return SpreadsheetApp.openById(ssId); } catch (e) { /* deleted or inaccessible */ }
   }
+  // DocumentProperties もフォールバックで確認
+  try {
+    var docProps = PropertiesService.getDocumentProperties();
+    var docSsId = docProps.getProperty('CHECKLIST_SS_ID');
+    if (docSsId) {
+      try {
+        var ss = SpreadsheetApp.openById(docSsId);
+        props.setProperty('CHECKLIST_SS_ID', docSsId);
+        return ss;
+      } catch (e) {}
+    }
+  } catch (e) {}
   var newSs = SpreadsheetApp.create('清掃チェックリスト管理');
   props.setProperty('CHECKLIST_SS_ID', newSs.getId());
   // 初期シート作成

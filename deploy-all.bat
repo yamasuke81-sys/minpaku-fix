@@ -1,68 +1,78 @@
 @echo off
-chcp 65001 >nul
+
+:: UTF-8に切り替え（chcpが使えない環境でもエラーにしない）
+%SystemRoot%\system32\chcp.com 65001 >nul 2>nul
+
 echo ==========================================
-echo  民泊アプリ 全体デプロイ
-echo  (1) git pull  (2) メインアプリ  (3) チェックリスト
+echo   minpaku app - Deploy All
+echo   (1) git pull  (2) Main app  (3) Checklist
 echo ==========================================
 echo.
 
 cd /d "%~dp0"
 
+:: Node.js PATH補完（よくあるインストール先を追加）
+set "PATH=%PATH%;%ProgramFiles%\nodejs;%ProgramFiles(x86)%\nodejs;%APPDATA%\npm;%LOCALAPPDATA%\Programs\Node.js;%USERPROFILE%\AppData\Roaming\nvm\current"
+
 :: Node.js チェック
 where node >nul 2>nul
 if errorlevel 1 (
-    echo [エラー] Node.js がインストールされていません。
+    echo [Error] Node.js ga install sareteimasen.
+    echo   https://nodejs.org/ kara install shitekudasai.
+    echo   Install-go, PC wo saikidou shitekudasai.
     pause
     exit /b 1
 )
+
+echo [OK] Node.js found:
+node --version
+echo.
 
 :: 1. git pull
-echo [1/3] 最新コードを取得中...
+echo [1/3] git pull ...
 git pull
 if errorlevel 1 (
-    echo [警告] git pull に失敗しました。ローカルのコードでデプロイを続行します。
+    echo [Warning] git pull failed. Continuing with local code.
 )
 echo.
 
-:: 2. メインアプリ clasp push + deploy
-echo [2/3] メインアプリをデプロイ中...
-echo   clasp push...
+:: 2. Main app clasp push
+echo [2/3] Main app clasp push ...
 npx clasp push
 if errorlevel 1 (
-    echo [エラー] メインアプリの clasp push に失敗しました。
+    echo [Error] Main app clasp push failed.
     pause
     exit /b 1
 )
-echo   メインアプリのプッシュ完了。
-echo   ※ GASエディタで「デプロイを管理」→ 編集 → 新しいバージョン → デプロイ してください。
+echo   Main app push OK.
 echo.
 
-:: 3. チェックリストアプリ clasp push + deploy
-echo [3/3] チェックリストアプリをデプロイ中...
+:: 3. Checklist app clasp push
+echo [3/3] Checklist app clasp push ...
 cd /d "%~dp0checklist-app"
 if not exist ".clasp.json" (
-    echo [スキップ] checklist-app/.clasp.json が見つかりません。チェックリストのデプロイをスキップします。
+    echo [Skip] checklist-app/.clasp.json not found. Skipping checklist deploy.
     cd /d "%~dp0"
     goto :done
 )
-echo   clasp push...
 npx clasp push
 if errorlevel 1 (
-    echo [エラー] チェックリストアプリの clasp push に失敗しました。
+    echo [Error] Checklist app clasp push failed.
     cd /d "%~dp0"
     pause
     exit /b 1
 )
-echo   チェックリストアプリのプッシュ完了。
-echo   ※ GASエディタで「デプロイを管理」→ 編集 → 新しいバージョン → デプロイ してください。
+echo   Checklist app push OK.
 cd /d "%~dp0"
 
 :done
 echo.
 echo ==========================================
-echo  完了！
-echo  両アプリとも clasp push 済みです。
-echo  GASエディタで「新しいバージョン」でデプロイを更新してください。
+echo   Done!
+echo   Both apps pushed via clasp.
+echo   Next: Open GAS editor, go to
+echo   Deploy - Manage deployments - Edit
+echo   - New version - Deploy
 echo ==========================================
 echo.
 pause

@@ -178,6 +178,18 @@ async function main() {
 
   const pushOnly = process.argv.includes('--push-only');
 
+  // プッシュ前バリデーション: ChecklistApp.gsが.claspignoreで除外されているか確認
+  const claspignorePath = path.join(__dirname, '.claspignore');
+  if (fs.existsSync(claspignorePath)) {
+    const ignoreContent = fs.readFileSync(claspignorePath, 'utf8');
+    if (!ignoreContent.includes('ChecklistApp.gs')) {
+      console.error('警告: .claspignore に ChecklistApp.gs が含まれていません。');
+      console.error('予約管理アプリに ChecklistApp.gs がプッシュされると SHEET_NAME 重複エラーが発生します。');
+      console.error('.claspignore に "ChecklistApp.gs" を追加してください。');
+      process.exit(1);
+    }
+  }
+
   console.log('1. コードをプッシュしています...');
   run(`${clasp} push`);
 

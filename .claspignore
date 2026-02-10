@@ -6,3 +6,7 @@
 **/package-lock.json
 **/README.md
 **/.git/**
+ChecklistApp.gs
+checklist-app/**
+**/*.bat
+**/*.txt

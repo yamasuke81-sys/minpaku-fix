@@ -27,12 +27,16 @@ echo [OK] Node.js:
 node --version
 echo.
 
-:: 1. git pull
+:: 1. git pull（ブランチ情報表示付き）
 echo [1/3] git pull ...
+for /f "tokens=*" %%a in ('git branch --show-current 2^>nul') do set CURRENT_BRANCH=%%a
+echo    Branch: %CURRENT_BRANCH%
 git pull
 if errorlevel 1 (
     echo [Warning] git pull failed. Continuing with local code.
 )
+for /f "tokens=*" %%a in ('git log --oneline -1 2^>nul') do set LATEST_COMMIT=%%a
+echo    Latest: %LATEST_COMMIT%
 echo.
 
 :: 2. Main app: deploy.js (push + deploy both owner and staff)

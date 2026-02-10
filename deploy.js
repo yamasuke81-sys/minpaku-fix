@@ -317,8 +317,8 @@ async function main() {
   checkVersionLimit(claspConfig.scriptId);
   console.log('');
 
-  // 2. オーナー用デプロイ（既存IDで更新のみ。新規作成は行わない）
-  console.log('2. オーナー用デプロイを更新しています（同じURLのまま）...');
+  // 2. オーナー用デプロイ（既存IDで更新。失敗時は新規作成してconfig更新）
+  console.log('2. オーナー用デプロイを更新しています...');
   let ownerResult = runCapture(`${clasp} deploy --deploymentId "${ownerId}" --description "オーナー用 ${today}"`);
   if (!ownerResult.success) {
     const ownerErr = (ownerResult.stdout + ownerResult.stderr).toLowerCase();
@@ -327,13 +327,27 @@ async function main() {
       console.error('   Apps Script「デプロイを管理」で不要なデプロイを手動で削除してから再実行してください。');
       process.exit(1);
     }
-    console.error('   オーナー用デプロイの更新に失敗しました。');
-    console.error('   deploy-config.json の ownerDeploymentId が正しいか、Apps Script「デプロイを管理」で確認してください。');
-    console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
-    process.exit(1);
+    // 既存デプロイが見つからない場合、新規作成
+    console.log('   既存デプロイが見つかりません。新規作成します...');
+    ownerResult = runCapture(`${clasp} deploy --description "オーナー用 ${today}"`);
+    if (!ownerResult.success) {
+      console.error('   オーナー用デプロイの新規作成にも失敗しました。');
+      console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
+      process.exit(1);
+    }
+    const newOwnerId = parseDeploymentId(ownerResult.stdout, ownerResult.stderr);
+    if (newOwnerId) {
+      currentOwnerId = newOwnerId;
+      ownerWasCreated = true;
+      config.ownerDeploymentId = newOwnerId;
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+      console.log('   新しいオーナー用デプロイID: ' + newOwnerId);
+      console.log('   deploy-config.json を更新しました。');
+    }
   }
+
   // 3. スタッフ用デプロイ（マニフェストをスタッフ設定に切り替えてからデプロイ）
-  console.log('3. スタッフ用デプロイを更新しています（同じURLのまま）...');
+  console.log('3. スタッフ用デプロイを更新しています...');
   console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
   setWebappConfig(STAFF_WEBAPP);
   run(`${clasp} push`);
@@ -345,10 +359,23 @@ async function main() {
       console.error('   Apps Script「デプロイを管理」で不要なデプロイを手動で削除してから再実行してください。');
       process.exit(1);
     }
-    console.error('   スタッフ用デプロイの更新に失敗しました。');
-    console.error('   deploy-config.json の staffDeploymentId が正しいか、Apps Script「デプロイを管理」で確認してください。');
-    console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
-    process.exit(1);
+    // 既存デプロイが見つからない場合、新規作成
+    console.log('   既存デプロイが見つかりません。新規作成します...');
+    staffResult = runCapture(`${clasp} deploy --description "スタッフ用 ${today}"`);
+    if (!staffResult.success) {
+      console.error('   スタッフ用デプロイの新規作成にも失敗しました。');
+      console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
+      process.exit(1);
+    }
+    const newStaffId = parseDeploymentId(staffResult.stdout, staffResult.stderr);
+    if (newStaffId) {
+      currentStaffId = newStaffId;
+      staffWasCreated = true;
+      config.staffDeploymentId = newStaffId;
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+      console.log('   新しいスタッフ用デプロイID: ' + newStaffId);
+      console.log('   deploy-config.json を更新しました。');
+    }
   }
 
   // マニフェストをオーナー用設定に戻す（ローカルファイルのみ。次回デプロイに備える）

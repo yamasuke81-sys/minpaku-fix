@@ -1,6 +1,6 @@
 @echo off
 
-:: UTF-8に切り替え（chcpが使えない環境でもエラーにしない）
+:: UTF-8
 %SystemRoot%\system32\chcp.com 65001 >nul 2>nul
 
 echo ==========================================
@@ -11,20 +11,40 @@ echo.
 
 cd /d "%~dp0"
 
-:: Node.js PATH補完（よくあるインストール先を追加）
-set "PATH=%PATH%;%ProgramFiles%\nodejs;%ProgramFiles(x86)%\nodejs;%APPDATA%\npm;%LOCALAPPDATA%\Programs\Node.js;%USERPROFILE%\AppData\Roaming\nvm\current"
-
-:: Node.js チェック
-where node >nul 2>nul
+:: Node.js check (use node directly, not "where")
+node --version >nul 2>nul
 if errorlevel 1 (
-    echo [Error] Node.js ga install sareteimasen.
-    echo   https://nodejs.org/ kara install shitekudasai.
-    echo   Install-go, PC wo saikidou shitekudasai.
+    echo [Info] Node.js not in PATH. Searching...
+    :: Try common install locations
+    if exist "%ProgramFiles%\nodejs\node.exe" (
+        set "PATH=%ProgramFiles%\nodejs;%PATH%"
+        goto :node_found
+    )
+    if exist "%LOCALAPPDATA%\fnm_multishells" (
+        for /f "delims=" %%d in ('dir /b /ad /o-d "%LOCALAPPDATA%\fnm_multishells" 2^>nul') do (
+            if exist "%LOCALAPPDATA%\fnm_multishells\%%d\node.exe" (
+                set "PATH=%LOCALAPPDATA%\fnm_multishells\%%d;%PATH%"
+                goto :node_found
+            )
+        )
+    )
+    if exist "%APPDATA%\nvm" (
+        for /f "delims=" %%d in ('dir /b /ad "%APPDATA%\nvm\v*" 2^>nul') do (
+            if exist "%APPDATA%\nvm\%%d\node.exe" (
+                set "PATH=%APPDATA%\nvm\%%d;%PATH%"
+                goto :node_found
+            )
+        )
+    )
+    echo [Error] Node.js not found.
+    echo   Please install from https://nodejs.org/
+    echo   After install, restart PC.
     pause
     exit /b 1
 )
 
-echo [OK] Node.js found:
+:node_found
+echo [OK] Node.js:
 node --version
 echo.
 
@@ -38,7 +58,7 @@ echo.
 
 :: 2. Main app clasp push
 echo [2/3] Main app clasp push ...
-npx clasp push
+call npx clasp push
 if errorlevel 1 (
     echo [Error] Main app clasp push failed.
     pause
@@ -51,11 +71,11 @@ echo.
 echo [3/3] Checklist app clasp push ...
 cd /d "%~dp0checklist-app"
 if not exist ".clasp.json" (
-    echo [Skip] checklist-app/.clasp.json not found. Skipping checklist deploy.
+    echo [Skip] checklist-app/.clasp.json not found.
     cd /d "%~dp0"
     goto :done
 )
-npx clasp push
+call npx clasp push
 if errorlevel 1 (
     echo [Error] Checklist app clasp push failed.
     cd /d "%~dp0"
@@ -68,9 +88,8 @@ cd /d "%~dp0"
 :done
 echo.
 echo ==========================================
-echo   Done!
-echo   Both apps pushed via clasp.
-echo   Next: Open GAS editor, go to
+echo   Done! Both apps pushed via clasp.
+echo   Next: Open GAS editor
 echo   Deploy - Manage deployments - Edit
 echo   - New version - Deploy
 echo ==========================================

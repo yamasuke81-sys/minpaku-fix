@@ -13,10 +13,13 @@ const path = require('path');
 const scriptDir = __dirname;
 const parentDir = path.join(scriptDir, '..');
 
-// npx が checklist-app ディレクトリから clasp を見つけられない場合があるため、
-// 親ディレクトリの node_modules/.bin を PATH に追加して clasp を呼ぶ
+// 親ディレクトリの node_modules/.bin から clasp を直接実行
+// npx 経由だと Windows で JSON5 エラーが発生する場合がある
 const parentBinDir = path.join(parentDir, 'node_modules', '.bin');
-const clasp = 'npx clasp';
+const claspCmd = process.platform === 'win32'
+  ? path.join(parentBinDir, 'clasp.cmd')
+  : path.join(parentBinDir, 'clasp');
+const clasp = fs.existsSync(claspCmd) ? `"${claspCmd}"` : 'npx clasp';
 
 /** コマンドを実行し結果を取得（親の node_modules/.bin を PATH に含む） */
 function runCapture(cmd, cwd) {
@@ -81,17 +84,36 @@ function main() {
     process.exit(1);
   }
 
+  // clasp 動作確認
+  console.log('   clasp: ' + clasp);
+  const versionCheck = runCapture(`${clasp} --version`);
+  if (!versionCheck.success) {
+    console.error('エラー: clasp が見つかりません。');
+    console.error('  npm install @google/clasp を実行してください。');
+    process.exit(1);
+  }
+  console.log('   clasp version: ' + versionCheck.stdout.trim());
+
   // バリデーション
   validateCode();
 
-  // clasp push
+  // clasp push（--force で確認プロンプトをスキップ）
   console.log('2. コードをプッシュしています...');
-  const pushResult = runCapture(`${clasp} push`);
+  const pushResult = runCapture(`${clasp} push --force`);
   if (!pushResult.success) {
+    const errText = (pushResult.stdout + pushResult.stderr);
     console.error('   clasp push に失敗しました。');
-    console.error('   ' + (pushResult.stdout + pushResult.stderr).slice(0, 500));
+    console.error('   ' + errText.slice(0, 500));
     console.error('');
-    console.error('   ログインが必要な場合: npx clasp login');
+    if (errText.includes('JSON') || errText.includes('json') || errText.includes('Parse')) {
+      console.error('   [ヒント] JSON解析エラーです。以下を試してください:');
+      console.error('   1. npx clasp login  （再ログイン）');
+      console.error('   2. %USERPROFILE%\\.clasprc.json を削除して再ログイン');
+    } else if (errText.includes('401') || errText.includes('auth') || errText.includes('login')) {
+      console.error('   [ヒント] 認証エラーです: npx clasp login');
+    } else {
+      console.error('   ログインが必要な場合: npx clasp login');
+    }
     process.exit(1);
   }
   console.log('   プッシュ完了');

@@ -2241,7 +2241,7 @@
         var isStaff = isStaffView;
         // フッターボタン設定
         var actionBtns = document.getElementById('eventModalActionBtns');
-        if (actionBtns) actionBtns.innerHTML = '';
+        if (actionBtns) { actionBtns.innerHTML = ''; actionBtns.style.display = 'none'; }
         // フッターの削除ボタン・アクションボタンは常に非表示（body内に移動済み）
         var deleteArea = document.getElementById('eventModalDeleteArea');
         if (deleteArea) deleteArea.style.display = 'none';

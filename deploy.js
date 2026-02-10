@@ -14,7 +14,12 @@ const http = require('http');
 const configPath = path.join(__dirname, 'deploy-config.json');
 const claspJsonPath = path.join(__dirname, '.clasp.json');
 const appsscriptPath = path.join(__dirname, 'appsscript.json');
-const clasp = 'npx clasp';
+// npx 経由だと Windows で JSON5 エラーが発生する場合があるため、直接実行を優先
+const binDir = path.join(__dirname, 'node_modules', '.bin');
+const claspBin = process.platform === 'win32'
+  ? path.join(binDir, 'clasp.cmd')
+  : path.join(binDir, 'clasp');
+const clasp = fs.existsSync(claspBin) ? `"${claspBin}"` : 'npx clasp';
 
 // オーナー用・スタッフ用の Webアプリ設定（appsscript.json の webapp セクション）
 const OWNER_WEBAPP = { access: 'ANYONE_ANONYMOUS', executeAs: 'USER_DEPLOYING' };

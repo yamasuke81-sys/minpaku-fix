@@ -109,20 +109,8 @@ function getOrCreateChecklistSpreadsheet_() {
       Logger.log('CHECKLIST_SS_ID=' + ssId + ' でスプレッドシートを開けません: ' + e.toString());
     }
   } else {
-    Logger.log('CHECKLIST_SS_ID が Script Properties に設定されていません');
+    Logger.log('CHECKLIST_SS_ID が Script Properties に設定されていません。新規作成します。');
   }
-  // DocumentProperties もフォールバックで確認
-  try {
-    var docProps = PropertiesService.getDocumentProperties();
-    var docSsId = docProps.getProperty('CHECKLIST_SS_ID');
-    if (docSsId) {
-      try {
-        var ss = SpreadsheetApp.openById(docSsId);
-        props.setProperty('CHECKLIST_SS_ID', docSsId);
-        return ss;
-      } catch (e) {}
-    }
-  } catch (e) {}
   var newSs = SpreadsheetApp.create('清掃チェックリスト管理');
   props.setProperty('CHECKLIST_SS_ID', newSs.getId());
   // 初期シート作成
@@ -461,7 +449,7 @@ function uploadChecklistPhoto(checkoutDate, spotId, timing, base64Data, staffNam
 }
 
 function getOrCreateChecklistPhotoFolder_() {
-  var props = PropertiesService.getDocumentProperties();
+  var props = PropertiesService.getScriptProperties();
   var folderId = props.getProperty('CHECKLIST_PHOTO_FOLDER_ID');
   if (folderId) {
     try { return DriveApp.getFolderById(folderId); } catch (e) {}

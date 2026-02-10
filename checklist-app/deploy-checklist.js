@@ -16,7 +16,10 @@ const parentDir = path.join(scriptDir, '..');
 // npx が checklist-app ディレクトリから clasp を見つけられない場合があるため、
 // 親ディレクトリの node_modules から直接 clasp を呼ぶ
 const claspBin = path.join(parentDir, 'node_modules', '.bin', 'clasp');
-const clasp = fs.existsSync(claspBin) ? '"' + claspBin + '"' : 'npx clasp';
+const claspCmd = claspBin + '.cmd';
+// Windows では .cmd ファイルを優先
+const claspPath = fs.existsSync(claspCmd) ? claspCmd : (fs.existsSync(claspBin) ? claspBin : '');
+const clasp = claspPath ? '"' + claspPath + '"' : 'npx clasp';
 
 /** コマンドを実行し結果を取得 */
 function runCapture(cmd, cwd) {

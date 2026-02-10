@@ -78,6 +78,43 @@ function getDeploymentIds(stdout) {
   return ids;
 }
 
+/** clasp versions の出力からバージョン数を取得 */
+function getVersionCount() {
+  const result = runCapture(`${clasp} versions`);
+  if (!result.success) return -1;
+  const text = result.stdout + result.stderr;
+  // "~N Versions." のパターンまたは各バージョン行をカウント
+  const countMatch = text.match(/~?(\d+)\s+Versions?\./i);
+  if (countMatch) return parseInt(countMatch[1], 10);
+  // バージョン行を数える（"1 - description" 形式）
+  const lines = text.split('\n').filter(l => /^\d+\s+-\s+/.test(l.trim()));
+  return lines.length;
+}
+
+/** バージョン数を確認し、上限に近い場合は警告してプロジェクト履歴を開く */
+function checkVersionLimit(scriptId) {
+  const count = getVersionCount();
+  if (count < 0) return;
+  console.log('   現在のバージョン数: ' + count + ' / 200');
+  if (count >= 150) {
+    console.log('');
+    console.log('   ⚠ バージョン数が上限(200)に近づいています！');
+    console.log('   GASエディタの「プロジェクトの履歴」から古いバージョンを一括削除してください。');
+    console.log('   ※ バージョン削除はAPIでは不可。GASエディタのUIからのみ可能です。');
+    if (scriptId) {
+      const historyUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
+      try {
+        if (process.platform === 'win32') {
+          execSync('start "" "' + historyUrl + '"', { shell: true });
+        } else {
+          execSync('open "' + historyUrl + '"', { shell: true });
+        }
+        console.log('   GASエディタを開きました。左メニュー「プロジェクトの履歴」→「バージョンの一括削除」で削除できます。');
+      } catch (e) { /* ignore */ }
+    }
+  }
+}
+
 /** deploy-config にない古いデプロイだけ削除（オーナー・スタッフの2件は必ず保持） */
 function cleanupOldDeployments(keepIds) {
   try {
@@ -273,6 +310,11 @@ async function main() {
   } else {
     console.log('   削除対象はありませんでした。');
   }
+
+  // 1.6. バージョン数チェック（200件上限の監視）
+  console.log('1.6. バージョン数を確認しています...');
+  const claspConfig = JSON.parse(fs.readFileSync(claspJsonPath, 'utf8'));
+  checkVersionLimit(claspConfig.scriptId);
   console.log('');
 
   // 2. オーナー用デプロイ（既存IDで更新のみ。新規作成は行わない）

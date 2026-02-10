@@ -11,7 +11,12 @@ const fs = require('fs');
 const path = require('path');
 
 const scriptDir = __dirname;
-const clasp = 'npx clasp';
+const parentDir = path.join(scriptDir, '..');
+
+// npx が checklist-app ディレクトリから clasp を見つけられない場合があるため、
+// 親ディレクトリの node_modules から直接 clasp を呼ぶ
+const claspBin = path.join(parentDir, 'node_modules', '.bin', 'clasp');
+const clasp = fs.existsSync(claspBin) ? '"' + claspBin + '"' : 'npx clasp';
 
 /** コマンドを実行し結果を取得 */
 function runCapture(cmd, cwd) {

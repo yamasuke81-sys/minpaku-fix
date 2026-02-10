@@ -17,6 +17,54 @@ const CL_OWNER_SHEET = 'オーナー';
 const CL_STAFF_SHEET = 'スタッフ';
 
 /**
+ * 診断用: Script Properties とスプレッドシートの状態を確認
+ * GASエディタで実行 → 実行ログで結果を確認
+ */
+function diagChecklistSetup() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty('CHECKLIST_SS_ID');
+  Logger.log('CHECKLIST_SS_ID = ' + (ssId || '(未設定)'));
+
+  if (!ssId) {
+    Logger.log('ERROR: CHECKLIST_SS_ID が設定されていません。Script Properties に設定してください。');
+    return;
+  }
+
+  try {
+    var ss = SpreadsheetApp.openById(ssId);
+    Logger.log('スプレッドシート名: ' + ss.getName());
+    var sheets = ss.getSheets();
+    Logger.log('シート数: ' + sheets.length);
+    sheets.forEach(function(s) {
+      Logger.log('  - ' + s.getName() + ' (行数: ' + s.getLastRow() + ')');
+    });
+
+    // マスタシートの確認
+    var masterSheet = ss.getSheetByName('チェックリストマスタ');
+    if (masterSheet) {
+      Logger.log('OK: チェックリストマスタ が存在 (行数: ' + masterSheet.getLastRow() + ')');
+      if (masterSheet.getLastRow() >= 1) {
+        Logger.log('  ヘッダー: ' + masterSheet.getRange(1, 1, 1, 6).getValues()[0].join(', '));
+      }
+    } else {
+      Logger.log('ERROR: チェックリストマスタ シートが存在しません');
+    }
+
+    var spotSheet = ss.getSheetByName('撮影箇所マスタ');
+    if (spotSheet) {
+      Logger.log('OK: 撮影箇所マスタ が存在 (行数: ' + spotSheet.getLastRow() + ')');
+      if (spotSheet.getLastRow() >= 1) {
+        Logger.log('  ヘッダー: ' + spotSheet.getRange(1, 1, 1, 7).getValues()[0].join(', '));
+      }
+    } else {
+      Logger.log('ERROR: 撮影箇所マスタ シートが存在しません');
+    }
+  } catch (e) {
+    Logger.log('ERROR: スプレッドシートを開けません: ' + e.toString());
+  }
+}
+
+/**
  * Webアプリのエントリーポイント
  */
 function doGet(e) {
@@ -57,7 +105,11 @@ function getOrCreateChecklistSpreadsheet_() {
   var props = PropertiesService.getScriptProperties();
   var ssId = props.getProperty('CHECKLIST_SS_ID');
   if (ssId) {
-    try { return SpreadsheetApp.openById(ssId); } catch (e) { /* deleted or inaccessible */ }
+    try { return SpreadsheetApp.openById(ssId); } catch (e) {
+      Logger.log('CHECKLIST_SS_ID=' + ssId + ' でスプレッドシートを開けません: ' + e.toString());
+    }
+  } else {
+    Logger.log('CHECKLIST_SS_ID が Script Properties に設定されていません');
   }
   // DocumentProperties もフォールバックで確認
   try {
@@ -239,7 +291,10 @@ function getChecklistForDate(checkoutDate) {
     var masterRes = JSON.parse(getChecklistMaster());
     var spotRes = JSON.parse(getPhotoSpotMaster());
     if (!masterRes.success || !spotRes.success) {
-      return JSON.stringify({ success: false, error: 'マスタデータの読み込みに失敗しました' });
+      var detail = '';
+      if (!masterRes.success) detail += 'チェックリストマスタ: ' + (masterRes.error || '不明');
+      if (!spotRes.success) detail += (detail ? ' / ' : '') + '撮影箇所マスタ: ' + (spotRes.error || '不明');
+      return JSON.stringify({ success: false, error: 'マスタデータの読み込みに失敗しました: ' + detail });
     }
 
     var recordSheet = clSheet_(SHEET_CL_RECORDS);

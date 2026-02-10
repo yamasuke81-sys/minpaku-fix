@@ -126,6 +126,30 @@ function fetchUrl(url, redirectCount = 0) {
   });
 }
 
+/** オーナー用（通常ブラウザ）とスタッフ用（Chromeシークレット）を開く */
+function openBrowserUrls(ownerUrl, staffUrl) {
+  try {
+    if (process.platform === 'win32') {
+      // オーナー用: デフォルトブラウザ（通常モード）
+      execSync('start "" "' + ownerUrl + '"', { shell: true });
+      // スタッフ用: Chrome シークレットモード
+      try {
+        execSync('start chrome --incognito "' + staffUrl + '"', { shell: true });
+      } catch (e) {
+        // Chrome が見つからない場合はデフォルトブラウザで開く
+        execSync('start "" "' + staffUrl + '"', { shell: true });
+        console.log('   ※ Chrome が見つからないためスタッフ用は通常ブラウザで開きました。');
+      }
+    } else {
+      execSync('open "' + ownerUrl + '"', { shell: true });
+      execSync('open -a "Google Chrome" --args --incognito "' + staffUrl + '"', { shell: true });
+    }
+    console.log('オーナー用（通常）・スタッフ用（シークレット）をブラウザで開きました。');
+  } catch (e) {
+    // ブラウザ起動に失敗してもデプロイは成功しているので無視
+  }
+}
+
 /** Apps Scriptのエディタをブラウザで開く */
 function openDeploymentsPage() {
   try {
@@ -228,19 +252,8 @@ async function main() {
     console.log('スタッフ用: ' + staffUrl);
     console.log('');
 
-    // push-only 時もブラウザを自動で開く
-    try {
-      if (process.platform === 'win32') {
-        execSync('start "" "' + ownerUrl + '"', { shell: true });
-        execSync('start "" "' + staffUrl + '"', { shell: true });
-      } else {
-        execSync('open "' + ownerUrl + '"', { shell: true });
-        execSync('open "' + staffUrl + '"', { shell: true });
-      }
-      console.log('オーナー用・スタッフ用のURLをブラウザで開きました。');
-    } catch (e) {
-      // ブラウザ起動に失敗してもプッシュ自体は成功しているので無視
-    }
+    // push-only 時もブラウザを自動で開く（スタッフ用はシークレットモード）
+    openBrowserUrls(ownerUrl, staffUrl);
 
     return;
   }
@@ -368,21 +381,9 @@ async function main() {
   console.log('スタッフ用: ' + staffUrl);
   console.log('');
 
-  // 新規デプロイが作成されていない場合のみ自動でブラウザを開く
+  // 新規デプロイが作成されていない場合のみ自動でブラウザを開く（スタッフ用はシークレットモード）
   if (!ownerWasCreated && !staffWasCreated) {
-    try {
-      const { execSync } = require('child_process');
-      if (process.platform === 'win32') {
-        execSync('start "" "' + ownerUrl + '"', { shell: true });
-        execSync('start "" "' + staffUrl + '"', { shell: true });
-      } else {
-        execSync('open "' + ownerUrl + '"', { shell: true });
-        execSync('open "' + staffUrl + '"', { shell: true });
-      }
-      console.log('オーナー用・スタッフ用のURLをブラウザで開きました。');
-    } catch (e) {
-      // ブラウザ起動に失敗してもデプロイは成功しているので無視
-    }
+    openBrowserUrls(ownerUrl, staffUrl);
   }
 }
 

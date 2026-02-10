@@ -14,17 +14,17 @@ const scriptDir = __dirname;
 const parentDir = path.join(scriptDir, '..');
 
 // npx が checklist-app ディレクトリから clasp を見つけられない場合があるため、
-// 親ディレクトリの node_modules から直接 clasp を呼ぶ
-const claspBin = path.join(parentDir, 'node_modules', '.bin', 'clasp');
-const claspCmd = claspBin + '.cmd';
-// Windows では .cmd ファイルを優先
-const claspPath = fs.existsSync(claspCmd) ? claspCmd : (fs.existsSync(claspBin) ? claspBin : '');
-const clasp = claspPath ? '"' + claspPath + '"' : 'npx clasp';
+// 親ディレクトリの node_modules/.bin を PATH に追加して clasp を呼ぶ
+const parentBinDir = path.join(parentDir, 'node_modules', '.bin');
+const clasp = 'npx clasp';
 
-/** コマンドを実行し結果を取得 */
+/** コマンドを実行し結果を取得（親の node_modules/.bin を PATH に含む） */
 function runCapture(cmd, cwd) {
+  // PATH に親の node_modules/.bin を追加（npx/clasp がここから見つかるようにする）
+  const sep = process.platform === 'win32' ? ';' : ':';
+  const envPath = parentBinDir + sep + (process.env.PATH || '');
   try {
-    const out = execSync(cmd, { encoding: 'utf8', shell: true, cwd: cwd || scriptDir });
+    const out = execSync(cmd, { encoding: 'utf8', shell: true, cwd: cwd || scriptDir, env: { ...process.env, PATH: envPath } });
     return { success: true, stdout: out || '', stderr: '' };
   } catch (e) {
     return { success: false, stdout: (e.stdout || '').toString(), stderr: (e.stderr || '').toString() };

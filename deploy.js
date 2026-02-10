@@ -412,48 +412,33 @@ async function main() {
   console.log('デプロイ完了しました。');
   console.log('');
   
-  // 新規デプロイが作成された場合は警告を表示
+  // 新規デプロイが作成された場合は手動設定が必要な旨を表示
   if (ownerWasCreated || staffWasCreated) {
     console.log('【警告】新規デプロイが作成されました。');
-    console.log('ブラウザで開く前に、以下の設定を完了してください:');
+    console.log('GASエディタの「デプロイを管理」で以下を確認してください:');
     console.log('');
     if (ownerWasCreated) {
-      console.log('【オーナー用】');
-      console.log('   1. デプロイ管理画面で、オーナー用デプロイ（説明: オーナー用 ' + today + '）を選択');
-      console.log('   2. 右側の設定パネル上部の「編集」ボタン（鉛筆アイコン）をクリック');
-      console.log('   3. 編集画面で以下を設定:');
-      console.log('      - 「次のユーザーとして実行: アクセスしているユーザー」');
-      console.log('      - 「アクセスできるユーザー: 全員」');
-      console.log('   4. 「デプロイ」をクリック');
-      console.log('');
-      openDeploymentsPage();
-      console.log('');
+      console.log('【オーナー用】 説明: オーナー用 ' + today);
+      console.log('   - 次のユーザーとして実行: アクセスしているユーザー');
+      console.log('   - アクセスできるユーザー: 全員');
     }
     if (staffWasCreated) {
-      console.log('【スタッフ用】');
-      console.log('   1. デプロイ管理画面で、スタッフ用デプロイ（説明: スタッフ用 ' + today + '）を選択');
-      console.log('   2. 右側の設定パネル上部の「編集」ボタン（鉛筆アイコン）をクリック');
-      console.log('   3. 編集画面で以下を設定:');
-      console.log('      - 「次のユーザーとして実行: 自分」');
-      console.log('      - 「アクセスできるユーザー: Google アカウントを持つ全員」');
-      console.log('   4. 「デプロイ」をクリック');
-      console.log('');
-      openDeploymentsPage();
-      console.log('');
+      console.log('【スタッフ用】 説明: スタッフ用 ' + today);
+      console.log('   - 次のユーザーとして実行: 自分');
+      console.log('   - アクセスできるユーザー: Google アカウントを持つ全員');
     }
-    console.log('設定完了後、以下のURLを手動でブラウザで開いてください:');
+    console.log('');
+    openDeploymentsPage();
     console.log('');
   }
-  
+
   console.log('【最新のURL】');
   console.log('オーナー用: ' + ownerUrl);
   console.log('スタッフ用: ' + staffUrl);
   console.log('');
 
-  // 新規デプロイが作成されていない場合のみ自動でブラウザを開く（スタッフ用はシークレットモード）
-  if (!ownerWasCreated && !staffWasCreated) {
-    openBrowserUrls(ownerUrl, staffUrl);
-  }
+  // カレンダーURLを常に開く（オーナー＝通常ブラウザ、スタッフ＝Chromeシークレット）
+  openBrowserUrls(ownerUrl, staffUrl);
 }
 
 main();

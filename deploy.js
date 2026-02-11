@@ -257,7 +257,7 @@ async function main() {
   }
 
   console.log('1. コードをプッシュしています...');
-  run(`${clasp} push`);
+  run(`${clasp} push --force`);
 
   if (pushOnly) {
     // ここから先は「プッシュのみ」用の軽量オートメーション
@@ -355,7 +355,7 @@ async function main() {
   console.log('3. スタッフ用デプロイを更新しています...');
   console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
   setWebappConfig(STAFF_WEBAPP);
-  run(`${clasp} push`);
+  run(`${clasp} push --force`);
   let staffResult = runCapture(`${clasp} deploy --deploymentId "${staffId}" --description "スタッフ用 ${today}"`);
   if (!staffResult.success) {
     const staffErr = (staffResult.stdout + staffResult.stderr).toLowerCase();

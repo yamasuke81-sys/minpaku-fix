@@ -9,6 +9,8 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
 const scriptDir = __dirname;
 const parentDir = path.join(scriptDir, '..');
@@ -33,11 +35,13 @@ function runCapture(cmd, cwd) {
   }
 }
 
-/** clasp deployments の出力からウェブアプリ用デプロイIDを取得（AKfycb... 形式） */
+/** clasp deployments の出力からウェブアプリ用デプロイIDを取得（AKfycb... 形式、HEAD除外） */
 function getWebAppDeploymentIds(text) {
   const ids = [];
   const lines = text.split('\n');
   for (const line of lines) {
+    // @HEAD はread-onlyなので除外
+    if (line.includes('@HEAD')) continue;
     const m = line.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
     if (m && !ids.includes(m[1])) ids.push(m[1]);
   }
@@ -76,7 +80,25 @@ function validateCode() {
   console.log('   バリデーション OK');
 }
 
-function main() {
+/** URLを取得（リダイレクト対応） */
+function fetchUrl(url, redirectCount) {
+  if (redirectCount === undefined) redirectCount = 0;
+  if (redirectCount >= 5) return Promise.reject(new Error('Too many redirects'));
+  return new Promise(function(resolve, reject) {
+    var lib = url.startsWith('https') ? https : http;
+    lib.get(url, { headers: { 'User-Agent': 'deploy-checklist/1.0' } }, function(res) {
+      if (res.statusCode >= 301 && res.statusCode <= 303 && res.headers.location) {
+        var next = res.headers.location.startsWith('http') ? res.headers.location : new URL(res.headers.location, url).href;
+        return fetchUrl(next, redirectCount + 1).then(resolve, reject);
+      }
+      var data = '';
+      res.on('data', function(chunk) { data += chunk; });
+      res.on('end', function() { resolve(data); });
+    }).on('error', reject);
+  });
+}
+
+async function main() {
   const claspJsonPath = path.join(scriptDir, '.clasp.json');
   if (!fs.existsSync(claspJsonPath)) {
     console.error('エラー: .clasp.json が見つかりません。');
@@ -188,12 +210,18 @@ function main() {
           const ownerUrl = 'https://script.google.com/macros/s/' + ownerId + '/exec';
           const updateUrl = ownerUrl + '?action=setChecklistAppUrl&url=' + encodeURIComponent(deployUrl);
           console.log('4. メインアプリのチェックリストURLを更新しています...');
-          // curl -L でリダイレクトを辿ってGAS URLにアクセス
-          const fetchResult = runCapture(`curl -s -L "${updateUrl}"`, parentDir);
-          if (fetchResult.success && fetchResult.stdout.trim() === 'OK') {
-            console.log('   CHECKLIST_APP_URL を更新しました。');
-          } else {
-            console.log('   自動更新できませんでした（応答: ' + (fetchResult.stdout || '').trim().slice(0, 100) + '）');
+          try {
+            const res = await fetchUrl(updateUrl);
+            const trimmed = (res || '').trim();
+            if (trimmed === 'OK') {
+              console.log('   CHECKLIST_APP_URL を更新しました。');
+            } else {
+              console.log('   自動更新できませんでした（応答: ' + trimmed.slice(0, 100) + '）');
+              console.log('   メインアプリの Script Properties に手動で設定してください:');
+              console.log('   CHECKLIST_APP_URL = ' + deployUrl);
+            }
+          } catch (fetchErr) {
+            console.log('   URL自動更新でエラー: ' + fetchErr.message);
             console.log('   メインアプリの Script Properties に手動で設定してください:');
             console.log('   CHECKLIST_APP_URL = ' + deployUrl);
           }
@@ -204,8 +232,20 @@ function main() {
     }
   }
 
+  // 初回セットアップのヒント
+  const claspConfig = JSON.parse(fs.readFileSync(claspJsonPath, 'utf8'));
+  const scriptId = claspConfig.scriptId;
+  if (scriptId) {
+    console.log('   ※ 初回デプロイの場合、GASエディタで diagChecklistSetup() を実行して');
+    console.log('     OAuth認証を許可してください:');
+    console.log('     https://script.google.com/home/projects/' + scriptId + '/edit');
+  }
+
   console.log('');
   console.log('完了しました。');
 }
 
-main();
+main().catch(function(e) {
+  console.error('エラー: ' + e.message);
+  process.exit(1);
+});

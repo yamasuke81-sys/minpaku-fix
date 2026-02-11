@@ -2685,17 +2685,14 @@
                 var rowNum = props.rowNumber;
                 var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
                 if (!r.recruitRowIndex) {
-                  var startBtn = document.createElement('button');
-                  startBtn.type = 'button';
-                  startBtn.className = 'btn btn-sm btn-primary me-1';
-                  startBtn.id = 'eventModalBtnStartRecruit';
-                  startBtn.textContent = '募集開始';
-                  if (startBtn)                   startBtn.onclick = function() {
-                    var detail = { date:'', guestCount:'', bbq:'', nationality:'日本', memo:'', cleaningStaff:'', notifyMethod:'メール' };
+                  // 募集レコードが未作成→自動作成（ボタン不要）
+                  ownerCenterArea.innerHTML = '<small class="text-muted">募集レコード作成中...</small>';
+                  var detail = { date:'', guestCount:'', bbq:'', nationality:'日本', memo:'', cleaningStaff:'', notifyMethod:'メール' };
+                  (function(oca, cd, rn, dt) {
                     google.script.run.withSuccessHandler(function(j) {
                       var res = JSON.parse(j);
-                      if (res.success && !res.alreadyExists && res.rowIndex) {
-                        ownerCenterArea.innerHTML = '';
+                      if (res.success && res.rowIndex) {
+                        oca.innerHTML = '';
                         var emPopMail = document.createElement('button');
                         emPopMail.type = 'button';
                         emPopMail.className = 'btn btn-sm btn-primary me-1';
@@ -2740,19 +2737,20 @@
                                 }
                               };
                             } else if (!jt.success) alert(jt.error || 'コピーに失敗しました');
-                          }).getRecruitmentCopyText(checkoutDate, rowNum, detail);
+                          }).getRecruitmentCopyText(cd, rn, dt);
                         };
                         var popBtnRow = document.createElement('div');
                         popBtnRow.className = 'd-flex flex-wrap justify-content-center gap-1 mt-2';
                         popBtnRow.appendChild(emPopMail);
                         popBtnRow.appendChild(emPopCopy);
-                        ownerCenterArea.appendChild(popBtnRow);
-                      } else if (res.alreadyExists) {
-                        alert('この予約は既に募集済みです。');
+                        oca.appendChild(popBtnRow);
+                      } else {
+                        oca.innerHTML = '';
                       }
-                    }).saveRecruitmentDetail(null, rowNum, checkoutDate, detail);
-                  };
-                  ownerCenterArea.appendChild(startBtn);
+                    }).withFailureHandler(function() {
+                      oca.innerHTML = '';
+                    }).saveRecruitmentDetail(null, rn, cd, dt);
+                  })(ownerCenterArea, checkoutDate, rowNum, detail);
                 } else {
                   var hasVol = r.volunteers && r.volunteers.length > 0;
                   var emBtnMail = document.createElement('button');

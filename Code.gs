@@ -1796,6 +1796,10 @@ function syncFromICal() {
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '' });
     }
 
+    // 同期後に募集レコードを自動作成
+    if (added > 0) {
+      try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
+    }
     return JSON.stringify({ success: true, added: added, removed: removed, details: details });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), added: 0, removed: 0, details: [] });
@@ -4912,10 +4916,6 @@ function checkAndCreateRecruitments() {
     if (colMap.checkOut < 0) return;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const rangeStart = new Date(today);
-    rangeStart.setDate(rangeStart.getDate() + (startWeeks - 1) * 7);
-    const rangeEnd = new Date(rangeStart);
-    rangeEnd.setDate(rangeEnd.getDate() + 7);
     const data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
     for (var i = 0; i < data.length; i++) {
       const checkOutVal = data[i][colMap.checkOut];
@@ -4923,7 +4923,7 @@ function checkAndCreateRecruitments() {
       if (!checkOut) continue;
       const co = new Date(checkOut);
       co.setHours(0, 0, 0, 0);
-      if (co < rangeStart || co >= rangeEnd) continue;
+      if (co < today) continue;
       const checkoutStr = toDateKeySafe_(checkOut);
       const rowNumber = i + 2;
       const existing = recruitSheet.getRange(2, 2, Math.max(recruitSheet.getLastRow(), 1), 2).getValues();

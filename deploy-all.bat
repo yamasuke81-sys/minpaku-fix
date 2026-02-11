@@ -27,6 +27,13 @@ git reset --hard origin/claude/fix-sheet-name-variable-tBTum
 for /f "tokens=*" %%a in ('git log --oneline -1 2^>nul') do echo    Latest: %%a
 echo.
 
+:: clasp インストール確認（なければ自動インストール）
+if not exist "node_modules\.bin\clasp.cmd" (
+    echo    clasp not found. Installing @google/clasp ...
+    call npm install @google/clasp --save-dev
+    echo.
+)
+
 :: Main app
 echo [2/3] Main app: push + deploy ...
 if not exist "deploy-config.json" (

@@ -257,7 +257,16 @@ async function main() {
   }
 
   console.log('1. コードをプッシュしています...');
-  run(`${clasp} push --force`);
+  const pushResult1 = runCapture(`${clasp} push --force`);
+  if (!pushResult1.success) {
+    console.error('   clasp push に失敗しました。');
+    console.error('   ' + (pushResult1.stdout + pushResult1.stderr).slice(0, 500));
+    console.error('');
+    console.error('   clasp がインストールされていない場合: npm install @google/clasp --save-dev');
+    console.error('   ログインが必要な場合: npx clasp login');
+    process.exit(1);
+  }
+  console.log('   プッシュ完了');
 
   if (pushOnly) {
     // ここから先は「プッシュのみ」用の軽量オートメーション
@@ -355,7 +364,13 @@ async function main() {
   console.log('3. スタッフ用デプロイを更新しています...');
   console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
   setWebappConfig(STAFF_WEBAPP);
-  run(`${clasp} push --force`);
+  const pushResult2 = runCapture(`${clasp} push --force`);
+  if (!pushResult2.success) {
+    console.error('   スタッフ用 clasp push に失敗しました。');
+    console.error('   ' + (pushResult2.stdout + pushResult2.stderr).slice(0, 500));
+    setWebappConfig(OWNER_WEBAPP); // マニフェストを戻す
+    process.exit(1);
+  }
   let staffResult = runCapture(`${clasp} deploy --deploymentId "${staffId}" --description "スタッフ用 ${today}"`);
   if (!staffResult.success) {
     const staffErr = (staffResult.stdout + staffResult.stderr).toLowerCase();

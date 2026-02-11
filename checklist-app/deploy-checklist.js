@@ -4,7 +4,7 @@
  *
  * 1. Code.gs内のSHEET_NAME重複チェック（バリデーション）
  * 2. clasp push（コードをGASプロジェクトにアップロード）
- * 3. clasp deploy（新しいバージョンでデプロイを更新）
+ * 3. clasp deploy（既存デプロイを新しいバージョンで更新）
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -23,7 +23,6 @@ const clasp = fs.existsSync(claspCmd) ? `"${claspCmd}"` : 'npx clasp';
 
 /** コマンドを実行し結果を取得（親の node_modules/.bin を PATH に含む） */
 function runCapture(cmd, cwd) {
-  // PATH に親の node_modules/.bin を追加（npx/clasp がここから見つかるようにする）
   const sep = process.platform === 'win32' ? ';' : ':';
   const envPath = parentBinDir + sep + (process.env.PATH || '');
   try {
@@ -32,6 +31,17 @@ function runCapture(cmd, cwd) {
   } catch (e) {
     return { success: false, stdout: (e.stdout || '').toString(), stderr: (e.stderr || '').toString() };
   }
+}
+
+/** clasp deployments の出力からウェブアプリ用デプロイIDを取得（AKfycb... 形式） */
+function getWebAppDeploymentIds(text) {
+  const ids = [];
+  const lines = text.split('\n');
+  for (const line of lines) {
+    const m = line.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (m && !ids.includes(m[1])) ids.push(m[1]);
+  }
+  return ids;
 }
 
 /** デプロイ前のバリデーション: SHEET_NAME の重複チェック */
@@ -46,41 +56,30 @@ function validateCode() {
 
   const code = fs.readFileSync(codeGsPath, 'utf8');
 
-  // SHEET_NAME が宣言されていないことを確認
-  const sheetNameMatch = code.match(/\bconst\s+SHEET_NAME\b/);
-  if (sheetNameMatch) {
+  if (code.match(/\bconst\s+SHEET_NAME\b/)) {
     console.error('   エラー: Code.gs に "const SHEET_NAME" が含まれています！');
-    console.error('   予約管理アプリの Code.gs と混同していないか確認してください。');
-    console.error('   チェックリストアプリでは CL_BOOKING_SHEET を使用する必要があります。');
+    console.error('   チェックリストアプリでは CL_BOOKING_SHEET を使用してください。');
     process.exit(1);
   }
 
-  // SHEET_OWNER / SHEET_STAFF が宣言されていないことを確認
-  const ownerMatch = code.match(/\bconst\s+SHEET_OWNER\b/);
-  const staffMatch = code.match(/\bconst\s+SHEET_STAFF\b/);
-  if (ownerMatch || staffMatch) {
-    console.error('   エラー: Code.gs に SHEET_OWNER または SHEET_STAFF が含まれています！');
+  if (code.match(/\bconst\s+SHEET_OWNER\b/) || code.match(/\bconst\s+SHEET_STAFF\b/)) {
+    console.error('   エラー: Code.gs に SHEET_OWNER/SHEET_STAFF が含まれています！');
     console.error('   CL_OWNER_SHEET, CL_STAFF_SHEET を使用してください。');
     process.exit(1);
   }
 
-  // doGet 関数が存在することを確認
   if (!code.includes('function doGet(')) {
     console.error('   エラー: Code.gs に doGet 関数がありません。');
-    console.error('   ウェブアプリとして機能するには doGet が必要です。');
     process.exit(1);
   }
 
   console.log('   バリデーション OK');
-  return true;
 }
 
 function main() {
-  // .clasp.json の存在確認
   const claspJsonPath = path.join(scriptDir, '.clasp.json');
   if (!fs.existsSync(claspJsonPath)) {
     console.error('エラー: .clasp.json が見つかりません。');
-    console.error('チェックリストアプリのプロジェクトIDを設定してください。');
     process.exit(1);
   }
 
@@ -88,8 +87,7 @@ function main() {
   console.log('   clasp: ' + clasp);
   const versionCheck = runCapture(`${clasp} --version`);
   if (!versionCheck.success) {
-    console.error('エラー: clasp が見つかりません。');
-    console.error('  npm install @google/clasp を実行してください。');
+    console.error('エラー: clasp が見つかりません。npm install @google/clasp を実行してください。');
     process.exit(1);
   }
   console.log('   clasp version: ' + versionCheck.stdout.trim());
@@ -118,35 +116,69 @@ function main() {
   }
   console.log('   プッシュ完了');
 
-  // clasp deploy
-  const deployOnly = !process.argv.includes('--push-only');
-  if (deployOnly) {
-    const today = new Date().toISOString().slice(0, 10);
-    console.log('3. デプロイを更新しています...');
-    const deployResult = runCapture(`${clasp} deploy --description "チェックリスト ${today}"`);
-    if (!deployResult.success) {
-      console.error('   clasp deploy に失敗しました。');
-      console.error('   ' + (deployResult.stdout + deployResult.stderr).slice(0, 500));
-      console.error('');
-      console.error('   手動でデプロイする場合:');
-      console.error('   Apps Scriptエディタ → デプロイ → デプロイを管理 → 編集 → 新しいバージョン → デプロイ');
-      process.exit(1);
-    }
-    console.log('   デプロイ完了');
+  // clasp deploy（既存デプロイを更新 or 新規作成）
+  if (process.argv.includes('--push-only')) {
+    console.log('');
+    console.log('プッシュのみ完了しました。（--push-only）');
+    return;
+  }
 
-    // デプロイIDを表示
+  const today = new Date().toISOString().slice(0, 10);
+  console.log('3. デプロイを更新しています...');
+
+  // 既存デプロイを取得
+  const deploymentsResult = runCapture(`${clasp} deployments`);
+  const existingIds = deploymentsResult.success
+    ? getWebAppDeploymentIds(deploymentsResult.stdout + deploymentsResult.stderr)
+    : [];
+
+  let deployResult;
+  let deployUrl = '';
+
+  if (existingIds.length > 0) {
+    // 既存デプロイを更新（URLが変わらない）
+    const deployId = existingIds[0];
+    console.log('   既存デプロイを更新: ' + deployId.substring(0, 30) + '...');
+    deployResult = runCapture(`${clasp} deploy --deploymentId "${deployId}" --description "チェックリスト ${today}"`);
+    if (deployResult.success) {
+      deployUrl = 'https://script.google.com/macros/s/' + deployId + '/exec';
+    } else {
+      // 更新失敗時は新規作成にフォールバック
+      console.log('   既存デプロイの更新に失敗。新規作成します...');
+      deployResult = runCapture(`${clasp} deploy --description "チェックリスト ${today}"`);
+    }
+  } else {
+    // 既存デプロイがない場合、新規作成
+    console.log('   既存デプロイが見つかりません。新規作成します...');
+    deployResult = runCapture(`${clasp} deploy --description "チェックリスト ${today}"`);
+  }
+
+  if (!deployResult.success) {
+    console.error('   clasp deploy に失敗しました。');
+    console.error('   ' + (deployResult.stdout + deployResult.stderr).slice(0, 500));
+    process.exit(1);
+  }
+
+  // デプロイURLを抽出
+  if (!deployUrl) {
     const text = deployResult.stdout + deployResult.stderr;
     const urlMatch = text.match(/script\.google\.com\/macros\/s\/([A-Za-z0-9_-]+)\/exec/);
     if (urlMatch) {
-      console.log('   URL: https://script.google.com/macros/s/' + urlMatch[1] + '/exec');
+      deployUrl = 'https://script.google.com/macros/s/' + urlMatch[1] + '/exec';
     }
+    const idMatch = text.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (idMatch) {
+      deployUrl = 'https://script.google.com/macros/s/' + idMatch[1] + '/exec';
+    }
+  }
+
+  console.log('   デプロイ完了');
+  if (deployUrl) {
+    console.log('   URL: ' + deployUrl);
   }
 
   console.log('');
   console.log('完了しました。');
-  console.log('チェックリストURL: https://script.google.com/macros/s/AKfycbyhVlj_IiLIk0tjKUFKjDBA4SNQ4EEVpgj_0WsSBw3JVMtcclOs5XzwHUfy9x9pExK_/exec');
-  console.log('');
-  console.log('ブラウザで開いて Ctrl+Shift+R でハードリフレッシュしてテストしてください。');
 }
 
 main();

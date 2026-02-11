@@ -177,6 +177,33 @@ function main() {
     console.log('   URL: ' + deployUrl);
   }
 
+  // メインアプリの CHECKLIST_APP_URL を自動更新
+  if (deployUrl) {
+    const configPath = path.join(parentDir, 'deploy-config.json');
+    if (fs.existsSync(configPath)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const ownerId = (config.ownerDeploymentId || '').trim();
+        if (ownerId) {
+          const ownerUrl = 'https://script.google.com/macros/s/' + ownerId + '/exec';
+          const updateUrl = ownerUrl + '?action=setChecklistAppUrl&url=' + encodeURIComponent(deployUrl);
+          console.log('4. メインアプリのチェックリストURLを更新しています...');
+          // curl -L でリダイレクトを辿ってGAS URLにアクセス
+          const fetchResult = runCapture(`curl -s -L "${updateUrl}"`, parentDir);
+          if (fetchResult.success && fetchResult.stdout.trim() === 'OK') {
+            console.log('   CHECKLIST_APP_URL を更新しました。');
+          } else {
+            console.log('   自動更新できませんでした（応答: ' + (fetchResult.stdout || '').trim().slice(0, 100) + '）');
+            console.log('   メインアプリの Script Properties に手動で設定してください:');
+            console.log('   CHECKLIST_APP_URL = ' + deployUrl);
+          }
+        }
+      } catch (e) {
+        console.log('   URL自動更新でエラー: ' + e.message);
+      }
+    }
+  }
+
   console.log('');
   console.log('完了しました。');
 }

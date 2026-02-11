@@ -108,6 +108,10 @@ function doGet(e) {
     PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', u);
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
+  if (action === 'setChecklistAppUrl' && url && typeof url === 'string') {
+    PropertiesService.getScriptProperties().setProperty('CHECKLIST_APP_URL', String(url).trim());
+    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+  }
   const template = HtmlService.createTemplateFromFile('index');
   template.baseUrl = ScriptApp.getService().getUrl();
   var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');

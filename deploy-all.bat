@@ -19,11 +19,17 @@ if errorlevel 1 (
 )
 
 :: ブランチ切り替え＋最新コード取得
+:: deploy-config.json はデプロイIDが入っているのでgit resetで上書きしない
 echo [1/3] Updating code ...
+if exist "deploy-config.json" copy /y "deploy-config.json" "deploy-config.json.bak" >nul 2>nul
 git stash -u -q 2>nul
 git fetch origin claude/fix-sheet-name-variable-tBTum
 git checkout -f claude/fix-sheet-name-variable-tBTum 2>nul
 git reset --hard origin/claude/fix-sheet-name-variable-tBTum
+if exist "deploy-config.json.bak" (
+    copy /y "deploy-config.json.bak" "deploy-config.json" >nul 2>nul
+    del "deploy-config.json.bak" >nul 2>nul
+)
 for /f "tokens=*" %%a in ('git log --oneline -1 2^>nul') do echo    Latest: %%a
 echo.
 

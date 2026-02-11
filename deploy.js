@@ -68,6 +68,22 @@ function parseDeploymentId(stdout, stderr) {
   return null;
 }
 
+/** clasp deployments の出力から、説明文にキーワードを含むデプロイIDを返す（HEAD除外） */
+function findDeploymentByDescription(text, keyword, excludeIds) {
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (line.includes('@HEAD')) continue;
+    if (keyword && !line.includes(keyword)) continue;
+    const m = line.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (m) {
+      const id = m[1].trim();
+      if (excludeIds && excludeIds.includes(id)) continue;
+      return id;
+    }
+  }
+  return null;
+}
+
 /** clasp deployments の出力からデプロイIDのリストを取得（AKfycb... 形式のみ。scriptId は除外） */
 function getDeploymentIds(stdout) {
   const ids = [];
@@ -331,7 +347,11 @@ async function main() {
   checkVersionLimit(claspConfig.scriptId);
   console.log('');
 
-  // 2. オーナー用デプロイ（既存IDで更新。失敗時は新規作成してconfig更新）
+  // 既存デプロイ一覧を取得（オーナー・スタッフ共通で使う）
+  const deploymentsInfo = runCapture(`${clasp} deployments`);
+  const deploymentsText = deploymentsInfo.success ? (deploymentsInfo.stdout + deploymentsInfo.stderr) : '';
+
+  // 2. オーナー用デプロイ（既存IDで更新。失敗時は既存デプロイを探す→最終手段で新規作成）
   console.log('2. オーナー用デプロイを更新しています...');
   let ownerResult = runCapture(`${clasp} deploy --deploymentId "${ownerId}" --description "オーナー用 ${today}"`);
   if (!ownerResult.success) {
@@ -341,22 +361,36 @@ async function main() {
       console.error('   Apps Script「デプロイを管理」で不要なデプロイを手動で削除してから再実行してください。');
       process.exit(1);
     }
-    // 既存デプロイが見つからない場合、新規作成
-    console.log('   既存デプロイが見つかりません。新規作成します...');
-    ownerResult = runCapture(`${clasp} deploy --description "オーナー用 ${today}"`);
-    if (!ownerResult.success) {
-      console.error('   オーナー用デプロイの新規作成にも失敗しました。');
-      console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
-      process.exit(1);
+    // 既存デプロイから「オーナー用」を探す（URL変更を最小限に）
+    const foundOwner = findDeploymentByDescription(deploymentsText, 'オーナー用', [staffId]);
+    if (foundOwner) {
+      console.log('   既存の「オーナー用」デプロイを発見: ' + foundOwner.substring(0, 30) + '...');
+      ownerResult = runCapture(`${clasp} deploy --deploymentId "${foundOwner}" --description "オーナー用 ${today}"`);
+      if (ownerResult.success) {
+        currentOwnerId = foundOwner;
+        config.ownerDeploymentId = foundOwner;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   deploy-config.json を更新しました。');
+      }
     }
-    const newOwnerId = parseDeploymentId(ownerResult.stdout, ownerResult.stderr);
-    if (newOwnerId) {
-      currentOwnerId = newOwnerId;
-      ownerWasCreated = true;
-      config.ownerDeploymentId = newOwnerId;
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-      console.log('   新しいオーナー用デプロイID: ' + newOwnerId);
-      console.log('   deploy-config.json を更新しました。');
+    if (!ownerResult.success) {
+      // 最終手段: 新規作成
+      console.log('   既存デプロイが見つかりません。新規作成します...');
+      ownerResult = runCapture(`${clasp} deploy --description "オーナー用 ${today}"`);
+      if (!ownerResult.success) {
+        console.error('   オーナー用デプロイの新規作成にも失敗しました。');
+        console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
+        process.exit(1);
+      }
+      const newOwnerId = parseDeploymentId(ownerResult.stdout, ownerResult.stderr);
+      if (newOwnerId) {
+        currentOwnerId = newOwnerId;
+        ownerWasCreated = true;
+        config.ownerDeploymentId = newOwnerId;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   新しいオーナー用デプロイID: ' + newOwnerId);
+        console.log('   deploy-config.json を更新しました。');
+      }
     }
   }
 
@@ -379,22 +413,36 @@ async function main() {
       console.error('   Apps Script「デプロイを管理」で不要なデプロイを手動で削除してから再実行してください。');
       process.exit(1);
     }
-    // 既存デプロイが見つからない場合、新規作成
-    console.log('   既存デプロイが見つかりません。新規作成します...');
-    staffResult = runCapture(`${clasp} deploy --description "スタッフ用 ${today}"`);
-    if (!staffResult.success) {
-      console.error('   スタッフ用デプロイの新規作成にも失敗しました。');
-      console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
-      process.exit(1);
+    // 既存デプロイから「スタッフ用」を探す（URL変更を最小限に）
+    const foundStaff = findDeploymentByDescription(deploymentsText, 'スタッフ用', [currentOwnerId]);
+    if (foundStaff) {
+      console.log('   既存の「スタッフ用」デプロイを発見: ' + foundStaff.substring(0, 30) + '...');
+      staffResult = runCapture(`${clasp} deploy --deploymentId "${foundStaff}" --description "スタッフ用 ${today}"`);
+      if (staffResult.success) {
+        currentStaffId = foundStaff;
+        config.staffDeploymentId = foundStaff;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   deploy-config.json を更新しました。');
+      }
     }
-    const newStaffId = parseDeploymentId(staffResult.stdout, staffResult.stderr);
-    if (newStaffId) {
-      currentStaffId = newStaffId;
-      staffWasCreated = true;
-      config.staffDeploymentId = newStaffId;
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-      console.log('   新しいスタッフ用デプロイID: ' + newStaffId);
-      console.log('   deploy-config.json を更新しました。');
+    if (!staffResult.success) {
+      // 最終手段: 新規作成
+      console.log('   既存デプロイが見つかりません。新規作成します...');
+      staffResult = runCapture(`${clasp} deploy --description "スタッフ用 ${today}"`);
+      if (!staffResult.success) {
+        console.error('   スタッフ用デプロイの新規作成にも失敗しました。');
+        console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
+        process.exit(1);
+      }
+      const newStaffId = parseDeploymentId(staffResult.stdout, staffResult.stderr);
+      if (newStaffId) {
+        currentStaffId = newStaffId;
+        staffWasCreated = true;
+        config.staffDeploymentId = newStaffId;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   新しいスタッフ用デプロイID: ' + newStaffId);
+        console.log('   deploy-config.json を更新しました。');
+      }
     }
   }
 

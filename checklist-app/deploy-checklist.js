@@ -148,49 +148,76 @@ async function main() {
   const today = new Date().toISOString().slice(0, 10);
   console.log('3. デプロイを更新しています...');
 
-  // 既存デプロイを取得
-  const deploymentsResult = runCapture(`${clasp} deployments`);
-  const existingIds = deploymentsResult.success
-    ? getWebAppDeploymentIds(deploymentsResult.stdout + deploymentsResult.stderr)
-    : [];
+  // deploy-config.json から保存済みのチェックリストデプロイIDを読み込む
+  const configPath = path.join(parentDir, 'deploy-config.json');
+  let config = {};
+  if (fs.existsSync(configPath)) {
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (e) {}
+  }
+  const savedChecklistId = (config.checklistDeploymentId || '').trim();
 
   let deployResult;
   let deployUrl = '';
+  let deployId = '';
+  let wasCreated = false;
 
-  if (existingIds.length > 0) {
-    // 既存デプロイを更新（URLが変わらない）
-    const deployId = existingIds[0];
-    console.log('   既存デプロイを更新: ' + deployId.substring(0, 30) + '...');
-    deployResult = runCapture(`${clasp} deploy --deploymentId "${deployId}" --description "チェックリスト ${today}"`);
+  // 優先順位1: deploy-config.json に保存済みIDがあれば使う（URLが変わらない）
+  if (savedChecklistId) {
+    console.log('   保存済みデプロイIDで更新: ' + savedChecklistId.substring(0, 30) + '...');
+    deployResult = runCapture(`${clasp} deploy --deploymentId "${savedChecklistId}" --description "チェックリスト ${today}"`);
     if (deployResult.success) {
+      deployId = savedChecklistId;
       deployUrl = 'https://script.google.com/macros/s/' + deployId + '/exec';
     } else {
-      // 更新失敗時は新規作成にフォールバック
-      console.log('   既存デプロイの更新に失敗。新規作成します...');
-      deployResult = runCapture(`${clasp} deploy --description "チェックリスト ${today}"`);
+      console.log('   保存済みIDでの更新に失敗。既存デプロイを探します...');
     }
-  } else {
-    // 既存デプロイがない場合、新規作成
+  }
+
+  // 優先順位2: clasp deployments から既存のversionedデプロイを探す
+  if (!deployId) {
+    const deploymentsResult = runCapture(`${clasp} deployments`);
+    const existingIds = deploymentsResult.success
+      ? getWebAppDeploymentIds(deploymentsResult.stdout + deploymentsResult.stderr)
+      : [];
+
+    if (existingIds.length > 0) {
+      const foundId = existingIds[0];
+      console.log('   既存デプロイを発見。更新: ' + foundId.substring(0, 30) + '...');
+      deployResult = runCapture(`${clasp} deploy --deploymentId "${foundId}" --description "チェックリスト ${today}"`);
+      if (deployResult.success) {
+        deployId = foundId;
+        deployUrl = 'https://script.google.com/macros/s/' + deployId + '/exec';
+      }
+    }
+  }
+
+  // 優先順位3: どうしても見つからない場合のみ新規作成
+  if (!deployId) {
     console.log('   既存デプロイが見つかりません。新規作成します...');
     deployResult = runCapture(`${clasp} deploy --description "チェックリスト ${today}"`);
-  }
-
-  if (!deployResult.success) {
-    console.error('   clasp deploy に失敗しました。');
-    console.error('   ' + (deployResult.stdout + deployResult.stderr).slice(0, 500));
-    process.exit(1);
-  }
-
-  // デプロイURLを抽出
-  if (!deployUrl) {
-    const text = deployResult.stdout + deployResult.stderr;
-    const urlMatch = text.match(/script\.google\.com\/macros\/s\/([A-Za-z0-9_-]+)\/exec/);
-    if (urlMatch) {
-      deployUrl = 'https://script.google.com/macros/s/' + urlMatch[1] + '/exec';
+    if (!deployResult.success) {
+      console.error('   clasp deploy に失敗しました。');
+      console.error('   ' + (deployResult.stdout + deployResult.stderr).slice(0, 500));
+      process.exit(1);
     }
+    // 新規デプロイのIDを抽出
+    const text = deployResult.stdout + deployResult.stderr;
     const idMatch = text.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
     if (idMatch) {
-      deployUrl = 'https://script.google.com/macros/s/' + idMatch[1] + '/exec';
+      deployId = idMatch[1];
+      deployUrl = 'https://script.google.com/macros/s/' + deployId + '/exec';
+    }
+    wasCreated = true;
+  }
+
+  // デプロイIDを deploy-config.json に永続保存（次回以降URLが変わらない）
+  if (deployId && deployId !== savedChecklistId) {
+    config.checklistDeploymentId = deployId;
+    try {
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+      console.log('   deploy-config.json にチェックリストデプロイIDを保存しました。');
+    } catch (e) {
+      console.log('   deploy-config.json の保存に失敗: ' + e.message);
     }
   }
 
@@ -198,36 +225,31 @@ async function main() {
   if (deployUrl) {
     console.log('   URL: ' + deployUrl);
   }
+  if (wasCreated) {
+    console.log('   ※ 新規デプロイが作成されました（URLが変更されています）');
+  }
 
   // メインアプリの CHECKLIST_APP_URL を自動更新
   if (deployUrl) {
-    const configPath = path.join(parentDir, 'deploy-config.json');
-    if (fs.existsSync(configPath)) {
+    const ownerId = (config.ownerDeploymentId || '').trim();
+    if (ownerId) {
+      const ownerUrl = 'https://script.google.com/macros/s/' + ownerId + '/exec';
+      const updateUrl = ownerUrl + '?action=setChecklistAppUrl&url=' + encodeURIComponent(deployUrl);
+      console.log('4. メインアプリのチェックリストURLを更新しています...');
       try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        const ownerId = (config.ownerDeploymentId || '').trim();
-        if (ownerId) {
-          const ownerUrl = 'https://script.google.com/macros/s/' + ownerId + '/exec';
-          const updateUrl = ownerUrl + '?action=setChecklistAppUrl&url=' + encodeURIComponent(deployUrl);
-          console.log('4. メインアプリのチェックリストURLを更新しています...');
-          try {
-            const res = await fetchUrl(updateUrl);
-            const trimmed = (res || '').trim();
-            if (trimmed === 'OK') {
-              console.log('   CHECKLIST_APP_URL を更新しました。');
-            } else {
-              console.log('   自動更新できませんでした（応答: ' + trimmed.slice(0, 100) + '）');
-              console.log('   メインアプリの Script Properties に手動で設定してください:');
-              console.log('   CHECKLIST_APP_URL = ' + deployUrl);
-            }
-          } catch (fetchErr) {
-            console.log('   URL自動更新でエラー: ' + fetchErr.message);
-            console.log('   メインアプリの Script Properties に手動で設定してください:');
-            console.log('   CHECKLIST_APP_URL = ' + deployUrl);
-          }
+        const res = await fetchUrl(updateUrl);
+        const trimmed = (res || '').trim();
+        if (trimmed === 'OK') {
+          console.log('   CHECKLIST_APP_URL を更新しました。');
+        } else {
+          console.log('   自動更新できませんでした（応答: ' + trimmed.slice(0, 100) + '）');
+          console.log('   メインアプリの Script Properties に手動で設定してください:');
+          console.log('   CHECKLIST_APP_URL = ' + deployUrl);
         }
-      } catch (e) {
-        console.log('   URL自動更新でエラー: ' + e.message);
+      } catch (fetchErr) {
+        console.log('   URL自動更新でエラー: ' + fetchErr.message);
+        console.log('   メインアプリの Script Properties に手動で設定してください:');
+        console.log('   CHECKLIST_APP_URL = ' + deployUrl);
       }
     }
   }

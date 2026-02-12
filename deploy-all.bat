@@ -31,7 +31,7 @@ if exist "deploy-config.json.bak" (
 for /f "tokens=*" %%a in ('git log --oneline -1 2^>nul') do echo    Latest: %%a
 echo.
 
-:: clasp インストール確認（なければ自動インストール）
+:: clasp install check
 if not exist "node_modules\.bin\clasp.cmd" (
     echo    clasp not found. Installing @google/clasp ...
     call npm install @google/clasp --save-dev

@@ -2538,6 +2538,163 @@ function setRecruitmentSettings(settings) {
 }
 
 /**********************************************
+ * 名簿リマインダー設定
+ **********************************************/
+
+function getRosterReminderSettings() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    ensureSheetsExist();
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    const lastRow = Math.max(sheet.getLastRow(), 1);
+    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    const map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = row[1];
+    });
+    return JSON.stringify({
+      success: true,
+      settings: {
+        rosterReminderEnabled: map['名簿リマインダー有効'] === true || map['名簿リマインダー有効'] === 'true',
+        rosterReminderDaysBefore: parseInt(map['名簿リマインダー日前'], 10) || 3,
+        rosterReminderHour: parseInt(map['名簿リマインダー送信時刻'], 10) || 9
+      }
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function saveRosterReminderSettings(settings) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 1).getValues() : [];
+    var keyRowMap = {};
+    rows.forEach(function(r, i) {
+      var k = String(r[0] || '').trim();
+      if (k) keyRowMap[k] = i + 2;
+    });
+    var pairs = [
+      ['名簿リマインダー有効', settings.rosterReminderEnabled ? 'true' : 'false'],
+      ['名簿リマインダー日前', settings.rosterReminderDaysBefore != null ? settings.rosterReminderDaysBefore : 3],
+      ['名簿リマインダー送信時刻', settings.rosterReminderHour != null ? settings.rosterReminderHour : 9]
+    ];
+    pairs.forEach(function(pair) {
+      var rowNum = keyRowMap[pair[0]];
+      if (rowNum) {
+        sheet.getRange(rowNum, 2).setValue(pair[1]);
+      } else {
+        var newRow = sheet.getLastRow() + 1;
+        sheet.getRange(newRow, 1).setValue(pair[0]);
+        sheet.getRange(newRow, 2).setValue(pair[1]);
+      }
+    });
+    // トリガーの設定/解除
+    setupRosterReminderTrigger(settings.rosterReminderEnabled, settings.rosterReminderHour);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function setupRosterReminderTrigger(enabled, hour) {
+  // 既存の名簿リマインダートリガーを削除
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === 'checkRosterReminder') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  if (enabled) {
+    ScriptApp.newTrigger('checkRosterReminder')
+      .timeBased()
+      .everyDays(1)
+      .atHour(hour || 9)
+      .create();
+  }
+}
+
+function checkRosterReminder() {
+  try {
+    var res = JSON.parse(getRosterReminderSettings());
+    if (!res.success || !res.settings || !res.settings.rosterReminderEnabled) return;
+    var daysBefore = res.settings.rosterReminderDaysBefore || 3;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!recruitSheet || recruitSheet.getLastRow() < 2) return;
+    var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
+    var staffSheet = ss.getSheetByName(SHEET_STAFF);
+    if (!staffSheet || staffSheet.getLastRow() < 2) return;
+    var maxCol = Math.max(recruitSheet.getLastColumn(), 9);
+    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, maxCol).getValues();
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var targetDate = new Date(today);
+    targetDate.setDate(targetDate.getDate() + daysBefore);
+    var unrespondedRecruits = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][3]).trim() !== '募集中') continue;
+      var checkoutDate = rows[i][0] ? new Date(rows[i][0]) : null;
+      if (!checkoutDate) continue;
+      checkoutDate.setHours(0, 0, 0, 0);
+      if (checkoutDate > targetDate) continue; // まだ先
+      if (checkoutDate < today) continue; // 過去
+      // 未回答スタッフを確認
+      var rowIndex = i + 2;
+      var respondedEmails = {};
+      if (volSheet && volSheet.getLastRow() >= 2) {
+        var vCols = Math.max(volSheet.getLastColumn(), 4);
+        var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, vCols).getValues();
+        volRows.forEach(function(vr) {
+          if (String(vr[0]).trim() === 'r' + rowIndex) {
+            respondedEmails[String(vr[2] || '').trim().toLowerCase()] = true;
+          }
+        });
+      }
+      var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, Math.max(staffSheet.getLastColumn(), 5)).getValues();
+      var unresponded = [];
+      staffRows.forEach(function(sr) {
+        var email = String(sr[2] || '').trim().toLowerCase();
+        if (email && !respondedEmails[email]) {
+          unresponded.push({ name: sr[0] || '', email: email });
+        }
+      });
+      if (unresponded.length > 0) {
+        unrespondedRecruits.push({
+          checkoutDate: Utilities.formatDate(checkoutDate, 'Asia/Tokyo', 'yyyy-MM-dd'),
+          property: rows[i][1] || '',
+          unresponded: unresponded
+        });
+      }
+    }
+    // 未回答者にリマインドメール送信
+    unrespondedRecruits.forEach(function(rec) {
+      rec.unresponded.forEach(function(staff) {
+        try {
+          GmailApp.sendEmail(
+            staff.email,
+            '【民泊】清掃募集の回答をお願いします（' + rec.checkoutDate + '）',
+            staff.name + ' 様\n\n' +
+            'チェックアウト日: ' + rec.checkoutDate + '\n' +
+            (rec.property ? '物件: ' + rec.property + '\n' : '') +
+            '\nまだ回答がされていません。お手数ですがアプリから回答をお願いします。'
+          );
+        } catch (e) {
+          Logger.log('名簿リマインダー送信失敗: ' + staff.email + ' - ' + e.toString());
+        }
+      });
+    });
+  } catch (e) {
+    Logger.log('checkRosterReminder: ' + e.toString());
+  }
+}
+
+/**********************************************
  * 募集・回答・選定
  **********************************************/
 

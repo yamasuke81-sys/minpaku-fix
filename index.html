@@ -1050,6 +1050,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="jobs">仕事内容</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="recruitSettings">募集設定</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="reminderEmail">リマインドメール</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿リマインダー</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="checklist">チェックリスト</a></li>
@@ -1147,6 +1148,16 @@
         </div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveReminderEmail">リマインド設定を保存</button>
         <p class="small text-muted mt-2">※ 送信には時間ベースのトリガー（1時間ごと）の設定が必要です。GASエディタで <code>checkAndSendReminderEmails</code> のトリガーを追加してください。</p>
+      </div>
+      <div id="settingsRosterReminder" style="display:none;">
+        <p class="small text-muted mb-2">チェックアウト日が近い募集に未回答のスタッフへ、自動でリマインドメールを送信します。</p>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="rosterReminderEnabled">
+          <label class="form-check-label" for="rosterReminderEnabled">名簿リマインダーを有効にする</label>
+        </div>
+        <div class="mb-2"><label class="form-label small">チェックアウト何日前から送信</label><input type="number" class="form-control form-control-sm" id="rosterReminderDaysBefore" min="1" max="30" value="3"></div>
+        <div class="mb-2"><label class="form-label small">送信時刻</label><select class="form-select form-select-sm" id="rosterReminderHour"></select></div>
+        <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿リマインダー設定を保存</button>
       </div>
       <div id="settingsSync" style="display:none;">
         <p class="small text-muted">Airbnb・Booking.comなどのiCal URLを登録すると、予約を自動取り込みできます。宿泊者がフォームで詳細入力すると、既存予約にマージされます。</p>
@@ -5500,6 +5511,51 @@
         }).setRecruitmentSettings(settings);
       });
 
+      // 名簿リマインダー設定
+      (function() {
+        var sel = document.getElementById('rosterReminderHour');
+        if (sel) {
+          for (var h = 0; h <= 23; h++) {
+            var opt = document.createElement('option');
+            opt.value = h;
+            opt.textContent = h + '時';
+            if (h === 9) opt.selected = true;
+            sel.appendChild(opt);
+          }
+        }
+      })();
+
+      function loadRosterReminderSettings() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.settings) {
+              document.getElementById('rosterReminderEnabled').checked = !!r.settings.rosterReminderEnabled;
+              document.getElementById('rosterReminderDaysBefore').value = r.settings.rosterReminderDaysBefore || 3;
+              document.getElementById('rosterReminderHour').value = r.settings.rosterReminderHour != null ? r.settings.rosterReminderHour : 9;
+            }
+          } catch (e) {}
+        }).getRosterReminderSettings();
+      }
+
+      document.getElementById('btnSaveRosterReminder').addEventListener('click', function() {
+        var btn = this;
+        setButtonLoading(btn, true);
+        var settings = {
+          rosterReminderEnabled: document.getElementById('rosterReminderEnabled').checked,
+          rosterReminderDaysBefore: parseInt(document.getElementById('rosterReminderDaysBefore').value, 10) || 3,
+          rosterReminderHour: parseInt(document.getElementById('rosterReminderHour').value, 10) || 9
+        };
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          setButtonLoading(btn, false);
+          var r = JSON.parse(jsonStr);
+          alert(r.success ? '保存しました。' : (r.error || '失敗'));
+        }).withFailureHandler(function(e) {
+          setButtonLoading(btn, false);
+          alert(e.message);
+        }).saveRosterReminderSettings(settings);
+      });
+
       // リマインド時刻selectに0〜23時のオプションを生成
       (function() {
         document.querySelectorAll('select.reminder-time').forEach(function(sel) {
@@ -5861,6 +5917,8 @@
           document.getElementById('settingsRecruitSettings').style.display = t === 'recruitSettings' ? 'block' : 'none';
           var reminderEl = document.getElementById('settingsReminderEmail');
           if (reminderEl) reminderEl.style.display = t === 'reminderEmail' ? 'block' : 'none';
+          var rrEl = document.getElementById('settingsRosterReminder');
+          if (rrEl) rrEl.style.display = t === 'rosterReminder' ? 'block' : 'none';
           document.getElementById('settingsSync').style.display = t === 'sync' ? 'block' : 'none';
           var notifEl = document.getElementById('settingsNotifications');
           if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
@@ -5871,6 +5929,7 @@
           if (t === 'jobs') loadJobList();
           if (t === 'recruitSettings') loadRecruitSettingsForm();
           if (t === 'reminderEmail') loadReminderEmailSettings();
+          if (t === 'rosterReminder') loadRosterReminderSettings();
           if (t === 'sync') loadSyncList();
           if (t === 'subOwners') loadSubOwnerList();
           if (t === 'notifications') loadNotificationList();

@@ -2527,7 +2527,7 @@
                       var memoEl = document.getElementById('eventModalChangeMemo');
                       var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
                       if (!memoVal) { alert('変更理由を入力してください。'); return; }
-                      b.disabled = true;
+                      setButtonLoading(b, true);
                       google.script.run.withSuccessHandler(function(j) {
                         var res = JSON.parse(j);
                         if (res.success) {
@@ -2536,8 +2536,8 @@
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
                           loadRecruitList();
-                        } else { alert(res.error || '失敗'); b.disabled = false; }
-                      }).withFailureHandler(function(e) { alert(e.message); b.disabled = false; }).requestResponseChange('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '', opt.val, memoVal);
+                        } else { alert(res.error || '失敗'); setButtonLoading(b, false); }
+                      }).withFailureHandler(function(e) { alert(e.message); setButtonLoading(b, false); }).requestResponseChange('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '', opt.val, memoVal);
                     };
                     changeBtnRow.appendChild(b);
                   });
@@ -2569,7 +2569,7 @@
                     b.onclick = function() {
                       var memoEl = document.getElementById('eventModalResponseMemo');
                       var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
-                      b.disabled = true;
+                      setButtonLoading(b, true);
                       google.script.run.withSuccessHandler(function(j) {
                         var res = JSON.parse(j);
                         if (res.success) {
@@ -2577,8 +2577,8 @@
                           loadAndRender();
                           if (window.staffMode) loadStaffSchedule();
                           loadRecruitList();
-                        } else { alert(res.error || '失敗'); b.disabled = false; }
-                      }).withFailureHandler(function(e) { alert(e.message); b.disabled = false; }).respondToRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '', opt.val, memoVal);
+                        } else { alert(res.error || '失敗'); setButtonLoading(b, false); }
+                      }).withFailureHandler(function(e) { alert(e.message); setButtonLoading(b, false); }).respondToRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '', opt.val, memoVal);
                     };
                     btnRow.appendChild(b);
                   });
@@ -2591,7 +2591,7 @@
                     delBtn.onclick = function() {
                       customConfirm('回答を削除しますか？').then(function(ok) {
                         if (!ok) return;
-                        delBtn.disabled = true; delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">削除</span><span class="btn-label">中…</span>';
+                        setButtonLoading(delBtn, true);
                         google.script.run.withSuccessHandler(function(j) {
                           var res = JSON.parse(j);
                           if (res.success) {
@@ -2599,8 +2599,8 @@
                             loadAndRender();
                             if (window.staffMode) loadStaffSchedule();
                             loadRecruitList();
-                          } else { alert(res.error || '失敗'); delBtn.disabled = false; delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">回答</span><span class="btn-label">削除</span>'; }
-                        }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; delBtn.innerHTML = '<span class="btn-icon" style="font-size:0.8rem;">回答</span><span class="btn-label">削除</span>'; }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                          } else { alert(res.error || '失敗'); setButtonLoading(delBtn, false); }
+                        }).withFailureHandler(function(e) { alert(e.message); setButtonLoading(delBtn, false); }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
                       });
                     };
                     btnRow.appendChild(delBtn);
@@ -4113,7 +4113,7 @@
                   var memoEl = document.getElementById('recruitEditChangeMemo');
                   var memoVal = memoEl ? memoEl.value.trim() : '';
                   if (!memoVal) { alert('変更理由を入力してください。'); return; }
-                  btn.disabled = true;
+                  setButtonLoading(btn, true);
                   google.script.run.withSuccessHandler(function(j) {
                     var res = JSON.parse(j);
                     if (res.success) {
@@ -4121,8 +4121,8 @@
                       bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
                       loadAndRender(); loadRecruitList();
                       if (r.asStaffTest) loadRecruitListStaffTest();
-                    } else { alert(res.error || '失敗'); btn.disabled = false; }
-                  }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).requestResponseChange(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
+                    } else { alert(res.error || '失敗'); setButtonLoading(btn, false); }
+                  }).withFailureHandler(function(e) { alert(e.message); setButtonLoading(btn, false); }).requestResponseChange(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
                 };
               });
             } else {
@@ -4139,15 +4139,15 @@
                   var resp = btn.getAttribute('data-resp');
                   var memoEl = document.getElementById('recruitEditResponseMemo');
                   var memoVal = memoEl ? memoEl.value.trim() : '';
-                  btn.disabled = true;
+                  setButtonLoading(btn, true);
                   google.script.run.withSuccessHandler(function(j) {
                     var res = JSON.parse(j);
                     if (res.success) {
                       bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
                       loadAndRender(); loadRecruitList();
                       if (r.asStaffTest) loadRecruitListStaffTest();
-                    } else { alert(res.error || '失敗'); btn.disabled = false; }
-                  }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).respondToRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
+                    } else { alert(res.error || '失敗'); setButtonLoading(btn, false); }
+                  }).withFailureHandler(function(e) { alert(e.message); setButtonLoading(btn, false); }).respondToRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '', resp, memoVal);
                 };
               });
             }

@@ -356,6 +356,44 @@
       color: #7f8c8d;
     }
 
+    /* 全体操作バー */
+    .action-bar {
+      display: flex;
+      gap: 8px;
+      margin: 12px 12px 4px;
+    }
+    .action-btn {
+      padding: 8px 14px;
+      border: 1px solid #bdc3c7;
+      border-radius: 6px;
+      background: white;
+      font-size: 13px;
+      font-weight: bold;
+      color: #2c3e50;
+      cursor: pointer;
+    }
+    .action-btn:active { background: #ecf0f1; }
+    .action-btn-check {
+      border-color: #27ae60;
+      color: #27ae60;
+    }
+    .action-btn-check:active { background: #eafaf1; }
+
+    /* カテゴリ内の全チェックボタン */
+    .section-check-all {
+      padding: 4px 10px;
+      border: 1px solid #27ae60;
+      border-radius: 4px;
+      background: transparent;
+      font-size: 11px;
+      font-weight: bold;
+      color: #27ae60;
+      cursor: pointer;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .section-check-all:active { background: #eafaf1; }
+
     /* ユーティリティ */
     .hidden { display: none !important; }
 
@@ -379,8 +417,11 @@
     <!-- 次回予約情報 -->
     <div id="bookingInfo" class="booking-info hidden"></div>
 
-    <!-- 要補充リスト -->
-    <div id="supplyList" class="supply-list hidden"></div>
+    <!-- 全体操作バー -->
+    <div class="action-bar">
+      <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()">全て展開</button>
+      <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()">全チェック</button>
+    </div>
 
     <!-- チェックリスト -->
     <div id="checklistContainer"></div>
@@ -397,6 +438,9 @@
         <button id="memoBtn" class="memo-btn">送信</button>
       </div>
     </div>
+
+    <!-- 要補充リスト -->
+    <div id="supplyList" class="supply-list hidden"></div>
   </div>
 
   <!-- ボトムバー -->
@@ -496,14 +540,16 @@
       Object.keys(categories).forEach(function(cat) {
         var catItems = categories[cat];
         var checkedInCat = catItems.filter(function(item) { return checked[item.id]; }).length;
+        var allCheckedInCat = checkedInCat === catItems.length;
 
         html += '<div class="section" data-category="' + escapeHtml(cat) + '">';
-        html += '<div class="section-header" onclick="toggleSection(this)">';
+        html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
         html += '<span class="section-icon">▼</span>';
         html += '<span class="section-title">' + escapeHtml(cat) + '</span>';
         html += '<span class="section-count">(' + checkedInCat + '/' + catItems.length + ')</span>';
+        if (!allCheckedInCat) html += '<button class="section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
         html += '</div>';
-        html += '<div class="section-body">';
+        html += '<div class="section-body collapsed">';
 
         catItems.forEach(function(item) {
           var isChecked = !!checked[item.id];
@@ -820,6 +866,55 @@
           alert('メモの追加に失敗しました: ' + res.error);
         }
       });
+    }
+
+    var allExpanded = false;
+    function toggleAllSections() {
+      allExpanded = !allExpanded;
+      var btn = document.getElementById('btnExpandAll');
+      var headers = document.querySelectorAll('.section-header');
+      var bodies = document.querySelectorAll('.section-body');
+      if (allExpanded) {
+        btn.textContent = '全て折りたたみ';
+        headers.forEach(function(h) { h.classList.remove('collapsed'); });
+        bodies.forEach(function(b) { b.classList.remove('collapsed'); });
+      } else {
+        btn.textContent = '全て展開';
+        headers.forEach(function(h) { h.classList.add('collapsed'); });
+        bodies.forEach(function(b) { b.classList.add('collapsed'); });
+      }
+    }
+
+    function checkAllItems() {
+      var unchecked = document.querySelectorAll('.item-checkbox:not(:checked)');
+      if (unchecked.length === 0) return;
+      var promises = [];
+      unchecked.forEach(function(cb) {
+        cb.checked = true;
+        var itemId = cb.getAttribute('data-item-id');
+        promises.push(callGAS('toggleChecklistItem', [checkoutDate, itemId, true, staffName]));
+        checklistData.checked[itemId] = { checked: true, by: staffName, at: new Date() };
+      });
+      updateProgress();
+      updateSectionCounts();
+      if (missingCheckActive) highlightMissing();
+    }
+
+    function checkCategory(btn) {
+      var section = btn.closest('.section');
+      if (!section) return;
+      var unchecked = section.querySelectorAll('.item-checkbox:not(:checked)');
+      if (unchecked.length === 0) return;
+      unchecked.forEach(function(cb) {
+        cb.checked = true;
+        var itemId = cb.getAttribute('data-item-id');
+        callGAS('toggleChecklistItem', [checkoutDate, itemId, true, staffName]);
+        checklistData.checked[itemId] = { checked: true, by: staffName, at: new Date() };
+      });
+      btn.remove();
+      updateProgress();
+      updateSectionCounts();
+      if (missingCheckActive) highlightMissing();
     }
 
     function completeChecklist() {

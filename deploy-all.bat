@@ -1,7 +1,5 @@
 @echo off
-
-:: UTF-8
-%SystemRoot%\system32\chcp.com 65001 >nul 2>nul
+chcp 65001 >nul 2>nul
 
 echo ==========================================
 echo   minpaku app - Full Auto Deploy
@@ -18,14 +16,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: ブランチ切り替え＋最新コード取得
-:: deploy-config.json はデプロイIDが入っているのでgit resetで上書きしない
-echo [1/3] Updating code ...
+:: Get latest code
+set BRANCH=claude/minpaku-fix-ui-updates-af95w
+echo [1/3] Updating code from %BRANCH% ...
 if exist "deploy-config.json" copy /y "deploy-config.json" "deploy-config.json.bak" >nul 2>nul
 git stash -u -q 2>nul
-git fetch origin claude/fix-sheet-name-variable-tBTum
-git checkout -f claude/fix-sheet-name-variable-tBTum 2>nul
-git reset --hard origin/claude/fix-sheet-name-variable-tBTum
+git fetch origin %BRANCH%
+git checkout -f %BRANCH% 2>nul
+git reset --hard origin/%BRANCH%
 if exist "deploy-config.json.bak" (
     copy /y "deploy-config.json.bak" "deploy-config.json" >nul 2>nul
     del "deploy-config.json.bak" >nul 2>nul

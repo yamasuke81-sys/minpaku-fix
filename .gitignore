@@ -1,0 +1,4 @@
+# デプロイIDはローカル環境固有（git reset --hardで上書きされないようにする）
+deploy-config.json
+
+node_modules/

@@ -4,5 +4,10 @@
 **/deploy.js
 **/package.json
 **/package-lock.json
-**/README.md
 **/.git/**
+ChecklistApp.gs
+checklist-app/**
+checklist.html
+**/*.md
+**/*.bat
+**/*.txt

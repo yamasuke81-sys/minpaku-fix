@@ -1858,7 +1858,9 @@
                   btn.onclick = function() {
                     if (hasVol) {
                       if (!confirm('立候補を取り消しますか？')) return;
+                      setButtonLoading(btn, true);
                       google.script.run.withSuccessHandler(function(j) {
+                        setButtonLoading(btn, false);
                         var res = JSON.parse(j);
                         if (res.success) {
                           bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
@@ -1866,15 +1868,23 @@
                           if (window.staffMode) loadStaffSchedule();
                           else loadRecruitList();
                         } else alert(res.error || '失敗');
-                      }).withFailureHandler(function(e) { alert(e.message); }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
+                      }).withFailureHandler(function(e) {
+                        setButtonLoading(btn, false);
+                        alert(e.message);
+                      }).cancelVolunteerForRecruitment('r' + r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
                     } else {
                       if (!confirm('立候補しますか？\n\nはい／いいえ')) return;
                       var memoEl = document.getElementById('eventModalVolunteerMemo');
                       var memoVal = (memoEl && memoEl.value) ? String(memoEl.value).trim() : '';
-                      volunteer('r' + r.recruitRowIndex, memoVal);
-                      bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                      loadAndRender();
-                      loadRecruitList();
+                      volunteer('r' + r.recruitRowIndex, memoVal, {
+                        button: btn,
+                        onDone: function(success) {
+                          if (success) {
+                            bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                            if (window.staffMode) loadStaffSchedule();
+                          }
+                        }
+                      });
                     }
                   };
                   volBodyArea.appendChild(btn);
@@ -1923,9 +1933,11 @@
                   startBtn.className = 'btn btn-sm btn-primary me-1';
                   startBtn.id = 'eventModalBtnStartRecruit';
                   startBtn.textContent = '募集開始';
-                  if (startBtn)                   startBtn.onclick = function() {
+                  if (startBtn) startBtn.onclick = function() {
                     var detail = { date:'', guestCount:'', bbq:'', nationality:'日本', memo:'', cleaningStaff:'', notifyMethod:'メール' };
+                    setButtonLoading(startBtn, true);
                     google.script.run.withSuccessHandler(function(j) {
+                      setButtonLoading(startBtn, false);
                       var res = JSON.parse(j);
                       if (res.success && !res.alreadyExists && res.rowIndex) {
                         ownerCenterArea.innerHTML = '';
@@ -1978,6 +1990,9 @@
                       } else if (res.alreadyExists) {
                         alert('この予約は既に募集済みです。');
                       }
+                    }).withFailureHandler(function(e) {
+                      setButtonLoading(startBtn, false);
+                      alert(e.message || 'エラー');
                     }).saveRecruitmentDetail(null, rowNum, checkoutDate, detail);
                   };
                   ownerCenterArea.appendChild(startBtn);
@@ -1989,10 +2004,15 @@
                   emBtnMail.textContent = 'メール送信';
                   emBtnMail.onclick = function() {
                     if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
+                    setButtonLoading(emBtnMail, true);
                     google.script.run.withSuccessHandler(function(a) {
+                      setButtonLoading(emBtnMail, false);
                       var ann = JSON.parse(a);
                       if (ann.success) { alert('メールで送信しました。'); bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
                       else alert(ann.error || '失敗');
+                    }).withFailureHandler(function(e) {
+                      setButtonLoading(emBtnMail, false);
+                      alert(e.message || 'エラー');
                     }).announceRecruitment(r.recruitRowIndex);
                   };
                   var emBtnCopy = document.createElement('button');
@@ -2026,10 +2046,15 @@
                     var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
                     if (volCount > 0 && !confirm('立候補者が' + volCount + '名います。募集を取消しますか？')) return;
                     if (volCount === 0 && !confirm('募集を取消しますか？')) return;
+                    setButtonLoading(emBtnCancel, true);
                     google.script.run.withSuccessHandler(function(j) {
+                      setButtonLoading(emBtnCancel, false);
                       var res = JSON.parse(j);
                       if (res.success) { bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide(); loadAndRender(); loadRecruitList(); }
                       else alert(res.error);
+                    }).withFailureHandler(function(e) {
+                      setButtonLoading(emBtnCancel, false);
+                      alert(e.message || 'エラー');
                     }).deleteRecruitment(r.recruitRowIndex);
                   };
                   ownerCenterArea.appendChild(emBtnMail);
@@ -2123,6 +2148,19 @@
         const div = document.createElement('div');
         div.textContent = s;
         return div.innerHTML;
+      }
+
+      function setButtonLoading(btn, isLoading) {
+        if (!btn) return;
+        if (isLoading) {
+          btn.disabled = true;
+          if (!btn._origHTML) btn._origHTML = btn.innerHTML;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>' + (btn._origHTML || '');
+        } else {
+          btn.disabled = false;
+          if (btn._origHTML) btn.innerHTML = btn._origHTML;
+          btn._origHTML = null;
+        }
       }
 
       // 清掃担当編集モーダルを開く
@@ -2859,11 +2897,14 @@
             notifyMethod: 'メール'
           };
         }
-        document.getElementById('btnRecruitEditSave').onclick = function() {
+        var btnSaveEl = document.getElementById('btnRecruitEditSave');
+        btnSaveEl.onclick = function() {
           document.getElementById('recruitEditError').style.display = 'none';
           var detail = collectDetail();
+          setButtonLoading(btnSaveEl, true);
           if (r.isNew) {
             google.script.run.withSuccessHandler(function(resStr) {
+              setButtonLoading(btnSaveEl, false);
               var ok = JSON.parse(resStr);
               if (ok.success && !ok.alreadyExists && ok.rowIndex) {
                 var popupArea = document.getElementById('recruitEditLineCopyArea');
@@ -2908,11 +2949,13 @@
                 document.getElementById('recruitEditError').style.display = 'block';
               }
             }).withFailureHandler(function(err) {
+              setButtonLoading(btnSaveEl, false);
               document.getElementById('recruitEditError').textContent = err.message || 'エラー';
               document.getElementById('recruitEditError').style.display = 'block';
             }).saveRecruitmentDetail(null, r.bookingRowNumber, r.checkoutDate, detail);
           } else {
             google.script.run.withSuccessHandler(function(resStr) {
+              setButtonLoading(btnSaveEl, false);
               var ok = JSON.parse(resStr);
               if (ok.success) {
                 alert('保存しました。');
@@ -2923,18 +2966,22 @@
                 document.getElementById('recruitEditError').style.display = 'block';
               }
             }).withFailureHandler(function(err) {
+              setButtonLoading(btnSaveEl, false);
               document.getElementById('recruitEditError').textContent = err.message || 'エラー';
               document.getElementById('recruitEditError').style.display = 'block';
             }).saveRecruitmentDetail(r.rowIndex, r.bookingRowNumber, r.checkoutDate, detail);
           }
         };
-        document.getElementById('btnRecruitEditMail').onclick = function() {
+        var btnMailEl = document.getElementById('btnRecruitEditMail');
+        btnMailEl.onclick = function() {
           if (!confirm('登録者全員に一斉送信します。よろしいですか？')) return;
           document.getElementById('recruitEditError').style.display = 'none';
           var detail = collectDetail();
           detail.notifyMethod = 'メール';
+          setButtonLoading(btnMailEl, true);
           function doAnnounce(rowIdx) {
             google.script.run.withSuccessHandler(function(annStr) {
+              setButtonLoading(btnMailEl, false);
               var ann = JSON.parse(annStr);
               if (ann.success) {
                 alert('メールで送信しました。');
@@ -2945,6 +2992,7 @@
                 document.getElementById('recruitEditError').style.display = 'block';
               }
             }).withFailureHandler(function(err) {
+              setButtonLoading(btnMailEl, false);
               document.getElementById('recruitEditError').textContent = err.message || 'エラー';
               document.getElementById('recruitEditError').style.display = 'block';
             }).announceRecruitment(rowIdx);
@@ -2994,18 +3042,24 @@
             if (j.success && j.copyText) showCopyText(j.copyText);
           }).getRecruitmentCopyText(r.checkoutDate, r.bookingRowNumber, nextRes);
         };
-        document.getElementById('btnRecruitEditCancel').onclick = function() {
+        var btnCancelEl = document.getElementById('btnRecruitEditCancel');
+        btnCancelEl.onclick = function() {
           if (!r.isNew && r.rowIndex) {
             var volCount = r.volunteers && r.volunteers.length ? r.volunteers.length : 0;
             var msg = volCount > 0 ? '立候補者が' + volCount + '名います。募集を取消しますか？' : '募集を取消しますか？';
             if (!confirm(msg)) return;
+            setButtonLoading(btnCancelEl, true);
             google.script.run.withSuccessHandler(function(resStr) {
+              setButtonLoading(btnCancelEl, false);
               var ok = JSON.parse(resStr);
               if (ok.success) {
                 bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
                 loadRecruitList();
                 loadAndRender();
               } else alert(ok.error || '失敗');
+            }).withFailureHandler(function(err) {
+              setButtonLoading(btnCancelEl, false);
+              alert(err.message || 'エラー');
             }).deleteRecruitment(r.rowIndex);
           }
           if (r.isNew) {
@@ -3018,15 +3072,22 @@
         };
         var volBtn = document.getElementById('btnRecruitEditVolunteer');
         if (volBtn) volBtn.onclick = function() {
-          volunteer(r.id);
-          bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
-          loadRecruitList();
-          if (r.asStaffTest) loadRecruitListStaffTest();
+          volunteer(r.id, null, {
+            button: volBtn,
+            onDone: function(success) {
+              if (success) {
+                bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
+                if (r.asStaffTest) loadRecruitListStaffTest();
+              }
+            }
+          });
         };
         var cancelVolBtn = document.getElementById('btnRecruitEditCancelVolunteer');
         if (cancelVolBtn) cancelVolBtn.onclick = function() {
           if (!confirm('立候補を取り消しますか？')) return;
+          setButtonLoading(cancelVolBtn, true);
           google.script.run.withSuccessHandler(function(jsonStr) {
+            setButtonLoading(cancelVolBtn, false);
             try {
               var res = JSON.parse(jsonStr);
               if (res.success) {
@@ -3036,7 +3097,10 @@
                 if (r.asStaffTest) loadRecruitListStaffTest();
               } else alert(res.error || '失敗');
             } catch (e) { alert('エラー'); }
-          }).withFailureHandler(function(err) { alert(err.message || 'エラー'); }).cancelVolunteerForRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '');
+          }).withFailureHandler(function(err) {
+            setButtonLoading(cancelVolBtn, false);
+            alert(err.message || 'エラー');
+          }).cancelVolunteerForRecruitment(r.id, window.currentUserName || '', window.currentUserEmail || '');
         };
         new bootstrap.Modal(document.getElementById('recruitEditModal')).show();
       }
@@ -3155,7 +3219,10 @@
         }).addRecruitmentManually(rowNumber, checkoutDate);
       }
 
-      function volunteer(recruitId, memoToSend) {
+      function volunteer(recruitId, memoToSend, opts) {
+        opts = opts || {};
+        var btn = opts.button || null;
+        var onDone = opts.onDone || null;
         var staffBar = document.getElementById('staffSelectorBar');
         var barVisible = staffBar && staffBar.style.display !== 'none';
         if (barVisible && !window.currentUserName && !window.currentUserEmail) {
@@ -3169,18 +3236,26 @@
           return;
         }
         var memo = (memoToSend != null) ? String(memoToSend).trim() : '';
+        setButtonLoading(btn, true);
         google.script.run.withSuccessHandler(function(jsonStr) {
+          setButtonLoading(btn, false);
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
               alert(r.already ? 'すでに立候補済みです。' : '立候補しました。');
               loadRecruitList();
               loadAndRender();
+              if (onDone) onDone(true);
             } else {
               alert(r.error || '失敗しました。');
+              if (onDone) onDone(false);
             }
-          } catch (e) { alert('エラー'); }
-        }).withFailureHandler(function(err) { alert(err.message || 'エラー'); }).volunteerForRecruitment(recruitId, nameToSend, emailToSend, memo);
+          } catch (e) { alert('エラー'); if (onDone) onDone(false); }
+        }).withFailureHandler(function(err) {
+          setButtonLoading(btn, false);
+          alert(err.message || 'エラー');
+          if (onDone) onDone(false);
+        }).volunteerForRecruitment(recruitId, nameToSend, emailToSend, memo);
       }
 
       function loadSyncList() {
@@ -4169,7 +4244,8 @@
         renderRecruitSelectStaffList();
       });
 
-      document.getElementById('btnConfirmSelect').addEventListener('click', function() {
+      var btnConfirmSelectEl = document.getElementById('btnConfirmSelect');
+      btnConfirmSelectEl.addEventListener('click', function() {
         var row = parseInt(document.getElementById('recruitSelectRowIndex').value, 10);
         var staff = (window._recruitSelectStaffNames || []).join(',').trim();
         var errEl = document.getElementById('recruitSelectError');
@@ -4179,7 +4255,9 @@
           return;
         }
         errEl.style.display = 'none';
+        setButtonLoading(btnConfirmSelectEl, true);
         google.script.run.withSuccessHandler(function(jsonStr) {
+          setButtonLoading(btnConfirmSelectEl, false);
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
@@ -4192,6 +4270,7 @@
             }
           } catch (e) { errEl.style.display = 'block'; }
         }).withFailureHandler(function(err) {
+          setButtonLoading(btnConfirmSelectEl, false);
           errEl.textContent = err.message || 'エラー';
           errEl.style.display = 'block';
         }).selectStaffForRecruitment(row, staff);

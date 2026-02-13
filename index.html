@@ -1832,6 +1832,7 @@
               start: checkIn,
               end: checkOut || undefined,
               allDay: true,
+              order: 1,
               extendedProps: {
                 type: 'booking',
                 rowNumber: b.rowNumber,
@@ -1872,6 +1873,7 @@
               title: (isCancelled ? '[キャンセル] ' : '') + formatCleaningTitle(b),
               start: checkOut,
               allDay: true,
+              order: 0,
               extendedProps: {
                 type: 'cleaning',
                 rowNumber: b.rowNumber,
@@ -3486,6 +3488,7 @@
           },
           height: 'auto',
           contentHeight: isMobile ? 480 : 'auto',
+          eventOrder: 'order,start,-duration,allDay,title',
           events: [],
           dayCellClassNames: function(arg) {
             var ds = window._recruitDates || {};

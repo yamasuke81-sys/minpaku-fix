@@ -3,6 +3,22 @@
  * 軽量・スマホ最適化版
  */
 
+// 日付を yyyy-MM-dd 文字列に正規化するヘルパー
+function normDateStr_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
+  }
+  var s = String(v || '').trim();
+  // 既に yyyy-MM-dd ならそのまま
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Date パース可能なら変換
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd');
+  }
+  return s;
+}
+
 // チェックリスト機能用シート名
 const SHEET_CL_MASTER = 'チェックリストマスタ';
 const SHEET_CL_PHOTO_SPOTS = '撮影箇所マスタ';
@@ -312,12 +328,15 @@ function getChecklistForDate(checkoutDate) {
     var memoSheet = clSheet_(SHEET_CL_MEMOS);
     var supplySheet = clSheet_(SHEET_CL_SUPPLIES);
 
+    // 日付を正規化して比較
+    var targetDate = normDateStr_(checkoutDate);
+
     // チェック記録を取得
     var checkedItems = {};
     if (recordSheet.getLastRow() >= 2) {
       var records = recordSheet.getRange(2, 1, recordSheet.getLastRow() - 1, 5).getValues();
       records.forEach(function(row) {
-        if (String(row[0]) === String(checkoutDate) && row[2]) {
+        if (normDateStr_(row[0]) === targetDate && row[2]) {
           checkedItems[String(row[1])] = { checked: true, by: String(row[3] || ''), at: String(row[4] || '') };
         }
       });
@@ -328,7 +347,7 @@ function getChecklistForDate(checkoutDate) {
     if (photoSheet.getLastRow() >= 2) {
       var photoRecords = photoSheet.getRange(2, 1, photoSheet.getLastRow() - 1, 6).getValues();
       photoRecords.forEach(function(row) {
-        if (String(row[0]) === String(checkoutDate)) {
+        if (normDateStr_(row[0]) === targetDate) {
           var spotId = String(row[1]);
           var timing = String(row[5] || '');
           if (!photos[spotId]) photos[spotId] = { before: [], after: [] };
@@ -344,7 +363,7 @@ function getChecklistForDate(checkoutDate) {
     if (supplySheet.getLastRow() >= 2) {
       var supplyRecords = supplySheet.getRange(2, 1, supplySheet.getLastRow() - 1, 5).getValues();
       supplyRecords.forEach(function(row) {
-        if (String(row[0]) === String(checkoutDate)) {
+        if (normDateStr_(row[0]) === targetDate) {
           supplyNeeded[String(row[1])] = { name: String(row[2]), by: String(row[3] || ''), at: String(row[4] || '') };
         }
       });
@@ -355,7 +374,7 @@ function getChecklistForDate(checkoutDate) {
     if (memoSheet.getLastRow() >= 2) {
       var memoRecords = memoSheet.getRange(2, 1, memoSheet.getLastRow() - 1, 4).getValues();
       memoRecords.forEach(function(row) {
-        if (String(row[0]) === String(checkoutDate)) {
+        if (normDateStr_(row[0]) === targetDate) {
           memos.push({ text: String(row[1] || ''), by: String(row[2] || ''), at: String(row[3] || '') });
         }
       });
@@ -386,13 +405,14 @@ function getChecklistForDate(checkoutDate) {
 function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
   try {
     var sheet = clSheet_(SHEET_CL_RECORDS);
+    var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
     var found = false;
 
     if (lastRow >= 2) {
       var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
       for (var i = 0; i < data.length; i++) {
-        if (String(data[i][0]) === String(checkoutDate) && String(data[i][1]) === String(itemId)) {
+        if (normDateStr_(data[i][0]) === targetDate && String(data[i][1]) === String(itemId)) {
           if (checked) {
             sheet.getRange(i + 2, 3).setValue('Y');
             sheet.getRange(i + 2, 4).setValue(staffName || '');
@@ -423,13 +443,14 @@ function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
 function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName) {
   try {
     var sheet = clSheet_(SHEET_CL_SUPPLIES);
+    var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
     var found = false;
 
     if (lastRow >= 2) {
       var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
       for (var i = 0; i < data.length; i++) {
-        if (String(data[i][0]) === String(checkoutDate) && String(data[i][1]) === String(itemId)) {
+        if (normDateStr_(data[i][0]) === targetDate && String(data[i][1]) === String(itemId)) {
           if (!needed) {
             sheet.deleteRow(i + 2);
           }
@@ -515,8 +536,9 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     var supplySheet = clSheet_(SHEET_CL_SUPPLIES);
     if (supplySheet.getLastRow() >= 2) {
       var supplyData = supplySheet.getRange(2, 1, supplySheet.getLastRow() - 1, 5).getValues();
+      var targetDate = normDateStr_(checkoutDate);
       supplyData.forEach(function(row) {
-        if (String(row[0]) === String(checkoutDate)) {
+        if (normDateStr_(row[0]) === targetDate) {
           supplyList.push(String(row[2]));
         }
       });
@@ -582,22 +604,33 @@ function importDefaultChecklist() {
     var spotId = 1;
     var sortOrder = 1;
 
-    // チェックリスト項目データ
+    // チェックリスト項目データ（部屋ベース三階層）
+    // 大カテゴリ = 部屋/エリア、中カテゴリ = 作業区分（：で区切り）、項目名 = 個別チェック項目
     var items = [
-      // 駐車場
-      ['item_' + itemId++, '駐車場', 'ゴミ拾い（ゴミボックス内のゴミ袋使用）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '駐車場', 'ゴミボックスがいっぱい→西山に連絡', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '駐車場', '雑草チェック', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '駐車場', '補充：ビニール袋（都度）', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, '駐車場', '除草剤散布（毎回は不要）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '駐車場', '草抜き（毎回は不要）', sortOrder++, 'Y', 'N'],
+      // ===== 屋外 =====
+      ['item_' + itemId++, '屋外：駐車場', 'ゴミ拾い（ゴミボックス内のゴミ袋使用）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：駐車場', 'ゴミボックスがいっぱい→西山に連絡', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：駐車場', '雑草チェック', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：駐車場', '補充：ビニール袋（都度）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, '屋外：駐車場', '除草剤散布（毎回は不要）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：駐車場', '草抜き（毎回は不要）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：敷地内', '敷地内のゴミ掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：敷地内', '落ち葉や虫の死骸の清掃', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：敷地内', '雑草チェック', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：敷地内', '除草剤散布（毎回は不要）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '屋外：敷地内', '草抜き（毎回は不要）', sortOrder++, 'Y', 'N'],
 
-      // テラス
+      // ===== テラス =====
       ['item_' + itemId++, 'テラス', '安全チェーン 設置位置のズレ、外れたりしていないか', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス', '忘れ物チェック', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス', '落ち葉や虫の死骸の清掃', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス', '床面に残飯あったら流し台へ', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス', 'トング、包丁、ハサミ、お皿などの洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'テラス', 'テーブル、イス油汚れの除去（洗剤スポンジ）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'テラス', 'ホースで高圧洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'テラス', '折りたたみイス、簡易テーブル、タープテントの片付け（テラスのBOXへ）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'テラス', '次の予約がBBQ利用あり', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'テラス', '次の予約がBBQなし', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス：ガスコンロ', '本体、ふたの洗浄', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス：ガスコンロ', '階段下に設置（水は不要）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス：ガスコンロ', '網の洗浄', sortOrder++, 'Y', 'N'],
@@ -612,17 +645,12 @@ function importDefaultChecklist() {
       ['item_' + itemId++, 'テラス：流し台', '天板の洗浄', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス：流し台', 'シンク内の洗浄', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'テラス：流し台', '下の棚部分　洗浄交換', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'テラス：流し台', '補充：水切りネット', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'テラス：流し台', '補充：スポンジ（汚れている場合）2枚', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'テラス', 'テーブル、イス油汚れの除去（洗剤スポンジ）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'テラス', 'ホースで高圧洗浄', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'テラス', '折りたたみイス、簡易テーブル、タープテントの片付け（テラスのBOXへ）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'テラス', '補充：食器洗剤【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'テラス', '補充：パイプユニッシュ（都度）', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'テラス', '次の予約がBBQ利用あり', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'テラス', '次の予約がBBQなし', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'テラス：補充', '食器洗剤【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'テラス：補充', 'パイプユニッシュ（都度）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'テラス：補充', '水切りネット', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'テラス：補充', 'スポンジ（汚れている場合）2枚', sortOrder++, 'Y', 'Y'],
 
-      // 2階ベランダ（テラス側）
+      // ===== 2階ベランダ =====
       ['item_' + itemId++, '2階ベランダ：テラス側', '鳥の糞除去（濡らしたティッシュなどで拭き掃除）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：テラス側', '虫の死骸除去', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：テラス側', 'クモの巣（クモがいたら殺す。くも用スプレーの使用も可）', sortOrder++, 'Y', 'N'],
@@ -630,27 +658,6 @@ function importDefaultChecklist() {
       ['item_' + itemId++, '2階ベランダ：テラス側', '屋外スリッパの整頓（スリッパ大2個）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：テラス側', 'テーブルとイスの整頓', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：テラス側', 'ほうきの整頓', sortOrder++, 'Y', 'N'],
-
-      // 敷地内（テラスとベランダ以外）
-      ['item_' + itemId++, '敷地内', '敷地内のゴミ掃除', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '敷地内', '落ち葉や虫の死骸の清掃', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '敷地内', '雑草チェック', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '敷地内', '除草剤散布（毎回は不要）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '敷地内', '草抜き（毎回は不要）', sortOrder++, 'Y', 'N'],
-
-      // 最初に室内全体のチェック
-      ['item_' + itemId++, '室内全体チェック', '全部屋　写真か動画を撮影（損害あり → 西山へ）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック', '写真はLINEグループのアルバムへ', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック', 'タバコのにおいチェック（あり → 西山へ）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック：換気', '和室押入', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック：換気', '1階備品庫（番号007）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック：換気', 'キッチン換気扇　常時ON', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック：換気', '脱衣所収納', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック：換気', 'お風呂換気扇　常時ON', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック', 'タオル集め（トイレx2、キッチンx1、洗面所x1、脱衣所人数分）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '室内全体チェック', 'シーツ集め（2階和室マットも見ること）', sortOrder++, 'Y', 'N'],
-
-      // 2階ベランダ（和室側）
       ['item_' + itemId++, '2階ベランダ：和室側', '障子破れていない？（補修キット用意する予定）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：和室側', '鳥の糞除去（濡らしたティッシュなどで拭き掃除）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：和室側', '虫の死骸除去', sortOrder++, 'Y', 'N'],
@@ -661,47 +668,115 @@ function importDefaultChecklist() {
       ['item_' + itemId++, '2階ベランダ：和室側', '窓を施錠', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階ベランダ：和室側', '障子を閉める', sortOrder++, 'Y', 'N'],
 
-      // 2階リビング
+      // ===== 室内全体 =====
+      ['item_' + itemId++, '室内全体：損傷チェック', '全部屋　写真か動画を撮影（損害あり → 西山へ）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：損傷チェック', '写真はLINEグループのアルバムへ', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：損傷チェック', 'タバコのにおいチェック（あり → 西山へ）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：換気', '和室押入', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：換気', '1階備品庫（番号007）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：換気', 'キッチン換気扇　常時ON', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：換気', '脱衣所収納', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：換気', 'お風呂換気扇　常時ON', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：リネン回収', 'タオル集め（トイレx2、キッチンx1、洗面所x1、脱衣所人数分）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '室内全体：リネン回収', 'シーツ集め（2階和室マットも見ること）', sortOrder++, 'Y', 'N'],
+
+      // ===== 2階和室 =====
+      ['item_' + itemId++, '2階和室', '布団の片付け・掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階和室', '畳の掃除機がけ', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階和室', '押入れの中チェック（忘れ物）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階和室', '窓の施錠確認', sortOrder++, 'Y', 'N'],
+
+      // ===== 2階リビング =====
       ['item_' + itemId++, '2階リビング', '冷蔵庫の中チェック（空にする）', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, '2階リビング', '補充：ティッシュ（都度）', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, '2階リビング', '補充：殺虫スプレー（都度）', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, '2階リビング', '補充：コロコロ（都度）', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, '2階リビング', '補充：マモルーム（ゴキブリ忌避）（都度）', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, '2階リビング', '補充：ダニスプレー（都度）', sortOrder++, 'Y', 'Y'],
       ['item_' + itemId++, '2階リビング', 'ゴミの回収', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング', 'ゴミ箱の中に予備のゴミ袋あるか？5枚程度（30L）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング', 'ゴミ箱にゴミ袋（30L）を装着', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング', 'おもちゃ片付け（除菌シート、ほこり取り）', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング', 'エアコンリモコン（黒）電池ある？', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング', 'カウンター照明リモコン電池ある？', sortOrder++, 'Y', 'N'],
-
-      // 2階リビング：ほこり取り（簡略化のため一部のみ記載、実際は全部入れる）
       ['item_' + itemId++, '2階リビング：ほこり取り', '照明器具', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング：ほこり取り', '消火器', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, '2階リビング：ほこり取り', 'エアコン上', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階リビング：ほこり取り', 'テレビ・テレビ台', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階リビング：ほこり取り', '棚・カウンター', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階リビング：ほこり取り', '窓枠・サッシ', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '2階リビング：補充', 'ティッシュ（都度）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, '2階リビング：補充', '殺虫スプレー（都度）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, '2階リビング：補充', 'コロコロ（都度）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, '2階リビング：補充', 'マモルーム（ゴキブリ忌避）（都度）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, '2階リビング：補充', 'ダニスプレー（都度）', sortOrder++, 'Y', 'Y'],
 
-      // ... 以下、残りの項目も同様に追加（文字数制限のため一部省略）
-      // 実際のコードでは全300項目を記載します
+      // ===== キッチン =====
+      ['item_' + itemId++, 'キッチン：確認', 'ロールスクリーン上げる', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：確認', 'イス7個あるか', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：確認', 'テーブル2個あるか', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：確認', '食器が全て戻っているか', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：洗い物', 'シンク内の食器洗い', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：洗い物', '水切りかごの片付け', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：洗い物', '排水口ネット交換', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：拭き掃除', '冷蔵庫の中', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：拭き掃除', '電子レンジの中', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：拭き掃除', '炊飯器', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：拭き掃除', 'コンロ周り', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：拭き掃除', 'カウンター・天板', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：床掃除', '掃除機がけ', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：床掃除', '床拭き（汚れがある場合）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'キッチン：補充', '洗剤【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'キッチン：補充', 'ハンドソープ【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'キッチン：補充', '水切りネット【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'キッチン：補充', 'ティッシュ【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'キッチン：補充', 'ゴミ袋（45L）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'キッチン：補充', 'ラップ・アルミホイル（都度）', sortOrder++, 'Y', 'Y'],
 
-      // キッチン（一部）
-      ['item_' + itemId++, 'キッチン', 'ロールスクリーン上げる', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'キッチン', 'イス7個あるか', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'キッチン', 'テーブル2個あるか', sortOrder++, 'Y', 'N'],
-      ['item_' + itemId++, 'キッチン', '補充：洗剤【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'キッチン', '補充：ハンドソープ【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'キッチン', '補充：水切りネット【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'キッチン', '補充：ティッシュ【毎回】', sortOrder++, 'Y', 'Y'],
+      // ===== お風呂 =====
+      ['item_' + itemId++, 'お風呂：清掃', '浴槽の洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：清掃', '壁・床の洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：清掃', '鏡の水垢取り', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：清掃', '排水口の髪の毛除去', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：清掃', 'シャワーヘッド・蛇口のカルキ取り', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：清掃', 'イス・おけの洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：清掃', '換気扇 常時ON', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'お風呂：補充', 'シャンプー【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'お風呂：補充', 'コンディショナー【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'お風呂：補充', 'ボディソープ【毎回】', sortOrder++, 'Y', 'Y'],
 
-      // お風呂（一部）
-      ['item_' + itemId++, 'お風呂', '補充：シャンプー【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'お風呂', '補充：コンディショナー【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'お風呂', '補充：ボディソープ【毎回】', sortOrder++, 'Y', 'Y'],
+      // ===== 脱衣所・洗面所 =====
+      ['item_' + itemId++, '脱衣所・洗面所：清掃', '洗面台の洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '脱衣所・洗面所：清掃', '鏡の拭き掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '脱衣所・洗面所：清掃', '床の拭き掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '脱衣所・洗面所：清掃', '排水口の清掃', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '脱衣所・洗面所：清掃', '収納の換気', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '脱衣所・洗面所：補充', 'タオルセット（人数分）', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, '脱衣所・洗面所：補充', 'ドライヤー動作確認', sortOrder++, 'Y', 'N'],
 
-      // トイレ（一部）
+      // ===== トイレ =====
+      ['item_' + itemId++, 'トイレ：1階', '便器の洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'トイレ：1階', '便座・フタの拭き掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'トイレ：1階', '床の拭き掃除', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'トイレ：1階', '補充：ハンドソープ【毎回】', sortOrder++, 'Y', 'Y'],
       ['item_' + itemId++, 'トイレ：1階', '補充：トイレットペーパー【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'トイレ：1階', 'タオル交換', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'トイレ：2階', '便器の洗浄', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'トイレ：2階', '便座・フタの拭き掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, 'トイレ：2階', '床の拭き掃除', sortOrder++, 'Y', 'N'],
       ['item_' + itemId++, 'トイレ：2階', '補充：ハンドソープ【毎回】', sortOrder++, 'Y', 'Y'],
-      ['item_' + itemId++, 'トイレ：2階', '補充：トイレットペーパー【毎回】', sortOrder++, 'Y', 'Y']
+      ['item_' + itemId++, 'トイレ：2階', '補充：トイレットペーパー【毎回】', sortOrder++, 'Y', 'Y'],
+      ['item_' + itemId++, 'トイレ：2階', 'タオル交換', sortOrder++, 'Y', 'N'],
+
+      // ===== 玄関・廊下・階段 =====
+      ['item_' + itemId++, '玄関・廊下・階段', '玄関の掃き掃除', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '玄関・廊下・階段', '靴箱チェック（忘れ物）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '玄関・廊下・階段', 'スリッパの整頓・除菌', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '玄関・廊下・階段', '廊下の掃除機がけ', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '玄関・廊下・階段', '階段の掃除機がけ', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '玄関・廊下・階段', '施錠確認（全ドア・窓）', sortOrder++, 'Y', 'N'],
+
+      // ===== 最終チェック =====
+      ['item_' + itemId++, '最終チェック', '全室照明OFF', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '最終チェック', 'エアコンOFF（シーズン中はつけっぱなし指示あり）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '最終チェック', '窓の施錠（全箇所）', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '最終チェック', '玄関ドア施錠', sortOrder++, 'Y', 'N'],
+      ['item_' + itemId++, '最終チェック', 'ゴミ出し完了', sortOrder++, 'Y', 'N']
     ];
 
     // チェックリスト項目を一括書き込み
@@ -709,18 +784,22 @@ function importDefaultChecklist() {
       sheet.getRange(2, 1, items.length, 6).setValues(items);
     }
 
-    // 撮影箇所データ
+    // 撮影箇所データ（カテゴリは大カテゴリ名と一致させる）
     var spots = [
-      ['spot_' + spotId++, 'テラス', 'ビフォー/アフター', '', 1, 'Y', 'テラス'],
-      ['spot_' + spotId++, '2階ベランダ：テラス側', 'ビフォー/アフター', '', 2, 'Y', '2階ベランダ'],
-      ['spot_' + spotId++, '2階ベランダ：和室側', 'ビフォー/アフター', '', 3, 'Y', '2階ベランダ'],
-      ['spot_' + spotId++, '2階リビング', 'アフター', '', 4, 'Y', '2階リビング'],
-      ['spot_' + spotId++, 'キッチン', 'アフター', '', 5, 'Y', 'キッチン'],
-      ['spot_' + spotId++, 'お風呂', 'アフター', '', 6, 'Y', 'お風呂'],
-      ['spot_' + spotId++, '脱衣・洗面所', 'アフター', '', 7, 'Y', '脱衣・洗面所'],
-      ['spot_' + spotId++, 'トイレ：1階', 'アフター', '', 8, 'Y', 'トイレ'],
-      ['spot_' + spotId++, 'トイレ：2階', 'アフター', '', 9, 'Y', 'トイレ'],
-      ['spot_' + spotId++, '玄関', 'アフター', '', 10, 'Y', '玄関']
+      ['spot_' + spotId++, '駐車場', 'ビフォー/アフター', '', 1, 'Y', '屋外'],
+      ['spot_' + spotId++, 'テラス全景', 'ビフォー/アフター', '', 2, 'Y', 'テラス'],
+      ['spot_' + spotId++, 'テラス：ガスコンロ', 'ビフォー/アフター', '', 3, 'Y', 'テラス'],
+      ['spot_' + spotId++, 'テラス：流し台', 'ビフォー/アフター', '', 4, 'Y', 'テラス'],
+      ['spot_' + spotId++, '2階ベランダ：テラス側', 'ビフォー/アフター', '', 5, 'Y', '2階ベランダ'],
+      ['spot_' + spotId++, '2階ベランダ：和室側', 'ビフォー/アフター', '', 6, 'Y', '2階ベランダ'],
+      ['spot_' + spotId++, '2階和室', 'アフター', '', 7, 'Y', '2階和室'],
+      ['spot_' + spotId++, '2階リビング', 'アフター', '', 8, 'Y', '2階リビング'],
+      ['spot_' + spotId++, 'キッチン', 'アフター', '', 9, 'Y', 'キッチン'],
+      ['spot_' + spotId++, 'お風呂', 'アフター', '', 10, 'Y', 'お風呂'],
+      ['spot_' + spotId++, '脱衣所・洗面所', 'アフター', '', 11, 'Y', '脱衣所・洗面所'],
+      ['spot_' + spotId++, 'トイレ：1階', 'アフター', '', 12, 'Y', 'トイレ'],
+      ['spot_' + spotId++, 'トイレ：2階', 'アフター', '', 13, 'Y', 'トイレ'],
+      ['spot_' + spotId++, '玄関', 'アフター', '', 14, 'Y', '玄関・廊下・階段']
     ];
 
     // 撮影箇所を一括書き込み

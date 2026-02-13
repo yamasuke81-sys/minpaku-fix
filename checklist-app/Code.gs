@@ -493,6 +493,7 @@ function uploadChecklistPhoto(checkoutDate, spotId, timing, base64Data, staffNam
 
 function getOrCreateChecklistPhotoFolder_() {
   var props = PropertiesService.getScriptProperties();
+  // メインアプリの設定タブで設定されたフォルダIDを優先
   var folderId = props.getProperty('CHECKLIST_PHOTO_FOLDER_ID');
   if (folderId) {
     try { return DriveApp.getFolderById(folderId); } catch (e) {}
@@ -500,6 +501,21 @@ function getOrCreateChecklistPhotoFolder_() {
   var folder = DriveApp.createFolder('清掃チェックリスト写真');
   props.setProperty('CHECKLIST_PHOTO_FOLDER_ID', folder.getId());
   return folder;
+}
+
+/**
+ * 写真保存フォルダIDを設定（メインアプリの設定タブから呼び出し可能）
+ */
+function setChecklistPhotoFolderId(folderId) {
+  try {
+    var id = String(folderId || '').trim();
+    if (!id) return JSON.stringify({ success: false, error: 'フォルダIDが空です。' });
+    try { DriveApp.getFolderById(id); } catch (e) {
+      return JSON.stringify({ success: false, error: 'フォルダにアクセスできません。' });
+    }
+    PropertiesService.getScriptProperties().setProperty('CHECKLIST_PHOTO_FOLDER_ID', id);
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
 }
 
 /**

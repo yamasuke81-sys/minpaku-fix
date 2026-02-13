@@ -4683,6 +4683,7 @@
           var d = new Date();
           return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         })();
+        el.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary" role="status"></div><span class="text-muted small ms-2">読み込み中…</span></div>';
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
@@ -4777,8 +4778,8 @@
               if (!notifItems.length) { el.innerHTML = '<p class="text-muted small">通知はまだありません。</p>'; return; }
               var html = notifItems.map(function(n) {
                 var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : 'secondary';
-                var readBtn = n.read ? '' : ' <button type="button" class="btn btn-sm btn-outline-secondary py-0 ms-1 btn-notif-read" data-row="' + n.rowIndex + '">既読</button>';
-                return '<div class="border rounded p-2 mb-2 small"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span>\u3000' + escapeHtml(n.message) + readBtn + '</div>';
+                var readBtn = n.read ? '' : '<button type="button" class="btn btn-sm btn-outline-secondary py-0 flex-shrink-0 btn-notif-read" data-row="' + n.rowIndex + '">既読</button>';
+                return '<div class="border rounded p-2 mb-2 small d-flex justify-content-between align-items-center gap-2"><div><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span>\u3000' + escapeHtml(n.message) + '</div>' + readBtn + '</div>';
               }).join('');
               el.innerHTML = html;
               el.querySelectorAll('.btn-notif-read').forEach(function(btn) {

@@ -125,6 +125,30 @@
       max-height: 0;
     }
 
+    /* 中カテゴリ（サブセクション） */
+    .sub-section {
+      margin-left: 12px;
+      border-left: 3px solid #3498db;
+    }
+    .sub-section .section-header {
+      padding: 10px 14px;
+      background: #f0f4f8;
+      font-size: 14px;
+    }
+    .sub-section .section-header:active {
+      background: #dce3ea;
+    }
+    .sub-section .section-header.has-missing {
+      background: #fff0f0;
+    }
+    .sub-section .section-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .sub-section .section-count {
+      font-size: 12px;
+    }
+
     /* チェック項目 */
     .checklist-item {
       padding: 12px 16px;
@@ -523,56 +547,97 @@
       document.getElementById('bookingInfo').classList.remove('hidden');
     }
 
+    function renderChecklistItem(item, checked, supplyNeeded) {
+      var isChecked = !!checked[item.id];
+      var isSupplyNeeded = !!supplyNeeded[item.id];
+      var html = '<div class="checklist-item">';
+      html += '<input type="checkbox" class="item-checkbox" data-item-id="' + escapeHtml(item.id) + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleItem(this)">';
+      html += '<div class="item-content">';
+      html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
+      if (item.supplyItem) {
+        html += '<div class="supply-checkbox-container">';
+        html += '<input type="checkbox" class="supply-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" ' + (isSupplyNeeded ? 'checked' : '') + ' onchange="toggleSupply(this)">';
+        html += '<label>要補充</label>';
+        html += '</div>';
+      }
+      html += '</div></div>';
+      return html;
+    }
+
     function renderChecklist() {
       var items = checklistData.items;
       var checked = checklistData.checked;
       var supplyNeeded = checklistData.supplyNeeded;
 
-      // カテゴリごとにグループ化
-      var categories = {};
+      // カテゴリを大中小に階層化
+      // "：" 区切り → 前半=大カテゴリ、後半=中カテゴリ、個別項目=小
+      var majorGroups = {};
+      var majorOrder = [];
       items.forEach(function(item) {
         var cat = item.category || 'その他';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(item);
+        var sep = cat.indexOf('：');
+        var majorName = sep >= 0 ? cat.substring(0, sep) : cat;
+        var subName = sep >= 0 ? cat.substring(sep + 1) : null;
+        if (!majorGroups[majorName]) {
+          majorGroups[majorName] = { direct: [], subs: {}, subOrder: [] };
+          majorOrder.push(majorName);
+        }
+        if (subName) {
+          if (!majorGroups[majorName].subs[subName]) {
+            majorGroups[majorName].subs[subName] = [];
+            majorGroups[majorName].subOrder.push(subName);
+          }
+          majorGroups[majorName].subs[subName].push(item);
+        } else {
+          majorGroups[majorName].direct.push(item);
+        }
       });
 
       var html = '';
-      Object.keys(categories).forEach(function(cat) {
-        var catItems = categories[cat];
-        var checkedInCat = catItems.filter(function(item) { return checked[item.id]; }).length;
-        var allCheckedInCat = checkedInCat === catItems.length;
+      majorOrder.forEach(function(majorName) {
+        var group = majorGroups[majorName];
+        // 大カテゴリ全体のアイテム数を計算
+        var allItems = group.direct.slice();
+        group.subOrder.forEach(function(sub) { allItems = allItems.concat(group.subs[sub]); });
+        var checkedInMajor = allItems.filter(function(item) { return checked[item.id]; }).length;
+        var totalInMajor = allItems.length;
+        var allCheckedInMajor = checkedInMajor === totalInMajor;
 
-        html += '<div class="section" data-category="' + escapeHtml(cat) + '">';
+        html += '<div class="section" data-category="' + escapeHtml(majorName) + '">';
         html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
         html += '<span class="section-icon">▼</span>';
-        html += '<span class="section-title">' + escapeHtml(cat) + '</span>';
-        html += '<span class="section-count">(' + checkedInCat + '/' + catItems.length + ')</span>';
-        if (!allCheckedInCat) html += '<button class="section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
+        html += '<span class="section-title">' + escapeHtml(majorName) + '</span>';
+        html += '<span class="section-count">(' + checkedInMajor + '/' + totalInMajor + ')</span>';
+        if (!allCheckedInMajor) html += '<button class="section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
         html += '</div>';
         html += '<div class="section-body collapsed">';
 
-        catItems.forEach(function(item) {
-          var isChecked = !!checked[item.id];
-          var isSupplyNeeded = !!supplyNeeded[item.id];
-
-          html += '<div class="checklist-item">';
-          html += '<input type="checkbox" class="item-checkbox" data-item-id="' + escapeHtml(item.id) + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleItem(this)">';
-          html += '<div class="item-content">';
-          html += '<div class="item-name">' + escapeHtml(item.name) + '</div>';
-
-          if (item.supplyItem) {
-            html += '<div class="supply-checkbox-container">';
-            html += '<input type="checkbox" class="supply-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" ' + (isSupplyNeeded ? 'checked' : '') + ' onchange="toggleSupply(this)">';
-            html += '<label>要補充</label>';
-            html += '</div>';
-          }
-
-          html += '</div>';
-          html += '</div>';
+        // 直属アイテム（中カテゴリなし）
+        group.direct.forEach(function(item) {
+          html += renderChecklistItem(item, checked, supplyNeeded);
         });
 
-        html += '</div>';
-        html += '</div>';
+        // 中カテゴリ（サブセクション）
+        group.subOrder.forEach(function(subName) {
+          var subItems = group.subs[subName];
+          var checkedInSub = subItems.filter(function(item) { return checked[item.id]; }).length;
+          var allCheckedInSub = checkedInSub === subItems.length;
+
+          html += '<div class="section sub-section" data-category="' + escapeHtml(majorName + '：' + subName) + '">';
+          html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
+          html += '<span class="section-icon">▼</span>';
+          html += '<span class="section-title">' + escapeHtml(subName) + '</span>';
+          html += '<span class="section-count">(' + checkedInSub + '/' + subItems.length + ')</span>';
+          if (!allCheckedInSub) html += '<button class="section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
+          html += '</div>';
+          html += '<div class="section-body collapsed">';
+          subItems.forEach(function(item) {
+            html += renderChecklistItem(item, checked, supplyNeeded);
+          });
+          html += '</div></div>';
+        });
+
+        html += '</div></div>';
       });
 
       document.getElementById('checklistContainer').innerHTML = html;

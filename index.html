@@ -2839,7 +2839,7 @@
                   emBtnSelect.textContent = 'スタッフ選定';
                   emBtnSelect.onclick = function() {
                     bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                    openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: checkoutDate || r.checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
+                    openRecruitSelectModal({ rowIndex: r.recruitRowIndex, bookingRowNumber: props.rowNumber, volunteers: r.volunteers || [], checkoutDate: checkoutDate || r.checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
                   };
                   btnRow.appendChild(emBtnSelect);
                   // 確定（募集締切）ボタン: スタッフ選定済み + ステータスが募集中の場合のみ表示
@@ -2857,7 +2857,7 @@
                         google.script.run.withSuccessHandler(function(j) {
                           var res = JSON.parse(j);
                           if (res.success) {
-                            applyConfirmOptimistic(r.recruitRowIndex);
+                            applyConfirmOptimistic(r.recruitRowIndex, props.rowNumber, (r.selectedStaff || d.cleaningStaff || '').trim());
                             loadAndRender(); loadRecruitList();
                             showConfirmationNotifyUI(ownerCenterArea, r.recruitRowIndex, 'eventModal');
                           }
@@ -3384,16 +3384,50 @@
        * 募集確定時の楽観的キャッシュ更新＋カレンダー即座再描画
        * confirmRecruitment() 成功後に呼び出し、loadAndRender() 完了を待たずにUIを更新する
        */
-      function applyConfirmOptimistic(recruitRowIdx) {
-        if (!window._recruitFullMap) return;
-        // recruitRowIndex から対応する予約行を見つけてステータスを更新
+      function applyConfirmOptimistic(recruitRowIdx, bookingRowNum, staffName) {
+        if (!window._recruitFullMap) window._recruitFullMap = {};
+        var updated = false;
+        // 1. recruitRowIndex で既存エントリを検索して更新
         for (var key in window._recruitFullMap) {
           if (window._recruitFullMap[key].recruitRowIndex === recruitRowIdx) {
             window._recruitFullMap[key].status = 'スタッフ確定済み';
+            if (staffName) {
+              window._recruitFullMap[key].staff = staffName;
+              window._recruitFullMap[key].selectedStaff = staffName;
+            }
+            updated = true;
             break;
           }
         }
-        // カレンダーを即座に再描画
+        // 2. 見つからない場合、bookingRowNum で直接エントリを作成/更新
+        if (!updated && bookingRowNum) {
+          if (window._recruitFullMap[bookingRowNum]) {
+            window._recruitFullMap[bookingRowNum].status = 'スタッフ確定済み';
+            if (staffName) {
+              window._recruitFullMap[bookingRowNum].staff = staffName;
+              window._recruitFullMap[bookingRowNum].selectedStaff = staffName;
+            }
+          } else {
+            window._recruitFullMap[bookingRowNum] = {
+              status: 'スタッフ確定済み',
+              staff: staffName || '',
+              selectedStaff: staffName || '',
+              volunteers: [],
+              recruitRowIndex: recruitRowIdx
+            };
+          }
+        }
+        // 3. allBookings の cleaningStaff も更新（マージ行含む）
+        if (staffName && typeof allBookings !== 'undefined' && bookingRowNum) {
+          var targetCi = null;
+          allBookings.forEach(function(b) { if (b.rowNumber === bookingRowNum) targetCi = b.checkInParsed; });
+          allBookings.forEach(function(b) {
+            if (b.rowNumber === bookingRowNum || (targetCi && b.checkInParsed === targetCi)) {
+              b.cleaningStaff = staffName;
+            }
+          });
+        }
+        // 4. カレンダーを即座に再描画
         if (typeof allBookings !== 'undefined' && window._recruitFullMap && calendar) {
           var staffSetDates = {};
           allBookings.forEach(function(b) {
@@ -4033,7 +4067,7 @@
             google.script.run.withSuccessHandler(function(j) {
               var res = JSON.parse(j);
               if (res.success) {
-                applyConfirmOptimistic(r.rowIndex);
+                applyConfirmOptimistic(r.rowIndex, r.bookingRowNumber || 0, (r.selectedStaff || '').trim());
                 loadRecruitList();
                 loadAndRender();
                 var parentArea = document.getElementById('recruitEditConfirmArea');
@@ -4362,6 +4396,7 @@
       function openRecruitSelectModal(r) {
         var volList = (r.volunteers || []);
         document.getElementById('recruitSelectRowIndex').value = r.rowIndex;
+        window._recruitSelectBookingRow = r.bookingRowNumber || 0;
         document.getElementById('recruitSelectModalTitle').textContent = '清掃担当を選定';
         document.getElementById('recruitSelectDate').textContent = 'チェックアウト日: ' + (r.checkoutDate || '');
         window._recruitSelectStaffNames = (r.selectedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
@@ -5847,7 +5882,7 @@
                 if (ok) {
                   google.script.run.withSuccessHandler(function(cj) {
                     var cr = JSON.parse(cj);
-                    if (cr.success) applyConfirmOptimistic(row);
+                    if (cr.success) applyConfirmOptimistic(row, window._recruitSelectBookingRow || 0, staff);
                     loadRecruitList();
                     loadAndRender();
                     if (cr.success) {

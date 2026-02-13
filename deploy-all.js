@@ -42,7 +42,7 @@ function getDeployIds(text) {
   return ids;
 }
 
-/** ブラウザを自動で開く（Windows/Mac/Linux対応） */
+/** ブラウザを通常ウィンドウで開く */
 function openBrowser(url) {
   try {
     if (process.platform === 'win32') {
@@ -53,9 +53,22 @@ function openBrowser(url) {
       execSync('xdg-open "' + url + '"');
     }
   } catch (e) {
-    console.log('  ブラウザを自動で開けませんでした。以下のURLを手動で開いてください:');
-    console.log('  ' + url);
+    console.log('  ブラウザを開けませんでした: ' + url);
   }
+}
+
+/** ブラウザをシークレットウィンドウで開く（Windows: Edge→Chrome→通常 の順で試行） */
+function openBrowserIncognito(url) {
+  if (process.platform !== 'win32') { openBrowser(url); return; }
+  try {
+    execSync('start msedge --inprivate "' + url + '"', { shell: true });
+    return;
+  } catch (e) {}
+  try {
+    execSync('start chrome --incognito "' + url + '"', { shell: true });
+    return;
+  } catch (e) {}
+  openBrowser(url);
 }
 
 function main() {
@@ -130,16 +143,22 @@ function main() {
   console.log('========================================');
   console.log('');
 
-  // URLを表示＆ブラウザで開く
+  // URLを表示
   urls.forEach(function(u) {
     console.log('  ' + u.label + ': ' + u.url);
   });
   console.log('');
 
-  // メインアプリ（オーナー用）をブラウザで開く
-  if (urls.length > 0) {
-    openBrowser(urls[0].url);
-  }
+  // ブラウザで3つ開く: オーナー(通常)、スタッフ(シークレット)、チェックリスト(通常)
+  urls.forEach(function(u) {
+    if (u.label === 'スタッフ用') {
+      console.log('  シークレットウィンドウで開く: ' + u.label);
+      openBrowserIncognito(u.url);
+    } else {
+      console.log('  通常ウィンドウで開く: ' + u.label);
+      openBrowser(u.url);
+    }
+  });
 }
 
 main();

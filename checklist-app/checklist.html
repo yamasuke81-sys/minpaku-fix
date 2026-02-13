@@ -10,7 +10,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: #f5f5f5;
       color: #333;
-      padding-bottom: 80px;
+      padding-bottom: 120px;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -85,14 +85,17 @@
     }
     .staff-remove-btn { font-size: 14px; }
 
-    /* タブナビ */
+    /* タブナビ（画面下部固定） */
     .tab-nav {
       display: flex;
       background: white;
-      border-bottom: 2px solid #ecf0f1;
-      position: sticky;
-      top: 0;
-      z-index: 90;
+      border-top: 2px solid #ecf0f1;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
     }
     .tab-nav-btn {
       flex: 1;
@@ -103,12 +106,12 @@
       font-weight: bold;
       color: #7f8c8d;
       cursor: pointer;
-      border-bottom: 3px solid transparent;
+      border-top: 3px solid transparent;
       transition: all 0.2s;
     }
     .tab-nav-btn.active {
       color: #2c3e50;
-      border-bottom-color: #3498db;
+      border-top-color: #3498db;
     }
     .tab-nav-btn .tab-badge {
       display: inline-block;
@@ -447,15 +450,15 @@
       white-space: nowrap;
     }
 
-    /* ボトムバー */
+    /* ボトムバー（タブナビの上） */
     .bottom-bar {
       position: fixed;
-      bottom: 0;
+      bottom: 52px;
       left: 0;
       right: 0;
       background: white;
-      padding: 12px;
-      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+      padding: 8px 12px;
+      box-shadow: 0 -1px 4px rgba(0,0,0,0.08);
       display: flex;
       gap: 8px;
       z-index: 99;
@@ -747,13 +750,7 @@
     <!-- 次回予約情報 -->
     <div id="bookingInfo" class="booking-info hidden"></div>
 
-    <!-- タブナビゲーション -->
-    <div class="tab-nav" id="tabNav">
-      <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
-      <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
-      <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
-      <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')">設定</button>
-    </div>
+    <!-- タブナビゲーション（画面下部に表示） -->
 
     <!-- チェックリストタブ -->
     <div id="tabChecklist" class="tab-content active">
@@ -809,6 +806,14 @@
     <button id="btnComplete" class="btn btn-complete">清掃完了</button>
   </div>
 
+  <!-- タブナビゲーション（画面下部固定） -->
+  <div class="tab-nav" id="tabNav">
+    <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
+    <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
+    <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
+    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')">設定</button>
+  </div>
+
   <!-- 保存インジケーター -->
   <div class="save-indicator" id="saveIndicator"></div>
 
@@ -849,16 +854,23 @@
       loadStaffList();
 
       // 定期リフレッシュ（60秒ごと、2人同時利用対応）
+      // 折りたたみ状態とタブ状態を保持してリフレッシュ
       setInterval(function() {
         if (!checklistData) return;
         callGAS('getChecklistForDate', [checkoutDate]).then(function(res) {
           if (res.success) {
+            // 現在の折りたたみ状態を保存
+            var collapseState = saveCollapseState();
+            var activeTab = getActiveTab();
             checklistData = res;
             renderChecklist();
             renderPhotoSection();
             renderSupplyList();
             updateProgress();
             updateCheckAllButton();
+            // 折りたたみ状態とタブを復元
+            restoreCollapseState(collapseState);
+            if (activeTab) switchTab(activeTab);
           }
         }).catch(function() {});
       }, 60000);
@@ -974,6 +986,43 @@
       });
       var target = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (target) target.classList.add('active');
+    }
+
+    // === 折りたたみ状態の保存・復元 ===
+    function getActiveTab() {
+      var active = document.querySelector('.tab-nav-btn.active');
+      return active ? active.getAttribute('data-tab') : 'checklist';
+    }
+
+    function saveCollapseState() {
+      var state = {};
+      document.querySelectorAll('#checklistContainer .section').forEach(function(section) {
+        var cat = section.getAttribute('data-category');
+        if (cat) {
+          var header = section.querySelector('.section-header');
+          state[cat] = header ? header.classList.contains('collapsed') : true;
+        }
+      });
+      return state;
+    }
+
+    function restoreCollapseState(state) {
+      document.querySelectorAll('#checklistContainer .section').forEach(function(section) {
+        var cat = section.getAttribute('data-category');
+        if (cat && state.hasOwnProperty(cat)) {
+          var header = section.querySelector('.section-header');
+          var body = section.querySelector('.section-body');
+          if (header && body) {
+            if (state[cat]) {
+              header.classList.add('collapsed');
+              body.classList.add('collapsed');
+            } else {
+              header.classList.remove('collapsed');
+              body.classList.remove('collapsed');
+            }
+          }
+        }
+      });
     }
 
     // === データ読み込み ===

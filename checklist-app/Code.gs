@@ -476,7 +476,10 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName) {
  */
 function uploadChecklistPhoto(checkoutDate, spotId, timing, base64Data, staffName) {
   try {
-    var folder = getOrCreateChecklistPhotoFolder_();
+    var parentFolder = getOrCreateChecklistPhotoFolder_();
+    // ビフォー/アフターのサブフォルダに保存
+    var subFolderName = (timing === 'ビフォー') ? 'ビフォー' : 'アフター';
+    var folder = getOrCreateSubFolder_(parentFolder, subFolderName);
     var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'photo_' + new Date().getTime() + '.jpg');
     var file = folder.createFile(blob);
     file.setName(checkoutDate + '_' + spotId + '_' + timing + '_' + new Date().getTime() + '.jpg');
@@ -501,6 +504,17 @@ function getOrCreateChecklistPhotoFolder_() {
   var folder = DriveApp.createFolder('清掃チェックリスト写真');
   props.setProperty('CHECKLIST_PHOTO_FOLDER_ID', folder.getId());
   return folder;
+}
+
+/**
+ * 親フォルダ内にサブフォルダを取得または作成
+ */
+function getOrCreateSubFolder_(parentFolder, subFolderName) {
+  var folders = parentFolder.getFoldersByName(subFolderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(subFolderName);
 }
 
 /**

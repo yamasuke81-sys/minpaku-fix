@@ -252,11 +252,7 @@
       color: #27ae60;
     }
     .section-check-all:active { background: #eafaf1; }
-    .section-photo-btn {
-      border-color: #e67e22;
-      color: #e67e22;
-    }
-    .section-photo-btn:active { background: #fef5ed; }
+
 
     /* チェック項目 */
     .checklist-item {
@@ -1170,49 +1166,6 @@
       });
 
       document.getElementById('photoSection').innerHTML = html;
-    }
-
-    // カテゴリヘッダーの撮影ボタンから呼ばれるモーダル
-    function openCategoryPhoto(majorName) {
-      var spots = checklistData.spots || [];
-      var photos = checklistData.photos || {};
-      // カテゴリに属する撮影箇所をフィルター
-      var matchedSpots = spots.filter(function(s) {
-        var cat = s.category || 'その他';
-        return cat === majorName || cat.indexOf(majorName) === 0;
-      });
-
-      if (matchedSpots.length === 0) {
-        // 撮影箇所がない場合、カテゴリ名をスポット名として直接撮影
-        currentPhotoSpotId = 'cat_' + majorName;
-        currentPhotoTiming = 'アフター';
-        document.getElementById('photoInput').click();
-        return;
-      }
-
-      // モーダルで撮影箇所一覧を表示
-      var overlay = document.createElement('div');
-      overlay.className = 'photo-modal-overlay';
-      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-
-      var modal = document.createElement('div');
-      modal.className = 'photo-modal';
-      var html = '<h3>📷 ' + escapeHtml(majorName) + ' の撮影</h3>';
-      matchedSpots.forEach(function(spot) {
-        var spotPhotos = photos[spot.id] || { before: [], after: [] };
-        var bCount = spotPhotos.before.length;
-        var aCount = spotPhotos.after.length;
-        html += '<div style="margin-bottom:12px;padding:10px;background:#fafafa;border-radius:6px;">';
-        html += '<div style="font-weight:bold;margin-bottom:8px;">' + escapeHtml(spot.name) + ' <span style="font-size:12px;color:#7f8c8d;">(B:' + bCount + ' / A:' + aCount + ')</span></div>';
-        html += '<div style="display:flex;gap:8px;">';
-        html += '<button class="photo-upload-btn" style="flex:1;" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\'); this.closest(\'.photo-modal-overlay\').remove();">ビフォー</button>';
-        html += '<button class="photo-upload-btn" style="flex:1;background:#e67e22;" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\'); this.closest(\'.photo-modal-overlay\').remove();">アフター</button>';
-        html += '</div></div>';
-      });
-      html += '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
-      modal.innerHTML = html;
-      overlay.appendChild(modal);
-      document.body.appendChild(overlay);
     }
 
     function renderMemos() {

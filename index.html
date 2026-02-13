@@ -2418,7 +2418,7 @@
                             loadAndRender();
                             if (window.staffMode) loadStaffSchedule();
                           } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
-                        }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                        }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, checkoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                       });
                     };
                     volBodyArea.appendChild(cancelReqBtn);
@@ -2733,7 +2733,7 @@
                           };
                         }
                       } else if (!jt.success) alert(jt.error || 'コピーに失敗しました');
-                    }).getRecruitmentCopyText(r.checkoutDate || checkoutDate, rowNum, { date:'', guestCount:'', bbq:'', nationality:'日本', memo:'' });
+                    }).getRecruitmentCopyText(checkoutDate || r.checkoutDate, rowNum, { date:'', guestCount:'', bbq:'', nationality:'日本', memo:'' });
                   };
                   var emBtnCancel = document.createElement('button');
                   emBtnCancel.type = 'button';
@@ -2766,7 +2766,7 @@
                   emBtnSelect.textContent = 'スタッフ選定';
                   emBtnSelect.onclick = function() {
                     bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                    openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: r.checkoutDate || checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
+                    openRecruitSelectModal({ rowIndex: r.recruitRowIndex, volunteers: r.volunteers || [], checkoutDate: checkoutDate || r.checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
                   };
                   btnRow.appendChild(emBtnSelect);
                   // 確定（募集締切）ボタン: スタッフ選定済み + ステータスが募集中の場合のみ表示
@@ -5791,12 +5791,19 @@
         var disp = document.getElementById('staffDisplayName');
         var badge = document.getElementById('currentAccountBadge');
         if (disp && disp.style.display !== 'none') {
-          // staffDisplayNameが表示中ならbadgeは非表示（重複防止）
           disp.textContent = window.currentUserName || window.currentUserEmail || '--';
           if (badge) badge.style.display = 'none';
         } else if (badge) {
           badge.textContent = window.currentUserName || (window.currentUserEmail ? window.currentUserEmail.split('@')[0] : '');
           badge.style.display = badge.textContent ? '' : 'none';
+        }
+        // カレンダーの赤枠（応募状況）を反映するためイベントを再構築
+        if (typeof calendar !== 'undefined' && calendar && typeof allBookings !== 'undefined' && allBookings && allBookings.length) {
+          var sources = calendar.getEventSources();
+          sources.forEach(function(s) { s.remove(); });
+          var newEvents = buildCalendarEvents(allBookings, window._recruitFullMap || {});
+          calendar.addEventSource(newEvents);
+          calendar.render();
         }
       }
       function showStaffSelectOverlay() {

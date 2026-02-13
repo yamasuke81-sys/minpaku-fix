@@ -646,7 +646,11 @@ function getStaffDeployUrl() {
     var base = '';
     try { base = ScriptApp.getService().getUrl(); } catch (e) {}
     var url = base ? (base.indexOf('?') >= 0 ? base + '&staff=1' : base + '?staff=1') : '';
-    return JSON.stringify({ success: true, url: url, isStored: false });
+    // 自動生成URLがあれば自動保存
+    if (url) {
+      try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
+    }
+    return JSON.stringify({ success: true, url: url, isStored: !!url });
   } catch (e) { return JSON.stringify({ success: false, url: '', isStored: false, error: e.toString() }); }
 }
 

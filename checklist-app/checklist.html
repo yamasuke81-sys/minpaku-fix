@@ -54,27 +54,35 @@
       align-items: flex-end;
       gap: 4px;
     }
+    .staff-selector-label {
+      font-size: 11px;
+      opacity: 0.8;
+      text-align: right;
+      margin-bottom: 2px;
+      letter-spacing: 0.5px;
+    }
     .staff-row {
       display: flex;
       align-items: center;
       gap: 4px;
     }
     .staff-select {
-      padding: 4px 8px;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.3);
-      background: rgba(255,255,255,0.15);
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 2px solid rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.2);
       color: white;
-      font-size: 13px;
-      max-width: 120px;
+      font-size: 14px;
+      font-weight: bold;
+      min-width: 140px;
     }
     .staff-select option { color: #333; background: white; }
     .staff-add-btn, .staff-remove-btn {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.4);
-      background: transparent;
+      border: 2px solid rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.15);
       color: white;
       font-size: 16px;
       line-height: 1;
@@ -91,7 +99,7 @@
       background: white;
       border-top: 2px solid #ecf0f1;
       position: fixed;
-      bottom: 0;
+      bottom: 52px;
       left: 0;
       right: 0;
       z-index: 100;
@@ -450,10 +458,10 @@
       white-space: nowrap;
     }
 
-    /* ボトムバー（タブナビの上） */
+    /* ボトムバー（最下部固定） */
     .bottom-bar {
       position: fixed;
-      bottom: 52px;
+      bottom: 0;
       left: 0;
       right: 0;
       background: white;
@@ -461,7 +469,7 @@
       box-shadow: 0 -1px 4px rgba(0,0,0,0.08);
       display: flex;
       gap: 8px;
-      z-index: 99;
+      z-index: 101;
     }
     .btn {
       flex: 1;
@@ -779,7 +787,7 @@
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="staff-selector" id="staffSelector">
-        <div style="font-size:11px;opacity:0.7;text-align:right;margin-bottom:2px;">担当スタッフ</div>
+        <div class="staff-selector-label">担当スタッフ</div>
         <div class="staff-row">
           <select class="staff-select" id="staffSelect0"></select>
           <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
@@ -833,10 +841,43 @@
       <div id="photoSection"></div>
     </div>
 
-    <!-- 設定タブ -->
+    <!-- 設定タブ（オーナーのみ表示） -->
     <div id="tabClSettings" class="tab-content">
       <div style="padding:16px;">
         <h3 style="font-size:16px;margin-bottom:16px;color:#2c3e50;">チェックリスト設定</h3>
+
+        <!-- 写真保存フォルダ設定 -->
+        <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #ddd;margin-bottom:16px;">
+          <h4 style="font-size:14px;margin-bottom:8px;">写真保存フォルダ（Googleドライブ）</h4>
+          <p style="font-size:12px;color:#666;margin-bottom:12px;">各写真の保存先フォルダURLまたはフォルダIDを指定。空欄の場合は自動作成されます。</p>
+
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:bold;color:#555;">ビフォー写真フォルダ</label>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <input type="text" id="folderBeforeInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+              <button onclick="saveSubFolder('before')" style="padding:6px 12px;background:#3498db;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px;font-weight:bold;color:#555;">アフター写真フォルダ</label>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <input type="text" id="folderAfterInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+              <button onclick="saveSubFolder('after')" style="padding:6px 12px;background:#e67e22;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:4px;">
+            <label style="font-size:12px;font-weight:bold;color:#555;">見本写真フォルダ</label>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <input type="text" id="folderExampleInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+              <button onclick="saveSubFolder('example')" style="padding:6px 12px;background:#9b59b6;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
+            </div>
+          </div>
+          <div id="folderSaveResult" style="display:none;margin-top:8px;font-size:12px;"></div>
+        </div>
+
+        <!-- 初期データ再インポート -->
         <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #ddd;margin-bottom:16px;">
           <h4 style="font-size:14px;margin-bottom:8px;">初期データ再インポート</h4>
           <p style="font-size:12px;color:#666;margin-bottom:12px;">チェックリスト項目と撮影箇所を初期状態に戻します。既存のマスターデータが上書きされます。</p>
@@ -847,18 +888,18 @@
     </div>
   </div>
 
-  <!-- ボトムバー -->
-  <div class="bottom-bar">
-    <button id="btnCheckMissing" class="btn btn-check">漏れチェック</button>
-    <button id="btnComplete" class="btn btn-complete">清掃完了</button>
-  </div>
-
-  <!-- タブナビゲーション（画面下部固定） -->
+  <!-- タブナビゲーション（ボタンの上に固定） -->
   <div class="tab-nav" id="tabNav">
     <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
     <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
     <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
-    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')">設定</button>
+    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')" style="display:none;">設定</button>
+  </div>
+
+  <!-- ボトムバー（最下部固定） -->
+  <div class="bottom-bar">
+    <button id="btnCheckMissing" class="btn btn-check">漏れチェック</button>
+    <button id="btnComplete" class="btn btn-complete">清掃完了</button>
   </div>
 
   <!-- 保存インジケーター -->
@@ -928,6 +969,7 @@
       document.getElementById('btnComplete').addEventListener('click', completeChecklist);
       document.getElementById('memoBtn').addEventListener('click', addMemo);
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
+      document.getElementById('staffSelect0').addEventListener('change', updateSettingsTabVisibility);
       document.getElementById('btnReimportCL').addEventListener('click', function() {
         if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\n既存のマスターデータが上書きされます。\n\nよろしいですか？')) return;
         var btn = this;
@@ -983,11 +1025,17 @@
         var currentVal = sel.value;
         sel.innerHTML = '<option value="">🧹 スタッフ選択</option>';
         staffList.forEach(function(name) {
+          if (name === 'オーナー') return; // 最後に追加するのでスキップ
           var opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
           sel.appendChild(opt);
         });
+        // 「オーナー」を常に最後に表示
+        var ownerOpt = document.createElement('option');
+        ownerOpt.value = 'オーナー';
+        ownerOpt.textContent = 'オーナー';
+        sel.appendChild(ownerOpt);
         // 初期選択: URLパラメータのstaffNameに一致するものがあれば選択
         if (!currentVal && staffName) {
           sel.value = staffName;
@@ -995,6 +1043,22 @@
           sel.value = currentVal;
         }
       });
+      // 設定タブの表示制御: オーナー選択時のみ表示
+      updateSettingsTabVisibility();
+    }
+
+    function updateSettingsTabVisibility() {
+      var firstSelect = document.getElementById('staffSelect0');
+      var isOwner = firstSelect && firstSelect.value === 'オーナー';
+      var settingsBtn = document.querySelector('.tab-nav-btn[data-tab="clSettings"]');
+      if (settingsBtn) settingsBtn.style.display = isOwner ? '' : 'none';
+      // オーナーでない場合に設定タブが表示中なら切り替え
+      if (!isOwner) {
+        var settingsTab = document.getElementById('tabClSettings');
+        if (settingsTab && settingsTab.classList.contains('active')) {
+          switchTab('checklist');
+        }
+      }
     }
 
     function addStaffRow() {
@@ -1034,6 +1098,50 @@
       });
       var target = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (target) target.classList.add('active');
+      if (tabName === 'clSettings') loadFolderSettings();
+    }
+
+    // フォルダ設定の読み込み
+    function loadFolderSettings() {
+      callGAS('getPhotoFolderSettings', []).then(function(res) {
+        if (res.success) {
+          var bi = document.getElementById('folderBeforeInput');
+          var ai = document.getElementById('folderAfterInput');
+          var ei = document.getElementById('folderExampleInput');
+          if (bi && res.beforeId) bi.value = 'https://drive.google.com/drive/folders/' + res.beforeId;
+          if (ai && res.afterId) ai.value = 'https://drive.google.com/drive/folders/' + res.afterId;
+          if (ei && res.exampleId) ei.value = 'https://drive.google.com/drive/folders/' + res.exampleId;
+        }
+      });
+    }
+
+    // フォルダ保存
+    function saveSubFolder(type) {
+      var inputMap = { 'before': 'folderBeforeInput', 'after': 'folderAfterInput', 'example': 'folderExampleInput' };
+      var input = document.getElementById(inputMap[type]);
+      if (!input) return;
+      var val = input.value.trim();
+      // URLからフォルダIDを抽出
+      var folderId = val;
+      var match = val.match(/folders\/([a-zA-Z0-9_-]+)/);
+      if (match) folderId = match[1];
+      var resEl = document.getElementById('folderSaveResult');
+      resEl.textContent = '保存中...';
+      resEl.style.color = '#666';
+      resEl.style.display = 'block';
+      callGAS('setPhotoSubFolderId', [type, folderId]).then(function(res) {
+        if (res.success) {
+          resEl.textContent = '保存しました';
+          resEl.style.color = '#27ae60';
+        } else {
+          resEl.textContent = res.error || '保存失敗';
+          resEl.style.color = '#e74c3c';
+        }
+        setTimeout(function() { resEl.style.display = 'none'; }, 3000);
+      }).catch(function() {
+        resEl.textContent = 'エラーが発生しました';
+        resEl.style.color = '#e74c3c';
+      });
     }
 
     // === 折りたたみ状態の保存・復元 ===
@@ -1307,33 +1415,38 @@
           html += '<button class="inline-spot-delete-btn" onclick="deleteSpot(\'' + spot.id + '\', \'' + escapeHtml(spot.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';
           html += '</div>';
 
-          // ビフォー
-          html += '<div class="photo-timing-group">';
-          html += '<div class="photo-timing-label">' + (bDone ? '✓ ' : '') + 'ビフォー (' + spotPhotos.before.length + '枚)</div>';
+          // ビフォー/アフター 左右配置
+          html += '<div style="display:flex;gap:8px;">';
+
+          // ビフォー（左）
+          html += '<div class="photo-timing-group" style="flex:1;">';
+          html += '<button class="photo-upload-btn" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')" style="margin-bottom:4px;">' + (bDone ? '✓ ビフォー' : 'ビフォー') + '</button>';
+          html += '<div style="font-size:11px;color:#888;text-align:center;">(' + spotPhotos.before.length + '枚)</div>';
           if (spotPhotos.before.length > 0) {
-            html += '<div class="photo-grid">';
+            html += '<div class="photo-grid" style="margin-top:6px;">';
             spotPhotos.before.forEach(function(photo) {
-              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/uc?id=' + photo.fileId + ')"></div>';
+              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200)"></div>';
               html += '<button class="photo-delete-btn" onclick="deletePhoto(\'' + spot.id + '\', \'' + photo.fileId + '\')">✕</button></div>';
             });
             html += '</div>';
           }
-          html += '<button class="photo-upload-btn" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '追加撮影' : 'ビフォー写真を撮影') + '</button>';
           html += '</div>';
 
-          // アフター
-          html += '<div class="photo-timing-group">';
-          html += '<div class="photo-timing-label">' + (aDone ? '✓ ' : '') + 'アフター (' + spotPhotos.after.length + '枚)</div>';
+          // アフター（右）
+          html += '<div class="photo-timing-group" style="flex:1;">';
+          html += '<button class="photo-upload-btn" style="background:#e67e22;margin-bottom:4px;" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓ アフター' : 'アフター') + '</button>';
+          html += '<div style="font-size:11px;color:#888;text-align:center;">(' + spotPhotos.after.length + '枚)</div>';
           if (spotPhotos.after.length > 0) {
-            html += '<div class="photo-grid">';
+            html += '<div class="photo-grid" style="margin-top:6px;">';
             spotPhotos.after.forEach(function(photo) {
-              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/uc?id=' + photo.fileId + ')"></div>';
+              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200)"></div>';
               html += '<button class="photo-delete-btn" onclick="deletePhoto(\'' + spot.id + '\', \'' + photo.fileId + '\')">✕</button></div>';
             });
             html += '</div>';
           }
-          html += '<button class="photo-upload-btn" style="background:#e67e22;" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '追加撮影' : 'アフター写真を撮影') + '</button>';
           html += '</div>';
+
+          html += '</div>'; // end flex row
 
           html += '</div>';
         });
@@ -1856,7 +1969,7 @@
       var modal = document.createElement('div');
       modal.className = 'photo-modal';
       modal.innerHTML = '<h3>📌 撮影見本</h3>' +
-        '<div style="text-align:center;"><img src="https://drive.google.com/uc?id=' + fileId + '" style="max-width:100%;border-radius:8px;border:2px solid #e67e22;" onerror="this.src=\'\';this.alt=\'画像を読み込めません\';"></div>' +
+        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;border:2px solid #e67e22;" onerror="this.src=\'\';this.alt=\'画像を読み込めません\';"></div>' +
         '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
@@ -1870,7 +1983,7 @@
       var modal = document.createElement('div');
       modal.className = 'photo-modal';
       modal.innerHTML = '<h3>📌 撮影見本</h3>' +
-        '<div style="text-align:center;"><img src="https://drive.google.com/uc?id=' + fileId + '" style="max-width:100%;border-radius:8px;border:2px solid #e67e22;" onerror="this.src=\'\';this.alt=\'画像を読み込めません\';"></div>' +
+        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;border:2px solid #e67e22;" onerror="this.src=\'\';this.alt=\'画像を読み込めません\';"></div>' +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
         '<button class="photo-modal-close" style="flex:1;background:#e67e22;color:white;border-color:#e67e22;" onclick="this.closest(\'.photo-modal-overlay\').remove();uploadExamplePrompt(\'' + spotId + '\')">変更</button>' +
         '<button class="photo-modal-close" style="flex:1;background:#e74c3c;color:white;border-color:#e74c3c;" onclick="this.closest(\'.photo-modal-overlay\').remove();deleteExample(\'' + spotId + '\')">削除</button>' +

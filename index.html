@@ -1009,16 +1009,7 @@
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenStaffUrl">開く</button>
         </div>
       </div>
-      <!-- チェックリスト写真保存フォルダ -->
-      <div id="photoFolderSection" class="mb-3 p-2 border rounded bg-light">
-        <label class="form-label small fw-bold">チェックリスト写真保存フォルダ（Googleドライブ）</label>
-        <p class="small text-muted mb-1">清掃写真の保存先フォルダのURLまたはフォルダIDを入力してください。</p>
-        <div class="d-flex gap-2 flex-wrap align-items-center">
-          <input type="text" class="form-control form-control-sm flex-grow-1" id="photoFolderUrlInput" placeholder="https://drive.google.com/drive/folders/xxxxx または フォルダID" style="min-width:200px;">
-          <button type="button" class="btn btn-sm btn-outline-primary" id="btnSavePhotoFolder">保存</button>
-        </div>
-        <div id="photoFolderSaveResult" class="small mt-1" style="display:none;"></div>
-      </div>
+      <!-- チェックリスト写真保存フォルダはチェックアプリの設定タブに移動 -->
       <!-- 請求書保存フォルダ（スタッフの請求書出力先） TODO: 請求書機能は詳細を詰めてから実装予定 -->
       <div id="invoiceFolderSection" class="mb-3 p-2 border rounded bg-light" style="display:none;">
         <label class="form-label small fw-bold">請求書保存フォルダ（スタッフ用）</label>
@@ -4796,13 +4787,6 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            var inp = document.getElementById('photoFolderUrlInput');
-            if (inp && r.success && r.folderId) inp.value = 'https://drive.google.com/drive/folders/' + r.folderId;
-          } catch (e) {}
-        }).getChecklistPhotoFolderId();
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
             if (!r.success) return;
             var setupForm = document.getElementById('ownerSetupForm');
             var emailSection = document.getElementById('ownerEmailSection');
@@ -4941,31 +4925,6 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try { var r = JSON.parse(jsonStr); alert(r.success ? '保存しました。' : 'エラー: ' + (r.error || '')); } catch (e) { alert('保存しました。'); }
         }).setStaffDeployUrl(url);
-      });
-      document.getElementById('btnSavePhotoFolder').addEventListener('click', function() {
-        var input = document.getElementById('photoFolderUrlInput').value.trim();
-        var resEl = document.getElementById('photoFolderSaveResult');
-        if (!input) { resEl.textContent = 'URLまたはフォルダIDを入力してください。'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; return; }
-        // URLからフォルダIDを抽出
-        var folderId = input;
-        var match = input.match(/folders\/([a-zA-Z0-9_-]+)/);
-        if (match) folderId = match[1];
-        resEl.textContent = '保存中...'; resEl.className = 'small mt-1 text-muted'; resEl.style.display = 'block';
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
-            if (r.success) {
-              resEl.textContent = '保存しました';
-              resEl.className = 'small mt-1 text-success';
-            } else {
-              resEl.textContent = r.error || '保存失敗';
-              resEl.className = 'small mt-1 text-danger';
-            }
-          } catch (e) { resEl.textContent = 'エラー'; resEl.className = 'small mt-1 text-danger'; }
-        }).withFailureHandler(function(err) {
-          resEl.textContent = err.message || 'エラー';
-          resEl.className = 'small mt-1 text-danger';
-        }).setChecklistPhotoFolderId(folderId);
       });
       document.getElementById('btnChangeOwnerEmail').addEventListener('click', function() {
         document.getElementById('ownerEmailNew').value = '';

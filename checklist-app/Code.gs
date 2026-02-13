@@ -477,12 +477,22 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName) {
 function uploadChecklistPhoto(checkoutDate, spotId, timing, base64Data, staffName) {
   try {
     var parentFolder = getOrCreateChecklistPhotoFolder_();
-    // ビフォー/アフターのサブフォルダに保存
+    // タイミングごとのフォルダに保存
     var subFolderName = (timing === 'ビフォー') ? 'ビフォー' : 'アフター';
-    var folder = getOrCreateSubFolder_(parentFolder, subFolderName);
+    // 個別フォルダ設定があればそちらを使用
+    var props = PropertiesService.getScriptProperties();
+    var folderIdKey = (timing === 'ビフォー') ? 'CL_PHOTO_FOLDER_BEFORE' : 'CL_PHOTO_FOLDER_AFTER';
+    var specificFolderId = props.getProperty(folderIdKey);
+    var folder;
+    if (specificFolderId) {
+      try { folder = DriveApp.getFolderById(specificFolderId); } catch (e) { folder = null; }
+    }
+    if (!folder) folder = getOrCreateSubFolder_(parentFolder, subFolderName);
     var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'photo_' + new Date().getTime() + '.jpg');
     var file = folder.createFile(blob);
     file.setName(checkoutDate + '_' + spotId + '_' + timing + '_' + new Date().getTime() + '.jpg');
+    // ファイルを閲覧可能に設定
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
 
     var sheet = clSheet_(SHEET_CL_PHOTOS);
     var nextRow = sheet.getLastRow() + 1;
@@ -518,7 +528,7 @@ function getOrCreateSubFolder_(parentFolder, subFolderName) {
 }
 
 /**
- * 写真保存フォルダIDを設定（メインアプリの設定タブから呼び出し可能）
+ * 写真保存フォルダIDを設定
  */
 function setChecklistPhotoFolderId(folderId) {
   try {
@@ -529,6 +539,42 @@ function setChecklistPhotoFolderId(folderId) {
     }
     PropertiesService.getScriptProperties().setProperty('CHECKLIST_PHOTO_FOLDER_ID', id);
     return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
+}
+
+/**
+ * 撮影フォルダを個別に設定（ビフォー/アフター/見本）
+ */
+function setPhotoSubFolderId(type, folderId) {
+  try {
+    var id = String(folderId || '').trim();
+    var keyMap = { 'before': 'CL_PHOTO_FOLDER_BEFORE', 'after': 'CL_PHOTO_FOLDER_AFTER', 'example': 'CL_PHOTO_FOLDER_EXAMPLE' };
+    var key = keyMap[type];
+    if (!key) return JSON.stringify({ success: false, error: '無効なタイプです' });
+    if (!id) {
+      // 空なら設定を削除（デフォルトフォルダを使う）
+      PropertiesService.getScriptProperties().deleteProperty(key);
+      return JSON.stringify({ success: true });
+    }
+    try { DriveApp.getFolderById(id); } catch (e) {
+      return JSON.stringify({ success: false, error: 'フォルダにアクセスできません。URLまたはIDを確認してください。' });
+    }
+    PropertiesService.getScriptProperties().setProperty(key, id);
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
+}
+
+/**
+ * 撮影フォルダ設定を取得
+ */
+function getPhotoFolderSettings() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var parentId = props.getProperty('CHECKLIST_PHOTO_FOLDER_ID') || '';
+    var beforeId = props.getProperty('CL_PHOTO_FOLDER_BEFORE') || '';
+    var afterId = props.getProperty('CL_PHOTO_FOLDER_AFTER') || '';
+    var exampleId = props.getProperty('CL_PHOTO_FOLDER_EXAMPLE') || '';
+    return JSON.stringify({ success: true, parentId: parentId, beforeId: beforeId, afterId: afterId, exampleId: exampleId });
   } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
 }
 
@@ -982,10 +1028,21 @@ function deletePhotoSpot(spotId) {
 function uploadExamplePhoto(spotId, base64Data) {
   try {
     if (!spotId || !base64Data) return JSON.stringify({ success: false, error: 'データが不足しています' });
-    var folder = getOrCreateChecklistPhotoFolder_();
-    var exampleFolder = getOrCreateSubFolder_(folder, '見本');
+    // 見本用フォルダ: 個別設定があればそちらを使用
+    var props = PropertiesService.getScriptProperties();
+    var specificFolderId = props.getProperty('CL_PHOTO_FOLDER_EXAMPLE');
+    var exampleFolder;
+    if (specificFolderId) {
+      try { exampleFolder = DriveApp.getFolderById(specificFolderId); } catch (e) { exampleFolder = null; }
+    }
+    if (!exampleFolder) {
+      var folder = getOrCreateChecklistPhotoFolder_();
+      exampleFolder = getOrCreateSubFolder_(folder, '見本');
+    }
     var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'example_' + spotId + '_' + new Date().getTime() + '.jpg');
     var file = exampleFolder.createFile(blob);
+    // ファイルを閲覧可能に設定
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
     // 撮影箇所マスタの撮影例ファイルIDを更新
     var sheet = clSheet_(SHEET_CL_PHOTO_SPOTS);
     var lastRow = sheet.getLastRow();

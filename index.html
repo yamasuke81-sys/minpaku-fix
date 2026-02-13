@@ -58,10 +58,14 @@
     }
     .fc-event-cleaning,
     .fc-event-cleaning-decided,
-    .fc-event-cleaning-recruiting,
     .fc-event-cleaning-undecided {
       background-color: #198754 !important;
       color: #fff !important;
+      border: none !important;
+    }
+    .fc-event-cleaning-recruiting {
+      background-color: #ffc107 !important;
+      color: #212529 !important;
       border: none !important;
     }
     .fc-event-cleaning .fc-event-main,
@@ -516,11 +520,13 @@
       border-color: #dc3545 !important;
       border-style: dashed !important;
       border-width: 3px !important;
+      background-clip: padding-box !important;
     }
     .fc-event-cleaning-selected-by-me {
       border-color: #dc3545 !important;
       border-style: solid !important;
       border-width: 3px !important;
+      background-clip: padding-box !important;
     }
     .fc-event-status-dot {
       border: 1px solid #fff !important;
@@ -956,7 +962,8 @@
         </div>
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span>【清掃】</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>募集中</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>未募集</span>
+          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#ffc107;border:1px solid #fff;"></span>募集中</span>
           <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
         </div>
       </div>
@@ -1876,7 +1883,7 @@
                 recruitStatus: recStatus,
                 statusDot: cleaningStatus
               },
-              backgroundColor: isCancelled ? '#9e9e9e' : '#198754',
+              backgroundColor: isCancelled ? '#9e9e9e' : (isRecruiting ? '#ffc107' : '#198754'),
               borderColor: 'transparent',
               classNames: cleaningClasses
             });
@@ -3507,7 +3514,7 @@
               arg.el.style.border = 'none';
             }
             var sd = arg.event.extendedProps && arg.event.extendedProps.statusDot;
-            var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#dc3545' : sd === 'cleaning-decided' ? '#198754' : null;
+            var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#ffc107' : sd === 'cleaning-decided' ? '#198754' : null;
             if (dotColor) {
               var dot = document.createElement('span');
               dot.className = 'fc-event-status-dot';
@@ -5739,6 +5746,7 @@
           document.getElementById('settingsSync').style.display = t === 'sync' ? 'block' : 'none';
           var notifEl = document.getElementById('settingsNotifications');
           if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
+          if (t === 'staff') loadStaffList();
           if (t === 'jobs') loadJobList();
           if (t === 'recruitSettings') loadRecruitSettingsForm();
           if (t === 'reminderEmail') loadReminderEmailSettings();

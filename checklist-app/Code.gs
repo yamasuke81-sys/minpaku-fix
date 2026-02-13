@@ -12,9 +12,9 @@ const SHEET_CL_MEMOS = 'チェックリストメモ';
 const SHEET_CL_SUPPLIES = '要補充記録';
 
 // 予約管理スプレッドシートのシート名（チェックリストアプリ用）
-const CL_BOOKING_SHEET = 'フォーム回答 1';
-const CL_OWNER_SHEET = 'オーナー';
-const CL_STAFF_SHEET = 'スタッフ';
+const CL_BOOKING_SHEET = 'フォームの回答 1';
+const CL_OWNER_SHEET = '設定_オーナー';
+const CL_STAFF_SHEET = '清掃スタッフ';
 
 /**
  * 診断用: Script Properties とスプレッドシートの状態を確認
@@ -143,6 +143,28 @@ function clSheet_(name) {
     else if (name === SHEET_CL_SUPPLIES) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', '項目名', '記入者', 'タイムスタンプ']]);
   }
   return sheet;
+}
+
+/**
+ * 清掃スタッフ一覧を取得
+ */
+function getCleaningStaffList() {
+  try {
+    var bookingSs = getBookingSpreadsheet_();
+    var staffSheet = bookingSs.getSheetByName(CL_STAFF_SHEET);
+    if (!staffSheet || staffSheet.getLastRow() < 2) {
+      return JSON.stringify({ success: true, list: [] });
+    }
+    var data = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 2).getValues();
+    var list = [];
+    data.forEach(function(row) {
+      var name = String(row[0] || '').trim();
+      if (name) list.push(name);
+    });
+    return JSON.stringify({ success: true, list: list });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), list: [] });
+  }
 }
 
 /**
@@ -517,6 +539,21 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     body += '詳細はチェックリストをご確認ください。';
 
     GmailApp.sendEmail(ownerEmail, subject, body);
+
+    // メインアプリの通知にも追加
+    try {
+      var notifSheet = bookingSs.getSheetByName('通知履歴');
+      if (notifSheet) {
+        var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+        var notifMsg = '清掃完了: ' + checkoutDate + ' 担当: ' + (staffName || '不明');
+        if (supplyList.length > 0) notifMsg += ' / 要補充: ' + supplyList.join(', ');
+        var notifData = JSON.stringify({ type: 'cleaningComplete', checkoutDate: checkoutDate, staff: staffName });
+        var nRow = notifSheet.getLastRow() + 1;
+        var nCols = Math.max(notifSheet.getLastColumn(), 5);
+        if (nCols < 5) nCols = 5;
+        notifSheet.getRange(nRow, 1, 1, 5).setValues([[now, '清掃完了', notifMsg, '', notifData]]);
+      }
+    } catch (ne) { /* 通知追加失敗は無視 */ }
 
     return JSON.stringify({ success: true });
   } catch (e) {

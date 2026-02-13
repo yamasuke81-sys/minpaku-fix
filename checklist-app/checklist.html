@@ -24,6 +24,13 @@
       z-index: 100;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .header-left { flex: 1; }
     .header-title { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
     .header-date { font-size: 14px; opacity: 0.9; }
     .progress-bar {
@@ -39,6 +46,85 @@
       transition: width 0.3s;
       border-radius: 3px;
     }
+
+    /* スタッフ選択 */
+    .staff-selector {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .staff-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .staff-select {
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 13px;
+      max-width: 120px;
+    }
+    .staff-select option { color: #333; background: white; }
+    .staff-add-btn, .staff-remove-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.4);
+      background: transparent;
+      color: white;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .staff-remove-btn { font-size: 14px; }
+
+    /* タブナビ */
+    .tab-nav {
+      display: flex;
+      background: white;
+      border-bottom: 2px solid #ecf0f1;
+      position: sticky;
+      top: 0;
+      z-index: 90;
+    }
+    .tab-nav-btn {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      background: white;
+      font-size: 14px;
+      font-weight: bold;
+      color: #7f8c8d;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-nav-btn.active {
+      color: #2c3e50;
+      border-bottom-color: #3498db;
+    }
+    .tab-nav-btn .tab-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .tab-badge-warning {
+      background: #ffc107;
+      color: #856404;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
 
     /* 次回予約情報 */
     .booking-info {
@@ -148,6 +234,29 @@
     .sub-section .section-count {
       font-size: 12px;
     }
+
+    /* セクションヘッダー内ボタン */
+    .section-header-btn {
+      padding: 4px 10px;
+      border: 1px solid;
+      border-radius: 4px;
+      background: transparent;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+    .section-check-all {
+      border-color: #27ae60;
+      color: #27ae60;
+    }
+    .section-check-all:active { background: #eafaf1; }
+    .section-photo-btn {
+      border-color: #e67e22;
+      color: #e67e22;
+    }
+    .section-photo-btn:active { background: #fef5ed; }
 
     /* チェック項目 */
     .checklist-item {
@@ -260,26 +369,37 @@
       background: #2980b9;
     }
 
-    /* 要補充リスト */
-    .supply-list {
+    /* 要補充リスト（タブ用） */
+    .supply-tab-content {
+      padding: 12px;
+    }
+    .supply-list-card {
       background: #fff3cd;
-      margin: 8px 12px;
       padding: 16px;
       border-radius: 8px;
       border-left: 4px solid #ffc107;
     }
-    .supply-list h3 {
+    .supply-list-card h3 {
       font-size: 16px;
       color: #856404;
       margin-bottom: 12px;
     }
     .supply-item {
-      padding: 6px 0;
+      padding: 8px 12px;
       font-size: 14px;
       color: #856404;
+      background: rgba(255,255,255,0.5);
+      border-radius: 4px;
+      margin-bottom: 6px;
     }
     .supply-item:before {
-      content: "⚠️ ";
+      content: "\26A0\FE0F ";
+    }
+    .supply-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #7f8c8d;
+      font-size: 14px;
     }
 
     /* メモセクション */
@@ -401,22 +521,11 @@
       border-color: #27ae60;
       color: #27ae60;
     }
-    .action-btn-check:active { background: #eafaf1; }
-
-    /* カテゴリ内の全チェックボタン */
-    .section-check-all {
-      padding: 4px 10px;
-      border: 1px solid #27ae60;
-      border-radius: 4px;
-      background: transparent;
-      font-size: 11px;
-      font-weight: bold;
-      color: #27ae60;
-      cursor: pointer;
-      margin-left: 8px;
-      white-space: nowrap;
+    .action-btn-check.is-all-checked {
+      border-color: #e74c3c;
+      color: #e74c3c;
     }
-    .section-check-all:active { background: #eafaf1; }
+    .action-btn-check:active { background: #eafaf1; }
 
     /* ユーティリティ */
     .hidden { display: none !important; }
@@ -424,12 +533,58 @@
     input[type="file"] {
       display: none;
     }
+
+    /* カテゴリ撮影モーダル */
+    .photo-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .photo-modal {
+      background: white;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .photo-modal h3 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #2c3e50;
+    }
+    .photo-modal-close {
+      padding: 10px;
+      width: 100%;
+      border: 1px solid #bdc3c7;
+      border-radius: 6px;
+      background: white;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="header-title">清掃チェックリスト</div>
-    <div class="header-date" id="headerDate"></div>
+    <div class="header-top">
+      <div class="header-left">
+        <div class="header-title">清掃チェックリスト</div>
+        <div class="header-date" id="headerDate"></div>
+      </div>
+      <div class="staff-selector" id="staffSelector">
+        <div class="staff-row">
+          <select class="staff-select" id="staffSelect0"></select>
+          <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
+        </div>
+      </div>
+    </div>
     <div class="progress-bar">
       <div class="progress-fill" id="progressFill" style="width: 0%"></div>
     </div>
@@ -441,30 +596,46 @@
     <!-- 次回予約情報 -->
     <div id="bookingInfo" class="booking-info hidden"></div>
 
-    <!-- 全体操作バー -->
-    <div class="action-bar">
-      <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()">全て展開</button>
-      <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()">全チェック</button>
+    <!-- タブナビゲーション -->
+    <div class="tab-nav" id="tabNav">
+      <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
+      <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
+      <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
     </div>
 
-    <!-- チェックリスト -->
-    <div id="checklistContainer"></div>
+    <!-- チェックリストタブ -->
+    <div id="tabChecklist" class="tab-content active">
+      <!-- 全体操作バー -->
+      <div class="action-bar">
+        <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()">全て展開</button>
+        <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()">全チェック</button>
+      </div>
 
-    <!-- 撮影セクション -->
-    <div id="photoSection" class="photo-section hidden"></div>
+      <!-- チェックリスト -->
+      <div id="checklistContainer"></div>
 
-    <!-- メモセクション -->
-    <div id="memoSection" class="memo-section">
-      <h3>📝 特記事項・備品不足など</h3>
-      <div id="memoList" class="memo-list"></div>
-      <div class="memo-input-group">
-        <input type="text" id="memoInput" class="memo-input" placeholder="備品不足やメモを入力...">
-        <button id="memoBtn" class="memo-btn">送信</button>
+      <!-- メモセクション -->
+      <div id="memoSection" class="memo-section">
+        <h3>📝 特記事項・備品不足など</h3>
+        <div id="memoList" class="memo-list"></div>
+        <div class="memo-input-group">
+          <input type="text" id="memoInput" class="memo-input" placeholder="備品不足やメモを入力...">
+          <button id="memoBtn" class="memo-btn">送信</button>
+        </div>
       </div>
     </div>
 
-    <!-- 要補充リスト -->
-    <div id="supplyList" class="supply-list hidden"></div>
+    <!-- 要補充タブ -->
+    <div id="tabSupply" class="tab-content">
+      <div class="supply-tab-content">
+        <div id="supplyListContent"></div>
+      </div>
+    </div>
+
+    <!-- 撮影タブ -->
+    <div id="tabPhoto" class="tab-content">
+      <div id="photoSection"></div>
+    </div>
   </div>
 
   <!-- ボトムバー -->
@@ -483,6 +654,8 @@
     var checklistData = null;
     var bookingData = null;
     var missingCheckActive = false;
+    var staffList = [];
+    var staffRowCount = 1;
 
     // 初期化
     window.onload = function() {
@@ -492,6 +665,7 @@
       }
       document.getElementById('headerDate').textContent = checkoutDate;
       loadData();
+      loadStaffList();
 
       // イベントリスナー
       document.getElementById('btnCheckMissing').addEventListener('click', toggleMissingCheck);
@@ -500,6 +674,76 @@
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
     };
 
+    // === スタッフ選択 ===
+    function loadStaffList() {
+      callGAS('getCleaningStaffList', []).then(function(res) {
+        if (res.success && res.list) {
+          staffList = res.list;
+          populateStaffSelects();
+        }
+      }).catch(function() {});
+    }
+
+    function populateStaffSelects() {
+      var selects = document.querySelectorAll('.staff-select');
+      selects.forEach(function(sel) {
+        var currentVal = sel.value;
+        sel.innerHTML = '<option value="">-- 選択 --</option>';
+        staffList.forEach(function(name) {
+          var opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          sel.appendChild(opt);
+        });
+        // 初期選択: URLパラメータのstaffNameに一致するものがあれば選択
+        if (!currentVal && staffName) {
+          sel.value = staffName;
+        } else if (currentVal) {
+          sel.value = currentVal;
+        }
+      });
+    }
+
+    function addStaffRow() {
+      var container = document.getElementById('staffSelector');
+      var idx = staffRowCount;
+      staffRowCount++;
+      var row = document.createElement('div');
+      row.className = 'staff-row';
+      row.id = 'staffRow' + idx;
+      row.innerHTML = '<select class="staff-select" id="staffSelect' + idx + '"></select>' +
+        '<button class="staff-remove-btn" onclick="removeStaffRow(' + idx + ')" title="削除">✕</button>';
+      container.appendChild(row);
+      populateStaffSelects();
+    }
+
+    function removeStaffRow(idx) {
+      var row = document.getElementById('staffRow' + idx);
+      if (row) row.remove();
+    }
+
+    function getSelectedStaffNames() {
+      var names = [];
+      document.querySelectorAll('.staff-select').forEach(function(sel) {
+        var v = sel.value.trim();
+        if (v && names.indexOf(v) === -1) names.push(v);
+      });
+      return names;
+    }
+
+    // === タブ切り替え ===
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-nav-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+      });
+      document.querySelectorAll('.tab-content').forEach(function(tc) {
+        tc.classList.remove('active');
+      });
+      var target = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+      if (target) target.classList.add('active');
+    }
+
+    // === データ読み込み ===
     function loadData() {
       Promise.all([
         callGAS('getNextBookingDetails', [checkoutDate]),
@@ -547,6 +791,7 @@
       document.getElementById('bookingInfo').classList.remove('hidden');
     }
 
+    // === チェックリスト ===
     function renderChecklistItem(item, checked, supplyNeeded) {
       var isChecked = !!checked[item.id];
       var isSupplyNeeded = !!supplyNeeded[item.id];
@@ -570,12 +815,11 @@
       var supplyNeeded = checklistData.supplyNeeded;
 
       // カテゴリを大中小に階層化
-      // "：" 区切り → 前半=大カテゴリ、後半=中カテゴリ、個別項目=小
       var majorGroups = {};
       var majorOrder = [];
       items.forEach(function(item) {
         var cat = item.category || 'その他';
-        var sep = cat.indexOf('：');
+        var sep = cat.indexOf('\uff1a');
         var majorName = sep >= 0 ? cat.substring(0, sep) : cat;
         var subName = sep >= 0 ? cat.substring(sep + 1) : null;
         if (!majorGroups[majorName]) {
@@ -596,39 +840,37 @@
       var html = '';
       majorOrder.forEach(function(majorName) {
         var group = majorGroups[majorName];
-        // 大カテゴリ全体のアイテム数を計算
         var allItems = group.direct.slice();
         group.subOrder.forEach(function(sub) { allItems = allItems.concat(group.subs[sub]); });
         var checkedInMajor = allItems.filter(function(item) { return checked[item.id]; }).length;
         var totalInMajor = allItems.length;
-        var allCheckedInMajor = checkedInMajor === totalInMajor;
 
         html += '<div class="section" data-category="' + escapeHtml(majorName) + '">';
         html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
         html += '<span class="section-icon">▼</span>';
         html += '<span class="section-title">' + escapeHtml(majorName) + '</span>';
         html += '<span class="section-count">(' + checkedInMajor + '/' + totalInMajor + ')</span>';
-        if (!allCheckedInMajor) html += '<button class="section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
+        html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
+        html += '<button class="section-header-btn section-photo-btn" onclick="event.stopPropagation(); openCategoryPhoto(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">📷</button>';
         html += '</div>';
         html += '<div class="section-body collapsed">';
 
-        // 直属アイテム（中カテゴリなし）
+        // 直属アイテム
         group.direct.forEach(function(item) {
           html += renderChecklistItem(item, checked, supplyNeeded);
         });
 
-        // 中カテゴリ（サブセクション）
+        // 中カテゴリ
         group.subOrder.forEach(function(subName) {
           var subItems = group.subs[subName];
           var checkedInSub = subItems.filter(function(item) { return checked[item.id]; }).length;
-          var allCheckedInSub = checkedInSub === subItems.length;
 
-          html += '<div class="section sub-section" data-category="' + escapeHtml(majorName + '：' + subName) + '">';
+          html += '<div class="section sub-section" data-category="' + escapeHtml(majorName + '\uff1a' + subName) + '">';
           html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
           html += '<span class="section-icon">▼</span>';
           html += '<span class="section-title">' + escapeHtml(subName) + '</span>';
           html += '<span class="section-count">(' + checkedInSub + '/' + subItems.length + ')</span>';
-          if (!allCheckedInSub) html += '<button class="section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
+          html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
           html += '</div>';
           html += '<div class="section-body collapsed">';
           subItems.forEach(function(item) {
@@ -643,32 +885,34 @@
       document.getElementById('checklistContainer').innerHTML = html;
     }
 
+    // === 撮影セクション ===
     function renderPhotoSection() {
       var spots = checklistData.spots;
       var photos = checklistData.photos;
 
-      if (spots.length === 0) return;
+      if (spots.length === 0) {
+        document.getElementById('photoSection').innerHTML = '<div class="supply-empty">撮影箇所が登録されていません</div>';
+        return;
+      }
 
       // カテゴリごとにグループ化
       var categories = {};
+      var catOrder = [];
       spots.forEach(function(spot) {
         var cat = spot.category || 'その他';
-        if (!categories[cat]) categories[cat] = [];
+        if (!categories[cat]) { categories[cat] = []; catOrder.push(cat); }
         categories[cat].push(spot);
       });
 
-      var html = '<h3>📷 撮影</h3>';
-
-      Object.keys(categories).forEach(function(cat) {
-        var catSpots = categories[cat];
-
-        catSpots.forEach(function(spot) {
+      var html = '';
+      catOrder.forEach(function(cat) {
+        html += '<div class="photo-section"><h3>📷 ' + escapeHtml(cat) + '</h3>';
+        categories[cat].forEach(function(spot) {
           var spotPhotos = photos[spot.id] || { before: [], after: [] };
-
           html += '<div class="photo-spot">';
           html += '<div class="photo-spot-name">' + escapeHtml(spot.name) + '</div>';
 
-          // ビフォー写真
+          // ビフォー
           html += '<div class="photo-timing-group">';
           html += '<div class="photo-timing-label">ビフォー</div>';
           if (spotPhotos.before.length > 0) {
@@ -681,7 +925,7 @@
           html += '<button class="photo-upload-btn" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">ビフォー写真を撮影</button>';
           html += '</div>';
 
-          // アフター写真
+          // アフター
           html += '<div class="photo-timing-group">';
           html += '<div class="photo-timing-label">アフター</div>';
           if (spotPhotos.after.length > 0) {
@@ -696,10 +940,53 @@
 
           html += '</div>';
         });
+        html += '</div>';
       });
 
       document.getElementById('photoSection').innerHTML = html;
-      document.getElementById('photoSection').classList.remove('hidden');
+    }
+
+    // カテゴリヘッダーの撮影ボタンから呼ばれるモーダル
+    function openCategoryPhoto(majorName) {
+      var spots = checklistData.spots || [];
+      var photos = checklistData.photos || {};
+      // カテゴリに属する撮影箇所をフィルター
+      var matchedSpots = spots.filter(function(s) {
+        var cat = s.category || 'その他';
+        return cat === majorName || cat.indexOf(majorName) === 0;
+      });
+
+      if (matchedSpots.length === 0) {
+        // 撮影箇所がない場合、カテゴリ名をスポット名として直接撮影
+        currentPhotoSpotId = 'cat_' + majorName;
+        currentPhotoTiming = 'アフター';
+        document.getElementById('photoInput').click();
+        return;
+      }
+
+      // モーダルで撮影箇所一覧を表示
+      var overlay = document.createElement('div');
+      overlay.className = 'photo-modal-overlay';
+      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+      var modal = document.createElement('div');
+      modal.className = 'photo-modal';
+      var html = '<h3>📷 ' + escapeHtml(majorName) + ' の撮影</h3>';
+      matchedSpots.forEach(function(spot) {
+        var spotPhotos = photos[spot.id] || { before: [], after: [] };
+        var bCount = spotPhotos.before.length;
+        var aCount = spotPhotos.after.length;
+        html += '<div style="margin-bottom:12px;padding:10px;background:#fafafa;border-radius:6px;">';
+        html += '<div style="font-weight:bold;margin-bottom:8px;">' + escapeHtml(spot.name) + ' <span style="font-size:12px;color:#7f8c8d;">(B:' + bCount + ' / A:' + aCount + ')</span></div>';
+        html += '<div style="display:flex;gap:8px;">';
+        html += '<button class="photo-upload-btn" style="flex:1;" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\'); this.closest(\'.photo-modal-overlay\').remove();">ビフォー</button>';
+        html += '<button class="photo-upload-btn" style="flex:1;background:#e67e22;" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\'); this.closest(\'.photo-modal-overlay\').remove();">アフター</button>';
+        html += '</div></div>';
+      });
+      html += '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
+      modal.innerHTML = html;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
     }
 
     function renderMemos() {
@@ -714,24 +1001,37 @@
       document.getElementById('memoList').innerHTML = html;
     }
 
+    // === 要補充リスト ===
     function renderSupplyList() {
       var supplyNeeded = checklistData.supplyNeeded;
-      var items = Object.values(supplyNeeded);
+      var keys = Object.keys(supplyNeeded);
 
-      if (items.length === 0) {
-        document.getElementById('supplyList').classList.add('hidden');
+      // タブバッジ更新
+      var badge = document.getElementById('supplyBadge');
+      if (keys.length > 0) {
+        badge.textContent = keys.length;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      // タブ内コンテンツ
+      var el = document.getElementById('supplyListContent');
+      if (keys.length === 0) {
+        el.innerHTML = '<div class="supply-empty">要補充のアイテムはありません</div>';
         return;
       }
 
-      var html = '<h3>⚠️ 要補充リスト</h3>';
-      items.forEach(function(item) {
+      var html = '<div class="supply-list-card"><h3>⚠️ 要補充リスト</h3>';
+      keys.forEach(function(k) {
+        var item = supplyNeeded[k];
         html += '<div class="supply-item">' + escapeHtml(item.name) + '</div>';
       });
-
-      document.getElementById('supplyList').innerHTML = html;
-      document.getElementById('supplyList').classList.remove('hidden');
+      html += '</div>';
+      el.innerHTML = html;
     }
 
+    // === セクション操作 ===
     function toggleSection(header) {
       var section = header.parentElement;
       var body = section.querySelector('.section-body');
@@ -742,19 +1042,20 @@
     function toggleItem(checkbox) {
       var itemId = checkbox.getAttribute('data-item-id');
       var checked = checkbox.checked;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
 
-      callGAS('toggleChecklistItem', [checkoutDate, itemId, checked, staffName]).then(function(res) {
+      callGAS('toggleChecklistItem', [checkoutDate, itemId, checked, who]).then(function(res) {
         if (res.success) {
           if (checked) {
-            checklistData.checked[itemId] = { checked: true, by: staffName, at: new Date() };
+            checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
           } else {
             delete checklistData.checked[itemId];
           }
           updateProgress();
           updateSectionCounts();
-          if (missingCheckActive) {
-            highlightMissing();
-          }
+          updateCheckAllButton();
+          if (missingCheckActive) highlightMissing();
         } else {
           alert('エラー: ' + res.error);
           checkbox.checked = !checked;
@@ -766,11 +1067,13 @@
       var itemId = checkbox.getAttribute('data-item-id');
       var itemName = checkbox.getAttribute('data-item-name');
       var needed = checkbox.checked;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
 
-      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, staffName]).then(function(res) {
+      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who]).then(function(res) {
         if (res.success) {
           if (needed) {
-            checklistData.supplyNeeded[itemId] = { name: itemName, by: staffName, at: new Date() };
+            checklistData.supplyNeeded[itemId] = { name: itemName, by: who, at: new Date() };
           } else {
             delete checklistData.supplyNeeded[itemId];
           }
@@ -820,7 +1123,6 @@
     }
 
     function highlightMissing() {
-      // チェック項目の赤字表示
       var items = document.querySelectorAll('.checklist-item');
       items.forEach(function(item) {
         var checkbox = item.querySelector('.item-checkbox');
@@ -832,7 +1134,6 @@
         }
       });
 
-      // セクションヘッダーの赤字表示
       var sections = document.querySelectorAll('.section');
       sections.forEach(function(section) {
         var items = section.querySelectorAll('.item-checkbox');
@@ -849,7 +1150,6 @@
         }
       });
 
-      // 撮影箇所の赤字表示
       var spots = document.querySelectorAll('.photo-spot');
       spots.forEach(function(spot) {
         var beforePhotos = spot.querySelectorAll('.photo-timing-group:nth-of-type(1) .photo-thumb');
@@ -885,35 +1185,32 @@
     function handlePhotoUpload(event) {
       var file = event.target.files[0];
       if (!file) return;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
 
       var reader = new FileReader();
       reader.onload = function(e) {
         var base64 = e.target.result.split(',')[1];
 
-        callGAS('uploadChecklistPhoto', [checkoutDate, currentPhotoSpotId, currentPhotoTiming, base64, staffName]).then(function(res) {
+        callGAS('uploadChecklistPhoto', [checkoutDate, currentPhotoSpotId, currentPhotoTiming, base64, who]).then(function(res) {
           if (res.success) {
-            // 写真を追加
             if (!checklistData.photos[currentPhotoSpotId]) {
               checklistData.photos[currentPhotoSpotId] = { before: [], after: [] };
             }
-            var photoData = { fileId: res.fileId, by: staffName, at: new Date() };
+            var photoData = { fileId: res.fileId, by: who, at: new Date() };
             if (currentPhotoTiming === 'ビフォー') {
               checklistData.photos[currentPhotoSpotId].before.push(photoData);
             } else {
               checklistData.photos[currentPhotoSpotId].after.push(photoData);
             }
             renderPhotoSection();
-            if (missingCheckActive) {
-              highlightMissing();
-            }
+            if (missingCheckActive) highlightMissing();
           } else {
             alert('写真のアップロードに失敗しました: ' + res.error);
           }
         });
       };
       reader.readAsDataURL(file);
-
-      // リセット
       event.target.value = '';
     }
 
@@ -921,10 +1218,12 @@
       var input = document.getElementById('memoInput');
       var text = input.value.trim();
       if (!text) return;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
 
-      callGAS('addChecklistMemo', [checkoutDate, text, staffName]).then(function(res) {
+      callGAS('addChecklistMemo', [checkoutDate, text, who]).then(function(res) {
         if (res.success) {
-          checklistData.memos.push({ text: text, by: staffName, at: new Date() });
+          checklistData.memos.push({ text: text, by: who, at: new Date() });
           renderMemos();
           input.value = '';
         } else {
@@ -933,12 +1232,13 @@
       });
     }
 
+    // === 全体操作 ===
     var allExpanded = false;
     function toggleAllSections() {
       allExpanded = !allExpanded;
       var btn = document.getElementById('btnExpandAll');
-      var headers = document.querySelectorAll('.section-header');
-      var bodies = document.querySelectorAll('.section-body');
+      var headers = document.querySelectorAll('#checklistContainer .section-header');
+      var bodies = document.querySelectorAll('#checklistContainer .section-body');
       if (allExpanded) {
         btn.textContent = '全て折りたたみ';
         headers.forEach(function(h) { h.classList.remove('collapsed'); });
@@ -950,42 +1250,113 @@
       }
     }
 
+    var allChecked = false;
     function checkAllItems() {
-      var unchecked = document.querySelectorAll('.item-checkbox:not(:checked)');
-      if (unchecked.length === 0) return;
-      var promises = [];
-      unchecked.forEach(function(cb) {
-        cb.checked = true;
-        var itemId = cb.getAttribute('data-item-id');
-        promises.push(callGAS('toggleChecklistItem', [checkoutDate, itemId, true, staffName]));
-        checklistData.checked[itemId] = { checked: true, by: staffName, at: new Date() };
-      });
+      var btn = document.getElementById('btnCheckAll');
+      if (!allChecked) {
+        // 全チェック
+        var unchecked = document.querySelectorAll('.item-checkbox:not(:checked)');
+        if (unchecked.length === 0) {
+          // 既に全チェック済み → トグルでアンチェック
+          uncheckAllItems();
+          return;
+        }
+        var names = getSelectedStaffNames();
+        var who = names.length > 0 ? names.join(', ') : staffName;
+        unchecked.forEach(function(cb) {
+          cb.checked = true;
+          var itemId = cb.getAttribute('data-item-id');
+          callGAS('toggleChecklistItem', [checkoutDate, itemId, true, who]);
+          checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
+        });
+        allChecked = true;
+        btn.textContent = '全チェック解除';
+        btn.classList.add('is-all-checked');
+      } else {
+        uncheckAllItems();
+      }
       updateProgress();
       updateSectionCounts();
       if (missingCheckActive) highlightMissing();
+    }
+
+    function uncheckAllItems() {
+      var checked = document.querySelectorAll('.item-checkbox:checked');
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
+      checked.forEach(function(cb) {
+        cb.checked = false;
+        var itemId = cb.getAttribute('data-item-id');
+        callGAS('toggleChecklistItem', [checkoutDate, itemId, false, who]);
+        delete checklistData.checked[itemId];
+      });
+      allChecked = false;
+      var btn = document.getElementById('btnCheckAll');
+      btn.textContent = '全チェック';
+      btn.classList.remove('is-all-checked');
+      updateProgress();
+      updateSectionCounts();
+      if (missingCheckActive) highlightMissing();
+    }
+
+    function updateCheckAllButton() {
+      var total = checklistData.items.length;
+      var checkedCount = Object.keys(checklistData.checked).length;
+      var btn = document.getElementById('btnCheckAll');
+      if (checkedCount >= total) {
+        allChecked = true;
+        btn.textContent = '全チェック解除';
+        btn.classList.add('is-all-checked');
+      } else {
+        allChecked = false;
+        btn.textContent = '全チェック';
+        btn.classList.remove('is-all-checked');
+      }
     }
 
     function checkCategory(btn) {
       var section = btn.closest('.section');
       if (!section) return;
-      var unchecked = section.querySelectorAll('.item-checkbox:not(:checked)');
-      if (unchecked.length === 0) return;
-      unchecked.forEach(function(cb) {
-        cb.checked = true;
-        var itemId = cb.getAttribute('data-item-id');
-        callGAS('toggleChecklistItem', [checkoutDate, itemId, true, staffName]);
-        checklistData.checked[itemId] = { checked: true, by: staffName, at: new Date() };
-      });
-      btn.remove();
+      var checkboxes = section.querySelectorAll(':scope > .section-body > .checklist-item > .item-checkbox');
+      // sub-sectionの場合は直接子要素のみ取得
+      if (checkboxes.length === 0) {
+        checkboxes = section.querySelectorAll('.item-checkbox');
+      }
+      var unchecked = Array.from(checkboxes).filter(function(cb) { return !cb.checked; });
+      var allDone = unchecked.length === 0;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
+
+      if (allDone) {
+        // 全チェック済み → 解除
+        Array.from(checkboxes).forEach(function(cb) {
+          if (cb.checked) {
+            cb.checked = false;
+            var itemId = cb.getAttribute('data-item-id');
+            callGAS('toggleChecklistItem', [checkoutDate, itemId, false, who]);
+            delete checklistData.checked[itemId];
+          }
+        });
+      } else {
+        unchecked.forEach(function(cb) {
+          cb.checked = true;
+          var itemId = cb.getAttribute('data-item-id');
+          callGAS('toggleChecklistItem', [checkoutDate, itemId, true, who]);
+          checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
+        });
+      }
       updateProgress();
       updateSectionCounts();
+      updateCheckAllButton();
       if (missingCheckActive) highlightMissing();
     }
 
     function completeChecklist() {
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
       if (!confirm('清掃を完了してオーナーに通知しますか？')) return;
 
-      callGAS('notifyCleaningComplete', [checkoutDate, staffName]).then(function(res) {
+      callGAS('notifyCleaningComplete', [checkoutDate, who]).then(function(res) {
         if (res.success) {
           alert('清掃完了通知を送信しました！お疲れ様でした！');
         } else {
@@ -994,7 +1365,7 @@
       });
     }
 
-    // ユーティリティ関数
+    // === ユーティリティ ===
     function callGAS(functionName, args) {
       return new Promise(function(resolve, reject) {
         google.script.run

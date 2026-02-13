@@ -1,9 +1,10 @@
 /**
- * 全アプリ一括デプロイスクリプト
+ * 全アプリ一括デプロイ＆ブラウザ自動オープン
  * 使い方: node deploy-all.js
  *
  * 1. メインアプリ: clasp push → clasp deploy（オーナー用・スタッフ用）
  * 2. チェックリストアプリ: clasp push → clasp deploy
+ * 3. ブラウザでメインアプリを自動オープン
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -41,11 +42,29 @@ function getDeployIds(text) {
   return ids;
 }
 
+/** ブラウザを自動で開く（Windows/Mac/Linux対応） */
+function openBrowser(url) {
+  try {
+    if (process.platform === 'win32') {
+      execSync('start "" "' + url + '"', { shell: true });
+    } else if (process.platform === 'darwin') {
+      execSync('open "' + url + '"');
+    } else {
+      execSync('xdg-open "' + url + '"');
+    }
+  } catch (e) {
+    console.log('  ブラウザを自動で開けませんでした。以下のURLを手動で開いてください:');
+    console.log('  ' + url);
+  }
+}
+
 function main() {
   console.log('========================================');
   console.log('  全アプリ一括デプロイ');
   console.log('========================================');
   console.log('');
+
+  var urls = [];
 
   // === メインアプリ ===
   console.log('[1/4] メインアプリ: コードをプッシュ...');
@@ -66,7 +85,8 @@ function main() {
       var label = i === 0 ? 'オーナー用' : 'スタッフ用';
       var r = run(clasp + ' deploy --deploymentId "' + id + '" --description "' + label + ' ' + today + '"', rootDir);
       if (r.ok) {
-        console.log('  ' + label + ': OK (' + id.substring(0, 30) + '...)');
+        console.log('  ' + label + ': OK');
+        urls.push({ label: label, url: 'https://script.google.com/macros/s/' + id + '/exec' });
       } else {
         console.log('  ' + label + ': 失敗 - ' + r.out.slice(0, 200));
       }
@@ -93,8 +113,8 @@ function main() {
     var clId = clIds[0];
     var r = run(clasp + ' deploy --deploymentId "' + clId + '" --description "チェックリスト ' + today + '"', checklistDir);
     if (r.ok) {
-      console.log('  OK (' + clId.substring(0, 30) + '...)');
-      console.log('  URL: https://script.google.com/macros/s/' + clId + '/exec');
+      console.log('  チェックリスト: OK');
+      urls.push({ label: 'チェックリスト', url: 'https://script.google.com/macros/s/' + clId + '/exec' });
     } else {
       console.log('  失敗 - ' + r.out.slice(0, 200));
     }
@@ -106,12 +126,20 @@ function main() {
 
   console.log('');
   console.log('========================================');
-  console.log('  デプロイ完了');
+  console.log('  デプロイ完了 - ブラウザを開いています...');
   console.log('========================================');
   console.log('');
-  console.log('ブラウザで Ctrl+Shift+R で強制リロードしてください。');
-  console.log('チェックリストの初期データを反映するには、');
-  console.log('チェックリストアプリの設定タブから「初期データを再インポート」を押してください。');
+
+  // URLを表示＆ブラウザで開く
+  urls.forEach(function(u) {
+    console.log('  ' + u.label + ': ' + u.url);
+  });
+  console.log('');
+
+  // メインアプリ（オーナー用）をブラウザで開く
+  if (urls.length > 0) {
+    openBrowser(urls[0].url);
+  }
 }
 
 main();

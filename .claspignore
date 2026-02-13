@@ -2,6 +2,7 @@
 **/*.sample
 **/deploy-config.json
 **/deploy.js
+deploy-all.js
 **/package.json
 **/package-lock.json
 **/.git/**

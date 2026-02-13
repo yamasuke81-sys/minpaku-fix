@@ -2857,6 +2857,7 @@
                         google.script.run.withSuccessHandler(function(j) {
                           var res = JSON.parse(j);
                           if (res.success) {
+                            applyConfirmOptimistic(r.recruitRowIndex);
                             loadAndRender(); loadRecruitList();
                             showConfirmationNotifyUI(ownerCenterArea, r.recruitRowIndex, 'eventModal');
                           }
@@ -3377,6 +3378,49 @@
             }
           }
         });
+      }
+
+      /**
+       * 募集確定時の楽観的キャッシュ更新＋カレンダー即座再描画
+       * confirmRecruitment() 成功後に呼び出し、loadAndRender() 完了を待たずにUIを更新する
+       */
+      function applyConfirmOptimistic(recruitRowIdx) {
+        if (!window._recruitFullMap) return;
+        // recruitRowIndex から対応する予約行を見つけてステータスを更新
+        for (var key in window._recruitFullMap) {
+          if (window._recruitFullMap[key].recruitRowIndex === recruitRowIdx) {
+            window._recruitFullMap[key].status = 'スタッフ確定済み';
+            break;
+          }
+        }
+        // カレンダーを即座に再描画
+        if (typeof allBookings !== 'undefined' && window._recruitFullMap && calendar) {
+          var staffSetDates = {};
+          allBookings.forEach(function(b) {
+            var rec = window._recruitFullMap[b.rowNumber] || {};
+            var isCnf = (rec.status === '選定済') || (rec.status === 'スタッフ確定済み');
+            var hasDirectStaff = !!(b.cleaningStaff && String(b.cleaningStaff).trim());
+            if ((isCnf || hasDirectStaff) && b.checkOutParsed) {
+              var d2 = new Date(b.checkOutParsed);
+              staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
+            }
+          });
+          var recruitDates = {};
+          allBookings.forEach(function(b) {
+            var rec = window._recruitFullMap[b.rowNumber] || {};
+            if ((rec.status || '') === '募集中' && b.checkOutParsed) {
+              var d = new Date(b.checkOutParsed);
+              var rKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+              if (!staffSetDates[rKey]) recruitDates[rKey] = true;
+            }
+          });
+          window._recruitDates = recruitDates;
+          var evts = buildCalendarEvents(allBookings, window._recruitFullMap);
+          var sources = calendar.getEventSources();
+          sources.forEach(function(s) { s.remove(); });
+          calendar.addEventSource(evts);
+          calendar.render();
+        }
       }
 
       /**
@@ -3989,6 +4033,7 @@
             google.script.run.withSuccessHandler(function(j) {
               var res = JSON.parse(j);
               if (res.success) {
+                applyConfirmOptimistic(r.rowIndex);
                 loadRecruitList();
                 loadAndRender();
                 var parentArea = document.getElementById('recruitEditConfirmArea');
@@ -5802,6 +5847,7 @@
                 if (ok) {
                   google.script.run.withSuccessHandler(function(cj) {
                     var cr = JSON.parse(cj);
+                    if (cr.success) applyConfirmOptimistic(row);
                     loadRecruitList();
                     loadAndRender();
                     if (cr.success) {

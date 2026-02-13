@@ -1363,6 +1363,84 @@ function addChecklistItemToMaster(category, name, isSupplyItem) {
 }
 
 /**
+ * カテゴリ名を変更（マスターシートの全該当項目のカテゴリ列を更新）
+ */
+function renameCategoryInMaster(oldFullPath, newName) {
+  try {
+    if (!oldFullPath || !newName) return JSON.stringify({ success: false, error: 'パラメータが不足しています' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目がありません' });
+    var categories = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    var parts = oldFullPath.split('：');
+    var oldName = parts[parts.length - 1];
+    parts[parts.length - 1] = newName;
+    var newFullPath = parts.join('：');
+    var updated = 0;
+    for (var i = 0; i < categories.length; i++) {
+      var cat = String(categories[i][0]);
+      if (cat === oldFullPath || cat.indexOf(oldFullPath + '：') === 0) {
+        var newCat = newFullPath + cat.substring(oldFullPath.length);
+        sheet.getRange(i + 2, 2).setValue(newCat);
+        updated++;
+      }
+    }
+    return JSON.stringify({ success: true, updated: updated });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * カテゴリを削除
+ * deleteContents=true: カテゴリ内の全項目も削除
+ * deleteContents=false: 項目は親カテゴリに移動
+ */
+function deleteCategoryFromMaster(fullPath, deleteContents) {
+  try {
+    if (!fullPath) return JSON.stringify({ success: false, error: 'カテゴリパスが空です' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目がありません' });
+    var categories = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    var parts = fullPath.split('：');
+    var parentPath = parts.slice(0, -1).join('：');
+    if (deleteContents) {
+      // 中身も含めて削除（下の行から削除して行番号ずれを防ぐ）
+      var rowsToDelete = [];
+      for (var i = 0; i < categories.length; i++) {
+        var cat = String(categories[i][0]);
+        if (cat === fullPath || cat.indexOf(fullPath + '：') === 0) {
+          rowsToDelete.push(i + 2);
+        }
+      }
+      for (var j = rowsToDelete.length - 1; j >= 0; j--) {
+        sheet.deleteRow(rowsToDelete[j]);
+      }
+      return JSON.stringify({ success: true, deleted: rowsToDelete.length });
+    } else {
+      // 中身は親カテゴリに移動
+      var updated = 0;
+      for (var i = 0; i < categories.length; i++) {
+        var cat = String(categories[i][0]);
+        if (cat === fullPath) {
+          sheet.getRange(i + 2, 2).setValue(parentPath || cat);
+          updated++;
+        } else if (cat.indexOf(fullPath + '：') === 0) {
+          var remainder = cat.substring(fullPath.length + 1);
+          var newCat = parentPath ? (parentPath + '：' + remainder) : remainder;
+          sheet.getRange(i + 2, 2).setValue(newCat);
+          updated++;
+        }
+      }
+      return JSON.stringify({ success: true, updated: updated });
+    }
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * 撮影箇所を追加
  */
 function addPhotoSpotToMaster(spotName, timing, category) {

@@ -228,32 +228,32 @@
     /* 中カテゴリ（サブセクション） */
     .sub-section {
       margin-left: 12px;
-      border-left: 3px solid #3498db;
+      border-left: 3px solid #2980b9;
     }
     .sub-section > .section-header {
       padding: 10px 14px;
-      background: #eaf2fb;
+      background: #3498db;
       font-size: 14px;
     }
     .sub-section > .section-header:active {
-      background: #d4e4f5;
+      background: #2980b9;
     }
     .sub-section > .section-header.has-missing {
-      background: #fff0f0;
+      background: #c0392b;
     }
     .sub-section > .section-icon {
-      color: #3498db;
+      color: #fff;
       font-size: 16px;
     }
     .sub-section > .section-title {
       font-size: 14px;
       font-weight: 600;
-      color: #2c3e50;
+      color: #fff;
       letter-spacing: 0;
     }
     .sub-section > .section-count {
       font-size: 12px;
-      color: #7f8c8d;
+      color: rgba(255,255,255,0.8);
     }
 
     /* 小カテゴリ（サブサブセクション） */
@@ -336,12 +336,14 @@
     }
     .section-check-all:active { background: #eafaf1; }
 
-    /* 大カテゴリヘッダー内ボタンは白系に */
-    .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section) > .section-header > .section-check-all {
+    /* 大カテゴリ・中カテゴリヘッダー内ボタンは白系に */
+    .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section) > .section-header > .section-check-all,
+    .sub-section > .section-header > .section-check-all {
       border-color: rgba(255,255,255,0.6);
       color: rgba(255,255,255,0.9);
     }
-    .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section) > .section-header > .section-check-all:active {
+    .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section) > .section-header > .section-check-all:active,
+    .sub-section > .section-header > .section-check-all:active {
       background: rgba(255,255,255,0.15);
     }
 

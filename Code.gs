@@ -5570,15 +5570,17 @@ function getOrCreateChecklistSpreadsheet_() {
   // 初期シート作成
   var s1 = newSs.getActiveSheet();
   s1.setName(SHEET_CL_MASTER);
-  s1.getRange(1, 1, 1, 5).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効']]);
+  s1.getRange(1, 1, 1, 6).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象']]);
   var s2 = newSs.insertSheet(SHEET_CL_PHOTO_SPOTS);
-  s2.getRange(1, 1, 1, 6).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効']]);
+  s2.getRange(1, 1, 1, 7).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効', 'カテゴリ']]);
   var s3 = newSs.insertSheet(SHEET_CL_RECORDS);
   s3.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', 'チェック済', 'チェック者', 'タイムスタンプ']]);
   var s4 = newSs.insertSheet(SHEET_CL_PHOTOS);
   s4.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ']]);
   var s5 = newSs.insertSheet(SHEET_CL_MEMOS);
   s5.getRange(1, 1, 1, 4).setValues([['チェックアウト日', 'メモ内容', '記入者', 'タイムスタンプ']]);
+  var s6 = newSs.insertSheet(SHEET_CL_SUPPLIES);
+  s6.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', '項目名', '記入者', 'タイムスタンプ']]);
   return newSs;
 }
 
@@ -5592,6 +5594,7 @@ function clSheet_(name) {
     else if (name === SHEET_CL_RECORDS) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', 'チェック済', 'チェック者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_PHOTOS) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_MEMOS) sheet.getRange(1, 1, 1, 4).setValues([['チェックアウト日', 'メモ内容', '記入者', 'タイムスタンプ']]);
+    else if (name === SHEET_CL_SUPPLIES) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', '項目名', '記入者', 'タイムスタンプ']]);
   }
   return sheet;
 }
@@ -5621,12 +5624,12 @@ function saveChecklistMasterItem(rowIndex, data) {
     var lastRow = sheet.getLastRow();
     if (rowIndex && rowIndex >= 2 && rowIndex <= lastRow) {
       var existingId = String(sheet.getRange(rowIndex, 1).getValue() || '');
-      sheet.getRange(rowIndex, 1, 1, 5).setValues([[existingId, data.category || '', data.name || '', parseInt(data.sortOrder, 10) || 0, data.active !== 'N' ? 'Y' : 'N']]);
+      sheet.getRange(rowIndex, 1, 1, 6).setValues([[existingId, data.category || '', data.name || '', parseInt(data.sortOrder, 10) || 0, data.active !== 'N' ? 'Y' : 'N', data.supplyItem === 'Y' ? 'Y' : 'N']]);
       return JSON.stringify({ success: true, rowIndex: rowIndex });
     }
     var id = 'CL' + new Date().getTime();
     var nextRow = lastRow + 1;
-    sheet.getRange(nextRow, 1, 1, 5).setValues([[id, data.category || '', data.name || '', parseInt(data.sortOrder, 10) || 0, 'Y']]);
+    sheet.getRange(nextRow, 1, 1, 6).setValues([[id, data.category || '', data.name || '', parseInt(data.sortOrder, 10) || 0, 'Y', data.supplyItem === 'Y' ? 'Y' : 'N']]);
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

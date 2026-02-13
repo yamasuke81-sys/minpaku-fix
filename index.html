@@ -3471,6 +3471,7 @@
         closeBtn.textContent = '閉じる';
         closeBtn.onclick = function() {
           bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+          loadAndRender();
         };
 
         btnRow.appendChild(mailBtn);
@@ -4195,6 +4196,7 @@
                 alert('保存しました。');
                 bootstrap.Modal.getInstance(document.getElementById('recruitEditModal')).hide();
                 loadRecruitList();
+                loadAndRender();
               } else {
                 document.getElementById('recruitEditError').textContent = ok.error || '失敗';
                 document.getElementById('recruitEditError').style.display = 'block';

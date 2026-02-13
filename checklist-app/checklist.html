@@ -538,7 +538,7 @@
       border-top: 1px dashed #e67e22;
     }
     .inline-photo-add-btn {
-      display: inline-block;
+      display: block;
       padding: 4px 10px;
       border: 1px dashed #ccc;
       border-radius: 4px;
@@ -547,6 +547,8 @@
       font-size: 11px;
       cursor: pointer;
       margin-top: 4px;
+      margin-left: auto;
+      width: fit-content;
     }
     .inline-photo-add-btn:active { background: #fef5ed; }
     .inline-photo-spot {
@@ -598,9 +600,9 @@
     }
     .inline-example-btn:active { background: #ecf0f1; }
     .inline-example-thumb {
-      width: 28px;
-      height: 28px;
-      border-radius: 4px;
+      width: 84px;
+      height: 84px;
+      border-radius: 6px;
       border: 1px solid #ddd;
       object-fit: cover;
       cursor: pointer;
@@ -668,6 +670,19 @@
       flex-shrink: 0;
     }
     .item-edit-btn:active { color: #3498db; }
+    .item-delete-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      color: #bdc3c7;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .item-delete-btn:active { color: #e74c3c; }
     .item-edit-input {
       width: 100%;
       padding: 6px 8px;
@@ -691,7 +706,7 @@
     .item-edit-save { background: #3498db; color: white; }
     .item-edit-cancel { background: #ecf0f1; color: #333; }
     .section-add-btn {
-      display: inline-block;
+      display: block;
       padding: 4px 10px;
       border: 1px dashed #ccc;
       border-radius: 4px;
@@ -699,11 +714,13 @@
       color: #aaa;
       font-size: 11px;
       cursor: pointer;
-      margin: 4px 16px;
+      margin: 4px 16px 4px auto;
+      text-align: center;
+      width: fit-content;
     }
     .section-add-btn:active { background: #ecf0f1; color: #3498db; }
     .category-add-btn {
-      display: inline-block;
+      display: block;
       padding: 6px 12px;
       border: 1px dashed #ccc;
       border-radius: 4px;
@@ -711,7 +728,9 @@
       color: #aaa;
       font-size: 12px;
       cursor: pointer;
-      margin: 6px 12px;
+      margin: 6px 12px 6px auto;
+      text-align: center;
+      width: fit-content;
     }
     .category-add-btn:active { background: #ecf0f1; color: #3498db; }
 
@@ -1196,6 +1215,21 @@
       });
     }
 
+    // === 状態を保持したまま再レンダリング ===
+    function reRenderWithState() {
+      var collapseState = saveCollapseState();
+      var activeTab = getActiveTab();
+      var scrollY = window.scrollY;
+      renderChecklist();
+      renderPhotoSection();
+      renderSupplyList();
+      updateProgress();
+      updateCheckAllButton();
+      restoreCollapseState(collapseState);
+      if (activeTab) switchTab(activeTab);
+      window.scrollTo(0, scrollY);
+    }
+
     // === データ読み込み ===
     function loadData() {
       Promise.all([
@@ -1260,6 +1294,7 @@
       }
       html += '</div>';
       html += '<button class="item-edit-btn" onclick="editItem(\'' + escapeHtml(item.id) + '\', this)" title="編集">✎</button>';
+      html += '<button class="item-delete-btn" onclick="deleteItemPrompt(\'' + escapeHtml(item.id) + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';
       html += '</div>';
       return html;
     }
@@ -1326,7 +1361,7 @@
           html += '<div class="inline-photo-spot">';
           // 見本サムネイル or 追加ボタン（左端）
           if (spot.exampleFileId) {
-            html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w56" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
+            html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w168" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
             html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
           }
@@ -1428,7 +1463,7 @@
           html += '<div class="photo-spot-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
           html += '<span>' + (spotDone ? '✅' : '⬜') + '</span>';
           if (spot.exampleFileId) {
-            html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w56" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
+            html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w168" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
             html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
           }
@@ -1916,6 +1951,25 @@
       if (nameEl) nameEl.style.display = '';
     }
 
+    function deleteItemPrompt(itemId, itemName) {
+      if (!confirm('「' + itemName + '」を削除しますか？')) return;
+      showSaveStatus('saving');
+      callGAS('deleteChecklistItemFromMaster', [itemId]).then(function(res) {
+        if (res.success) {
+          showSaveStatus('saved');
+          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+            if (clRes.success) {
+              checklistData = clRes;
+              reRenderWithState();
+            }
+          });
+        } else {
+          showSaveStatus('error');
+          alert('削除に失敗しました: ' + (res.error || ''));
+        }
+      }).catch(function() { showSaveStatus('error'); });
+    }
+
     function addItemPrompt(category) {
       var name = prompt('追加する項目名を入力してください:');
       if (!name || !name.trim()) return;
@@ -1923,15 +1977,10 @@
       callGAS('addChecklistItemToMaster', [category, name.trim(), false]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          // リロードしてチェックリストを再取得
           callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
             if (clRes.success) {
               checklistData = clRes;
-              renderChecklist();
-              renderPhotoSection();
-              renderSupplyList();
-              updateProgress();
-              updateCheckAllButton();
+              reRenderWithState();
             }
           });
         } else {
@@ -1954,11 +2003,7 @@
           callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
             if (clRes.success) {
               checklistData = clRes;
-              renderChecklist();
-              renderPhotoSection();
-              renderSupplyList();
-              updateProgress();
-              updateCheckAllButton();
+              reRenderWithState();
             }
           });
         } else {
@@ -1980,11 +2025,7 @@
           callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
             if (clRes.success) {
               checklistData = clRes;
-              renderChecklist();
-              renderPhotoSection();
-              renderSupplyList();
-              updateProgress();
-              updateCheckAllButton();
+              reRenderWithState();
             }
           });
         } else {
@@ -2004,8 +2045,7 @@
           callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
             if (clRes.success) {
               checklistData = clRes;
-              renderChecklist();
-              renderPhotoSection();
+              reRenderWithState();
             }
           });
         } else {

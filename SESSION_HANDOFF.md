@@ -1,16 +1,37 @@
 # セッション引き継ぎファイル
 
-> **作成日**: 2026-02-13
-> **前セッションブランチ**: `claude/create-handoff-docs-tRAuI`
-> **最新コミット**: `0db3da6 feat: チェックリスト4階層対応 + CSV全558項目を網羅`
-> **コード元ブランチ**: `claude/minpaku-fix-ui-updates-af95w`（チェックリストアプリの全コードがここに存在）
+> **最終更新**: 2026-02-13
+> **作業ブランチ**: `claude/create-handoff-docs-tRAuI`
+> **最新コミット**: `c13137f 大カテゴリと中カテゴリの見出しデザインを差別化`
 
 ---
 
-## 必須コマンド（ユーザーのWindows PCで実行）
+## 必須ルール（全セッション共通）
+
+### 1. 変更プッシュ後は毎回デプロイ手順を表示すること
+
+コードを変更してプッシュしたら、**必ず毎回**以下を表示する：
 
 ```
-cd C:\Users\yamas\minpaku-fix && git pull origin claude/minpaku-fix-ui-updates-af95w && node deploy-all.js
+cd C:\Users\yamas\Desktop\For_OpenHands\minpaku-fix
+git pull origin claude/create-handoff-docs-tRAuI
+node deploy-all.js
+```
+
+### 2. チャット移行時は引き継ぎ資料を更新すること
+
+セッション終了・チャット移行時には、`SESSION_HANDOFF.md` と `HANDOFF.md` を最新状態に更新してコミット＆プッシュする。
+
+### 3. 常に日本語で応答すること
+
+---
+
+## 必須デプロイコマンド（ユーザーのWindows PCで実行）
+
+```
+cd C:\Users\yamas\Desktop\For_OpenHands\minpaku-fix
+git pull origin claude/create-handoff-docs-tRAuI
+node deploy-all.js
 ```
 
 **注意**: コードの変更後は必ず上記を実行しないとGASに反映されません。
@@ -23,40 +44,30 @@ cd C:\Users\yamas\minpaku-fix && git pull origin claude/minpaku-fix-ui-updates-a
 
 1. **このファイルを読む**（`SESSION_HANDOFF.md`）
 2. **HANDOFF.md も読む**（プロジェクト全体の構成・技術仕様が記載）
-3. **疑問点を洗い出す** — 以下のようなプロンプトを前のチャットに投げるための質問リストを作成してください：
-   - 「前セッションで〇〇の実装意図は何でしたか？」
-   - 「△△の部分でこう変更しても問題ないですか？」
-   - 「□□は完了していますか？テスト済みですか？」
-
-4. **ブランチの確認**:
+3. **ブランチの確認**:
    ```
-   git fetch origin
-   git log origin/claude/minpaku-fix-ui-updates-af95w --oneline -10
+   git fetch origin claude/create-handoff-docs-tRAuI
    git log origin/claude/create-handoff-docs-tRAuI --oneline -10
    ```
-   - `claude/minpaku-fix-ui-updates-af95w` = メインの開発ブランチ（全コードあり）
-   - `claude/create-handoff-docs-tRAuI` = このセッションで追加した変更
-
-5. **両ブランチをマージ**して最新状態にすること
 
 ---
 
-## 前セッションで完了した作業
+## 今回のセッションで完了した作業
 
-### 1. チェックリストUI改善
-- 見本写真サムネイル 28px → 84px に3倍化
-- 「項目追加」「カテゴリを追加」ボタンを右寄せ配置
-- チェックリスト項目の鉛筆マーク右に削除ボタン（✕）追加
-- `deleteChecklistItemFromMaster()` サーバー関数追加
-- 折りたたみ状態・スクロール位置の維持（`reRenderWithState()`）
+### 1. 大カテゴリと中カテゴリの見出しデザイン差別化
+- **大カテゴリ**: 濃紺背景（`#2c3e50`）＋白文字＋白アイコン → 目立つ帯状デザイン
+- **中カテゴリ**: 薄い青背景（`#eaf2fb`）＋青アイコン（`#3498db`）→ 軽めのデザイン
+- **小カテゴリ**: オレンジアイコン（`#e67e22`）を明示的に設定
+- **細カテゴリ**: 紫アイコン（`#9b59b6`）を明示的に設定
+- 大カテゴリの「全チェック」ボタンも白系に調整
+- 未完了時の大カテゴリは赤背景（`#c0392b`）
 
-### 2. チェックリスト4階層対応（大規模リファクタ）
-- カテゴリを2レベル → 4レベルに拡張（大：中：小：細）
-- `renderChecklist()` を再帰ツリー構造（`buildCategoryTree` / `renderCategoryNode`）にリファクタ
-- CSS追加: `.sub-sub-section`（オレンジ）, `.sub-sub-sub-section`（紫）
-- `importDefaultChecklist()` を CSV の全558項目で再構築（旧114項目）
-- 撮影箇所を14 → 20に拡充
-- 元CSV（`checklist-app/cleaning_checklist.csv`）をリポジトリに追加
+### 2. 前セッションまでの完了作業
+- チェックリストUI改善（サムネイル3倍化、ボタン右寄せ、項目削除、状態維持）
+- チェックリスト4階層対応（大：中：小：細）+ CSV全558項目
+- タブナビ移動、漏れチェック統合、メモ自動保存、項目名タッチ対応
+- 見本写真サムネイル表示、撮影箇所レイアウト整備
+- カテゴリ階層ボタン追加、追加ボタン控えめデザイン
 
 ---
 
@@ -67,9 +78,9 @@ cd C:\Users\yamas\minpaku-fix && git pull origin claude/minpaku-fix-ui-updates-a
 - **「西山PCテスト」の▲表示**: 「募集_立候補」シートに回答データ（△）が残存 → 該当行を削除
 
 ### デプロイ後の確認必要
+- 大カテゴリ・中カテゴリの見出しデザイン差別化が実機で正しく表示されるか
 - 558項目の4階層チェックリストが正しく表示されるか
 - 折りたたみの開閉、全チェック、項目追加/削除が正常動作するか
-- `importDefaultChecklist()` の再インポートで全項目が正しく入るか
 
 ### 将来の課題（HANDOFF.mdにも記載）
 - 条件分岐対応（BBQ利用あり/なし、宿泊人数による表示切替）
@@ -101,7 +112,7 @@ cd C:\Users\yamas\minpaku-fix && git pull origin claude/minpaku-fix-ui-updates-a
 ### レンダリングの仕組み
 - `buildCategoryTree()` が全アイテムをツリー構造に変換
 - `renderCategoryNode()` が再帰的にHTMLを生成
-- レベル0=`.section`、1=`.sub-section`、2=`.sub-sub-section`、3=`.sub-sub-sub-section`
+- レベル0=`.section`（濃紺）、1=`.sub-section`（薄青）、2=`.sub-sub-section`（オレンジ）、3=`.sub-sub-sub-section`（紫）
 
 ### データ保存
 - GASのSpreadsheetService（Google Sheets）をバックエンドDBとして使用

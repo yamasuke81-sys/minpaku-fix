@@ -1,8 +1,8 @@
 # minpaku-fix プロジェクト引き継ぎ資料
 
 > **最終更新**: 2026-02-13
-> **作業ブランチ**: `claude/minpaku-fix-ui-updates-af95w`
-> **最新コミット**: `966085e feat: チェックアプリUI全面改修 - タブ移動・漏れチェック統合・サムネイル等`
+> **作業ブランチ**: `claude/create-handoff-docs-tRAuI`
+> **最新コミット**: `c13137f 大カテゴリと中カテゴリの見出しデザインを差別化`
 
 ---
 
@@ -11,7 +11,9 @@
 ユーザーのWindows PCで下記を実行すること。**変更を反映するには必ずこの手順が必要。**
 
 ```
-cd C:\Users\yamas\minpaku-fix && git pull origin claude/minpaku-fix-ui-updates-af95w && node deploy-all.js
+cd C:\Users\yamas\Desktop\For_OpenHands\minpaku-fix
+git pull origin claude/create-handoff-docs-tRAuI
+node deploy-all.js
 ```
 
 ---
@@ -31,9 +33,10 @@ cd C:\Users\yamas\minpaku-fix && git pull origin claude/minpaku-fix-ui-updates-a
 ## 2. ユーザー環境
 
 - OS: Windows 10/11
-- ローカルパス: `C:\Users\yamas\minpaku-fix`
+- ローカルパス: `C:\Users\yamas\Desktop\For_OpenHands\minpaku-fix`
 - デプロイ方法: `node deploy-all.js` または `deploy-all.bat` をダブルクリック
 - **常に日本語で応答すること**
+- **変更をプッシュしたら毎回デプロイ手順を表示すること**
 
 ## 3. ファイル構成
 
@@ -69,11 +72,15 @@ minpaku-fix/
 | ブランチ | 用途 | 状態 |
 |---------|------|------|
 | `main` | 本番 | 安定版 |
-| `claude/minpaku-fix-ui-updates-af95w` | UI改修 | **現在のアクティブブランチ** |
+| `claude/create-handoff-docs-tRAuI` | 現在の開発 | **現在のアクティブブランチ** |
+| `claude/minpaku-fix-ui-updates-af95w` | 旧UI改修 | 過去のブランチ |
 | `claude/fix-sheet-name-variable-tBTum` | 旧開発 | 過去のブランチ |
 
 ### 最新コミット履歴
 ```
+c13137f 大カテゴリと中カテゴリの見出しデザインを差別化
+0db3da6 feat: チェックリスト4階層対応 + CSV全558項目を網羅
+04a0617 feat: チェックリストUI改善 - サムネ3倍化・ボタン右寄せ・項目削除・状態維持
 966085e feat: チェックアプリUI全面改修 - タブ移動・漏れチェック統合・サムネイル等
 1925197 feat: チェックアプリのレイアウト大幅改修
 384d276 feat: チェックアプリUI大幅改善・フォルダ設定移動
@@ -81,14 +88,20 @@ minpaku-fix/
 522b3c3 fix: スタッフ用URLに?staff=1を追加、チェックリストのブラウザ自動オープンを除外
 7cd2c3a fix: カレンダー色修正・チェックリストUI改善・写真フォルダ分離
 34b61f5 fix: deploy-all.jsで3URL自動オープン
-84f6702 fix: deploy-all.jsをclaspignoreに追加 + ブラウザ自動オープン
-df2f73c feat: 一括デプロイスクリプト + チェックリストアプリに設定タブ追加
-ed9879c feat: 撮影項目追加ボタンを大カテゴリ直下に実装
 ```
 
 ---
 
-## 5. 今回のセッションで完了した変更
+## 5. 全セッションで完了した変更
+
+### チェックリストアプリ - カテゴリ見出し差別化 (`checklist-app/checklist.html`)
+
+| 項目 | 内容 | 状態 |
+|------|------|------|
+| 大カテゴリ見出し | 濃紺背景(`#2c3e50`)＋白文字で目立つ帯状デザインに変更 | **完了** |
+| 中カテゴリ見出し | 薄い青背景(`#eaf2fb`)＋青アイコンで軽めに | **完了** |
+| 小カテゴリ/細カテゴリ | 各レベルのアイコン色を明示的に設定（オレンジ/紫） | **完了** |
+| 大カテゴリ未完了時 | 赤背景(`#c0392b`)で表示 | **完了** |
 
 ### メインアプリ (`index.html`)
 
@@ -378,3 +391,8 @@ function callGAS(functionName, args) {
 - 「撮影項目を追加・項目を追加・カテゴリを追加のボタンは、画面の左側に寄せて配置して。あまり目立たないようにしてほしい」→ **完了**
 - 「大カテゴリの中には必ず中カテゴリを追加するボタンを追加、中カテゴリの中には必ず小カテゴリを追加するボタンを追加」→ **完了**
 - 「見本写真は全日付で同じものを表示（日付に依存しない）」→ **実装済み（マスタデータ管理）、要実環境テスト**
+- 「大カテゴリと中カテゴリの見出し部分の表示方法が似ているので判別しづらいです」→ **完了**（大カテゴリを濃紺帯、中カテゴリを薄青に差別化）
+
+### 運用ルール
+- 「変更をプッシュしたら毎回デプロイ手順を表示して」→ **ルール化済み**
+- 「チャット移行時に引き継ぎ資料をまとめて」→ **ルール化済み**

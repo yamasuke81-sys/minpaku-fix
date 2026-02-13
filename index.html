@@ -3251,6 +3251,8 @@
           allBookings = res.data || [];
           // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
           window._recruitFullMap = recruitMap;
+          // 先にリセットして古いデータが残らないようにする
+          window._recruitDates = {};
           // スタッフ確定済み（募集フロー確定 or 直接割当済み）のチェックアウト日を収集
           var staffSetDates = {};
           (res.data || []).forEach(function(b) {

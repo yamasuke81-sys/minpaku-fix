@@ -10,7 +10,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: #f5f5f5;
       color: #333;
-      padding-bottom: 120px;
+      padding-bottom: 60px;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -18,7 +18,7 @@
     .header {
       background: #2c3e50;
       color: white;
-      padding: 12px 16px;
+      padding: 8px 16px;
       position: sticky;
       top: 0;
       z-index: 100;
@@ -27,17 +27,16 @@
     .header-top {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 8px;
     }
-    .header-left { flex: 1; }
-    .header-title { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+    .header-title { font-size: 14px; font-weight: bold; }
     .header-date { font-size: 14px; opacity: 0.9; }
     .progress-bar {
       height: 6px;
       background: rgba(255,255,255,0.2);
       border-radius: 3px;
-      margin-top: 8px;
+      margin-top: 6px;
       overflow: hidden;
     }
     .progress-fill {
@@ -47,59 +46,62 @@
       border-radius: 3px;
     }
 
-    /* スタッフ選択 */
+    /* スタッフ選択（チェックリスト本体上部） */
     .staff-selector {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
+      background: #f0f8ff;
+      border: 2px solid #3498db;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 10px 12px 4px;
     }
     .staff-selector-label {
-      font-size: 11px;
-      opacity: 0.8;
-      text-align: right;
-      margin-bottom: 2px;
-      letter-spacing: 0.5px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 6px;
     }
     .staff-row {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
+      margin-bottom: 4px;
     }
+    .staff-row:last-child { margin-bottom: 0; }
     .staff-select {
-      padding: 6px 10px;
+      padding: 8px 10px;
       border-radius: 6px;
-      border: 2px solid rgba(255,255,255,0.5);
-      background: rgba(255,255,255,0.2);
-      color: white;
-      font-size: 14px;
+      border: 1px solid #bbb;
+      background: white;
+      color: #333;
+      font-size: 15px;
       font-weight: bold;
-      min-width: 140px;
+      flex: 1;
     }
     .staff-select option { color: #333; background: white; }
     .staff-add-btn, .staff-remove-btn {
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.5);
-      background: rgba(255,255,255,0.15);
-      color: white;
-      font-size: 16px;
+      border: 1px solid #3498db;
+      background: white;
+      color: #3498db;
+      font-size: 18px;
       line-height: 1;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
-    .staff-remove-btn { font-size: 14px; }
+    .staff-remove-btn { font-size: 14px; border-color: #e74c3c; color: #e74c3c; }
 
-    /* タブナビ（画面下部固定） */
+    /* タブナビ（最下部固定） */
     .tab-nav {
       display: flex;
       background: white;
       border-top: 2px solid #ecf0f1;
       position: fixed;
-      bottom: 52px;
+      bottom: 0;
       left: 0;
       right: 0;
       z-index: 100;
@@ -107,15 +109,16 @@
     }
     .tab-nav-btn {
       flex: 1;
-      padding: 12px 8px;
+      padding: 16px 8px;
       border: none;
       background: white;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: bold;
       color: #7f8c8d;
       cursor: pointer;
       border-top: 3px solid transparent;
       transition: all 0.2s;
+      min-height: 54px;
     }
     .tab-nav-btn.active {
       color: #2c3e50;
@@ -458,18 +461,15 @@
       white-space: nowrap;
     }
 
-    /* ボトムバー（最下部固定） */
+    /* アクションボタンバー（チェックリストタブ内、下部） */
     .bottom-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
       background: white;
-      padding: 8px 12px;
-      box-shadow: 0 -1px 4px rgba(0,0,0,0.08);
+      padding: 12px;
+      margin: 8px 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
       display: flex;
       gap: 8px;
-      z-index: 101;
     }
     .btn {
       flex: 1;
@@ -782,17 +782,8 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-left">
-        <div class="header-title">清掃チェックリスト</div>
-        <div class="header-date" id="headerDate"></div>
-      </div>
-      <div class="staff-selector" id="staffSelector">
-        <div class="staff-selector-label">担当スタッフ</div>
-        <div class="staff-row">
-          <select class="staff-select" id="staffSelect0"></select>
-          <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
-        </div>
-      </div>
+      <div class="header-title">清掃チェックリスト</div>
+      <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
       <div class="progress-fill" id="progressFill" style="width: 0%"></div>
@@ -809,6 +800,15 @@
 
     <!-- チェックリストタブ -->
     <div id="tabChecklist" class="tab-content active">
+      <!-- 担当スタッフ選択 -->
+      <div class="staff-selector" id="staffSelector">
+        <div class="staff-selector-label" id="staffSelectorLabel">担当スタッフ</div>
+        <div class="staff-row">
+          <select class="staff-select" id="staffSelect0"></select>
+          <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
+        </div>
+      </div>
+
       <!-- 全体操作バー -->
       <div class="action-bar">
         <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()">全て展開</button>
@@ -826,6 +826,12 @@
           <input type="text" id="memoInput" class="memo-input" placeholder="備品不足やメモを入力...">
           <button id="memoBtn" class="memo-btn">送信</button>
         </div>
+      </div>
+
+      <!-- 漏れチェック・清掃完了 -->
+      <div class="bottom-bar">
+        <button id="btnCheckMissing" class="btn btn-check">漏れチェック</button>
+        <button id="btnComplete" class="btn btn-complete">清掃完了</button>
       </div>
     </div>
 
@@ -888,18 +894,12 @@
     </div>
   </div>
 
-  <!-- タブナビゲーション（ボタンの上に固定） -->
+  <!-- タブナビゲーション（最下部固定） -->
   <div class="tab-nav" id="tabNav">
     <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
     <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
     <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
     <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')" style="display:none;">設定</button>
-  </div>
-
-  <!-- ボトムバー（最下部固定） -->
-  <div class="bottom-bar">
-    <button id="btnCheckMissing" class="btn btn-check">漏れチェック</button>
-    <button id="btnComplete" class="btn btn-complete">清掃完了</button>
   </div>
 
   <!-- 保存インジケーター -->
@@ -938,7 +938,9 @@
         alert('チェックアウト日が指定されていません');
         return;
       }
-      document.getElementById('headerDate').textContent = checkoutDate;
+      // 日付表示を "2026/2/17" 形式に
+      var dp = checkoutDate.split('-');
+      document.getElementById('headerDate').textContent = dp.length === 3 ? (parseInt(dp[0]) + '/' + parseInt(dp[1]) + '/' + parseInt(dp[2])) : checkoutDate;
       loadData();
       loadStaffList();
 
@@ -969,7 +971,7 @@
       document.getElementById('btnComplete').addEventListener('click', completeChecklist);
       document.getElementById('memoBtn').addEventListener('click', addMemo);
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
-      document.getElementById('staffSelect0').addEventListener('change', updateSettingsTabVisibility);
+      document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); });
       document.getElementById('btnReimportCL').addEventListener('click', function() {
         if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\n既存のマスターデータが上書きされます。\n\nよろしいですか？')) return;
         var btn = this;
@@ -1023,7 +1025,7 @@
       var selects = document.querySelectorAll('.staff-select');
       selects.forEach(function(sel) {
         var currentVal = sel.value;
-        sel.innerHTML = '<option value="">🧹 スタッフ選択</option>';
+        sel.innerHTML = '<option value="">担当スタッフを選択</option>';
         staffList.forEach(function(name) {
           if (name === 'オーナー') return; // 最後に追加するのでスキップ
           var opt = document.createElement('option');
@@ -1043,8 +1045,18 @@
           sel.value = currentVal;
         }
       });
+      // ラベルの表示制御: 未選択時のみ表示
+      updateStaffLabel();
       // 設定タブの表示制御: オーナー選択時のみ表示
       updateSettingsTabVisibility();
+    }
+
+    function updateStaffLabel() {
+      var label = document.getElementById('staffSelectorLabel');
+      var firstSelect = document.getElementById('staffSelect0');
+      if (label && firstSelect) {
+        label.style.display = firstSelect.value ? 'none' : '';
+      }
     }
 
     function updateSettingsTabVisibility() {
@@ -1605,10 +1617,35 @@
         }
       });
 
+      // 写真撮影の漏れチェック（チェックリストタブ内のインライン撮影箇所）
+      var photos = checklistData ? checklistData.photos || {} : {};
+      var spots = checklistData ? checklistData.spots || [] : [];
+      var photoMissing = false;
+      var inlineSpots = document.querySelectorAll('.inline-photo-spot');
+      inlineSpots.forEach(function(el) {
+        var nameEl = el.querySelector('.inline-photo-spot-name');
+        var bBtn = el.querySelector('.inline-photo-btn');
+        var aBtn = el.querySelector('.inline-photo-btn-after');
+        var bDone = bBtn && bBtn.classList.contains('done');
+        var aDone = aBtn && aBtn.classList.contains('done');
+        if (!bDone || !aDone) {
+          if (nameEl) nameEl.classList.add('missing');
+          photoMissing = true;
+        } else {
+          if (nameEl) nameEl.classList.remove('missing');
+        }
+      });
+
       var sections = document.querySelectorAll('.section');
       sections.forEach(function(section) {
         var items = section.querySelectorAll('.item-checkbox');
         var hasMissing = Array.from(items).some(function(cb) { return !cb.checked; });
+        // この大カテゴリ配下のインライン撮影箇所も漏れチェック
+        var sectionSpots = section.querySelectorAll('.inline-photo-spot');
+        sectionSpots.forEach(function(sp) {
+          var nm = sp.querySelector('.inline-photo-spot-name');
+          if (nm && nm.classList.contains('missing')) hasMissing = true;
+        });
         var header = section.querySelector('.section-header');
         var title = section.querySelector('.section-title');
 
@@ -1621,16 +1658,15 @@
         }
       });
 
-      var spots = document.querySelectorAll('.photo-spot');
-      spots.forEach(function(spot) {
-        var beforePhotos = spot.querySelectorAll('.photo-timing-group:nth-of-type(1) .photo-thumb');
-        var afterPhotos = spot.querySelectorAll('.photo-timing-group:nth-of-type(2) .photo-thumb');
+      // 撮影タブ内の撮影箇所（従来通り）
+      var photoSpotEls = document.querySelectorAll('.photo-spot');
+      photoSpotEls.forEach(function(spot) {
+        var thumbs = spot.querySelectorAll('.photo-thumb');
         var nameEl = spot.querySelector('.photo-spot-name');
-
-        if (beforePhotos.length === 0 || afterPhotos.length === 0) {
-          nameEl.classList.add('missing');
+        if (thumbs.length === 0) {
+          if (nameEl) nameEl.classList.add('missing');
         } else {
-          nameEl.classList.remove('missing');
+          if (nameEl) nameEl.classList.remove('missing');
         }
       });
     }

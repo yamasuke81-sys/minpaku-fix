@@ -1996,6 +1996,48 @@
           }).saveCleaningNotice(parseInt(ta.dataset.row), ta.value);
         };
 
+        // 宿泊人数編集トグル
+        window.toggleGuestCountEdit = function() {
+          var area = document.getElementById('guestCountEditArea');
+          if (!area) return;
+          area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        };
+
+        // 宿泊人数保存
+        window.saveGuestCountUI = function() {
+          var btn = document.getElementById('btnSaveGuestCount');
+          if (!btn) return;
+          var rowNumber = parseInt(btn.dataset.row);
+          var adults = document.getElementById('guestCountAdultsInput').value;
+          var infants = document.getElementById('guestCountInfantsInput').value;
+          btn.disabled = true; btn.textContent = '保存中...';
+          google.script.run.withSuccessHandler(function(res) {
+            var r = JSON.parse(res);
+            if (r.success) {
+              btn.textContent = '保存しました'; btn.classList.replace('btn-primary', 'btn-success');
+              // 表示を即時更新
+              var disp = document.getElementById('guestCountDisplay');
+              if (disp) {
+                var parts = [];
+                if (adults) parts.push('大人' + adults + '名');
+                if (infants) parts.push('3歳以下' + infants + '名');
+                disp.textContent = parts.length ? parts.join('、') : '-';
+              }
+              setTimeout(function() {
+                btn.disabled = false; btn.textContent = '保存'; btn.classList.replace('btn-success', 'btn-primary');
+                var area = document.getElementById('guestCountEditArea');
+                if (area) area.style.display = 'none';
+              }, 1500);
+            } else {
+              alert(r.error || '保存に失敗しました。');
+              btn.disabled = false; btn.textContent = '保存';
+            }
+          }).withFailureHandler(function(e) {
+            alert('保存に失敗しました: ' + e.message);
+            btn.disabled = false; btn.textContent = '保存';
+          }).saveGuestCount(rowNumber, adults, infants);
+        };
+
         function fmtDateRange(raw) {
           if (!raw) return '-';
           var s = String(raw);
@@ -2115,9 +2157,30 @@
               }
             }
 
-            // 人数
+            // 人数（オーナーのみ編集ボタン付き）
             var guestDisp = d.guestCountDisplay != null ? d.guestCountDisplay : formatGuestCount(d);
-            html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-people-fill"></i> 宿泊人数:</strong></span><span class="detail-value">' + fmt(guestDisp) + '</span></div>';
+            html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-people-fill"></i> 宿泊人数:</strong></span><span class="detail-value">';
+            html += '<span id="guestCountDisplay">' + fmt(guestDisp) + '</span>';
+            if (!isStaffView) {
+              html += ' <button class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" style="font-size:0.75rem;" onclick="toggleGuestCountEdit()" id="btnEditGuestCount"><i class="bi bi-pencil-fill"></i></button>';
+            }
+            html += '</span></div>';
+            // 人数編集フォーム（オーナーのみ、非表示で配置）
+            if (!isStaffView) {
+              var curAdults = d.guestCountAdults || '';
+              var curInfants = d.guestCountInfants || '';
+              html += '<div id="guestCountEditArea" style="display:none; margin: 4px 0 8px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">';
+              html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
+              html += '<label style="font-size:0.85rem; white-space:nowrap;">大人</label>';
+              html += '<input type="number" id="guestCountAdultsInput" class="form-control form-control-sm" style="width:70px;" min="0" value="' + escapeHtml(curAdults) + '" placeholder="0">';
+              html += '<label style="font-size:0.85rem; white-space:nowrap;">3歳以下</label>';
+              html += '<input type="number" id="guestCountInfantsInput" class="form-control form-control-sm" style="width:70px;" min="0" value="' + escapeHtml(curInfants) + '" placeholder="0">';
+              html += '<button class="btn btn-sm btn-primary py-0 px-2" onclick="saveGuestCountUI()" id="btnSaveGuestCount" data-row="' + props.rowNumber + '">保存</button>';
+              html += '<button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="toggleGuestCountEdit()">取消</button>';
+              html += '</div>';
+              html += '<div class="text-muted mt-1" style="font-size:0.7rem;">※ 宿泊者がGoogleフォームに入力すると、フォームの内容で上書きされます</div>';
+              html += '</div>';
+            }
             // ベッド（2名の場合のみ）
             var totalGuests = (parseInt(d.guestCountAdults, 10) || 0) + (parseInt(d.guestCountInfants, 10) || 0);
             if (totalGuests === 2 && d.bedChoice && !hideForStaff && !hideForOwnerCleaning) {

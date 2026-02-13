@@ -503,6 +503,29 @@ function saveBookingMemo(rowNumber, memoText) {
   }
 }
 
+/**
+ * 宿泊人数を保存（オーナーのみ）
+ * Googleフォーム入力時は同じ列に上書きされるため、フォームが優先される
+ */
+function saveGuestCount(rowNumber, adults, infants) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet || rowNumber < 2 || rowNumber > sheet.getLastRow()) return JSON.stringify({ success: false, error: '無効な行です。' });
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colMap = buildColumnMap(headers);
+    if (colMap.guestCount < 0) return JSON.stringify({ success: false, error: '宿泊人数列が見つかりません。' });
+    sheet.getRange(rowNumber, colMap.guestCount + 1).setValue(adults != null && adults !== '' ? String(adults) : '');
+    if (colMap.guestCountInfants >= 0) {
+      sheet.getRange(rowNumber, colMap.guestCountInfants + 1).setValue(infants != null && infants !== '' ? String(infants) : '');
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 function saveCleaningNotice(rowNumber, noticeText) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });

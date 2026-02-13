@@ -11,9 +11,7 @@
 ユーザーのWindows PCで下記を実行すること。**変更を反映するには必ずこの手順が必要。**
 
 ```
-cd C:\Users\yamas\Desktop\For_OpenHands\minpaku-fix
-git pull origin claude/create-handoff-docs-tRAuI
-node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git pull origin claude/create-handoff-docs-tRAuI && node deploy-all.js
 ```
 
 ---
@@ -33,7 +31,7 @@ node deploy-all.js
 ## 2. ユーザー環境
 
 - OS: Windows 10/11
-- ローカルパス: `C:\Users\yamas\Desktop\For_OpenHands\minpaku-fix`
+- ローカルパス: `C:\Users\yamas\minpaku-fix`
 - デプロイ方法: `node deploy-all.js` または `deploy-all.bat` をダブルクリック
 - **常に日本語で応答すること**
 - **変更をプッシュしたら毎回デプロイ手順を表示すること**

@@ -1796,10 +1796,8 @@ function syncFromICal() {
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '' });
     }
 
-    // 同期後に募集レコードを自動作成
-    if (added > 0) {
-      try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
-    }
+    // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）
+    try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
     return JSON.stringify({ success: true, added: added, removed: removed, details: details });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), added: 0, removed: 0, details: [] });
@@ -5061,9 +5059,9 @@ function notifyStaffConfirmation(recruitRowIndex) {
 function checkAndCreateRecruitments() {
   try {
     ensureSheetsExist();
-    const res = JSON.parse(getRecruitmentSettings());
-    if (!res.success || !res.settings) return;
-    const startWeeks = res.settings.recruitStartWeeks || 4;
+    // 注: getRecruitmentSettings() は requireOwner() を含むため、
+    // onFormSubmit等の非オーナー文脈で呼ばれると失敗する。
+    // この関数では設定値を実際には使用しないため、直接処理する。
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const formSheet = ss.getSheetByName(SHEET_NAME);
     const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
@@ -5075,6 +5073,11 @@ function checkAndCreateRecruitments() {
     today.setHours(0, 0, 0, 0);
     const data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
     for (var i = 0; i < data.length; i++) {
+      // キャンセル済みの予約はスキップ
+      if (colMap.cancelledAt >= 0) {
+        var cancelledVal = String(data[i][colMap.cancelledAt] || '').trim();
+        if (cancelledVal) continue;
+      }
       const checkOutVal = data[i][colMap.checkOut];
       const checkOut = parseDate(checkOutVal);
       if (!checkOut) continue;

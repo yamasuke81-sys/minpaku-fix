@@ -10,7 +10,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: #f5f5f5;
       color: #333;
-      padding-bottom: 60px;
+      padding-bottom: 16px;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -95,34 +95,32 @@
     }
     .staff-remove-btn { font-size: 14px; border-color: #e74c3c; color: #e74c3c; }
 
-    /* タブナビ（最下部固定） */
+    /* タブナビ（ヘッダー直下） */
     .tab-nav {
       display: flex;
-      background: white;
-      border-top: 2px solid #ecf0f1;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+      gap: 6px;
+      padding: 6px 12px;
+      background: #f5f5f5;
+      position: sticky;
+      top: 52px;
+      z-index: 99;
     }
     .tab-nav-btn {
       flex: 1;
-      padding: 16px 8px;
-      border: none;
+      padding: 10px 6px;
+      border: 1px solid #bdc3c7;
       background: white;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: bold;
       color: #7f8c8d;
       cursor: pointer;
-      border-top: 3px solid transparent;
+      border-radius: 8px;
       transition: all 0.2s;
-      min-height: 54px;
     }
     .tab-nav-btn.active {
-      color: #2c3e50;
-      border-top-color: #3498db;
+      color: white;
+      background: #2c3e50;
+      border-color: #2c3e50;
     }
     .tab-nav-btn .tab-badge {
       display: inline-block;
@@ -293,6 +291,9 @@
       font-size: 15px;
       color: #333;
       line-height: 1.5;
+      cursor: pointer;
+      -webkit-user-select: none;
+      user-select: none;
     }
     .item-name.missing {
       color: #e74c3c;
@@ -440,39 +441,30 @@
       color: #7f8c8d;
       margin-top: 4px;
     }
-    .memo-input-group {
-      display: flex;
-      gap: 8px;
-    }
     .memo-input {
-      flex: 1;
+      width: 100%;
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 14px;
     }
-    .memo-btn {
-      padding: 10px 16px;
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
 
-    /* アクションボタンバー（チェックリストタブ内、下部） */
-    .bottom-bar {
+    /* 清掃完了エリア */
+    .complete-area {
       background: white;
       padding: 12px;
       margin: 8px 12px 16px;
       border-radius: 8px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      display: flex;
-      gap: 8px;
     }
-    .btn {
-      flex: 1;
+    .complete-msg {
+      font-size: 13px;
+      color: #e74c3c;
+      margin-bottom: 8px;
+      display: none;
+    }
+    .btn-complete {
+      width: 100%;
       padding: 14px;
       border: none;
       border-radius: 6px;
@@ -480,24 +472,11 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s;
-    }
-    .btn-check {
-      background: #e67e22;
-      color: white;
-    }
-    .btn-check:active {
-      background: #d35400;
-    }
-    .btn-complete {
       background: #27ae60;
       color: white;
     }
     .btn-complete:active {
       background: #229954;
-    }
-    .btn-complete:disabled {
-      background: #95a5a6;
-      cursor: not-allowed;
     }
 
     /* ローディング */
@@ -559,17 +538,14 @@
       border-top: 1px dashed #e67e22;
     }
     .inline-photo-add-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 6px;
-      border: 1px dashed #e67e22;
+      display: inline-block;
+      padding: 4px 10px;
+      border: 1px dashed #ccc;
       border-radius: 4px;
       background: transparent;
-      color: #e67e22;
-      font-size: 12px;
+      color: #aaa;
+      font-size: 11px;
       cursor: pointer;
-      width: 100%;
       margin-top: 4px;
     }
     .inline-photo-add-btn:active { background: #fef5ed; }
@@ -611,15 +587,25 @@
     }
     .inline-photo-btn-after:active { background: #fef5ed; }
     .inline-example-btn {
-      padding: 4px 8px;
+      padding: 2px 6px;
       border: 1px solid #7f8c8d;
       border-radius: 4px;
       background: white;
       font-size: 11px;
       color: #7f8c8d;
       cursor: pointer;
+      flex-shrink: 0;
     }
     .inline-example-btn:active { background: #ecf0f1; }
+    .inline-example-thumb {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      object-fit: cover;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
 
     /* 撮影箇所操作ボタン */
     .inline-spot-actions {
@@ -705,35 +691,29 @@
     .item-edit-save { background: #3498db; color: white; }
     .item-edit-cancel { background: #ecf0f1; color: #333; }
     .section-add-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 8px;
-      border: 2px dashed #bdc3c7;
+      display: inline-block;
+      padding: 4px 10px;
+      border: 1px dashed #ccc;
       border-radius: 4px;
       background: transparent;
-      color: #7f8c8d;
-      font-size: 13px;
+      color: #aaa;
+      font-size: 11px;
       cursor: pointer;
-      width: calc(100% - 32px);
-      margin: 8px 16px;
+      margin: 4px 16px;
     }
-    .section-add-btn:active { background: #ecf0f1; border-color: #3498db; color: #3498db; }
+    .section-add-btn:active { background: #ecf0f1; color: #3498db; }
     .category-add-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      border: 2px dashed #bdc3c7;
-      border-radius: 8px;
-      background: white;
-      color: #7f8c8d;
-      font-size: 14px;
-      font-weight: bold;
+      display: inline-block;
+      padding: 6px 12px;
+      border: 1px dashed #ccc;
+      border-radius: 4px;
+      background: transparent;
+      color: #aaa;
+      font-size: 12px;
       cursor: pointer;
-      margin: 8px 12px;
+      margin: 6px 12px;
     }
-    .category-add-btn:active { background: #ecf0f1; border-color: #3498db; color: #3498db; }
+    .category-add-btn:active { background: #ecf0f1; color: #3498db; }
 
     /* ユーティリティ */
     .hidden { display: none !important; }
@@ -790,13 +770,19 @@
     </div>
   </div>
 
+  <!-- タブナビゲーション（ヘッダー直下） -->
+  <div class="tab-nav" id="tabNav">
+    <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
+    <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
+    <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
+    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')" style="display:none;">設定</button>
+  </div>
+
   <div id="loadingArea" class="loading">読み込み中...</div>
 
   <div id="contentArea" class="hidden">
     <!-- 次回予約情報 -->
     <div id="bookingInfo" class="booking-info hidden"></div>
-
-    <!-- タブナビゲーション（画面下部に表示） -->
 
     <!-- チェックリストタブ -->
     <div id="tabChecklist" class="tab-content active">
@@ -822,16 +808,13 @@
       <div id="memoSection" class="memo-section">
         <h3>📝 特記事項・備品不足など</h3>
         <div id="memoList" class="memo-list"></div>
-        <div class="memo-input-group">
-          <input type="text" id="memoInput" class="memo-input" placeholder="備品不足やメモを入力...">
-          <button id="memoBtn" class="memo-btn">送信</button>
-        </div>
+        <input type="text" id="memoInput" class="memo-input" placeholder="備品不足やメモを入力...（入力後に自動保存）">
       </div>
 
-      <!-- 漏れチェック・清掃完了 -->
-      <div class="bottom-bar">
-        <button id="btnCheckMissing" class="btn btn-check">漏れチェック</button>
-        <button id="btnComplete" class="btn btn-complete">清掃完了</button>
+      <!-- 清掃完了エリア（漏れチェック統合） -->
+      <div class="complete-area">
+        <div id="completeMsg" class="complete-msg"></div>
+        <button id="btnComplete" class="btn-complete" onclick="completeChecklist()">清掃完了</button>
       </div>
     </div>
 
@@ -894,13 +877,6 @@
     </div>
   </div>
 
-  <!-- タブナビゲーション（最下部固定） -->
-  <div class="tab-nav" id="tabNav">
-    <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
-    <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
-    <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
-    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')" style="display:none;">設定</button>
-  </div>
 
   <!-- 保存インジケーター -->
   <div class="save-indicator" id="saveIndicator"></div>
@@ -915,7 +891,6 @@
     var staffName = '<?= staffName ?>' || '';
     var checklistData = null;
     var bookingData = null;
-    var missingCheckActive = false;
     var staffList = [];
     var staffRowCount = 1;
     var saveIndicatorTimer = null;
@@ -967,11 +942,39 @@
       }, 60000);
 
       // イベントリスナー
-      document.getElementById('btnCheckMissing').addEventListener('click', toggleMissingCheck);
-      document.getElementById('btnComplete').addEventListener('click', completeChecklist);
-      document.getElementById('memoBtn').addEventListener('click', addMemo);
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
       document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); });
+
+      // 項目名タッチでチェック切替（イベント委譲）
+      document.getElementById('checklistContainer').addEventListener('click', function(e) {
+        var nameEl = e.target.closest('.item-name');
+        if (!nameEl) return;
+        var itemEl = nameEl.closest('.checklist-item');
+        if (!itemEl) return;
+        var checkbox = itemEl.querySelector('.item-checkbox');
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          toggleItem(checkbox);
+        }
+      });
+
+      // メモ自動保存（デバウンス）
+      var memoTimer = null;
+      document.getElementById('memoInput').addEventListener('input', function() {
+        var input = this;
+        if (memoTimer) clearTimeout(memoTimer);
+        memoTimer = setTimeout(function() {
+          var text = input.value.trim();
+          if (!text) return;
+          addMemo();
+        }, 1500);
+      });
+      document.getElementById('memoInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          if (memoTimer) clearTimeout(memoTimer);
+          addMemo();
+        }
+      });
       document.getElementById('btnReimportCL').addEventListener('click', function() {
         if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\n既存のマスターデータが上書きされます。\n\nよろしいですか？')) return;
         var btn = this;
@@ -1321,15 +1324,18 @@
           var bDone = spotPhotos.before.length > 0;
           var aDone = spotPhotos.after.length > 0;
           html += '<div class="inline-photo-spot">';
-          html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
-          html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓B' : 'B') + '</button>';
-          html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓A' : 'A') + '</button>';
-          // 見本ボタン: 常に表示（写真あり→「見本」、なし→「⊞」）
+          // 見本サムネイル or 追加ボタン（左端）
           if (spot.exampleFileId) {
-            html += '<button class="inline-example-btn" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')">見本</button>';
+            html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w56" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
             html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
           }
+          // 名前
+          html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
+          // 撮影ボタン
+          html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓前' : '📷前') + '</button>';
+          html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓後' : '📷後') + '</button>';
+          // 編集・削除ボタン（右端）
           html += '<div class="inline-spot-actions">';
           html += '<button class="inline-spot-edit-btn" onclick="editSpotName(\'' + spot.id + '\')" title="名称変更">✎</button>';
           html += '<button class="inline-spot-delete-btn" onclick="deleteSpot(\'' + spot.id + '\', \'' + escapeHtml(spot.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';
@@ -1362,11 +1368,15 @@
           });
           // サブカテゴリ内の項目追加ボタン
           html += '<button class="section-add-btn" onclick="addItemPrompt(\'' + escapeHtml(majorName + '\uff1a' + subName).replace(/'/g, "\\'") + '\')">＋ 項目を追加</button>';
+          // 小カテゴリ（sub-sub）を追加ボタン
+          html += '<button class="section-add-btn" onclick="addSubCategoryPrompt(\'' + escapeHtml(majorName + '\uff1a' + subName).replace(/'/g, "\\'") + '\')">＋ 小カテゴリを追加</button>';
           html += '</div></div>';
         });
 
         // 大カテゴリ直属の項目追加ボタン
         html += '<button class="section-add-btn" onclick="addItemPrompt(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">＋ 項目を追加</button>';
+        // 中カテゴリを追加ボタン
+        html += '<button class="section-add-btn" onclick="addSubCategoryPrompt(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">＋ 中カテゴリを追加</button>';
 
         html += '</div></div>';
       });
@@ -1417,14 +1427,16 @@
           html += '<div class="photo-spot" style="' + (spotDone ? 'border-left:3px solid #27ae60;' : 'border-left:3px solid #e74c3c;') + '">';
           html += '<div class="photo-spot-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
           html += '<span>' + (spotDone ? '✅' : '⬜') + '</span>';
-          html += '<span>' + escapeHtml(spot.name) + '</span>';
           if (spot.exampleFileId) {
-            html += '<button class="inline-example-btn" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')">見本</button>';
+            html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w56" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
             html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
           }
+          html += '<span style="flex:1;">' + escapeHtml(spot.name) + '</span>';
+          html += '<div class="inline-spot-actions">';
           html += '<button class="inline-spot-edit-btn" onclick="editSpotName(\'' + spot.id + '\')" title="名称変更">✎</button>';
           html += '<button class="inline-spot-delete-btn" onclick="deleteSpot(\'' + spot.id + '\', \'' + escapeHtml(spot.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';
+          html += '</div>';
           html += '</div>';
 
           // ビフォー/アフター 左右配置
@@ -1536,7 +1548,6 @@
           updateProgress();
           updateSectionCounts();
           updateCheckAllButton();
-          if (missingCheckActive) highlightMissing();
         } else {
           showSaveStatus('error');
           checkbox.checked = !checked;
@@ -1574,7 +1585,6 @@
       var percent = total > 0 ? Math.round((checked / total) * 100) : 0;
 
       document.getElementById('progressFill').style.width = percent + '%';
-      document.getElementById('btnComplete').disabled = checked < total;
     }
 
     function updateSectionCounts() {
@@ -1588,21 +1598,6 @@
           count.textContent = '(' + checked + '/' + total + ')';
         }
       });
-    }
-
-    function toggleMissingCheck() {
-      missingCheckActive = !missingCheckActive;
-      var btn = document.getElementById('btnCheckMissing');
-
-      if (missingCheckActive) {
-        btn.textContent = '通常表示';
-        btn.style.background = '#c0392b';
-        highlightMissing();
-      } else {
-        btn.textContent = '漏れチェック';
-        btn.style.background = '#e67e22';
-        clearMissingHighlight();
-      }
     }
 
     function highlightMissing() {
@@ -1714,7 +1709,6 @@
             }
             renderPhotoSection();
             renderChecklist();
-            if (missingCheckActive) highlightMissing();
           } else {
             showSaveStatus('error');
             alert('写真のアップロードに失敗しました: ' + res.error);
@@ -1791,7 +1785,6 @@
       }
       updateProgress();
       updateSectionCounts();
-      if (missingCheckActive) highlightMissing();
     }
 
     function uncheckAllItems() {
@@ -1810,7 +1803,6 @@
       btn.classList.remove('is-all-checked');
       updateProgress();
       updateSectionCounts();
-      if (missingCheckActive) highlightMissing();
     }
 
     function updateCheckAllButton() {
@@ -1862,7 +1854,6 @@
       updateProgress();
       updateSectionCounts();
       updateCheckAllButton();
-      if (missingCheckActive) highlightMissing();
     }
 
     // === 項目編集・追加 ===
@@ -1950,8 +1941,35 @@
       }).catch(function() { showSaveStatus('error'); });
     }
 
+    function addSubCategoryPrompt(parentCategory) {
+      var subName = prompt('追加するサブカテゴリ名を入力してください:');
+      if (!subName || !subName.trim()) return;
+      var itemName = prompt('最初の項目名を入力してください:');
+      if (!itemName || !itemName.trim()) return;
+      var fullCategory = parentCategory + '\uff1a' + subName.trim();
+      showSaveStatus('saving');
+      callGAS('addChecklistItemToMaster', [fullCategory, itemName.trim(), false]).then(function(res) {
+        if (res.success) {
+          showSaveStatus('saved');
+          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+            if (clRes.success) {
+              checklistData = clRes;
+              renderChecklist();
+              renderPhotoSection();
+              renderSupplyList();
+              updateProgress();
+              updateCheckAllButton();
+            }
+          });
+        } else {
+          showSaveStatus('error');
+          alert('追加に失敗しました: ' + (res.error || ''));
+        }
+      }).catch(function() { showSaveStatus('error'); });
+    }
+
     function addCategoryPrompt() {
-      var category = prompt('追加するカテゴリ名を入力してください:\n（サブカテゴリの場合は「大カテゴリ：サブカテゴリ」形式）');
+      var category = prompt('追加するカテゴリ名を入力してください:');
       if (!category || !category.trim()) return;
       var name = prompt('最初の項目名を入力してください:');
       if (!name || !name.trim()) return;
@@ -2149,7 +2167,34 @@
     function completeChecklist() {
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
-      if (!confirm('清掃を完了してオーナーに通知しますか？')) return;
+
+      // 漏れチェック実行
+      var uncheckedItems = document.querySelectorAll('.item-checkbox:not(:checked)');
+      var photos = checklistData ? checklistData.photos || {} : {};
+      var spots = checklistData ? checklistData.spots || [] : [];
+      var missingPhotos = spots.filter(function(s) {
+        var p = photos[s.id] || { before: [], after: [] };
+        return p.before.length === 0 || p.after.length === 0;
+      });
+
+      var msgEl = document.getElementById('completeMsg');
+
+      if (uncheckedItems.length > 0 || missingPhotos.length > 0) {
+        // 未完了項目あり → ハイライト表示
+        highlightMissing();
+        var msgs = [];
+        if (uncheckedItems.length > 0) msgs.push('未チェック項目: ' + uncheckedItems.length + '件');
+        if (missingPhotos.length > 0) msgs.push('未撮影箇所: ' + missingPhotos.length + '件');
+        msgEl.textContent = msgs.join('、');
+        msgEl.style.display = 'block';
+
+        // 未完了でも確認して送信可能
+        if (!confirm('未完了項目があります。\n' + msgs.join('\n') + '\n\nそれでも清掃完了を通知しますか？')) return;
+      } else {
+        msgEl.style.display = 'none';
+        clearMissingHighlight();
+        if (!confirm('清掃を完了してオーナーに通知しますか？')) return;
+      }
 
       callGAS('notifyCleaningComplete', [checkoutDate, who]).then(function(res) {
         if (res.success) {

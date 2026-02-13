@@ -752,6 +752,7 @@
       <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
       <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
       <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
+      <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')">設定</button>
     </div>
 
     <!-- チェックリストタブ -->
@@ -786,6 +787,19 @@
     <!-- 撮影タブ -->
     <div id="tabPhoto" class="tab-content">
       <div id="photoSection"></div>
+    </div>
+
+    <!-- 設定タブ -->
+    <div id="tabClSettings" class="tab-content">
+      <div style="padding:16px;">
+        <h3 style="font-size:16px;margin-bottom:16px;color:#2c3e50;">チェックリスト設定</h3>
+        <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #ddd;margin-bottom:16px;">
+          <h4 style="font-size:14px;margin-bottom:8px;">初期データ再インポート</h4>
+          <p style="font-size:12px;color:#666;margin-bottom:12px;">チェックリスト項目と撮影箇所を初期状態に戻します。既存のマスターデータが上書きされます。</p>
+          <button id="btnReimportCL" style="padding:10px 20px;background:#e74c3c;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;width:100%;">初期データを再インポート</button>
+          <div id="reimportResult" style="display:none;margin-top:8px;font-size:13px;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -854,6 +868,43 @@
       document.getElementById('btnComplete').addEventListener('click', completeChecklist);
       document.getElementById('memoBtn').addEventListener('click', addMemo);
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
+      document.getElementById('btnReimportCL').addEventListener('click', function() {
+        if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\n既存のマスターデータが上書きされます。\n\nよろしいですか？')) return;
+        var btn = this;
+        var resEl = document.getElementById('reimportResult');
+        btn.disabled = true;
+        btn.textContent = 'インポート中...';
+        resEl.style.display = 'block';
+        resEl.textContent = '処理中...';
+        resEl.style.color = '#666';
+        callGAS('importDefaultChecklist', []).then(function(res) {
+          if (res.success) {
+            resEl.textContent = '完了: ' + (res.itemCount || 0) + '件の項目、' + (res.spotCount || 0) + '件の撮影箇所をインポートしました。';
+            resEl.style.color = '#27ae60';
+            // データを再読み込み
+            callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+              if (clRes.success) {
+                checklistData = clRes;
+                renderChecklist();
+                renderPhotoSection();
+                renderSupplyList();
+                updateProgress();
+                updateCheckAllButton();
+              }
+            });
+          } else {
+            resEl.textContent = 'エラー: ' + (res.error || '不明');
+            resEl.style.color = '#e74c3c';
+          }
+          btn.disabled = false;
+          btn.textContent = '初期データを再インポート';
+        }).catch(function(e) {
+          resEl.textContent = 'エラー: ' + (e.message || '通信失敗');
+          resEl.style.color = '#e74c3c';
+          btn.disabled = false;
+          btn.textContent = '初期データを再インポート';
+        });
+      });
     };
 
     // === スタッフ選択 ===

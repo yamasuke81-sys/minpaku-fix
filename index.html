@@ -64,17 +64,15 @@
       border: none !important;
     }
     .fc-event-cleaning-decided {
-      background-color: #198754 !important;
-      color: #fff !important;
+      background-color: #ffc107 !important;
+      color: #212529 !important;
       border: none !important;
     }
     .fc-event-cleaning .fc-event-main,
     .fc-event-cleaning-recruiting .fc-event-main,
-    .fc-event-cleaning-undecided .fc-event-main {
-      color: #212529 !important;
-    }
+    .fc-event-cleaning-undecided .fc-event-main,
     .fc-event-cleaning-decided .fc-event-main {
-      color: #fff !important;
+      color: #212529 !important;
     }
     .fc-day-recruiting {
       background-color: #ffff00 !important;
@@ -144,8 +142,8 @@
         color: #212529 !important;
       }
       .fc-event-cleaning-decided {
-        background-color: #198754 !important;
-        color: #fff !important;
+        background-color: #ffc107 !important;
+        color: #212529 !important;
       }
       .fc-event-cleaning-volunteered-by-me,
       .fc-event-cleaning-selected-by-me {
@@ -1005,7 +1003,8 @@
         <label class="form-label small fw-bold">スタッフ用URL（?staff=1付き）</label>
         <p class="small text-muted mb-1">デプロイ時に自動反映されます。コピーしてLINE等で共有できます。</p>
         <div class="d-flex gap-2 flex-wrap align-items-center">
-          <input type="url" class="form-control form-control-sm flex-grow-1" id="staffDeployUrlInput" placeholder="https://script.../exec?staff=1" style="min-width:200px;" readonly>
+          <input type="url" class="form-control form-control-sm flex-grow-1" id="staffDeployUrlInput" placeholder="https://script.../exec?staff=1" style="min-width:200px;">
+          <button type="button" class="btn btn-sm btn-outline-success" id="btnSaveStaffUrl">保存</button>
           <button type="button" class="btn btn-sm btn-primary" id="btnCopyStaffUrl">コピー</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenStaffUrl">開く</button>
         </div>
@@ -1900,7 +1899,7 @@
                 recruitStatus: recStatus,
                 statusDot: cleaningStatus
               },
-              backgroundColor: isCancelled ? '#9e9e9e' : (isDecided ? '#198754' : '#ffc107'),
+              backgroundColor: isCancelled ? '#9e9e9e' : '#ffc107',
               borderColor: 'transparent',
               classNames: cleaningClasses
             });
@@ -4935,6 +4934,13 @@
           if (document.execCommand) document.execCommand('copy');
           alert('コピーしました。');
         }
+      });
+      document.getElementById('btnSaveStaffUrl').addEventListener('click', function() {
+        var url = document.getElementById('staffDeployUrlInput').value.trim();
+        if (!url) { alert('URLを入力してください。'); return; }
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try { var r = JSON.parse(jsonStr); alert(r.success ? '保存しました。' : 'エラー: ' + (r.error || '')); } catch (e) { alert('保存しました。'); }
+        }).setStaffDeployUrl(url);
       });
       document.getElementById('btnSavePhotoFolder').addEventListener('click', function() {
         var input = document.getElementById('photoFolderUrlInput').value.trim();

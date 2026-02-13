@@ -931,3 +931,128 @@ function addPhotoSpotToMaster(spotName, timing, category) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
 }
+
+/**
+ * 撮影箇所の名称を変更
+ */
+function updatePhotoSpotName(spotId, newName) {
+  try {
+    if (!spotId || !newName) return JSON.stringify({ success: false, error: 'IDまたは名称が空です' });
+    var sheet = clSheet_(SHEET_CL_PHOTO_SPOTS);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '箇所が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(spotId)) {
+        sheet.getRange(i + 2, 2).setValue(newName);
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '箇所が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 撮影箇所を削除（論理削除: 有効フラグをNに）
+ */
+function deletePhotoSpot(spotId) {
+  try {
+    if (!spotId) return JSON.stringify({ success: false, error: 'IDが空です' });
+    var sheet = clSheet_(SHEET_CL_PHOTO_SPOTS);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '箇所が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(spotId)) {
+        sheet.getRange(i + 2, 6).setValue('N');
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '箇所が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 見本写真をアップロード
+ */
+function uploadExamplePhoto(spotId, base64Data) {
+  try {
+    if (!spotId || !base64Data) return JSON.stringify({ success: false, error: 'データが不足しています' });
+    var folder = getOrCreateChecklistPhotoFolder_();
+    var exampleFolder = getOrCreateSubFolder_(folder, '見本');
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'example_' + spotId + '_' + new Date().getTime() + '.jpg');
+    var file = exampleFolder.createFile(blob);
+    // 撮影箇所マスタの撮影例ファイルIDを更新
+    var sheet = clSheet_(SHEET_CL_PHOTO_SPOTS);
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(spotId)) {
+          sheet.getRange(i + 2, 4).setValue(file.getId());
+          break;
+        }
+      }
+    }
+    return JSON.stringify({ success: true, fileId: file.getId() });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 見本写真を削除
+ */
+function deleteExamplePhoto(spotId) {
+  try {
+    if (!spotId) return JSON.stringify({ success: false, error: 'IDが空です' });
+    var sheet = clSheet_(SHEET_CL_PHOTO_SPOTS);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '箇所が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(spotId)) {
+        var oldFileId = String(sheet.getRange(i + 2, 4).getValue() || '').trim();
+        sheet.getRange(i + 2, 4).setValue('');
+        // Driveからも削除
+        if (oldFileId) {
+          try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) {}
+        }
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '箇所が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 撮影写真を削除
+ */
+function deleteChecklistPhoto(checkoutDate, spotId, fileId) {
+  try {
+    if (!fileId) return JSON.stringify({ success: false, error: 'ファイルIDが空です' });
+    var sheet = clSheet_(SHEET_CL_PHOTOS);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+      for (var i = data.length - 1; i >= 0; i--) {
+        if (normDateStr_(data[i][0]) === targetDate && String(data[i][1]) === String(spotId) && String(data[i][2]) === String(fileId)) {
+          sheet.deleteRow(i + 2);
+          break;
+        }
+      }
+    }
+    // Driveからも削除
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}

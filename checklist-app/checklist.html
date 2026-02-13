@@ -178,7 +178,7 @@
     }
     .section-header {
       padding: 14px 16px;
-      background: #ecf0f1;
+      background: #2c3e50;
       display: flex;
       align-items: center;
       cursor: pointer;
@@ -187,31 +187,33 @@
       transition: background 0.2s;
     }
     .section-header:active {
-      background: #d5dbdd;
+      background: #1a252f;
     }
     .section-header.has-missing {
-      background: #ffe6e6;
+      background: #c0392b;
     }
     .section-icon {
       font-size: 20px;
       margin-right: 8px;
       transition: transform 0.3s;
+      color: white;
     }
     .section-header.collapsed .section-icon {
       transform: rotate(-90deg);
     }
     .section-title {
       flex: 1;
-      font-size: 16px;
+      font-size: 17px;
       font-weight: bold;
-      color: #2c3e50;
+      color: white;
+      letter-spacing: 0.5px;
     }
     .section-title.missing {
-      color: #e74c3c;
+      color: #ff8a80;
     }
     .section-count {
       font-size: 13px;
-      color: #7f8c8d;
+      color: rgba(255,255,255,0.7);
       margin-left: 8px;
     }
     .section-body {
@@ -230,21 +232,28 @@
     }
     .sub-section > .section-header {
       padding: 10px 14px;
-      background: #f0f4f8;
+      background: #eaf2fb;
       font-size: 14px;
     }
     .sub-section > .section-header:active {
-      background: #dce3ea;
+      background: #d4e4f5;
     }
     .sub-section > .section-header.has-missing {
       background: #fff0f0;
     }
+    .sub-section > .section-icon {
+      color: #3498db;
+      font-size: 16px;
+    }
     .sub-section > .section-title {
       font-size: 14px;
       font-weight: 600;
+      color: #2c3e50;
+      letter-spacing: 0;
     }
     .sub-section > .section-count {
       font-size: 12px;
+      color: #7f8c8d;
     }
 
     /* 小カテゴリ（サブサブセクション） */
@@ -263,12 +272,19 @@
     .sub-sub-section > .section-header.has-missing {
       background: #fff5f0;
     }
+    .sub-sub-section > .section-icon {
+      color: #e67e22;
+      font-size: 14px;
+    }
     .sub-sub-section > .section-title {
       font-size: 13px;
       font-weight: 600;
+      color: #2c3e50;
+      letter-spacing: 0;
     }
     .sub-sub-section > .section-count {
       font-size: 11px;
+      color: #7f8c8d;
     }
 
     /* 細カテゴリ（サブサブサブセクション） */
@@ -287,12 +303,19 @@
     .sub-sub-sub-section > .section-header.has-missing {
       background: #fdf0ff;
     }
+    .sub-sub-sub-section > .section-icon {
+      color: #9b59b6;
+      font-size: 13px;
+    }
     .sub-sub-sub-section > .section-title {
       font-size: 12px;
       font-weight: 600;
+      color: #2c3e50;
+      letter-spacing: 0;
     }
     .sub-sub-sub-section > .section-count {
       font-size: 11px;
+      color: #7f8c8d;
     }
 
     /* セクションヘッダー内ボタン */
@@ -312,6 +335,15 @@
       color: #27ae60;
     }
     .section-check-all:active { background: #eafaf1; }
+
+    /* 大カテゴリヘッダー内ボタンは白系に */
+    .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section) > .section-header > .section-check-all {
+      border-color: rgba(255,255,255,0.6);
+      color: rgba(255,255,255,0.9);
+    }
+    .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section) > .section-header > .section-check-all:active {
+      background: rgba(255,255,255,0.15);
+    }
 
 
     /* チェック項目 */

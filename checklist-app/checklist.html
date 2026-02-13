@@ -547,6 +547,21 @@
       background: #fef9f0;
       border-top: 1px dashed #e67e22;
     }
+    .inline-photo-add-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border: 1px dashed #e67e22;
+      border-radius: 4px;
+      background: transparent;
+      color: #e67e22;
+      font-size: 12px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 4px;
+    }
+    .inline-photo-add-btn:active { background: #fef5ed; }
     .inline-photo-spot {
       display: flex;
       align-items: center;
@@ -1032,23 +1047,22 @@
         html += '<div class="section-body collapsed">';
 
         // インライン撮影箇所（大カテゴリ折りたたみ直下）
-        if (categorySpots.length > 0) {
-          html += '<div class="inline-photo-spots">';
-          categorySpots.forEach(function(spot) {
-            var spotPhotos = photos[spot.id] || { before: [], after: [] };
-            var bDone = spotPhotos.before.length > 0;
-            var aDone = spotPhotos.after.length > 0;
-            html += '<div class="inline-photo-spot">';
-            html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
-            html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓B' : 'B') + '</button>';
-            html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓A' : 'A') + '</button>';
-            if (spot.exampleFileId) {
-              html += '<button class="inline-example-btn" onclick="showExample(\'' + spot.exampleFileId + '\')">見本</button>';
-            }
-            html += '</div>';
-          });
+        html += '<div class="inline-photo-spots">';
+        categorySpots.forEach(function(spot) {
+          var spotPhotos = photos[spot.id] || { before: [], after: [] };
+          var bDone = spotPhotos.before.length > 0;
+          var aDone = spotPhotos.after.length > 0;
+          html += '<div class="inline-photo-spot">';
+          html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
+          html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓B' : 'B') + '</button>';
+          html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓A' : 'A') + '</button>';
+          if (spot.exampleFileId) {
+            html += '<button class="inline-example-btn" onclick="showExample(\'' + spot.exampleFileId + '\')">見本</button>';
+          }
           html += '</div>';
-        }
+        });
+        html += '<button class="inline-photo-add-btn" onclick="addPhotoSpotPrompt(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">＋ 撮影項目を追加</button>';
+        html += '</div>';
 
         // 直属アイテム
         group.direct.forEach(function(item) {
@@ -1643,6 +1657,27 @@
               renderSupplyList();
               updateProgress();
               updateCheckAllButton();
+            }
+          });
+        } else {
+          showSaveStatus('error');
+          alert('追加に失敗しました: ' + (res.error || ''));
+        }
+      }).catch(function() { showSaveStatus('error'); });
+    }
+
+    function addPhotoSpotPrompt(category) {
+      var name = prompt('追加する撮影箇所名を入力してください:');
+      if (!name || !name.trim()) return;
+      showSaveStatus('saving');
+      callGAS('addPhotoSpotToMaster', [name.trim(), 'ビフォー/アフター', category]).then(function(res) {
+        if (res.success) {
+          showSaveStatus('saved');
+          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+            if (clRes.success) {
+              checklistData = clRes;
+              renderChecklist();
+              renderPhotoSection();
             }
           });
         } else {

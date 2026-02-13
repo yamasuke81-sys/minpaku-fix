@@ -890,3 +890,30 @@ function addChecklistItemToMaster(category, name, isSupplyItem) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
 }
+
+/**
+ * 撮影箇所を追加
+ */
+function addPhotoSpotToMaster(spotName, timing, category) {
+  try {
+    if (!spotName) return JSON.stringify({ success: false, error: '箇所名が空です' });
+    var sheet = clSheet_(SHEET_CL_PHOTO_SPOTS);
+    var lastRow = sheet.getLastRow();
+    var maxId = 0;
+    var maxSort = 0;
+    if (lastRow >= 2) {
+      var rows = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+      rows.forEach(function(row) {
+        var m = String(row[0]).match(/spot_(\d+)/);
+        if (m) maxId = Math.max(maxId, parseInt(m[1], 10));
+        maxSort = Math.max(maxSort, parseInt(row[4], 10) || 0);
+      });
+    }
+    var newId = 'spot_' + (maxId + 1);
+    var nextRow = lastRow + 1;
+    sheet.getRange(nextRow, 1, 1, 7).setValues([[newId, spotName, timing || 'ビフォー/アフター', '', maxSort + 1, 'Y', category || '']]);
+    return JSON.stringify({ success: true, spotId: newId });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}

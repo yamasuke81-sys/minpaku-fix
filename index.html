@@ -946,7 +946,6 @@
       <li class="nav-item" id="navStaffSchedule" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
       <li class="nav-item" id="navNotifications" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
       <li class="nav-item" id="navSettings" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
-      <li class="nav-item" id="navStaffTest" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="staffTest">スタッフ画面のテスト</a></li>
     </ul>
     <div id="panelCalendar">
       <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex flex-column gap-1">
@@ -987,27 +986,17 @@
       </div>
       <div id="notificationListMain"></div>
     </div>
-    <div id="panelStaffTest" style="display:none;">
-      <div class="alert alert-info small mb-2">スタッフ画面のテスト表示です。スタッフが実際に見る画面を確認できます。実際の権限は変わりません。</div>
-      <ul class="nav nav-tabs mb-2" id="staffTestSubTabs">
-        <li class="nav-item"><a class="nav-link active staff-test-sub" href="#" data-stafftest-tab="calendar">カレンダー</a></li>
-        <li class="nav-item"><a class="nav-link staff-test-sub" href="#" data-stafftest-tab="schedule">出勤一覧</a></li>
-      </ul>
-      <div id="staffTestCalendarSection" style="display:block;"></div>
-      <div id="staffTestScheduleSection" style="display:none;"></div>
-    </div>
     <div id="panelSettings" style="display:none;">
       <p class="small text-muted" id="settingsDescription">オーナーのみ閲覧・編集可能です。</p>
       <!-- スタッフ用URL -->
       <div id="staffUrlSection" class="mb-3 p-2 border rounded bg-light">
         <label class="form-label small fw-bold">スタッフ用URL（?staff=1付き）</label>
-        <p class="small text-muted mb-1">スタッフに共有するURL。claspで <code>npm run deploy</code> 実行時に自動で最新のスタッフ用URLがここに反映されます。手動で入力・保存も可能。コピーしてLINE等で共有できます。</p>
+        <p class="small text-muted mb-1">デプロイ時に自動反映されます。コピーしてLINE等で共有できます。</p>
         <div class="d-flex gap-2 flex-wrap align-items-center">
-          <input type="url" class="form-control form-control-sm flex-grow-1" id="staffDeployUrlInput" placeholder="https://script.../exec?staff=1" style="min-width:200px;">
-          <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveStaffUrl">保存</button>
+          <input type="url" class="form-control form-control-sm flex-grow-1" id="staffDeployUrlInput" placeholder="https://script.../exec?staff=1" style="min-width:200px;" readonly>
           <button type="button" class="btn btn-sm btn-primary" id="btnCopyStaffUrl">コピー</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenStaffUrl">開く</button>
         </div>
-        <div id="staffUrlSaveResult" class="small mt-1" style="display:none;"></div>
       </div>
       <!-- 請求書保存フォルダ（スタッフの請求書出力先） TODO: 請求書機能は詳細を詰めてから実装予定 -->
       <div id="invoiceFolderSection" class="mb-3 p-2 border rounded bg-light" style="display:none;">
@@ -1053,8 +1042,6 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿リマインダー</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="checklist">チェックリスト</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="photoSpots">撮影箇所</a></li>
       </ul>
       <div id="settingsStaff">
         <button type="button" class="btn btn-sm btn-primary mb-2" id="btnAddStaff">スタッフ追加</button>
@@ -1150,13 +1137,13 @@
         <p class="small text-muted mt-2">※ 送信には時間ベースのトリガー（1時間ごと）の設定が必要です。GASエディタで <code>checkAndSendReminderEmails</code> のトリガーを追加してください。</p>
       </div>
       <div id="settingsRosterReminder" style="display:none;">
-        <p class="small text-muted mb-2">チェックアウト日が近い募集に未回答のスタッフへ、自動でリマインドメールを送信します。</p>
+        <p class="small text-muted mb-2">チェックイン日が近い予約について、宿泊者名簿が未記入の場合にオーナー宛に通知とメールを送ります。オーナーは通知を見て、宿泊者に名簿記入を催促してください。</p>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="rosterReminderEnabled">
           <label class="form-check-label" for="rosterReminderEnabled">名簿リマインダーを有効にする</label>
         </div>
-        <div class="mb-2"><label class="form-label small">チェックアウト何日前から送信</label><input type="number" class="form-control form-control-sm" id="rosterReminderDaysBefore" min="1" max="30" value="3"></div>
-        <div class="mb-2"><label class="form-label small">送信時刻</label><select class="form-select form-select-sm" id="rosterReminderHour"></select></div>
+        <div class="mb-2"><label class="form-label small">チェックイン何日前に通知</label><input type="number" class="form-control form-control-sm" id="rosterReminderDaysBefore" min="1" max="30" value="3" style="max-width:100px;"></div>
+        <div class="mb-2"><label class="form-label small">通知時刻</label><select class="form-select form-select-sm" id="rosterReminderHour" style="max-width:120px;"></select></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿リマインダー設定を保存</button>
       </div>
       <div id="settingsSync" style="display:none;">
@@ -1172,16 +1159,6 @@
       <div id="settingsNotifications" style="display:none;">
         <p class="small text-muted mb-2">回答・回答取消・予約追加・予約削除・フォーム回答などの通知履歴です。</p>
         <div id="notificationList"></div>
-      </div>
-      <div id="settingsChecklist" style="display:none;">
-        <p class="small text-muted mb-2">清掃チェックリストの項目を管理します。カテゴリごとにグルーピングされます。</p>
-        <button type="button" class="btn btn-sm btn-primary mb-2" id="btnAddChecklistItem">項目を追加</button>
-        <div id="checklistMasterList"></div>
-      </div>
-      <div id="settingsPhotoSpots" style="display:none;">
-        <p class="small text-muted mb-2">清掃時の撮影箇所を管理します。撮影例の写真を設定できます。</p>
-        <button type="button" class="btn btn-sm btn-primary mb-2" id="btnAddPhotoSpot">撮影箇所を追加</button>
-        <div id="photoSpotMasterList"></div>
       </div>
     </div>
   </div>
@@ -1444,57 +1421,6 @@
     </div>
   </div>
 
-  <!-- チェックリスト項目 編集モーダル -->
-  <div class="modal fade" id="checklistItemModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header"><h6 class="modal-title" id="checklistItemModalTitle">チェックリスト項目</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="mb-2"><label class="form-label">カテゴリ</label><input type="text" class="form-control form-control-sm" id="clItemCategory" placeholder="例: リビング、キッチン"></div>
-          <div class="mb-2"><label class="form-label">項目名</label><input type="text" class="form-control form-control-sm" id="clItemName" placeholder="例: テーブルの拭き掃除"></div>
-          <div class="mb-2"><label class="form-label">表示順</label><input type="number" class="form-control form-control-sm" id="clItemOrder" min="0" value="0"></div>
-          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="clItemActive" checked><label class="form-check-label" for="clItemActive">有効</label></div>
-          <div id="clItemError" class="text-danger small" style="display:none;"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-          <button type="button" class="btn btn-danger" id="btnDeleteChecklistItem" style="display:none;">削除</button>
-          <button type="button" class="btn btn-primary" id="btnSaveChecklistItem">保存</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 撮影箇所 編集モーダル -->
-  <div class="modal fade" id="photoSpotModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header"><h6 class="modal-title" id="photoSpotModalTitle">撮影箇所</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="mb-2"><label class="form-label">箇所名</label><input type="text" class="form-control form-control-sm" id="psName" placeholder="例: 玄関、リビング全体"></div>
-          <div class="mb-2"><label class="form-label">撮影タイミング</label>
-            <select class="form-select form-select-sm" id="psTiming">
-              <option value="チェックアウト直後">チェックアウト直後</option>
-              <option value="清掃完了後">清掃完了後</option>
-            </select>
-          </div>
-          <div class="mb-2"><label class="form-label">表示順</label><input type="number" class="form-control form-control-sm" id="psOrder" min="0" value="0"></div>
-          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="psActive" checked><label class="form-check-label" for="psActive">有効</label></div>
-          <div class="mb-2" id="psExampleArea">
-            <label class="form-label">撮影例</label>
-            <div id="psExamplePreview" class="mb-1"></div>
-            <input type="file" id="psExampleFileInput" accept="image/*" class="form-control form-control-sm">
-          </div>
-          <div id="psError" class="text-danger small" style="display:none;"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-          <button type="button" class="btn btn-danger" id="btnDeletePhotoSpot" style="display:none;">削除</button>
-          <button type="button" class="btn btn-primary" id="btnSavePhotoSpot">保存</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- 写真プレビューモーダル -->
   <div class="modal fade" id="photoPreviewModal" tabindex="-1">
@@ -3639,7 +3565,6 @@
             var tab = this.getAttribute('data-tab');
             document.querySelectorAll('#mainTabs .nav-link').forEach(function(l) { l.classList.remove('active'); });
             this.classList.add('active');
-            if (tab !== 'staffTest') restoreStaffTestPanels();
             document.getElementById('panelCalendar').style.display = tab === 'calendar' ? 'block' : 'none';
             document.getElementById('panelRecruit').style.display = tab === 'recruit' ? 'block' : 'none';
             document.getElementById('panelStaffSchedule').style.display = tab === 'staffSchedule' ? 'block' : 'none';
@@ -3653,110 +3578,9 @@
             if (tab === 'staffSchedule') loadStaffSchedule();
             if (tab === 'notifications') loadNotificationListMain();
             if (tab === 'settings') loadSettings();
-            if (tab === 'staffTest') loadStaffTestContent();
           });
         });
 
-        function loadStaffTestContent() {
-          var staffBar = document.getElementById('staffSelectorBar');
-          if (staffBar) staffBar.style.display = 'block';
-          var changeBtnTest = document.getElementById('btnStaffChange');
-          if (changeBtnTest) changeBtnTest.style.display = '';
-          var dispTest = document.getElementById('staffDisplayName');
-          if (dispTest) dispTest.style.display = '';
-          var calendarSec = document.getElementById('staffTestCalendarSection');
-          var scheduleSec = document.getElementById('staffTestScheduleSection');
-          var calPanel = document.getElementById('panelCalendar');
-          var schedPanel = document.getElementById('panelStaffSchedule');
-          if (!calendarSec || !scheduleSec) return;
-          if (!window._staffTestMoved) {
-            window._staffTestMoved = true;
-            window._staffTestCalNext = calPanel.nextSibling;
-            window._staffTestSchedNext = schedPanel.nextSibling;
-            window._staffTestCalParent = calPanel.parentNode;
-            window._staffTestSchedParent = schedPanel.parentNode;
-          }
-          calendarSec.innerHTML = '';
-          scheduleSec.innerHTML = '';
-          calendarSec.appendChild(calPanel);
-          scheduleSec.appendChild(schedPanel);
-          document.querySelectorAll('#staffTestSubTabs .staff-test-sub').forEach(function(l) { l.classList.remove('active'); });
-          var activeSub = (window._staffTestActiveSubTab || 'calendar');
-          window._staffTestActiveSubTab = activeSub;
-          var calLink = document.querySelector('#staffTestSubTabs [data-stafftest-tab="calendar"]');
-          var schedLink = document.querySelector('#staffTestSubTabs [data-stafftest-tab="schedule"]');
-          if (activeSub === 'calendar') {
-            if (calLink) calLink.classList.add('active');
-            calendarSec.style.display = 'block';
-            scheduleSec.style.display = 'none';
-            calPanel.style.display = 'block';
-            schedPanel.style.display = 'none';
-            setTimeout(function() { if (calendar) calendar.updateSize(); }, 50);
-          } else {
-            if (schedLink) schedLink.classList.add('active');
-            calendarSec.style.display = 'none';
-            scheduleSec.style.display = 'block';
-            calPanel.style.display = 'none';
-            schedPanel.style.display = 'block';
-            loadStaffSchedule();
-          }
-        }
-        function restoreStaffTestPanels() {
-          if (!window._staffTestMoved) return;
-          if (!window.staffMode) {
-            var staffBar2 = document.getElementById('staffSelectorBar');
-            if (staffBar2) staffBar2.style.display = 'none';
-            var changeBtn2 = document.getElementById('btnStaffChange');
-            if (changeBtn2) changeBtn2.style.display = 'none';
-            var disp2 = document.getElementById('staffDisplayName');
-            if (disp2) disp2.style.display = 'none';
-          }
-          var calPanel = document.getElementById('panelCalendar');
-          var schedPanel = document.getElementById('panelStaffSchedule');
-          var calendarSec = document.getElementById('staffTestCalendarSection');
-          var scheduleSec = document.getElementById('staffTestScheduleSection');
-          if (calendarSec && calPanel && calPanel.parentNode === calendarSec) {
-            if (window._staffTestCalNext && window._staffTestCalParent) {
-              window._staffTestCalParent.insertBefore(calPanel, window._staffTestCalNext);
-            } else if (window._staffTestCalParent) {
-              window._staffTestCalParent.appendChild(calPanel);
-            }
-          }
-          if (scheduleSec && schedPanel && schedPanel.parentNode === scheduleSec) {
-            if (window._staffTestSchedNext && window._staffTestSchedParent) {
-              window._staffTestSchedParent.insertBefore(schedPanel, window._staffTestSchedNext);
-            } else if (window._staffTestSchedParent) {
-              window._staffTestSchedParent.appendChild(schedPanel);
-            }
-          }
-          window._staffTestMoved = false;
-        }
-        document.querySelectorAll('#staffTestSubTabs .staff-test-sub').forEach(function(a) {
-          a.addEventListener('click', function(e) {
-            e.preventDefault();
-            var subTab = this.getAttribute('data-stafftest-tab');
-            window._staffTestActiveSubTab = subTab;
-            document.querySelectorAll('#staffTestSubTabs .staff-test-sub').forEach(function(l) { l.classList.remove('active'); });
-            this.classList.add('active');
-            var calendarSec = document.getElementById('staffTestCalendarSection');
-            var scheduleSec = document.getElementById('staffTestScheduleSection');
-            var calPanel = document.getElementById('panelCalendar');
-            var schedPanel = document.getElementById('panelStaffSchedule');
-            if (subTab === 'calendar') {
-              if (calendarSec) calendarSec.style.display = 'block';
-              if (scheduleSec) scheduleSec.style.display = 'none';
-              if (calPanel) calPanel.style.display = 'block';
-              if (schedPanel) schedPanel.style.display = 'none';
-              setTimeout(function() { if (calendar) calendar.updateSize(); }, 50);
-            } else {
-              if (calendarSec) calendarSec.style.display = 'none';
-              if (scheduleSec) scheduleSec.style.display = 'block';
-              if (calPanel) calPanel.style.display = 'none';
-              if (schedPanel) schedPanel.style.display = 'block';
-              loadStaffSchedule();
-            }
-          });
-        });
 
         // オーナー判定＋アカウント切り替えボタン（設定タブ表示・切り替えURL）
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -4550,6 +4374,8 @@
       }
 
       function loadSyncList() {
+        var _syncList = document.getElementById('syncList');
+        if (_syncList) _syncList.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var res = JSON.parse(jsonStr);
@@ -4605,6 +4431,8 @@
         return m[1] + '/' + parseInt(m[2],10) + '/' + parseInt(m[3],10) + ' ' + parseInt(m[4],10) + ':' + m[5].padStart(2,'0');
       }
       function loadNotificationList() {
+        var _notifList = document.getElementById('notificationList');
+        if (_notifList) _notifList.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
         var el = document.getElementById('notificationList');
         if (!el) return;
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -5033,28 +4861,10 @@
           resEl.className = 'small ms-2 text-danger';
         }).createStaffInvoice(ym, staffId, null);
       });
-      document.getElementById('btnSaveStaffUrl').addEventListener('click', function() {
+      document.getElementById('btnOpenStaffUrl').addEventListener('click', function() {
         var url = document.getElementById('staffDeployUrlInput').value.trim();
-        var resEl = document.getElementById('staffUrlSaveResult');
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
-            if (r.success) {
-              resEl.textContent = '保存しました。';
-              resEl.className = 'small mt-1 text-success';
-              resEl.style.display = 'block';
-              setTimeout(function() { resEl.style.display = 'none'; }, 2000);
-            } else {
-              resEl.textContent = r.error || '失敗';
-              resEl.className = 'small mt-1 text-danger';
-              resEl.style.display = 'block';
-            }
-          } catch (e) { resEl.textContent = 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
-        }).withFailureHandler(function(err) {
-          resEl.textContent = err.message || 'エラー';
-          resEl.className = 'small mt-1 text-danger';
-          resEl.style.display = 'block';
-        }).setStaffDeployUrl(url);
+        if (!url) { alert('スタッフ用URLがまだ設定されていません。'); return; }
+        window.open(url, '_blank');
       });
       document.getElementById('btnCopyStaffUrl').addEventListener('click', function() {
         var url = document.getElementById('staffDeployUrlInput').value.trim();
@@ -5090,6 +4900,8 @@
       });
 
       function loadStaffList() {
+        var _staffList = document.getElementById('staffList');
+        if (_staffList) _staffList.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var res = JSON.parse(jsonStr);
@@ -5184,6 +4996,8 @@
       });
 
       function loadSubOwnerList() {
+        var _soList = document.getElementById('subOwnerList');
+        if (_soList) _soList.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var res = JSON.parse(jsonStr);
@@ -5257,6 +5071,8 @@
       });
 
       function loadJobList() {
+        var _jobList = document.getElementById('jobList');
+        if (_jobList) _jobList.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
         google.script.run.withSuccessHandler(function(jobStr) {
           var jobRes = JSON.parse(jobStr);
           if (!jobRes.success || !jobRes.list) {
@@ -5923,10 +5739,6 @@
           document.getElementById('settingsSync').style.display = t === 'sync' ? 'block' : 'none';
           var notifEl = document.getElementById('settingsNotifications');
           if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
-          var clEl = document.getElementById('settingsChecklist');
-          if (clEl) clEl.style.display = t === 'checklist' ? 'block' : 'none';
-          var psEl = document.getElementById('settingsPhotoSpots');
-          if (psEl) psEl.style.display = t === 'photoSpots' ? 'block' : 'none';
           if (t === 'jobs') loadJobList();
           if (t === 'recruitSettings') loadRecruitSettingsForm();
           if (t === 'reminderEmail') loadReminderEmailSettings();
@@ -5934,8 +5746,6 @@
           if (t === 'sync') loadSyncList();
           if (t === 'subOwners') loadSubOwnerList();
           if (t === 'notifications') loadNotificationList();
-          if (t === 'checklist') loadChecklistMasterUI();
-          if (t === 'photoSpots') loadPhotoSpotMasterUI();
         });
       });
 
@@ -6125,132 +5935,6 @@
         } catch (e) {}
       }).isOwner();
 
-      // --- 設定: チェックリストマスタ管理 ---
-      function loadChecklistMasterUI() {
-        var list = document.getElementById('checklistMasterList');
-        list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
-        google.script.run.withSuccessHandler(function(j) {
-          var r = JSON.parse(j);
-          if (!r.success) { list.innerHTML = '<div class="text-danger">' + escapeHtml(r.error) + '</div>'; return; }
-          var items = r.items || [];
-          if (!items.length) { list.innerHTML = '<div class="text-muted small">項目がありません。「項目を追加」から登録してください。</div>'; return; }
-          var html = '';
-          items.forEach(function(item) {
-            html += '<div class="cl-settings-item" data-row="' + item.rowIndex + '"><span class="cl-si-cat">' + escapeHtml(item.category || '-') + '</span><span class="cl-si-name">' + escapeHtml(item.name) + '</span><span class="cl-si-order">#' + item.sortOrder + '</span>';
-            if (item.active !== 'Y') html += '<span class="badge bg-secondary" style="font-size:0.6rem;">無効</span>';
-            html += '<button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editChecklistItem(' + item.rowIndex + ')"><i class="bi bi-pencil"></i></button></div>';
-          });
-          list.innerHTML = html;
-        }).getChecklistMaster();
-      }
-
-      var _clEditRow = null;
-      document.getElementById('btnAddChecklistItem').addEventListener('click', function() { openChecklistItemModal(null); });
-      function openChecklistItemModal(rowIndex) {
-        _clEditRow = rowIndex;
-        document.getElementById('checklistItemModalTitle').textContent = rowIndex ? 'チェックリスト項目を編集' : 'チェックリスト項目を追加';
-        document.getElementById('clItemCategory').value = '';
-        document.getElementById('clItemName').value = '';
-        document.getElementById('clItemOrder').value = '0';
-        document.getElementById('clItemActive').checked = true;
-        document.getElementById('clItemError').style.display = 'none';
-        document.getElementById('btnDeleteChecklistItem').style.display = rowIndex ? '' : 'none';
-        if (rowIndex) {
-          google.script.run.withSuccessHandler(function(j) {
-            var r = JSON.parse(j); if (!r.success) return;
-            var item = (r.items || []).find(function(i) { return i.rowIndex === rowIndex; });
-            if (item) { document.getElementById('clItemCategory').value = item.category; document.getElementById('clItemName').value = item.name; document.getElementById('clItemOrder').value = item.sortOrder; document.getElementById('clItemActive').checked = item.active === 'Y'; }
-          }).getChecklistMaster();
-        }
-        new bootstrap.Modal(document.getElementById('checklistItemModal')).show();
-      }
-      function editChecklistItem(rowIndex) { openChecklistItemModal(rowIndex); }
-
-      document.getElementById('btnSaveChecklistItem').addEventListener('click', function() {
-        var name = document.getElementById('clItemName').value.trim();
-        if (!name) { document.getElementById('clItemError').textContent = '項目名は必須です'; document.getElementById('clItemError').style.display = 'block'; return; }
-        var data = { category: document.getElementById('clItemCategory').value.trim(), name: name, sortOrder: parseInt(document.getElementById('clItemOrder').value, 10) || 0, active: document.getElementById('clItemActive').checked ? 'Y' : 'N' };
-        google.script.run.withSuccessHandler(function(j) {
-          var r = JSON.parse(j);
-          if (r.success) { bootstrap.Modal.getInstance(document.getElementById('checklistItemModal')).hide(); loadChecklistMasterUI(); }
-          else { document.getElementById('clItemError').textContent = r.error; document.getElementById('clItemError').style.display = 'block'; }
-        }).saveChecklistMasterItem(_clEditRow, data);
-      });
-
-      document.getElementById('btnDeleteChecklistItem').addEventListener('click', function() {
-        if (!_clEditRow || !confirm('この項目を削除しますか？')) return;
-        google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('checklistItemModal')).hide(); loadChecklistMasterUI(); } else alert(r.error); })
-          .deleteChecklistMasterItem(_clEditRow);
-      });
-
-      // --- 設定: 撮影箇所マスタ管理 ---
-      function loadPhotoSpotMasterUI() {
-        var list = document.getElementById('photoSpotMasterList');
-        list.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
-        google.script.run.withSuccessHandler(function(j) {
-          var r = JSON.parse(j);
-          if (!r.success) { list.innerHTML = '<div class="text-danger">' + escapeHtml(r.error) + '</div>'; return; }
-          var items = r.items || [];
-          if (!items.length) { list.innerHTML = '<div class="text-muted small">撮影箇所がありません。「撮影箇所を追加」から登録してください。</div>'; return; }
-          var html = '';
-          items.forEach(function(item) {
-            html += '<div class="cl-settings-item" data-row="' + item.rowIndex + '"><span class="cl-si-cat">' + escapeHtml(item.timing) + '</span><span class="cl-si-name">' + escapeHtml(item.name) + '</span>';
-            if (item.exampleFileId) html += '<img src="https://drive.google.com/thumbnail?id=' + escapeHtml(item.exampleFileId) + '&sz=w60" style="width:30px;height:22px;object-fit:cover;border-radius:3px;">';
-            html += '<span class="cl-si-order">#' + item.sortOrder + '</span>';
-            if (item.active !== 'Y') html += '<span class="badge bg-secondary" style="font-size:0.6rem;">無効</span>';
-            html += '<button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="editPhotoSpot(' + item.rowIndex + ')"><i class="bi bi-pencil"></i></button></div>';
-          });
-          list.innerHTML = html;
-        }).getPhotoSpotMaster();
-      }
-
-      var _psEditRow = null;
-      document.getElementById('btnAddPhotoSpot').addEventListener('click', function() { openPhotoSpotModal(null); });
-      function openPhotoSpotModal(rowIndex) {
-        _psEditRow = rowIndex;
-        document.getElementById('photoSpotModalTitle').textContent = rowIndex ? '撮影箇所を編集' : '撮影箇所を追加';
-        document.getElementById('psName').value = '';
-        document.getElementById('psTiming').value = 'チェックアウト直後';
-        document.getElementById('psOrder').value = '0';
-        document.getElementById('psActive').checked = true;
-        document.getElementById('psExamplePreview').innerHTML = '';
-        document.getElementById('psExampleFileInput').value = '';
-        document.getElementById('psError').style.display = 'none';
-        document.getElementById('btnDeletePhotoSpot').style.display = rowIndex ? '' : 'none';
-        if (rowIndex) {
-          google.script.run.withSuccessHandler(function(j) {
-            var r = JSON.parse(j); if (!r.success) return;
-            var item = (r.items || []).find(function(i) { return i.rowIndex === rowIndex; });
-            if (item) { document.getElementById('psName').value = item.name; document.getElementById('psTiming').value = item.timing; document.getElementById('psOrder').value = item.sortOrder; document.getElementById('psActive').checked = item.active === 'Y'; if (item.exampleFileId) document.getElementById('psExamplePreview').innerHTML = '<img src="https://drive.google.com/thumbnail?id=' + escapeHtml(item.exampleFileId) + '&sz=w200" style="max-width:100%;border-radius:6px;">'; }
-          }).getPhotoSpotMaster();
-        }
-        new bootstrap.Modal(document.getElementById('photoSpotModal')).show();
-      }
-      function editPhotoSpot(rowIndex) { openPhotoSpotModal(rowIndex); }
-
-      document.getElementById('btnSavePhotoSpot').addEventListener('click', function() {
-        var name = document.getElementById('psName').value.trim();
-        if (!name) { document.getElementById('psError').textContent = '箇所名は必須です'; document.getElementById('psError').style.display = 'block'; return; }
-        var data = { name: name, timing: document.getElementById('psTiming').value, sortOrder: parseInt(document.getElementById('psOrder').value, 10) || 0, active: document.getElementById('psActive').checked ? 'Y' : 'N' };
-        function doSave() {
-          google.script.run.withSuccessHandler(function(j) {
-            var r = JSON.parse(j);
-            if (r.success) {
-              var file = document.getElementById('psExampleFileInput').files[0];
-              if (file && r.rowIndex) { compressAndUpload(file, function(base64) { google.script.run.withSuccessHandler(function() { bootstrap.Modal.getInstance(document.getElementById('photoSpotModal')).hide(); loadPhotoSpotMasterUI(); }).uploadExamplePhoto(r.rowIndex, base64); }); }
-              else { bootstrap.Modal.getInstance(document.getElementById('photoSpotModal')).hide(); loadPhotoSpotMasterUI(); }
-            } else { document.getElementById('psError').textContent = r.error; document.getElementById('psError').style.display = 'block'; }
-          }).savePhotoSpotMasterItem(_psEditRow, data);
-        }
-        if (_psEditRow) { google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); var item = (r.items || []).find(function(i) { return i.rowIndex === _psEditRow; }); data.exampleFileId = item ? item.exampleFileId : ''; doSave(); }).getPhotoSpotMaster(); }
-        else { doSave(); }
-      });
-
-      document.getElementById('btnDeletePhotoSpot').addEventListener('click', function() {
-        if (!_psEditRow || !confirm('この撮影箇所を削除しますか？')) return;
-        google.script.run.withSuccessHandler(function(j) { var r = JSON.parse(j); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('photoSpotModal')).hide(); loadPhotoSpotMasterUI(); } else alert(r.error); })
-          .deletePhotoSpotMasterItem(_psEditRow);
-      });
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

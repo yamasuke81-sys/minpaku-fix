@@ -2623,70 +2623,66 @@ function checkRosterReminder() {
     if (!res.success || !res.settings || !res.settings.rosterReminderEnabled) return;
     var daysBefore = res.settings.rosterReminderDaysBefore || 3;
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
-    if (!recruitSheet || recruitSheet.getLastRow() < 2) return;
-    var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
-    var staffSheet = ss.getSheetByName(SHEET_STAFF);
-    if (!staffSheet || staffSheet.getLastRow() < 2) return;
-    var maxCol = Math.max(recruitSheet.getLastColumn(), 9);
-    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, maxCol).getValues();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet || sheet.getLastRow() < 2) return;
+
+    // ヘッダーからチェックイン列と氏名列を特定
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var checkInCol = -1, guestNameCol = -1;
+    for (var h = 0; h < headers.length; h++) {
+      var hdr = String(headers[h]).trim();
+      if (hdr === HEADERS.CHECK_IN) checkInCol = h;
+      if (hdr === HEADERS.GUEST_NAME) guestNameCol = h;
+    }
+    if (checkInCol < 0) return;
+
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     var today = new Date();
     today.setHours(0, 0, 0, 0);
     var targetDate = new Date(today);
     targetDate.setDate(targetDate.getDate() + daysBefore);
-    var unrespondedRecruits = [];
+
+    // 宿泊者名簿未記入の予約を検出
+    var missing = [];
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][3]).trim() !== '募集中') continue;
-      var checkoutDate = rows[i][0] ? new Date(rows[i][0]) : null;
-      if (!checkoutDate) continue;
-      checkoutDate.setHours(0, 0, 0, 0);
-      if (checkoutDate > targetDate) continue; // まだ先
-      if (checkoutDate < today) continue; // 過去
-      // 未回答スタッフを確認
-      var rowIndex = i + 2;
-      var respondedEmails = {};
-      if (volSheet && volSheet.getLastRow() >= 2) {
-        var vCols = Math.max(volSheet.getLastColumn(), 4);
-        var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, vCols).getValues();
-        volRows.forEach(function(vr) {
-          if (String(vr[0]).trim() === 'r' + rowIndex) {
-            respondedEmails[String(vr[2] || '').trim().toLowerCase()] = true;
-          }
-        });
-      }
-      var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, Math.max(staffSheet.getLastColumn(), 5)).getValues();
-      var unresponded = [];
-      staffRows.forEach(function(sr) {
-        var email = String(sr[2] || '').trim().toLowerCase();
-        if (email && !respondedEmails[email]) {
-          unresponded.push({ name: sr[0] || '', email: email });
-        }
-      });
-      if (unresponded.length > 0) {
-        unrespondedRecruits.push({
-          checkoutDate: Utilities.formatDate(checkoutDate, 'Asia/Tokyo', 'yyyy-MM-dd'),
-          property: rows[i][1] || '',
-          unresponded: unresponded
+      var checkInDate = rows[i][checkInCol] ? new Date(rows[i][checkInCol]) : null;
+      if (!checkInDate) continue;
+      checkInDate.setHours(0, 0, 0, 0);
+      if (checkInDate < today || checkInDate > targetDate) continue;
+      // 氏名が空 = 名簿未記入とみなす
+      var guestName = guestNameCol >= 0 ? String(rows[i][guestNameCol] || '').trim() : '';
+      if (!guestName) {
+        missing.push({
+          checkIn: Utilities.formatDate(checkInDate, 'Asia/Tokyo', 'yyyy-MM-dd'),
+          rowNumber: i + 2
         });
       }
     }
-    // 未回答者にリマインドメール送信
-    unrespondedRecruits.forEach(function(rec) {
-      rec.unresponded.forEach(function(staff) {
-        try {
-          GmailApp.sendEmail(
-            staff.email,
-            '【民泊】清掃募集の回答をお願いします（' + rec.checkoutDate + '）',
-            staff.name + ' 様\n\n' +
-            'チェックアウト日: ' + rec.checkoutDate + '\n' +
-            (rec.property ? '物件: ' + rec.property + '\n' : '') +
-            '\nまだ回答がされていません。お手数ですがアプリから回答をお願いします。'
-          );
-        } catch (e) {
-          Logger.log('名簿リマインダー送信失敗: ' + staff.email + ' - ' + e.toString());
-        }
-      });
+    if (missing.length === 0) return;
+
+    // オーナーに通知 + メール
+    var ownerRes = JSON.parse(getOwnerEmail());
+    var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
+    var msgLines = missing.map(function(m) {
+      return 'チェックイン ' + m.checkIn + '（行' + m.rowNumber + '）';
     });
+    var message = '宿泊者名簿が未記入の予約が ' + missing.length + ' 件あります: ' + msgLines.join(', ');
+    addNotification_('名簿', message, { type: 'rosterReminder', missing: missing });
+
+    if (ownerEmail) {
+      try {
+        GmailApp.sendEmail(
+          ownerEmail,
+          '【民泊】宿泊者名簿の未記入通知（' + missing.length + '件）',
+          '以下の予約について、宿泊者名簿がまだ記入されていません。\n' +
+          '宿泊者への催促をお願いします。\n\n' +
+          msgLines.join('\n') + '\n\n' +
+          '※ アプリの通知にも同じ内容が届いています。'
+        );
+      } catch (e) {
+        Logger.log('名簿リマインダーメール送信失敗: ' + e.toString());
+      }
+    }
   } catch (e) {
     Logger.log('checkRosterReminder: ' + e.toString());
   }

@@ -319,27 +319,30 @@
       color: rgba(255,255,255,0.8);
     }
 
-    /* セクションヘッダー内ボタン */
+    /* セクションヘッダー内ボタン（アイコンのみ） */
     .section-header-btn {
-      padding: 4px 10px;
+      padding: 4px 6px;
       border: 1px solid;
       border-radius: 4px;
       background: transparent;
-      font-size: 11px;
+      font-size: 14px;
       font-weight: bold;
       cursor: pointer;
-      margin-left: 6px;
       white-space: nowrap;
+      line-height: 1;
     }
     .section-check-all {
-      border-color: #27ae60;
-      color: #27ae60;
+      border-color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.9);
+      margin-right: 6px;
+      order: -1;
     }
-    .section-check-all:active { background: #eafaf1; }
+    .section-check-all:active { background: rgba(255,255,255,0.15); }
 
     .section-expand-toggle {
       border-color: rgba(255,255,255,0.5);
       color: rgba(255,255,255,0.85);
+      margin-left: 6px;
     }
     .section-expand-toggle:active { background: rgba(255,255,255,0.12); }
     .section-cat-edit, .section-cat-delete {
@@ -347,16 +350,29 @@
       color: rgba(255,255,255,0.7);
       padding: 4px 6px;
       font-size: 12px;
+      margin-left: 4px;
     }
     .section-cat-edit:active, .section-cat-delete:active { background: rgba(255,255,255,0.12); }
-
-    /* 全カテゴリヘッダー内ボタンは白系に */
-    .section > .section-header > .section-check-all {
-      border-color: rgba(255,255,255,0.6);
-      color: rgba(255,255,255,0.9);
+    .section-header-spacer {
+      flex: 1;
     }
-    .section > .section-header > .section-check-all:active {
-      background: rgba(255,255,255,0.15);
+
+    /* サブセクションの全チェックボタンは緑系に */
+    .sub-section > .section-header > .section-check-all,
+    .sub-sub-section > .section-header > .section-check-all,
+    .sub-sub-sub-section > .section-header > .section-check-all {
+      border-color: #27ae60;
+      color: #27ae60;
+    }
+    .sub-section > .section-header > .section-check-all:active,
+    .sub-sub-section > .section-header > .section-check-all:active,
+    .sub-sub-sub-section > .section-header > .section-check-all:active {
+      background: #eafaf1;
+    }
+    .sub-section > .section-header > .section-expand-toggle,
+    .sub-sub-section > .section-header > .section-expand-toggle {
+      border-color: #7f8c8d;
+      color: #7f8c8d;
     }
 
 
@@ -587,14 +603,15 @@
       margin: 12px 12px 4px;
     }
     .action-btn {
-      padding: 8px 14px;
+      padding: 6px 10px;
       border: 1px solid #bdc3c7;
       border-radius: 6px;
       background: white;
-      font-size: 13px;
+      font-size: 16px;
       font-weight: bold;
       color: #2c3e50;
       cursor: pointer;
+      line-height: 1;
     }
     .action-btn:active { background: #ecf0f1; }
     .action-btn-check {
@@ -910,8 +927,8 @@
 
       <!-- 全体操作バー -->
       <div class="action-bar">
-        <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()">全て展開</button>
-        <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()">全チェック</button>
+        <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()" title="全て展開">⊞</button>
+        <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()" title="全チェック">✓</button>
       </div>
 
       <!-- チェックリスト -->
@@ -1429,12 +1446,13 @@
       var html = '<div class="' + levelClass + '" data-category="' + escapeHtml(fullPath) + '">';
       html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
       html += '<span class="section-icon">▼</span>';
+      html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)" title="全チェック">✓</button>';
       html += '<span class="section-title">' + escapeHtml(name) + '</span>';
       html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';
-      html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
       if (node.childOrder.length > 0) {
-        html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)">全展開</button>';
+        html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)" title="全展開">⊞</button>';
       }
+      html += '<span class="section-header-spacer"></span>';
       html += '<button class="section-header-btn section-cat-edit" onclick="event.stopPropagation(); renameCategoryPrompt(\'' + escapedPath + '\', \'' + escapeHtml(name).replace(/'/g, "\\'") + '\')" title="名称変更">✎</button>';
       html += '<button class="section-header-btn section-cat-delete" onclick="event.stopPropagation(); deleteCategoryPrompt(\'' + escapedPath + '\')" title="削除">✕</button>';
       html += '</div>';
@@ -1650,11 +1668,13 @@
       if (allOpen) {
         childHeaders.forEach(function(h) { h.classList.add('collapsed'); });
         childBodies.forEach(function(b) { b.classList.add('collapsed'); });
-        btn.textContent = '全展開';
+        btn.textContent = '⊞';
+        btn.title = '全展開';
       } else {
         childHeaders.forEach(function(h) { h.classList.remove('collapsed'); });
         childBodies.forEach(function(b) { b.classList.remove('collapsed'); });
-        btn.textContent = '全折り';
+        btn.textContent = '⊟';
+        btn.title = '全折り';
       }
     }
 
@@ -1924,11 +1944,13 @@
       var headers = document.querySelectorAll('#checklistContainer .section-header');
       var bodies = document.querySelectorAll('#checklistContainer .section-body');
       if (allExpanded) {
-        btn.textContent = '全て折りたたみ';
+        btn.textContent = '⊟';
+        btn.title = '全て折りたたみ';
         headers.forEach(function(h) { h.classList.remove('collapsed'); });
         bodies.forEach(function(b) { b.classList.remove('collapsed'); });
       } else {
-        btn.textContent = '全て展開';
+        btn.textContent = '⊞';
+        btn.title = '全て展開';
         headers.forEach(function(h) { h.classList.add('collapsed'); });
         bodies.forEach(function(b) { b.classList.add('collapsed'); });
       }
@@ -1956,7 +1978,8 @@
           checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
         });
         allChecked = true;
-        btn.textContent = '全チェック解除';
+        btn.textContent = '✗';
+        btn.title = '全チェック解除';
         btn.classList.add('is-all-checked');
       } else {
         if (!confirm('全てのチェックを外しますか？')) return;
@@ -1978,7 +2001,8 @@
       });
       allChecked = false;
       var btn = document.getElementById('btnCheckAll');
-      btn.textContent = '全チェック';
+      btn.textContent = '✓';
+      btn.title = '全チェック';
       btn.classList.remove('is-all-checked');
       updateProgress();
       updateSectionCounts();
@@ -1990,11 +2014,13 @@
       var btn = document.getElementById('btnCheckAll');
       if (checkedCount >= total) {
         allChecked = true;
-        btn.textContent = '全チェック解除';
+        btn.textContent = '✗';
+        btn.title = '全チェック解除';
         btn.classList.add('is-all-checked');
       } else {
         allChecked = false;
-        btn.textContent = '全チェック';
+        btn.textContent = '✓';
+        btn.title = '全チェック';
         btn.classList.remove('is-all-checked');
       }
     }

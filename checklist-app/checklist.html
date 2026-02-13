@@ -579,6 +579,7 @@
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="staff-selector" id="staffSelector">
+        <div style="font-size:11px;opacity:0.7;text-align:right;margin-bottom:2px;">担当スタッフ</div>
         <div class="staff-row">
           <select class="staff-select" id="staffSelect0"></select>
           <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
@@ -688,7 +689,7 @@
       var selects = document.querySelectorAll('.staff-select');
       selects.forEach(function(sel) {
         var currentVal = sel.value;
-        sel.innerHTML = '<option value="">-- 選択 --</option>';
+        sel.innerHTML = '<option value="">🧹 スタッフ選択</option>';
         staffList.forEach(function(name) {
           var opt = document.createElement('option');
           opt.value = name;
@@ -911,6 +912,14 @@
           var spotPhotos = photos[spot.id] || { before: [], after: [] };
           html += '<div class="photo-spot">';
           html += '<div class="photo-spot-name">' + escapeHtml(spot.name) + '</div>';
+
+          // 撮影例がある場合は表示
+          if (spot.exampleFileId) {
+            html += '<div style="margin-bottom:8px;">';
+            html += '<div style="font-size:12px;color:#7f8c8d;margin-bottom:4px;">📌 撮影例</div>';
+            html += '<div class="photo-grid"><div class="photo-thumb" style="background-image: url(https://drive.google.com/uc?id=' + spot.exampleFileId + ');border:2px solid #e67e22;"></div></div>';
+            html += '</div>';
+          }
 
           // ビフォー
           html += '<div class="photo-timing-group">';
@@ -1258,9 +1267,11 @@
         var unchecked = document.querySelectorAll('.item-checkbox:not(:checked)');
         if (unchecked.length === 0) {
           // 既に全チェック済み → トグルでアンチェック
+          if (!confirm('全てのチェックを外しますか？')) return;
           uncheckAllItems();
           return;
         }
+        if (!confirm('全項目（' + unchecked.length + '件）にチェックを入れますか？')) return;
         var names = getSelectedStaffNames();
         var who = names.length > 0 ? names.join(', ') : staffName;
         unchecked.forEach(function(cb) {
@@ -1273,6 +1284,7 @@
         btn.textContent = '全チェック解除';
         btn.classList.add('is-all-checked');
       } else {
+        if (!confirm('全てのチェックを外しますか？')) return;
         uncheckAllItems();
       }
       updateProgress();

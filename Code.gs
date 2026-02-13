@@ -547,7 +547,28 @@ function updateCleaningStaff(rowNumber, staffName) {
 
     const colIndex = columnMap.cleaningStaff + 1;
     const value = staffName ? String(staffName).trim() : '';
+    var previousStaff = String(sheet.getRange(rowNumber, colIndex).getValue() || '').trim();
     sheet.getRange(rowNumber, colIndex).setValue(value);
+
+    // チェックアウト日を取得（通知用）
+    var coDateStr = '';
+    if (columnMap.checkOut >= 0) {
+      coDateStr = toDateKeySafe_(sheet.getRange(rowNumber, columnMap.checkOut + 1).getValue()) || '';
+    }
+
+    // 以前のスタッフが外された場合に通知
+    if (previousStaff && previousStaff !== value) {
+      var prevNames = previousStaff.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
+      var newNames = value ? value.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean) : [];
+      var removedNames = prevNames.filter(function(n) { return newNames.indexOf(n) < 0; });
+      if (removedNames.length > 0) {
+        addNotification_('清掃変更', removedNames.join(', ') + ' が清掃担当から外れました（' + coDateStr + '）', { bookingRowNumber: rowNumber, checkoutDate: coDateStr, removedStaff: removedNames });
+      }
+      // スタッフが全削除され募集再開 → 募集開始通知
+      if (!value && previousStaff) {
+        addNotification_('清掃募集開始', '清掃募集が再開されました（' + coDateStr + '）', { bookingRowNumber: rowNumber, checkoutDate: coDateStr });
+      }
+    }
 
     // 同一チェックイン日の重複行にもcleaningStaffを書き込む（iCal+フォーム重複対策）
     if (columnMap.checkIn >= 0 && lastRow >= 2) {
@@ -3189,8 +3210,24 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
       sheet.getRange(recruitRowIndexOrNull, 14).setValue(detail.memo || '');
       sheet.getRange(recruitRowIndexOrNull, 15).setValue(detail.bedCount || '');
       var staffVal = (detail.cleaningStaff || '').trim();
+      var prevStaff = String(sheet.getRange(recruitRowIndexOrNull, 5).getValue() || '').trim();
       sheet.getRange(recruitRowIndexOrNull, 5).setValue(staffVal);
-      if (staffVal) sheet.getRange(recruitRowIndexOrNull, 4).setValue('スタッフ確定済み');
+      if (staffVal) {
+        sheet.getRange(recruitRowIndexOrNull, 4).setValue('スタッフ確定済み');
+      } else if (prevStaff) {
+        // スタッフが全削除 → 募集再開
+        sheet.getRange(recruitRowIndexOrNull, 4).setValue('募集中');
+        addNotification_('清掃募集開始', '清掃募集が再開されました（' + checkoutDateStr + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr });
+      }
+      // 以前のスタッフが外された場合に通知
+      if (prevStaff && prevStaff !== staffVal) {
+        var prevNames = prevStaff.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
+        var newNames = staffVal ? staffVal.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean) : [];
+        var removedNames = prevNames.filter(function(n) { return newNames.indexOf(n) < 0; });
+        if (removedNames.length > 0) {
+          addNotification_('清掃変更', removedNames.join(', ') + ' が清掃担当から外れました（' + checkoutDateStr + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr, removedStaff: removedNames });
+        }
+      }
       var formSheet = ss.getSheetByName(SHEET_NAME);
       if (formSheet && bookingRowNumber && formSheet.getLastRow() >= bookingRowNumber) {
         var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
@@ -3444,6 +3481,7 @@ function createRecruitmentForBooking(bookingRowNumber, checkoutDateStr) {
     const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     ensureRecruitDetailColumns_();
     sheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutDateStr, bookingRowNumber, '', '募集中', '', '', now, '', 'メール', '', '', '', '', '', '']]);
+    addNotification_('清掃募集開始', '清掃募集が開始されました（' + checkoutDateStr + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr });
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

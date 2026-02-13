@@ -228,23 +228,71 @@
       margin-left: 12px;
       border-left: 3px solid #3498db;
     }
-    .sub-section .section-header {
+    .sub-section > .section-header {
       padding: 10px 14px;
       background: #f0f4f8;
       font-size: 14px;
     }
-    .sub-section .section-header:active {
+    .sub-section > .section-header:active {
       background: #dce3ea;
     }
-    .sub-section .section-header.has-missing {
+    .sub-section > .section-header.has-missing {
       background: #fff0f0;
     }
-    .sub-section .section-title {
+    .sub-section > .section-title {
       font-size: 14px;
       font-weight: 600;
     }
-    .sub-section .section-count {
+    .sub-section > .section-count {
       font-size: 12px;
+    }
+
+    /* 小カテゴリ（サブサブセクション） */
+    .sub-sub-section {
+      margin-left: 10px;
+      border-left: 3px solid #e67e22;
+    }
+    .sub-sub-section > .section-header {
+      padding: 8px 12px;
+      background: #fdf6ee;
+      font-size: 13px;
+    }
+    .sub-sub-section > .section-header:active {
+      background: #f5e6d0;
+    }
+    .sub-sub-section > .section-header.has-missing {
+      background: #fff5f0;
+    }
+    .sub-sub-section > .section-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .sub-sub-section > .section-count {
+      font-size: 11px;
+    }
+
+    /* 細カテゴリ（サブサブサブセクション） */
+    .sub-sub-sub-section {
+      margin-left: 8px;
+      border-left: 3px solid #9b59b6;
+    }
+    .sub-sub-sub-section > .section-header {
+      padding: 6px 10px;
+      background: #f9f0fc;
+      font-size: 12px;
+    }
+    .sub-sub-sub-section > .section-header:active {
+      background: #eedaf5;
+    }
+    .sub-sub-sub-section > .section-header.has-missing {
+      background: #fdf0ff;
+    }
+    .sub-sub-sub-section > .section-title {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .sub-sub-sub-section > .section-count {
+      font-size: 11px;
     }
 
     /* セクションヘッダー内ボタン */
@@ -1299,129 +1347,106 @@
       return html;
     }
 
-    function renderChecklist() {
-      var items = checklistData.items;
-      var checked = checklistData.checked;
-      var supplyNeeded = checklistData.supplyNeeded;
-      var spots = checklistData.spots || [];
-      var photos = checklistData.photos || {};
-
-      // カテゴリを大中小に階層化
-      var majorGroups = {};
-      var majorOrder = [];
+    // === ツリー構造でカテゴリを管理（4階層対応） ===
+    function buildCategoryTree(items) {
+      var tree = { children: {}, childOrder: [], items: [] };
       items.forEach(function(item) {
-        var cat = item.category || 'その他';
-        var sep = cat.indexOf('\uff1a');
-        var majorName = sep >= 0 ? cat.substring(0, sep) : cat;
-        var subName = sep >= 0 ? cat.substring(sep + 1) : null;
-        if (!majorGroups[majorName]) {
-          majorGroups[majorName] = { direct: [], subs: {}, subOrder: [] };
-          majorOrder.push(majorName);
-        }
-        if (subName) {
-          if (!majorGroups[majorName].subs[subName]) {
-            majorGroups[majorName].subs[subName] = [];
-            majorGroups[majorName].subOrder.push(subName);
+        var parts = (item.category || 'その他').split('：');
+        var node = tree;
+        for (var i = 0; i < parts.length; i++) {
+          if (!parts[i]) continue;
+          if (!node.children[parts[i]]) {
+            node.children[parts[i]] = { children: {}, childOrder: [], items: [] };
+            node.childOrder.push(parts[i]);
           }
-          majorGroups[majorName].subs[subName].push(item);
-        } else {
-          majorGroups[majorName].direct.push(item);
+          node = node.children[parts[i]];
         }
+        node.items.push(item);
       });
+      return tree;
+    }
 
-      var html = '';
-      majorOrder.forEach(function(majorName) {
-        var group = majorGroups[majorName];
-        var allItems = group.direct.slice();
-        group.subOrder.forEach(function(sub) { allItems = allItems.concat(group.subs[sub]); });
-        var checkedInMajor = allItems.filter(function(item) { return checked[item.id]; }).length;
-        var totalInMajor = allItems.length;
+    function getAllNodeItems(node) {
+      var result = node.items.slice();
+      node.childOrder.forEach(function(name) {
+        result = result.concat(getAllNodeItems(node.children[name]));
+      });
+      return result;
+    }
 
-        // カテゴリに属する撮影箇所を取得
+    function renderCategoryNode(name, node, level, fullPath, checked, supplyNeeded, spots, photos) {
+      var allItems = getAllNodeItems(node);
+      var checkedCount = allItems.filter(function(item) { return checked[item.id]; }).length;
+      var totalCount = allItems.length;
+      var levelClass = level === 0 ? 'section' : (level === 1 ? 'section sub-section' : (level === 2 ? 'section sub-sub-section' : 'section sub-sub-sub-section'));
+      var html = '<div class="' + levelClass + '" data-category="' + escapeHtml(fullPath) + '">';
+      html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
+      html += '<span class="section-icon">▼</span>';
+      html += '<span class="section-title">' + escapeHtml(name) + '</span>';
+      html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';
+      html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
+      html += '</div>';
+      html += '<div class="section-body collapsed">';
+      // 大カテゴリのみ：インライン撮影箇所
+      if (level === 0 && spots && photos) {
         var categorySpots = spots.filter(function(s) {
           var sc = s.category || '';
-          return sc === majorName || s.name === majorName || s.name.indexOf(majorName) === 0;
+          return sc === name || s.name === name || s.name.indexOf(name) === 0;
         });
-
-        html += '<div class="section" data-category="' + escapeHtml(majorName) + '">';
-        html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
-        html += '<span class="section-icon">▼</span>';
-        html += '<span class="section-title">' + escapeHtml(majorName) + '</span>';
-        html += '<span class="section-count">(' + checkedInMajor + '/' + totalInMajor + ')</span>';
-        html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
-        html += '</div>';
-        html += '<div class="section-body collapsed">';
-
-        // インライン撮影箇所（大カテゴリ折りたたみ直下）
         html += '<div class="inline-photo-spots">';
         categorySpots.forEach(function(spot) {
           var spotPhotos = photos[spot.id] || { before: [], after: [] };
           var bDone = spotPhotos.before.length > 0;
           var aDone = spotPhotos.after.length > 0;
           html += '<div class="inline-photo-spot">';
-          // 見本サムネイル or 追加ボタン（左端）
           if (spot.exampleFileId) {
             html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w168" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
             html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
           }
-          // 名前
           html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
-          // 撮影ボタン
           html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓前' : '📷前') + '</button>';
           html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓後' : '📷後') + '</button>';
-          // 編集・削除ボタン（右端）
           html += '<div class="inline-spot-actions">';
           html += '<button class="inline-spot-edit-btn" onclick="editSpotName(\'' + spot.id + '\')" title="名称変更">✎</button>';
           html += '<button class="inline-spot-delete-btn" onclick="deleteSpot(\'' + spot.id + '\', \'' + escapeHtml(spot.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';
-          html += '</div>';
-          html += '</div>';
-        });
-        html += '<button class="inline-photo-add-btn" onclick="addPhotoSpotPrompt(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">＋ 撮影項目を追加</button>';
-        html += '</div>';
-
-        // 直属アイテム
-        group.direct.forEach(function(item) {
-          html += renderChecklistItem(item, checked, supplyNeeded);
-        });
-
-        // 中カテゴリ
-        group.subOrder.forEach(function(subName) {
-          var subItems = group.subs[subName];
-          var checkedInSub = subItems.filter(function(item) { return checked[item.id]; }).length;
-
-          html += '<div class="section sub-section" data-category="' + escapeHtml(majorName + '\uff1a' + subName) + '">';
-          html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
-          html += '<span class="section-icon">▼</span>';
-          html += '<span class="section-title">' + escapeHtml(subName) + '</span>';
-          html += '<span class="section-count">(' + checkedInSub + '/' + subItems.length + ')</span>';
-          html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)">全チェック</button>';
-          html += '</div>';
-          html += '<div class="section-body collapsed">';
-          subItems.forEach(function(item) {
-            html += renderChecklistItem(item, checked, supplyNeeded);
-          });
-          // サブカテゴリ内の項目追加ボタン
-          html += '<button class="section-add-btn" onclick="addItemPrompt(\'' + escapeHtml(majorName + '\uff1a' + subName).replace(/'/g, "\\'") + '\')">＋ 項目を追加</button>';
-          // 小カテゴリ（sub-sub）を追加ボタン
-          html += '<button class="section-add-btn" onclick="addSubCategoryPrompt(\'' + escapeHtml(majorName + '\uff1a' + subName).replace(/'/g, "\\'") + '\')">＋ 小カテゴリを追加</button>';
           html += '</div></div>';
         });
-
-        // 大カテゴリ直属の項目追加ボタン
-        html += '<button class="section-add-btn" onclick="addItemPrompt(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">＋ 項目を追加</button>';
-        // 中カテゴリを追加ボタン
-        html += '<button class="section-add-btn" onclick="addSubCategoryPrompt(\'' + escapeHtml(majorName).replace(/'/g, "\\'") + '\')">＋ 中カテゴリを追加</button>';
-
-        html += '</div></div>';
+        html += '<button class="inline-photo-add-btn" onclick="addPhotoSpotPrompt(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">＋ 撮影項目を追加</button>';
+        html += '</div>';
+      }
+      // 直属アイテム
+      node.items.forEach(function(item) {
+        html += renderChecklistItem(item, checked, supplyNeeded);
       });
-
-      // カテゴリ追加ボタン
-      html += '<button class="category-add-btn" onclick="addCategoryPrompt()">＋ カテゴリを追加</button>';
-
-      document.getElementById('checklistContainer').innerHTML = html;
+      // 子カテゴリ（再帰）
+      node.childOrder.forEach(function(childName) {
+        var childPath = fullPath + '：' + childName;
+        html += renderCategoryNode(childName, node.children[childName], level + 1, childPath, checked, supplyNeeded, null, null);
+      });
+      // 追加ボタン
+      var escapedPath = escapeHtml(fullPath).replace(/'/g, "\\'");
+      html += '<button class="section-add-btn" onclick="addItemPrompt(\'' + escapedPath + '\')">＋ 項目を追加</button>';
+      html += '<button class="section-add-btn" onclick="addSubCategoryPrompt(\'' + escapedPath + '\')">＋ サブカテゴリを追加</button>';
+      html += '</div></div>';
+      return html;
     }
 
+    function renderChecklist() {
+      var items = checklistData.items;
+      var checked = checklistData.checked;
+      var supplyNeeded = checklistData.supplyNeeded;
+      var spots = checklistData.spots || [];
+      var photos = checklistData.photos || {};
+      var tree = buildCategoryTree(items);
+      var html = '';
+      tree.childOrder.forEach(function(majorName) {
+        html += renderCategoryNode(majorName, tree.children[majorName], 0, majorName, checked, supplyNeeded, spots, photos);
+      });
+      // カテゴリ追加ボタン
+      html += '<button class="category-add-btn" onclick="addCategoryPrompt()">＋ カテゴリを追加</button>';
+      document.getElementById('checklistContainer').innerHTML = html;
+    }
     // === 撮影セクション ===
     function renderPhotoSection() {
       var spots = checklistData.spots;

@@ -1532,6 +1532,18 @@
         var supplyNeeded = checklistData.supplyNeeded || {};
         var spots = checklistData.spots || [];
         var photos = checklistData.photos || {};
+
+        // 項目が0件の場合：インポート案内を表示
+        if (items.length === 0) {
+          document.getElementById('checklistContainer').innerHTML =
+            '<div style="padding:30px 20px;text-align:center;color:#666;">' +
+            '<p style="font-size:16px;margin-bottom:16px;">チェックリスト項目がありません</p>' +
+            '<p style="font-size:13px;margin-bottom:20px;color:#999;">項目が削除されたか、初期データが読み込まれていません。</p>' +
+            '<button onclick="reimportFromChecklist()" style="padding:12px 28px;font-size:15px;border-radius:8px;border:none;background:#3498db;color:#fff;cursor:pointer;">初期データをインポート</button>' +
+            '</div>';
+          return;
+        }
+
         var tree = buildCategoryTree(items);
         var html = '';
         tree.childOrder.forEach(function(majorName) {
@@ -2200,6 +2212,28 @@
           alert('追加に失敗しました: ' + (res.error || ''));
         }
       }).catch(function() { showSaveStatus('error'); });
+    }
+
+    function reimportFromChecklist() {
+      if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\nよろしいですか？')) return;
+      callGAS('importDefaultChecklist', []).then(function(res) {
+        if (res.success) {
+          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+            if (clRes.success) {
+              checklistData = clRes;
+              renderChecklist();
+              renderPhotoSection();
+              renderSupplyList();
+              updateProgress();
+              updateCheckAllButton();
+            }
+          });
+        } else {
+          alert('インポートに失敗しました: ' + (res.error || '不明'));
+        }
+      }).catch(function(e) {
+        alert('インポートに失敗しました: ' + (e.message || '通信失敗'));
+      });
     }
 
     function addCategoryPrompt() {

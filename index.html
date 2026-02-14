@@ -5991,19 +5991,37 @@
       window.currentUserName = '';
       window.isOwnerUser = !window.staffMode; // デフォルト: オーナーURL→true, スタッフURL→false
       function populateStaffSelectOptions(targetId) {
-        google.script.run.withSuccessHandler(function(sStr) {
-          try {
-            var s = JSON.parse(sStr);
-            var el = document.getElementById(targetId);
-            if (el && s.success && s.list && s.list.length) {
-              el.innerHTML = '<option value="">-- 選択 --</option>';
-              s.list.forEach(function(st) {
-                var label = st.name || st.email;
-                el.innerHTML += '<option value="' + escapeHtml(st.name || '') + '|' + escapeHtml(st.email || '') + '" data-has-pw="' + (st.hasPassword ? '1' : '0') + '">' + escapeHtml(label) + '</option>';
-              });
+        google.script.run
+          .withSuccessHandler(function(sStr) {
+            try {
+              var s = JSON.parse(sStr);
+              var el = document.getElementById(targetId);
+              if (!el) return;
+              if (s.success && s.list && s.list.length) {
+                el.innerHTML = '<option value="">-- 選択 --</option>';
+                s.list.forEach(function(st) {
+                  var label = st.name || st.email;
+                  el.innerHTML += '<option value="' + escapeHtml(st.name || '') + '|' + escapeHtml(st.email || '') + '" data-has-pw="' + (st.hasPassword ? '1' : '0') + '">' + escapeHtml(label) + '</option>';
+                });
+              } else if (s.success && (!s.list || s.list.length === 0)) {
+                el.innerHTML = '<option value="">（スタッフ未登録）</option>';
+                console.warn('スタッフリスト: 登録データが0件です');
+              } else {
+                el.innerHTML = '<option value="">（読み込み失敗）</option>';
+                console.error('スタッフリスト読み込みエラー:', s.error);
+              }
+            } catch (e) {
+              console.error('スタッフリストのパースエラー:', e);
+              var el = document.getElementById(targetId);
+              if (el) el.innerHTML = '<option value="">（読み込み失敗）</option>';
             }
-          } catch (e) {}
-        }).getStaffNamesForSelection();
+          })
+          .withFailureHandler(function(err) {
+            console.error('スタッフリスト取得失敗:', err);
+            var el = document.getElementById(targetId);
+            if (el) el.innerHTML = '<option value="">（読み込み失敗）</option>';
+          })
+          .getStaffNamesForSelection();
       }
       function applyStaffSelection(name, email) {
         window.currentUserName = (name || '').trim();

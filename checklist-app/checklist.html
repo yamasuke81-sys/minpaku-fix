@@ -331,16 +331,19 @@
       white-space: nowrap;
       line-height: 1;
     }
-    .section-check-all {
-      margin-right: 6px;
-    }
     .section-expand-toggle {
-      margin-right: 6px;
+      margin-right: 8px;
     }
-    .section-cat-edit, .section-cat-delete {
+    .section-check-all {
+      margin-right: 8px;
+    }
+    .section-cat-edit {
       padding: 4px 6px;
       font-size: 12px;
-      margin-left: 4px;
+    }
+    .section-cat-delete {
+      padding: 4px 6px;
+      font-size: 12px;
     }
     /* 大カテゴリ(濃紺)のボタン */
     .section > .section-header > .section-header-btn {
@@ -1459,9 +1462,9 @@
       if (node.childOrder.length > 0) {
         html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)" title="全展開">全展開</button>';
       }
-      html += '<span class="section-header-spacer"></span>';
       html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)" title="全チェック">全✓</button>';
       html += '<button class="section-header-btn section-cat-edit" onclick="event.stopPropagation(); renameCategoryPrompt(\'' + escapedPath + '\', \'' + escapeHtml(name).replace(/'/g, "\\'") + '\')" title="名称変更">✎</button>';
+      html += '<span class="section-header-spacer"></span>';
       html += '<button class="section-header-btn section-cat-delete" onclick="event.stopPropagation(); deleteCategoryPrompt(\'' + escapedPath + '\')" title="削除">✕</button>';
       html += '</div>';
       html += '<div class="section-body collapsed">';

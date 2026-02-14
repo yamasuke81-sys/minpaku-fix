@@ -332,46 +332,55 @@
       line-height: 1;
     }
     .section-check-all {
-      border-color: rgba(255,255,255,0.5);
-      color: rgba(255,255,255,0.9);
       margin-right: 6px;
     }
-    .section-check-all:active { background: rgba(255,255,255,0.15); }
-
     .section-expand-toggle {
-      border-color: rgba(255,255,255,0.5);
-      color: rgba(255,255,255,0.85);
       margin-right: 6px;
     }
-    .section-expand-toggle:active { background: rgba(255,255,255,0.12); }
     .section-cat-edit, .section-cat-delete {
-      border-color: rgba(255,255,255,0.4);
-      color: rgba(255,255,255,0.7);
       padding: 4px 6px;
       font-size: 12px;
       margin-left: 4px;
     }
-    .section-cat-edit:active, .section-cat-delete:active { background: rgba(255,255,255,0.12); }
+    /* 大カテゴリ(濃紺)のボタン */
+    .section > .section-header > .section-header-btn {
+      border-color: rgba(255,255,255,0.6);
+      color: #fff;
+      background: rgba(255,255,255,0.12);
+    }
+    .section > .section-header > .section-header-btn:active {
+      background: rgba(255,255,255,0.25);
+    }
     .section-header-spacer {
       flex: 1;
     }
 
-    /* サブセクションの全チェックボタンは緑系に */
-    .sub-section > .section-header > .section-check-all,
-    .sub-sub-section > .section-header > .section-check-all,
-    .sub-sub-sub-section > .section-header > .section-check-all {
-      border-color: #27ae60;
-      color: #27ae60;
+    /* 中カテゴリ(青)のボタン */
+    .sub-section > .section-header > .section-header-btn {
+      border-color: rgba(255,255,255,0.6);
+      color: #fff;
+      background: rgba(255,255,255,0.15);
     }
-    .sub-section > .section-header > .section-check-all:active,
-    .sub-sub-section > .section-header > .section-check-all:active,
-    .sub-sub-sub-section > .section-header > .section-check-all:active {
-      background: #eafaf1;
+    .sub-section > .section-header > .section-header-btn:active {
+      background: rgba(255,255,255,0.3);
     }
-    .sub-section > .section-header > .section-expand-toggle,
-    .sub-sub-section > .section-header > .section-expand-toggle {
-      border-color: #7f8c8d;
-      color: #7f8c8d;
+    /* 小カテゴリ(オレンジ)のボタン */
+    .sub-sub-section > .section-header > .section-header-btn {
+      border-color: rgba(255,255,255,0.6);
+      color: #fff;
+      background: rgba(0,0,0,0.12);
+    }
+    .sub-sub-section > .section-header > .section-header-btn:active {
+      background: rgba(0,0,0,0.25);
+    }
+    /* 細カテゴリ(紫)のボタン */
+    .sub-sub-sub-section > .section-header > .section-header-btn {
+      border-color: rgba(255,255,255,0.6);
+      color: #fff;
+      background: rgba(255,255,255,0.15);
+    }
+    .sub-sub-sub-section > .section-header > .section-header-btn:active {
+      background: rgba(255,255,255,0.3);
     }
 
 

@@ -10,9 +10,10 @@
 ## 必須デプロイコマンド
 
 ユーザーのWindows PCで下記を実行すること。**変更を反映するには必ずこの手順が必要。**
+どのブランチにいても、未コミットの変更があっても、これ1つでOK。
 
 ```
-cd C:\Users\yamas\minpaku-fix && git pull origin claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
 ```
 
 ---

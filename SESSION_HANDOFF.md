@@ -16,12 +16,12 @@
 チェックアプリ（`checklist-app/`）に変更がある場合も `deploy-all.js` で両方デプロイされるので同じコマンドでOK。
 
 ```
-cd C:\Users\yamas\minpaku-fix && git pull origin <現在の作業ブランチ名> && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <現在の作業ブランチ名> && git reset --hard origin/<現在の作業ブランチ名> && node deploy-all.js
 ```
 
 **現時点のコマンド:**
 ```
-cd C:\Users\yamas\minpaku-fix && git pull origin claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
 ```
 
 ### ルール2: チャット行数が5000行を超えたら移行を提案すること
@@ -87,7 +87,7 @@ git log origin/<作業ブランチ> --oneline -10
 ## 必須デプロイコマンド（ユーザーのWindows PCで実行）
 
 ```
-cd C:\Users\yamas\minpaku-fix && git pull origin claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
 ```
 
 ---

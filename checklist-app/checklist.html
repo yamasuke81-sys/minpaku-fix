@@ -203,7 +203,7 @@
     }
     .section-title {
       flex: 1;
-      font-size: 17px;
+      font-size: 13px;
       font-weight: bold;
       color: white;
       letter-spacing: 0.5px;
@@ -1448,11 +1448,11 @@
       html += '<span class="section-icon">▼</span>';
       html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)" title="全チェック">全✓</button>';
       html += '<span class="section-title">' + escapeHtml(name) + '</span>';
-      if (node.childOrder.length > 0) {
-        html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)" title="全展開">全展開</button>';
-      }
       html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';
       html += '<span class="section-header-spacer"></span>';
+      if (node.childOrder.length > 0) {
+        html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)" title="全展開" style="margin-right:6px;">全展開</button>';
+      }
       html += '<button class="section-header-btn section-cat-edit" onclick="event.stopPropagation(); renameCategoryPrompt(\'' + escapedPath + '\', \'' + escapeHtml(name).replace(/'/g, "\\'") + '\')" title="名称変更">✎</button>';
       html += '<button class="section-header-btn section-cat-delete" onclick="event.stopPropagation(); deleteCategoryPrompt(\'' + escapedPath + '\')" title="削除">✕</button>';
       html += '</div>';

@@ -89,6 +89,9 @@ const SHEET_CL_PHOTOS = 'チェックリスト写真';
 const SHEET_CL_MEMOS = 'チェックリストメモ';
 const SHEET_CL_SUPPLIES = '要補充記録';
 
+// クリーニング連絡用シート名
+const SHEET_LAUNDRY = 'クリーニング連絡';
+
 // 日付を yyyy-MM-dd に正規化するヘルパー
 function normDateStr_(v) {
   if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
@@ -1124,6 +1127,11 @@ function ensureSheetsExist() {
   if (!ss.getSheetByName(SHEET_NOTIFICATIONS)) {
     const s = ss.insertSheet(SHEET_NOTIFICATIONS);
     s.getRange(1, 1, 1, 4).setValues([['日時', '種類', '内容', '既読']]);
+  }
+
+  if (!ss.getSheetByName(SHEET_LAUNDRY)) {
+    const s = ss.insertSheet(SHEET_LAUNDRY);
+    s.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '出した人', '出した日時', '受け取った人', '受け取った日時', '施設に戻した人', '施設に戻した日時']]);
   }
 
 }
@@ -6606,4 +6614,125 @@ function importDefaultChecklist() {
  */
 function myFunction() {
   Logger.log(getNextReservationDebug(5));
+}
+
+/**********************************************
+ * クリーニング連絡機能
+ * シート「クリーニング連絡」に出し/受取/施設戻しを記録
+ **********************************************/
+
+/**
+ * クリーニング連絡の現在ステータスを取得
+ * @param {string} checkoutDate yyyy-MM-dd
+ * @return {string} JSON { success, data: { sentBy, sentAt, receivedBy, receivedAt, returnedBy, returnedAt } }
+ */
+function getCleaningLaundryStatus(checkoutDate) {
+  try {
+    ensureSheetsExist();
+    var dateKey = normDateStr_(checkoutDate);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_LAUNDRY);
+    if (!sheet) return JSON.stringify({ success: true, data: null });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, data: null });
+    var data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (normDateStr_(data[i][0]) === dateKey) {
+        return JSON.stringify({ success: true, data: {
+          sentBy: String(data[i][1] || ''),
+          sentAt: String(data[i][2] || ''),
+          receivedBy: String(data[i][3] || ''),
+          receivedAt: String(data[i][4] || ''),
+          returnedBy: String(data[i][5] || ''),
+          returnedAt: String(data[i][6] || '')
+        }});
+      }
+    }
+    return JSON.stringify({ success: true, data: null });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * クリーニング連絡のステップを記録
+ * @param {string} checkoutDate yyyy-MM-dd
+ * @param {string} step 'sent' | 'received' | 'returned'
+ * @param {string} staffName スタッフ名
+ * @return {string} JSON { success }
+ */
+function recordCleaningLaundryStep(checkoutDate, step, staffName) {
+  try {
+    ensureSheetsExist();
+    var dateKey = normDateStr_(checkoutDate);
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_LAUNDRY);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+
+    // 既存行を検索
+    var lastRow = sheet.getLastRow();
+    var rowIndex = -1;
+    if (lastRow >= 2) {
+      var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < dates.length; i++) {
+        if (normDateStr_(dates[i][0]) === dateKey) { rowIndex = i + 2; break; }
+      }
+    }
+
+    // 行がなければ新規作成
+    if (rowIndex < 0) {
+      rowIndex = lastRow + 1;
+      sheet.getRange(rowIndex, 1).setValue(dateKey);
+    }
+
+    // ステップに応じて列を更新
+    if (step === 'sent') {
+      sheet.getRange(rowIndex, 2).setValue(staffName);
+      sheet.getRange(rowIndex, 3).setValue(now);
+      addNotification_('クリーニング出し', staffName + ' がクリーニングに出しました（' + dateKey + '）', { checkoutDate: dateKey });
+    } else if (step === 'received') {
+      sheet.getRange(rowIndex, 4).setValue(staffName);
+      sheet.getRange(rowIndex, 5).setValue(now);
+      addNotification_('クリーニング受取', staffName + ' がクリーニングを受け取りました（' + dateKey + '）', { checkoutDate: dateKey });
+    } else if (step === 'returned') {
+      sheet.getRange(rowIndex, 6).setValue(staffName);
+      sheet.getRange(rowIndex, 7).setValue(now);
+      addNotification_('クリーニング戻し', staffName + ' がクリーニングを施設に戻しました（' + dateKey + '）', { checkoutDate: dateKey });
+    } else {
+      return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * クリーニング連絡をリセット（オーナーのみ）
+ * @param {string} checkoutDate yyyy-MM-dd
+ * @return {string} JSON { success }
+ */
+function resetCleaningLaundry(checkoutDate) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ操作できます' });
+    ensureSheetsExist();
+    var dateKey = normDateStr_(checkoutDate);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_LAUNDRY);
+    if (!sheet) return JSON.stringify({ success: true });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true });
+    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < dates.length; i++) {
+      if (normDateStr_(dates[i][0]) === dateKey) {
+        sheet.getRange(i + 2, 2, 1, 6).clearContent();
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
 }

@@ -2125,6 +2125,9 @@
             // チェックリストを開くボタン（別アプリに遷移）
             html += '<div class="mt-2 mb-2" id="checklistBtnArea"></div>';
 
+            // クリーニング連絡カード
+            html += '<div class="mt-2 mb-2" id="laundryCardArea"></div>';
+
             // LINE用テキスト（オーナーのみ）
             if (!isStaffView) {
               html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-primary" id="eventModalCopyToClipboard">コピー</button></div>';
@@ -2313,6 +2316,17 @@
               })
               .withFailureHandler(function(e) { console.error('getChecklistAppUrl failed:', e); })
               .getChecklistAppUrl();
+          }
+        }
+
+        // クリーニング連絡カードを描画
+        if (type === 'cleaning') {
+          var laundryArea = document.getElementById('laundryCardArea');
+          if (laundryArea) {
+            var checkoutDateForLaundry = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+            if (checkoutDateForLaundry) {
+              renderCleaningLaundryCard(laundryArea, checkoutDateForLaundry, isStaffView);
+            }
           }
         }
 
@@ -6144,6 +6158,126 @@
         } catch (e) {}
       }).isOwner();
 
+
+      // ==========================================
+      // クリーニング連絡カード
+      // ==========================================
+      function renderCleaningLaundryCard(container, checkoutDate, isStaffView) {
+        container.innerHTML = '<div class="modal-next-res-card" style="margin-top:0.5rem;"><div class="text-muted small text-center"><span class="spinner-border spinner-border-sm me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>クリーニング状況を読み込み中…</div></div>';
+        google.script.run
+          .withSuccessHandler(function(resStr) {
+            try {
+              var res = JSON.parse(resStr);
+              if (!res.success) { container.innerHTML = ''; return; }
+              buildLaundryCardHtml(container, checkoutDate, res.data, isStaffView);
+            } catch (e) { container.innerHTML = ''; console.error('laundry card error:', e); }
+          })
+          .withFailureHandler(function(e) { container.innerHTML = ''; console.error('getCleaningLaundryStatus failed:', e); })
+          .getCleaningLaundryStatus(checkoutDate);
+      }
+
+      function buildLaundryCardHtml(container, checkoutDate, data, isStaffView) {
+        var d = data || {};
+        var hasSent = !!d.sentBy;
+        var hasReceived = !!d.receivedBy;
+        var hasReturned = !!d.returnedBy;
+
+        var html = '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
+        html += '<div class="card-title-sm" style="display:flex;align-items:center;gap:0.3rem;"><i class="bi bi-basket2"></i> クリーニング状況</div>';
+
+        // ステップ1: 出す
+        html += '<div class="mt-2" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
+        html += '<span class="badge ' + (hasSent ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasSent ? '<i class="bi bi-check"></i>' : '1') + '</span>';
+        if (hasSent) {
+          html += '<span class="small">' + escapeHtml(d.sentBy) + '　' + formatLaundryTime(d.sentAt) + '</span>';
+        } else {
+          html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundrySent" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)"><i class="bi bi-box-arrow-up-right me-1"></i>クリーニングに出した</button>';
+        }
+        html += '</div>';
+
+        // ステップ2: 受取
+        html += '<div class="mt-1" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
+        html += '<span class="badge ' + (hasReceived ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasReceived ? '<i class="bi bi-check"></i>' : '2') + '</span>';
+        if (hasReceived) {
+          html += '<span class="small">' + escapeHtml(d.receivedBy) + '　' + formatLaundryTime(d.receivedAt) + '</span>';
+        } else if (hasSent) {
+          html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundryReceived" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)"><i class="bi bi-box-arrow-in-down me-1"></i>受け取った</button>';
+        } else {
+          html += '<span class="small text-muted">受け取り（出した後に有効）</span>';
+        }
+        html += '</div>';
+
+        // ステップ3: 施設に戻す
+        html += '<div class="mt-1" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
+        html += '<span class="badge ' + (hasReturned ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasReturned ? '<i class="bi bi-check"></i>' : '3') + '</span>';
+        if (hasReturned) {
+          html += '<span class="small">' + escapeHtml(d.returnedBy) + '　' + formatLaundryTime(d.returnedAt) + '</span>';
+        } else if (hasReceived) {
+          html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundryReturned" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)"><i class="bi bi-house-check me-1"></i>施設に戻した</button>';
+        } else {
+          html += '<span class="small text-muted">施設に戻す（受取後に有効）</span>';
+        }
+        html += '</div>';
+
+        // リセットボタン（オーナーのみ、何かしら記録がある場合）
+        if (!isStaffView && (hasSent || hasReceived || hasReturned)) {
+          html += '<div class="mt-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="resetLaundry(\'' + escapeHtml(checkoutDate) + '\', this)"><i class="bi bi-arrow-counterclockwise me-1"></i>リセット</button></div>';
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      function formatLaundryTime(dtStr) {
+        if (!dtStr) return '';
+        // "2026-02-15 11:30" → "2/15 11:30"
+        var m = String(dtStr).match(/(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}:\d{2})/);
+        if (m) return parseInt(m[2],10) + '/' + parseInt(m[3],10) + ' ' + m[4];
+        return dtStr;
+      }
+
+      function confirmLaundryStep(checkoutDate, step, btn) {
+        var staffName = window.currentUserName || '';
+        if (!staffName) { alert('スタッフ名が取得できません。画面を再読み込みしてください。'); return; }
+        var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
+        if (!confirm(staffName + ' さんとして「' + labels[step] + '」を記録しますか？')) return;
+        setButtonLoading(btn, true);
+        google.script.run
+          .withSuccessHandler(function(resStr) {
+            try {
+              var res = JSON.parse(resStr);
+              if (res.success) {
+                var area = document.getElementById('laundryCardArea');
+                if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
+              } else {
+                alert('エラー: ' + (res.error || '不明なエラー'));
+                setButtonLoading(btn, false);
+              }
+            } catch (e) { alert('エラーが発生しました'); setButtonLoading(btn, false); }
+          })
+          .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
+          .recordCleaningLaundryStep(checkoutDate, step, staffName);
+      }
+
+      function resetLaundry(checkoutDate, btn) {
+        if (!confirm('クリーニング連絡をリセットしますか？（全ステップが消去されます）')) return;
+        setButtonLoading(btn, true);
+        google.script.run
+          .withSuccessHandler(function(resStr) {
+            try {
+              var res = JSON.parse(resStr);
+              if (res.success) {
+                var area = document.getElementById('laundryCardArea');
+                if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
+              } else {
+                alert('エラー: ' + (res.error || ''));
+                setButtonLoading(btn, false);
+              }
+            } catch (e) { alert('エラーが発生しました'); setButtonLoading(btn, false); }
+          })
+          .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
+          .resetCleaningLaundry(checkoutDate);
+      }
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

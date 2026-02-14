@@ -2,9 +2,9 @@
 **/*.sample
 **/deploy-config.json
 **/deploy.js
+deploy-all.js
 **/package.json
 **/package-lock.json
-**/README.md
 **/.git/**
 checklist-app/**
 HANDOFF.md

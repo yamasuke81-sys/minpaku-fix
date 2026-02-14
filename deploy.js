@@ -14,7 +14,12 @@ const http = require('http');
 const configPath = path.join(__dirname, 'deploy-config.json');
 const claspJsonPath = path.join(__dirname, '.clasp.json');
 const appsscriptPath = path.join(__dirname, 'appsscript.json');
-const clasp = 'npx clasp';
+// npx 経由だと Windows で JSON5 エラーが発生する場合があるため、直接実行を優先
+const binDir = path.join(__dirname, 'node_modules', '.bin');
+const claspBin = process.platform === 'win32'
+  ? path.join(binDir, 'clasp.cmd')
+  : path.join(binDir, 'clasp');
+const clasp = fs.existsSync(claspBin) ? `"${claspBin}"` : 'npx clasp';
 
 // オーナー用・スタッフ用の Webアプリ設定（appsscript.json の webapp セクション）
 const OWNER_WEBAPP = { access: 'ANYONE_ANONYMOUS', executeAs: 'USER_DEPLOYING' };
@@ -63,6 +68,22 @@ function parseDeploymentId(stdout, stderr) {
   return null;
 }
 
+/** clasp deployments の出力から、説明文にキーワードを含むデプロイIDを返す（HEAD除外） */
+function findDeploymentByDescription(text, keyword, excludeIds) {
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (line.includes('@HEAD')) continue;
+    if (keyword && !line.includes(keyword)) continue;
+    const m = line.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (m) {
+      const id = m[1].trim();
+      if (excludeIds && excludeIds.includes(id)) continue;
+      return id;
+    }
+  }
+  return null;
+}
+
 /** clasp deployments の出力からデプロイIDのリストを取得（AKfycb... 形式のみ。scriptId は除外） */
 function getDeploymentIds(stdout) {
   const ids = [];
@@ -76,6 +97,43 @@ function getDeploymentIds(stdout) {
     }
   }
   return ids;
+}
+
+/** clasp versions の出力からバージョン数を取得 */
+function getVersionCount() {
+  const result = runCapture(`${clasp} versions`);
+  if (!result.success) return -1;
+  const text = result.stdout + result.stderr;
+  // "~N Versions." のパターンまたは各バージョン行をカウント
+  const countMatch = text.match(/~?(\d+)\s+Versions?\./i);
+  if (countMatch) return parseInt(countMatch[1], 10);
+  // バージョン行を数える（"1 - description" 形式）
+  const lines = text.split('\n').filter(l => /^\d+\s+-\s+/.test(l.trim()));
+  return lines.length;
+}
+
+/** バージョン数を確認し、上限に近い場合は警告してプロジェクト履歴を開く */
+function checkVersionLimit(scriptId) {
+  const count = getVersionCount();
+  if (count < 0) return;
+  console.log('   現在のバージョン数: ' + count + ' / 200');
+  if (count >= 150) {
+    console.log('');
+    console.log('   ⚠ バージョン数が上限(200)に近づいています！');
+    console.log('   GASエディタの「プロジェクトの履歴」から古いバージョンを一括削除してください。');
+    console.log('   ※ バージョン削除はAPIでは不可。GASエディタのUIからのみ可能です。');
+    if (scriptId) {
+      const historyUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
+      try {
+        if (process.platform === 'win32') {
+          execSync('start "" "' + historyUrl + '"', { shell: true });
+        } else {
+          execSync('open "' + historyUrl + '"', { shell: true });
+        }
+        console.log('   GASエディタを開きました。左メニュー「プロジェクトの履歴」→「バージョンの一括削除」で削除できます。');
+      } catch (e) { /* ignore */ }
+    }
+  }
 }
 
 /** deploy-config にない古いデプロイだけ削除（オーナー・スタッフの2件は必ず保持） */
@@ -124,6 +182,30 @@ function fetchUrl(url, redirectCount = 0) {
       res.on('end', () => resolve(data));
     }).on('error', reject);
   });
+}
+
+/** オーナー用（通常ブラウザ）とスタッフ用（Chromeシークレット）を開く */
+function openBrowserUrls(ownerUrl, staffUrl) {
+  try {
+    if (process.platform === 'win32') {
+      // オーナー用: デフォルトブラウザ（通常モード）
+      execSync('start "" "' + ownerUrl + '"', { shell: true });
+      // スタッフ用: Chrome シークレットモード
+      try {
+        execSync('start chrome --incognito "' + staffUrl + '"', { shell: true });
+      } catch (e) {
+        // Chrome が見つからない場合はデフォルトブラウザで開く
+        execSync('start "" "' + staffUrl + '"', { shell: true });
+        console.log('   ※ Chrome が見つからないためスタッフ用は通常ブラウザで開きました。');
+      }
+    } else {
+      execSync('open "' + ownerUrl + '"', { shell: true });
+      execSync('open -a "Google Chrome" --args --incognito "' + staffUrl + '"', { shell: true });
+    }
+    console.log('オーナー用（通常）・スタッフ用（シークレット）をブラウザで開きました。');
+  } catch (e) {
+    // ブラウザ起動に失敗してもデプロイは成功しているので無視
+  }
 }
 
 /** Apps Scriptのエディタをブラウザで開く */
@@ -178,8 +260,29 @@ async function main() {
 
   const pushOnly = process.argv.includes('--push-only');
 
+  // プッシュ前バリデーション: ChecklistApp.gsが.claspignoreで除外されているか確認
+  const claspignorePath = path.join(__dirname, '.claspignore');
+  if (fs.existsSync(claspignorePath)) {
+    const ignoreContent = fs.readFileSync(claspignorePath, 'utf8');
+    if (!ignoreContent.includes('ChecklistApp.gs')) {
+      console.error('警告: .claspignore に ChecklistApp.gs が含まれていません。');
+      console.error('予約管理アプリに ChecklistApp.gs がプッシュされると SHEET_NAME 重複エラーが発生します。');
+      console.error('.claspignore に "ChecklistApp.gs" を追加してください。');
+      process.exit(1);
+    }
+  }
+
   console.log('1. コードをプッシュしています...');
-  run(`${clasp} push`);
+  const pushResult1 = runCapture(`${clasp} push --force`);
+  if (!pushResult1.success) {
+    console.error('   clasp push に失敗しました。');
+    console.error('   ' + (pushResult1.stdout + pushResult1.stderr).slice(0, 500));
+    console.error('');
+    console.error('   clasp がインストールされていない場合: npm install @google/clasp --save-dev');
+    console.error('   ログインが必要な場合: npx clasp login');
+    process.exit(1);
+  }
+  console.log('   プッシュ完了');
 
   if (pushOnly) {
     // ここから先は「プッシュのみ」用の軽量オートメーション
@@ -216,19 +319,8 @@ async function main() {
     console.log('スタッフ用: ' + staffUrl);
     console.log('');
 
-    // push-only 時もブラウザを自動で開く
-    try {
-      if (process.platform === 'win32') {
-        execSync('start "" "' + ownerUrl + '"', { shell: true });
-        execSync('start "" "' + staffUrl + '"', { shell: true });
-      } else {
-        execSync('open "' + ownerUrl + '"', { shell: true });
-        execSync('open "' + staffUrl + '"', { shell: true });
-      }
-      console.log('オーナー用・スタッフ用のURLをブラウザで開きました。');
-    } catch (e) {
-      // ブラウザ起動に失敗してもプッシュ自体は成功しているので無視
-    }
+    // push-only 時もブラウザを自動で開く（スタッフ用はシークレットモード）
+    openBrowserUrls(ownerUrl, staffUrl);
 
     return;
   }
@@ -248,10 +340,19 @@ async function main() {
   } else {
     console.log('   削除対象はありませんでした。');
   }
+
+  // 1.6. バージョン数チェック（200件上限の監視）
+  console.log('1.6. バージョン数を確認しています...');
+  const claspConfig = JSON.parse(fs.readFileSync(claspJsonPath, 'utf8'));
+  checkVersionLimit(claspConfig.scriptId);
   console.log('');
 
-  // 2. オーナー用デプロイ（既存IDで更新のみ。新規作成は行わない）
-  console.log('2. オーナー用デプロイを更新しています（同じURLのまま）...');
+  // 既存デプロイ一覧を取得（オーナー・スタッフ共通で使う）
+  const deploymentsInfo = runCapture(`${clasp} deployments`);
+  const deploymentsText = deploymentsInfo.success ? (deploymentsInfo.stdout + deploymentsInfo.stderr) : '';
+
+  // 2. オーナー用デプロイ（既存IDで更新。失敗時は既存デプロイを探す→最終手段で新規作成）
+  console.log('2. オーナー用デプロイを更新しています...');
   let ownerResult = runCapture(`${clasp} deploy --deploymentId "${ownerId}" --description "オーナー用 ${today}"`);
   if (!ownerResult.success) {
     const ownerErr = (ownerResult.stdout + ownerResult.stderr).toLowerCase();
@@ -260,16 +361,50 @@ async function main() {
       console.error('   Apps Script「デプロイを管理」で不要なデプロイを手動で削除してから再実行してください。');
       process.exit(1);
     }
-    console.error('   オーナー用デプロイの更新に失敗しました。');
-    console.error('   deploy-config.json の ownerDeploymentId が正しいか、Apps Script「デプロイを管理」で確認してください。');
-    console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
-    process.exit(1);
+    // 既存デプロイから「オーナー用」を探す（URL変更を最小限に）
+    const foundOwner = findDeploymentByDescription(deploymentsText, 'オーナー用', [staffId]);
+    if (foundOwner) {
+      console.log('   既存の「オーナー用」デプロイを発見: ' + foundOwner.substring(0, 30) + '...');
+      ownerResult = runCapture(`${clasp} deploy --deploymentId "${foundOwner}" --description "オーナー用 ${today}"`);
+      if (ownerResult.success) {
+        currentOwnerId = foundOwner;
+        config.ownerDeploymentId = foundOwner;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   deploy-config.json を更新しました。');
+      }
+    }
+    if (!ownerResult.success) {
+      // 最終手段: 新規作成
+      console.log('   既存デプロイが見つかりません。新規作成します...');
+      ownerResult = runCapture(`${clasp} deploy --description "オーナー用 ${today}"`);
+      if (!ownerResult.success) {
+        console.error('   オーナー用デプロイの新規作成にも失敗しました。');
+        console.error('   出力: ' + (ownerResult.stdout + ownerResult.stderr).slice(0, 300));
+        process.exit(1);
+      }
+      const newOwnerId = parseDeploymentId(ownerResult.stdout, ownerResult.stderr);
+      if (newOwnerId) {
+        currentOwnerId = newOwnerId;
+        ownerWasCreated = true;
+        config.ownerDeploymentId = newOwnerId;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   新しいオーナー用デプロイID: ' + newOwnerId);
+        console.log('   deploy-config.json を更新しました。');
+      }
+    }
   }
+
   // 3. スタッフ用デプロイ（マニフェストをスタッフ設定に切り替えてからデプロイ）
-  console.log('3. スタッフ用デプロイを更新しています（同じURLのまま）...');
+  console.log('3. スタッフ用デプロイを更新しています...');
   console.log('   マニフェストをスタッフ用設定に切り替えて再プッシュしています...');
   setWebappConfig(STAFF_WEBAPP);
-  run(`${clasp} push`);
+  const pushResult2 = runCapture(`${clasp} push --force`);
+  if (!pushResult2.success) {
+    console.error('   スタッフ用 clasp push に失敗しました。');
+    console.error('   ' + (pushResult2.stdout + pushResult2.stderr).slice(0, 500));
+    setWebappConfig(OWNER_WEBAPP); // マニフェストを戻す
+    process.exit(1);
+  }
   let staffResult = runCapture(`${clasp} deploy --deploymentId "${staffId}" --description "スタッフ用 ${today}"`);
   if (!staffResult.success) {
     const staffErr = (staffResult.stdout + staffResult.stderr).toLowerCase();
@@ -278,10 +413,37 @@ async function main() {
       console.error('   Apps Script「デプロイを管理」で不要なデプロイを手動で削除してから再実行してください。');
       process.exit(1);
     }
-    console.error('   スタッフ用デプロイの更新に失敗しました。');
-    console.error('   deploy-config.json の staffDeploymentId が正しいか、Apps Script「デプロイを管理」で確認してください。');
-    console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
-    process.exit(1);
+    // 既存デプロイから「スタッフ用」を探す（URL変更を最小限に）
+    const foundStaff = findDeploymentByDescription(deploymentsText, 'スタッフ用', [currentOwnerId]);
+    if (foundStaff) {
+      console.log('   既存の「スタッフ用」デプロイを発見: ' + foundStaff.substring(0, 30) + '...');
+      staffResult = runCapture(`${clasp} deploy --deploymentId "${foundStaff}" --description "スタッフ用 ${today}"`);
+      if (staffResult.success) {
+        currentStaffId = foundStaff;
+        config.staffDeploymentId = foundStaff;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   deploy-config.json を更新しました。');
+      }
+    }
+    if (!staffResult.success) {
+      // 最終手段: 新規作成
+      console.log('   既存デプロイが見つかりません。新規作成します...');
+      staffResult = runCapture(`${clasp} deploy --description "スタッフ用 ${today}"`);
+      if (!staffResult.success) {
+        console.error('   スタッフ用デプロイの新規作成にも失敗しました。');
+        console.error('   出力: ' + (staffResult.stdout + staffResult.stderr).slice(0, 300));
+        process.exit(1);
+      }
+      const newStaffId = parseDeploymentId(staffResult.stdout, staffResult.stderr);
+      if (newStaffId) {
+        currentStaffId = newStaffId;
+        staffWasCreated = true;
+        config.staffDeploymentId = newStaffId;
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+        console.log('   新しいスタッフ用デプロイID: ' + newStaffId);
+        console.log('   deploy-config.json を更新しました。');
+      }
+    }
   }
 
   // マニフェストをオーナー用設定に戻す（ローカルファイルのみ。次回デプロイに備える）
@@ -318,60 +480,33 @@ async function main() {
   console.log('デプロイ完了しました。');
   console.log('');
   
-  // 新規デプロイが作成された場合は警告を表示
+  // 新規デプロイが作成された場合は手動設定が必要な旨を表示
   if (ownerWasCreated || staffWasCreated) {
     console.log('【警告】新規デプロイが作成されました。');
-    console.log('ブラウザで開く前に、以下の設定を完了してください:');
+    console.log('GASエディタの「デプロイを管理」で以下を確認してください:');
     console.log('');
     if (ownerWasCreated) {
-      console.log('【オーナー用】');
-      console.log('   1. デプロイ管理画面で、オーナー用デプロイ（説明: オーナー用 ' + today + '）を選択');
-      console.log('   2. 右側の設定パネル上部の「編集」ボタン（鉛筆アイコン）をクリック');
-      console.log('   3. 編集画面で以下を設定:');
-      console.log('      - 「次のユーザーとして実行: アクセスしているユーザー」');
-      console.log('      - 「アクセスできるユーザー: 全員」');
-      console.log('   4. 「デプロイ」をクリック');
-      console.log('');
-      openDeploymentsPage();
-      console.log('');
+      console.log('【オーナー用】 説明: オーナー用 ' + today);
+      console.log('   - 次のユーザーとして実行: アクセスしているユーザー');
+      console.log('   - アクセスできるユーザー: 全員');
     }
     if (staffWasCreated) {
-      console.log('【スタッフ用】');
-      console.log('   1. デプロイ管理画面で、スタッフ用デプロイ（説明: スタッフ用 ' + today + '）を選択');
-      console.log('   2. 右側の設定パネル上部の「編集」ボタン（鉛筆アイコン）をクリック');
-      console.log('   3. 編集画面で以下を設定:');
-      console.log('      - 「次のユーザーとして実行: 自分」');
-      console.log('      - 「アクセスできるユーザー: Google アカウントを持つ全員」');
-      console.log('   4. 「デプロイ」をクリック');
-      console.log('');
-      openDeploymentsPage();
-      console.log('');
+      console.log('【スタッフ用】 説明: スタッフ用 ' + today);
+      console.log('   - 次のユーザーとして実行: 自分');
+      console.log('   - アクセスできるユーザー: Google アカウントを持つ全員');
     }
-    console.log('設定完了後、以下のURLを手動でブラウザで開いてください:');
+    console.log('');
+    openDeploymentsPage();
     console.log('');
   }
-  
+
   console.log('【最新のURL】');
   console.log('オーナー用: ' + ownerUrl);
   console.log('スタッフ用: ' + staffUrl);
   console.log('');
 
-  // 新規デプロイが作成されていない場合のみ自動でブラウザを開く
-  if (!ownerWasCreated && !staffWasCreated) {
-    try {
-      const { execSync } = require('child_process');
-      if (process.platform === 'win32') {
-        execSync('start "" "' + ownerUrl + '"', { shell: true });
-        execSync('start "" "' + staffUrl + '"', { shell: true });
-      } else {
-        execSync('open "' + ownerUrl + '"', { shell: true });
-        execSync('open "' + staffUrl + '"', { shell: true });
-      }
-      console.log('オーナー用・スタッフ用のURLをブラウザで開きました。');
-    } catch (e) {
-      // ブラウザ起動に失敗してもデプロイは成功しているので無視
-    }
-  }
+  // カレンダーURLを常に開く（オーナー＝通常ブラウザ、スタッフ＝Chromeシークレット）
+  openBrowserUrls(ownerUrl, staffUrl);
 }
 
 main();

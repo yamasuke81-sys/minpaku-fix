@@ -1,5 +1,1 @@
-{
-  "ownerDeploymentId": "オーナー用デプロイのID（デプロイ管理で確認）",
-  "staffDeploymentId": "スタッフ用デプロイのID（デプロイ管理で確認）",
-  "urlUpdateSecret": "任意。設定すると npm run deploy 時にスタッフ用URLをオーナー画面に自動反映。GASで setUrlUpdateSecretForDeploy('同じ値') を実行しておく"
-}
+{"ownerDeploymentId": "ここにオーナー用デプロイIDを入力", "staffDeploymentId": "ここにスタッフ用デプロイIDを入力", "checklistDeploymentId": ""}

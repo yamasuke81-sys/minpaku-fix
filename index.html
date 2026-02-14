@@ -1874,7 +1874,13 @@
               return isMe && v.response && v.response !== '未回答' && v.response !== '×';
             });
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
-            if (window.staffMode && isVolunteeredByMe) cleaningClasses.push(isSelectedByMe ? 'fc-event-cleaning-selected-by-me' : 'fc-event-cleaning-volunteered-by-me');
+            if (window.staffMode && isVolunteeredByMe) {
+              if (isSelectedByMe) {
+                cleaningClasses.push('fc-event-cleaning-selected-by-me');
+              } else if (!isDecided) {
+                cleaningClasses.push('fc-event-cleaning-volunteered-by-me');
+              }
+            }
             var cleaningStatus = isCancelled ? 'cancelled' : (isDecided ? 'cleaning-decided' : (isRecruiting ? 'cleaning-recruiting' : 'cleaning-not-recruiting'));
             events.push({
               id: 'c-' + b.rowNumber,

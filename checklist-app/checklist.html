@@ -1374,6 +1374,9 @@
 
         if (checklistRes.success) {
           checklistData = checklistRes;
+          if (checklistRes.items.length === 0 && checklistRes.totalRows > 0) {
+            console.warn('チェックリスト: シートに' + checklistRes.totalRows + '行あるが表示可能な項目が0件');
+          }
           try {
             renderChecklist();
             renderPhotoSection();

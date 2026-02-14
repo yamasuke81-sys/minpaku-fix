@@ -271,12 +271,12 @@ function getChecklistMaster() {
         category: String(row[1] || ''),
         name: String(row[2] || ''),
         sortOrder: parseInt(row[3], 10) || 0,
-        active: String(row[4] || 'Y'),
+        active: String(row[4] || 'Y').trim().toUpperCase(),
         supplyItem: String(row[5] || 'N') === 'Y'
       };
-    }).filter(function(item) { return item.id && item.name && item.active === 'Y'; });
+    }).filter(function(item) { return item.id && item.name && item.active !== 'N'; });
     items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
-    return JSON.stringify({ success: true, items: items });
+    return JSON.stringify({ success: true, items: items, totalRows: rows.length });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

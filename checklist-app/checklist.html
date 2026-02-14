@@ -680,7 +680,8 @@
       font-size: 13px;
       font-weight: bold;
       color: #2c3e50;
-      min-width: 60px;
+      min-width: 40px;
+      flex: 1;
     }
     .inline-photo-btn {
       padding: 4px 10px;
@@ -732,7 +733,6 @@
     .inline-spot-actions {
       display: flex;
       gap: 4px;
-      margin-left: auto;
     }
     .inline-spot-edit-btn, .inline-spot-delete-btn {
       width: 22px;
@@ -1482,9 +1482,9 @@
           } else {
             html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
           }
-          html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
           html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓前' : '📷前') + '</button>';
           html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓後' : '📷後') + '</button>';
+          html += '<span class="inline-photo-spot-name">' + escapeHtml(spot.name) + '</span>';
           html += '<div class="inline-spot-actions">';
           html += '<button class="inline-spot-edit-btn" onclick="editSpotName(\'' + spot.id + '\')" title="名称変更">✎</button>';
           html += '<button class="inline-spot-delete-btn" onclick="deleteSpot(\'' + spot.id + '\', \'' + escapeHtml(spot.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';

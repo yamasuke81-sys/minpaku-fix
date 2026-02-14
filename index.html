@@ -5308,89 +5308,113 @@
       function loadJobList() {
         var _jobList = document.getElementById('jobList');
         if (_jobList) _jobList.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
-        google.script.run.withSuccessHandler(function(jobStr) {
-          var jobRes = JSON.parse(jobStr);
-          if (!jobRes.success || !jobRes.list) {
-            document.getElementById('jobList').innerHTML = '<p class="text-muted">仕事内容がありません。</p>';
-            return;
-          }
-          google.script.run.withSuccessHandler(function(compStr) {
+        function showJobError(msg) {
+          var el = document.getElementById('jobList');
+          if (el) el.innerHTML = '<p class="text-danger small">読み込みエラー: ' + escapeHtml(msg) + '</p>';
+        }
+        google.script.run
+          .withSuccessHandler(function(jobStr) {
             try {
-              var compRes = JSON.parse(compStr);
-              var byJob = {};
-              if (compRes.success && compRes.list) {
-                compRes.list.forEach(function(c) {
-                  if (!byJob[c.jobName]) byJob[c.jobName] = {};
-                  byJob[c.jobName][c.staffName] = c.amount;
-                });
-              }
-              google.script.run.withSuccessHandler(function(specStr) {
-                var specRes = JSON.parse(specStr);
-                var specialByJob = (specRes.success && specRes.byJob) ? specRes.byJob : {};
-                google.script.run.withSuccessHandler(function(optStr) {
-                  var opt = JSON.parse(optStr);
-                  var staffOrder = ['共通'];
-                  if (opt.success && opt.staffList) {
-                    opt.staffList.forEach(function(s) {
-                      if (s.name) staffOrder.push(s.name);
+              var jobRes = JSON.parse(jobStr);
+            } catch (e) { showJobError('仕事内容のパース失敗'); return; }
+            if (!jobRes.success || !jobRes.list) {
+              document.getElementById('jobList').innerHTML = '<p class="text-muted">仕事内容がありません。' + (jobRes.error ? ' (' + escapeHtml(jobRes.error) + ')' : '') + '</p>';
+              return;
+            }
+            google.script.run
+              .withSuccessHandler(function(compStr) {
+                try {
+                  var compRes = JSON.parse(compStr);
+                  var byJob = {};
+                  if (compRes.success && compRes.list) {
+                    compRes.list.forEach(function(c) {
+                      if (!byJob[c.jobName]) byJob[c.jobName] = {};
+                      byJob[c.jobName][c.staffName] = c.amount;
                     });
                   }
-                  var html = '';
-                  jobRes.list.forEach(function(j) {
-                    var comps = byJob[j.name] || {};
-                    var specials = specialByJob[j.name] || [];
-                    html += '<div class="border rounded p-3 mb-3">';
-                    html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-                    html += '<strong>' + escapeHtml(j.name) + '</strong>';
-                    html += '<div><button type="button" class="btn btn-sm btn-outline-secondary btnEditJob" data-row="' + j.rowIndex + '" data-name="' + escapeHtml(j.name) + '" data-sort="' + (j.sortOrder || 99) + '">仕事内容を編集</button> ';
-                    html += '<button type="button" class="btn btn-sm btn-outline-primary btnEditJobComp" data-name="' + escapeHtml(j.name) + '">報酬を編集</button> ';
-                    html += '<button type="button" class="btn btn-sm btn-outline-danger btnDelJob" data-row="' + j.rowIndex + '">削除</button></div>';
-                    html += '</div>';
-                    html += '<div class="ms-2 small text-muted">';
-                    staffOrder.forEach(function(staff) {
-                      var amt = comps[staff];
-                      html += '<span class="me-3">' + escapeHtml(staff) + ': ' + (amt ? escapeHtml(amt) + '円' : '未設定') + '</span>';
-                    });
-                    html += '</div>';
-                    if (specials.length) {
-                      html += '<div class="ms-2 small text-muted mt-1">特別: ';
-                      html += specials.map(function(s) {
-                        var range = s.startDate === (s.endDate || s.startDate) ? s.startDate : s.startDate + '～' + (s.endDate || s.startDate);
-                        return escapeHtml(s.itemName) + ' ' + range + ' +' + escapeHtml(s.amount) + '円';
-                      }).join(' / ');
-                      html += '</div>';
-                    }
-                    html += '</div>';
-                  });
-                document.getElementById('jobList').innerHTML = html || '<p class="text-muted">仕事内容がありません。</p>';
-                document.querySelectorAll('.btnEditJob').forEach(function(btn) {
-                  btn.addEventListener('click', function() {
-                    document.getElementById('jobFormRowIndex').value = this.getAttribute('data-row') || '';
-                    document.getElementById('jobFormSortOrder').value = this.getAttribute('data-sort') || '99';
-                    document.getElementById('jobFormName').value = this.getAttribute('data-name') || '';
-                    document.getElementById('jobFormError').style.display = 'none';
-                    new bootstrap.Modal(document.getElementById('jobFormModal')).show();
-                  });
-                });
-                document.querySelectorAll('.btnEditJobComp').forEach(function(btn) {
-                  btn.addEventListener('click', function() {
-                    openJobCompFormModal(this.getAttribute('data-name'));
-                  });
-                });
-                document.querySelectorAll('.btnDelJob').forEach(function(btn) {
-                  btn.addEventListener('click', function() {
-                    var rowToDelete = parseInt(btn.getAttribute('data-row'), 10);
-                    customConfirm('削除しますか？').then(function(ok) {
-                      if (!ok) return;
-                      google.script.run.withSuccessHandler(function() { loadJobList(); }).deleteJobType(rowToDelete);
-                    });
-                  });
-                });
-              }).getCompFormOptions();
-            }).getAllSpecialRates();
-          } catch (e) {}
-          }).getCompensation();
-        }).getJobTypes();
+                  google.script.run
+                    .withSuccessHandler(function(specStr) {
+                      try {
+                        var specRes = JSON.parse(specStr);
+                      } catch (e) { showJobError('特別レートのパース失敗'); return; }
+                      var specialByJob = (specRes.success && specRes.byJob) ? specRes.byJob : {};
+                      google.script.run
+                        .withSuccessHandler(function(optStr) {
+                          try {
+                            var opt = JSON.parse(optStr);
+                          } catch (e) { showJobError('オプションのパース失敗'); return; }
+                          var staffOrder = ['共通'];
+                          if (opt.success && opt.staffList) {
+                            opt.staffList.forEach(function(s) {
+                              if (s.name) staffOrder.push(s.name);
+                            });
+                          }
+                          var html = '';
+                          jobRes.list.forEach(function(j) {
+                            var comps = byJob[j.name] || {};
+                            var specials = specialByJob[j.name] || [];
+                            html += '<div class="border rounded p-3 mb-3">';
+                            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+                            html += '<strong>' + escapeHtml(j.name) + '</strong>';
+                            html += '<div><button type="button" class="btn btn-sm btn-outline-secondary btnEditJob" data-row="' + j.rowIndex + '" data-name="' + escapeHtml(j.name) + '" data-sort="' + (j.sortOrder || 99) + '">仕事内容を編集</button> ';
+                            html += '<button type="button" class="btn btn-sm btn-outline-primary btnEditJobComp" data-name="' + escapeHtml(j.name) + '">報酬を編集</button> ';
+                            html += '<button type="button" class="btn btn-sm btn-outline-danger btnDelJob" data-row="' + j.rowIndex + '">削除</button></div>';
+                            html += '</div>';
+                            html += '<div class="ms-2 small text-muted">';
+                            staffOrder.forEach(function(staff) {
+                              var amt = comps[staff];
+                              html += '<span class="me-3">' + escapeHtml(staff) + ': ' + (amt ? escapeHtml(amt) + '円' : '未設定') + '</span>';
+                            });
+                            html += '</div>';
+                            if (specials.length) {
+                              html += '<div class="ms-2 small text-muted mt-1">特別: ';
+                              html += specials.map(function(s) {
+                                var range = s.startDate === (s.endDate || s.startDate) ? s.startDate : s.startDate + '～' + (s.endDate || s.startDate);
+                                return escapeHtml(s.itemName) + ' ' + range + ' +' + escapeHtml(s.amount) + '円';
+                              }).join(' / ');
+                              html += '</div>';
+                            }
+                            html += '</div>';
+                          });
+                          document.getElementById('jobList').innerHTML = html || '<p class="text-muted">仕事内容がありません。</p>';
+                          document.querySelectorAll('.btnEditJob').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                              document.getElementById('jobFormRowIndex').value = this.getAttribute('data-row') || '';
+                              document.getElementById('jobFormSortOrder').value = this.getAttribute('data-sort') || '99';
+                              document.getElementById('jobFormName').value = this.getAttribute('data-name') || '';
+                              document.getElementById('jobFormError').style.display = 'none';
+                              new bootstrap.Modal(document.getElementById('jobFormModal')).show();
+                            });
+                          });
+                          document.querySelectorAll('.btnEditJobComp').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                              openJobCompFormModal(this.getAttribute('data-name'));
+                            });
+                          });
+                          document.querySelectorAll('.btnDelJob').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                              var rowToDelete = parseInt(btn.getAttribute('data-row'), 10);
+                              customConfirm('削除しますか？').then(function(ok) {
+                                if (!ok) return;
+                                google.script.run.withSuccessHandler(function() { loadJobList(); }).deleteJobType(rowToDelete);
+                              });
+                            });
+                          });
+                        })
+                        .withFailureHandler(function(e) { showJobError('getCompFormOptions: ' + (e.message || e)); })
+                        .getCompFormOptions();
+                    })
+                    .withFailureHandler(function(e) { showJobError('getAllSpecialRates: ' + (e.message || e)); })
+                    .getAllSpecialRates();
+                } catch (e) {
+                  showJobError('報酬データ処理中: ' + String(e));
+                }
+              })
+              .withFailureHandler(function(e) { showJobError('getCompensation: ' + (e.message || e)); })
+              .getCompensation();
+          })
+          .withFailureHandler(function(e) { showJobError('getJobTypes: ' + (e.message || e)); })
+          .getJobTypes();
       }
 
       function addSpecialRateRow(container, data) {

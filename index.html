@@ -6007,19 +6007,19 @@
                 el.innerHTML = '<option value="">（スタッフ未登録）</option>';
                 console.warn('スタッフリスト: 登録データが0件です');
               } else {
-                el.innerHTML = '<option value="">（読み込み失敗）</option>';
+                el.innerHTML = '<option value="">（読み込み失敗: ' + escapeHtml(s.error || '原因不明') + '）</option>';
                 console.error('スタッフリスト読み込みエラー:', s.error);
               }
             } catch (e) {
               console.error('スタッフリストのパースエラー:', e);
               var el = document.getElementById(targetId);
-              if (el) el.innerHTML = '<option value="">（読み込み失敗）</option>';
+              if (el) el.innerHTML = '<option value="">（パースエラー: ' + escapeHtml(String(e)) + '）</option>';
             }
           })
           .withFailureHandler(function(err) {
             console.error('スタッフリスト取得失敗:', err);
             var el = document.getElementById(targetId);
-            if (el) el.innerHTML = '<option value="">（読み込み失敗）</option>';
+            if (el) el.innerHTML = '<option value="">（サーバーエラー: ' + escapeHtml(String(err.message || err)) + '）</option>';
           })
           .getStaffNamesForSelection();
       }

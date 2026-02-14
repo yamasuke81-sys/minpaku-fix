@@ -398,7 +398,7 @@
       flex: 1;
     }
     .item-name {
-      font-size: 15px;
+      font-size: 13px;
       color: #333;
       line-height: 1.5;
       cursor: pointer;
@@ -607,7 +607,7 @@
       border: 1px solid #bdc3c7;
       border-radius: 6px;
       background: white;
-      font-size: 16px;
+      font-size: 12px;
       font-weight: bold;
       color: #2c3e50;
       cursor: pointer;
@@ -927,8 +927,8 @@
 
       <!-- 全体操作バー -->
       <div class="action-bar">
-        <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()" title="全て展開">⊞</button>
-        <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()" title="全チェック">✓</button>
+        <button id="btnExpandAll" class="action-btn" onclick="toggleAllSections()" title="全て展開">全展開</button>
+        <button id="btnCheckAll" class="action-btn action-btn-check" onclick="checkAllItems()" title="全チェック">全✓</button>
       </div>
 
       <!-- チェックリスト -->
@@ -1446,12 +1446,12 @@
       var html = '<div class="' + levelClass + '" data-category="' + escapeHtml(fullPath) + '">';
       html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
       html += '<span class="section-icon">▼</span>';
-      html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)" title="全チェック">✓</button>';
+      html += '<button class="section-header-btn section-check-all" onclick="event.stopPropagation(); checkCategory(this)" title="全チェック">全✓</button>';
       html += '<span class="section-title">' + escapeHtml(name) + '</span>';
-      html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';
       if (node.childOrder.length > 0) {
-        html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)" title="全展開">⊞</button>';
+        html += '<button class="section-header-btn section-expand-toggle" onclick="event.stopPropagation(); toggleCategorySections(this)" title="全展開">全展開</button>';
       }
+      html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';
       html += '<span class="section-header-spacer"></span>';
       html += '<button class="section-header-btn section-cat-edit" onclick="event.stopPropagation(); renameCategoryPrompt(\'' + escapedPath + '\', \'' + escapeHtml(name).replace(/'/g, "\\'") + '\')" title="名称変更">✎</button>';
       html += '<button class="section-header-btn section-cat-delete" onclick="event.stopPropagation(); deleteCategoryPrompt(\'' + escapedPath + '\')" title="削除">✕</button>';
@@ -1668,12 +1668,12 @@
       if (allOpen) {
         childHeaders.forEach(function(h) { h.classList.add('collapsed'); });
         childBodies.forEach(function(b) { b.classList.add('collapsed'); });
-        btn.textContent = '⊞';
+        btn.textContent = '全展開';
         btn.title = '全展開';
       } else {
         childHeaders.forEach(function(h) { h.classList.remove('collapsed'); });
         childBodies.forEach(function(b) { b.classList.remove('collapsed'); });
-        btn.textContent = '⊟';
+        btn.textContent = '全折り';
         btn.title = '全折り';
       }
     }
@@ -1944,12 +1944,12 @@
       var headers = document.querySelectorAll('#checklistContainer .section-header');
       var bodies = document.querySelectorAll('#checklistContainer .section-body');
       if (allExpanded) {
-        btn.textContent = '⊟';
+        btn.textContent = '全折り';
         btn.title = '全て折りたたみ';
         headers.forEach(function(h) { h.classList.remove('collapsed'); });
         bodies.forEach(function(b) { b.classList.remove('collapsed'); });
       } else {
-        btn.textContent = '⊞';
+        btn.textContent = '全展開';
         btn.title = '全て展開';
         headers.forEach(function(h) { h.classList.add('collapsed'); });
         bodies.forEach(function(b) { b.classList.add('collapsed'); });
@@ -1978,7 +1978,7 @@
           checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
         });
         allChecked = true;
-        btn.textContent = '✗';
+        btn.textContent = '全✓解除';
         btn.title = '全チェック解除';
         btn.classList.add('is-all-checked');
       } else {
@@ -2014,12 +2014,12 @@
       var btn = document.getElementById('btnCheckAll');
       if (checkedCount >= total) {
         allChecked = true;
-        btn.textContent = '✗';
+        btn.textContent = '全✓解除';
         btn.title = '全チェック解除';
         btn.classList.add('is-all-checked');
       } else {
         allChecked = false;
-        btn.textContent = '✓';
+        btn.textContent = '全✓';
         btn.title = '全チェック';
         btn.classList.remove('is-all-checked');
       }

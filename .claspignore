@@ -6,3 +6,7 @@
 **/package-lock.json
 **/README.md
 **/.git/**
+checklist-app/**
+HANDOFF.md
+SESSION_HANDOFF.md
+deploy-all.js

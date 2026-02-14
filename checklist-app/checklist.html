@@ -1341,17 +1341,21 @@
 
     // === 状態を保持したまま再レンダリング ===
     function reRenderWithState() {
-      var collapseState = saveCollapseState();
-      var activeTab = getActiveTab();
-      var scrollY = window.scrollY;
-      renderChecklist();
-      renderPhotoSection();
-      renderSupplyList();
-      updateProgress();
-      updateCheckAllButton();
-      restoreCollapseState(collapseState);
-      if (activeTab) switchTab(activeTab);
-      window.scrollTo(0, scrollY);
+      try {
+        var collapseState = saveCollapseState();
+        var activeTab = getActiveTab();
+        var scrollY = window.scrollY;
+        renderChecklist();
+        renderPhotoSection();
+        renderSupplyList();
+        updateProgress();
+        updateCheckAllButton();
+        restoreCollapseState(collapseState);
+        if (activeTab) switchTab(activeTab);
+        window.scrollTo(0, scrollY);
+      } catch (e) {
+        console.error('reRenderWithState error:', e);
+      }
     }
 
     // === データ読み込み ===
@@ -1370,11 +1374,15 @@
 
         if (checklistRes.success) {
           checklistData = checklistRes;
-          renderChecklist();
-          renderPhotoSection();
-          renderMemos();
-          renderSupplyList();
-          updateProgress();
+          try {
+            renderChecklist();
+            renderPhotoSection();
+            renderMemos();
+            renderSupplyList();
+            updateProgress();
+          } catch (e) {
+            console.error('初期レンダリングエラー:', e);
+          }
         } else {
           alert('チェックリストの読み込みに失敗しました: ' + checklistRes.error);
         }
@@ -1515,19 +1523,28 @@
     }
 
     function renderChecklist() {
-      var items = checklistData.items;
-      var checked = checklistData.checked;
-      var supplyNeeded = checklistData.supplyNeeded;
-      var spots = checklistData.spots || [];
-      var photos = checklistData.photos || {};
-      var tree = buildCategoryTree(items);
-      var html = '';
-      tree.childOrder.forEach(function(majorName) {
-        html += renderCategoryNode(majorName, tree.children[majorName], 0, majorName, checked, supplyNeeded, spots, photos);
-      });
-      // カテゴリ追加ボタン
-      html += '<button class="category-add-btn" onclick="addCategoryPrompt()">＋ カテゴリを追加</button>';
-      document.getElementById('checklistContainer').innerHTML = html;
+      try {
+        var items = checklistData.items || [];
+        var checked = checklistData.checked || {};
+        var supplyNeeded = checklistData.supplyNeeded || {};
+        var spots = checklistData.spots || [];
+        var photos = checklistData.photos || {};
+        var tree = buildCategoryTree(items);
+        var html = '';
+        tree.childOrder.forEach(function(majorName) {
+          html += renderCategoryNode(majorName, tree.children[majorName], 0, majorName, checked, supplyNeeded, spots, photos);
+        });
+        // カテゴリ追加ボタン
+        html += '<button class="category-add-btn" onclick="addCategoryPrompt()">＋ カテゴリを追加</button>';
+        document.getElementById('checklistContainer').innerHTML = html;
+      } catch (e) {
+        console.error('renderChecklist error:', e);
+        document.getElementById('checklistContainer').innerHTML =
+          '<div style="padding:20px;text-align:center;color:#c0392b;">' +
+          '<p>表示エラーが発生しました</p>' +
+          '<button onclick="location.reload()" style="padding:10px 24px;font-size:16px;border-radius:8px;border:none;background:#3498db;color:#fff;cursor:pointer;">再読み込み</button>' +
+          '</div>';
+      }
     }
     // === 撮影セクション ===
     function renderPhotoSection() {
@@ -1725,16 +1742,22 @@
       }).catch(function() { showSaveStatus('error'); });
     }
 
-    function reloadChecklist() {
-      callGAS('getChecklistForDate', [checkoutDate]).then(function(res) {
+    function reloadAndRender() {
+      return callGAS('getChecklistForDate', [checkoutDate]).then(function(res) {
         if (res.success) {
           checklistData = res;
-          renderChecklist();
-          updateProgress();
-          updateSectionCounts();
-          updateCheckAllButton();
+          reRenderWithState();
+        } else {
+          alert('データ取得に失敗しました: ' + (res.error || '不明なエラー'));
         }
+      }).catch(function(err) {
+        console.error('reloadAndRender error:', err);
+        alert('通信エラーが発生しました。ページを再読み込みしてください。');
       });
+    }
+
+    function reloadChecklist() {
+      reloadAndRender();
     }
 
     function toggleItem(checkbox) {
@@ -2135,12 +2158,7 @@
       callGAS('deleteChecklistItemFromMaster', [itemId]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
-            if (clRes.success) {
-              checklistData = clRes;
-              reRenderWithState();
-            }
-          });
+          reloadAndRender();
         } else {
           showSaveStatus('error');
           alert('削除に失敗しました: ' + (res.error || ''));
@@ -2155,12 +2173,7 @@
       callGAS('addChecklistItemToMaster', [category, name.trim(), false]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
-            if (clRes.success) {
-              checklistData = clRes;
-              reRenderWithState();
-            }
-          });
+          reloadAndRender();
         } else {
           showSaveStatus('error');
           alert('追加に失敗しました: ' + (res.error || ''));
@@ -2178,12 +2191,7 @@
       callGAS('addChecklistItemToMaster', [fullCategory, itemName.trim(), false]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
-            if (clRes.success) {
-              checklistData = clRes;
-              reRenderWithState();
-            }
-          });
+          reloadAndRender();
         } else {
           showSaveStatus('error');
           alert('追加に失敗しました: ' + (res.error || ''));
@@ -2200,12 +2208,7 @@
       callGAS('addChecklistItemToMaster', [category.trim(), name.trim(), false]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
-            if (clRes.success) {
-              checklistData = clRes;
-              reRenderWithState();
-            }
-          });
+          reloadAndRender();
         } else {
           showSaveStatus('error');
           alert('追加に失敗しました: ' + (res.error || ''));
@@ -2220,12 +2223,7 @@
       callGAS('addPhotoSpotToMaster', [name.trim(), 'ビフォー/アフター', category]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
-            if (clRes.success) {
-              checklistData = clRes;
-              reRenderWithState();
-            }
-          });
+          reloadAndRender();
         } else {
           showSaveStatus('error');
           alert('追加に失敗しました: ' + (res.error || ''));

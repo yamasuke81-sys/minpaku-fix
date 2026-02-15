@@ -6705,13 +6705,19 @@ function getCleaningLaundryStatus(checkoutDate) {
     var data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
     for (var i = 0; i < data.length; i++) {
       if (normDateStr_(data[i][0]) === dateKey) {
+        // getValues()がDate型を返す場合があるのでフォーマット
+        var fmtDt_ = function(v) {
+          if (!v) return '';
+          if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+          return String(v);
+        };
         return JSON.stringify({ success: true, data: {
           sentBy: String(data[i][1] || ''),
-          sentAt: String(data[i][2] || ''),
+          sentAt: fmtDt_(data[i][2]),
           receivedBy: String(data[i][3] || ''),
-          receivedAt: String(data[i][4] || ''),
+          receivedAt: fmtDt_(data[i][4]),
           returnedBy: String(data[i][5] || ''),
-          returnedAt: String(data[i][6] || '')
+          returnedAt: fmtDt_(data[i][6])
         }});
       }
     }

@@ -1252,7 +1252,8 @@
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header" id="eventModalHeader">
-          <h6 class="modal-title" id="eventModalTitle">予約詳細</h6>
+          <h6 class="modal-title flex-grow-1" id="eventModalTitle">予約詳細</h6>
+          <span id="checklistBtnHeaderArea" class="me-2" style="display:none;"></span>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body" id="eventModalBody"></div>
@@ -1978,6 +1979,8 @@
         var headerEl = document.getElementById('eventModalHeader');
         document.getElementById('eventModalTitle').innerHTML = titleIcon + dotHtml + escapeHtml(title);
         headerEl.className = 'modal-header ' + (type === 'cleaning' ? 'modal-header-cleaning' : 'modal-header-booking');
+        var clHeaderArea = document.getElementById('checklistBtnHeaderArea');
+        if (clHeaderArea) { clHeaderArea.innerHTML = ''; clHeaderArea.style.display = 'none'; }
 
         // 非同期コールバックの競合防止用世代ID
         var modalGen = (window._eventModalGen = (window._eventModalGen || 0) + 1);
@@ -2149,8 +2152,7 @@
             html += '</div>';
             html += '</div>';
 
-            // チェックリストを開くボタン（別アプリに遷移）
-            html += '<div class="mt-2 mb-2" id="checklistBtnArea"></div>';
+            // チェックリストボタンはヘッダーに表示（checklistBtnHeaderArea）
 
             // クリーニング連絡カード
             html += '<div class="mt-2 mb-2" id="laundryCardArea"></div>';
@@ -2315,9 +2317,9 @@
           }
         }
 
-        // チェックリストボタンを追加（清掃詳細の場合）
+        // チェックリストボタンをヘッダーに追加（清掃詳細の場合）
         if (type === 'cleaning') {
-          var clBtnArea = document.getElementById('checklistBtnArea');
+          var clBtnArea = document.getElementById('checklistBtnHeaderArea');
           if (clBtnArea) {
             google.script.run
               .withSuccessHandler(function(resStr) {
@@ -2326,8 +2328,9 @@
                   if (res.success && res.url) {
                     var btnCl = document.createElement('button');
                     btnCl.type = 'button';
-                    btnCl.className = 'btn btn-outline-success btn-sm w-100';
-                    btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリストを開く';
+                    btnCl.className = 'btn btn-outline-success btn-sm';
+                    btnCl.style.cssText = 'font-size:0.7rem;white-space:nowrap;padding:0.15rem 0.5rem;';
+                    btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリスト';
                     btnCl.onclick = function() {
                       var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
                       var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
@@ -2338,6 +2341,7 @@
                       }
                     };
                     clBtnArea.appendChild(btnCl);
+                    clBtnArea.style.display = '';
                   }
                 } catch (e) { console.error('checklist button error:', e); }
               })
@@ -6295,7 +6299,7 @@
         html += '<div class="mt-2" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
         html += '<span class="badge ' + (hasSent ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasSent ? '<i class="bi bi-check"></i>' : '1') + '</span>';
         if (hasSent) {
-          html += '<span class="small flex-grow-1">' + escapeHtml(d.sentBy) + '　' + formatLaundryTime(d.sentAt) + '</span>';
+          html += '<span class="small flex-grow-1">' + formatLaundryTime(d.sentAt) + '　' + escapeHtml(d.sentBy) + '</span>';
           if (lastCompletedStep === 'sent') {
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)">取消</button>';
           }
@@ -6308,7 +6312,7 @@
         html += '<div class="mt-1" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
         html += '<span class="badge ' + (hasReceived ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasReceived ? '<i class="bi bi-check"></i>' : '2') + '</span>';
         if (hasReceived) {
-          html += '<span class="small flex-grow-1">' + escapeHtml(d.receivedBy) + '　' + formatLaundryTime(d.receivedAt) + '</span>';
+          html += '<span class="small flex-grow-1">' + formatLaundryTime(d.receivedAt) + '　' + escapeHtml(d.receivedBy) + '</span>';
           if (lastCompletedStep === 'received') {
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)">取消</button>';
           }
@@ -6323,7 +6327,7 @@
         html += '<div class="mt-1" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
         html += '<span class="badge ' + (hasReturned ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasReturned ? '<i class="bi bi-check"></i>' : '3') + '</span>';
         if (hasReturned) {
-          html += '<span class="small flex-grow-1">' + escapeHtml(d.returnedBy) + '　' + formatLaundryTime(d.returnedAt) + '</span>';
+          html += '<span class="small flex-grow-1">' + formatLaundryTime(d.returnedAt) + '　' + escapeHtml(d.returnedBy) + '</span>';
           if (lastCompletedStep === 'returned') {
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)">取消</button>';
           }
@@ -6340,9 +6344,20 @@
 
       function formatLaundryTime(dtStr) {
         if (!dtStr) return '';
-        // "2026-02-15 11:30" → "2/15 11:30"
+        var days = ['日','月','火','水','木','金','土'];
+        // "2026-02-15 11:30" → "2026/2/15(日)11:30"
         var m = String(dtStr).match(/(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}:\d{2})/);
-        if (m) return parseInt(m[2],10) + '/' + parseInt(m[3],10) + ' ' + m[4];
+        if (m) {
+          var dt = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+          var dow = days[dt.getDay()];
+          return m[1] + '/' + parseInt(m[2],10) + '/' + parseInt(m[3],10) + '(' + dow + ')' + m[4];
+        }
+        // フォールバック: Date文字列をパース
+        var d = new Date(dtStr);
+        if (!isNaN(d.getTime())) {
+          var dow = days[d.getDay()];
+          return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + '(' + dow + ')' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
         return dtStr;
       }
 

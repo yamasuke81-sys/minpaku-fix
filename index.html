@@ -6339,7 +6339,7 @@
         return dtStr;
       }
 
-      function confirmLaundryStep(checkoutDate, step, btn) {
+      window.confirmLaundryStep = function(checkoutDate, step, btn) {
         var staffName = window.currentUserName || '';
         if (!staffName) { alert('スタッフ名が取得できません。画面を再読み込みしてください。'); return; }
         var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
@@ -6360,9 +6360,9 @@
           })
           .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
           .recordCleaningLaundryStep(checkoutDate, step, staffName);
-      }
+      };
 
-      function resetLaundry(checkoutDate, btn) {
+      window.resetLaundry = function(checkoutDate, btn) {
         if (!confirm('クリーニング連絡をリセットしますか？（全ステップが消去されます）')) return;
         setButtonLoading(btn, true);
         google.script.run
@@ -6380,7 +6380,7 @@
           })
           .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
           .resetCleaningLaundry(checkoutDate);
-      }
+      };
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);

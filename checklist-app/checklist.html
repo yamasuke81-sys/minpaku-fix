@@ -1539,8 +1539,47 @@
             '<div style="padding:30px 20px;text-align:center;color:#666;">' +
             '<p style="font-size:16px;margin-bottom:16px;">チェックリスト項目がありません</p>' +
             '<p style="font-size:13px;margin-bottom:20px;color:#999;">項目が削除されたか、初期データが読み込まれていません。</p>' +
-            '<button onclick="reimportFromChecklist()" style="padding:12px 28px;font-size:15px;border-radius:8px;border:none;background:#3498db;color:#fff;cursor:pointer;">初期データをインポート</button>' +
+            '<button id="btnReimportInline" style="padding:12px 28px;font-size:15px;border-radius:8px;border:none;background:#3498db;color:#fff;cursor:pointer;">初期データをインポート</button>' +
+            '<div id="reimportInlineMsg" style="margin-top:12px;font-size:13px;display:none;"></div>' +
             '</div>';
+          document.getElementById('btnReimportInline').addEventListener('click', function() {
+            var btn = this;
+            var msg = document.getElementById('reimportInlineMsg');
+            btn.disabled = true;
+            btn.textContent = 'インポート中…';
+            msg.style.display = 'block';
+            msg.style.color = '#666';
+            msg.textContent = '処理中…';
+            callGAS('importDefaultChecklist', []).then(function(res) {
+              if (res.success) {
+                msg.textContent = '完了！再読み込み中…';
+                msg.style.color = '#27ae60';
+                callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+                  if (clRes.success) {
+                    checklistData = clRes;
+                    renderChecklist();
+                    renderPhotoSection();
+                    renderSupplyList();
+                    updateProgress();
+                    updateCheckAllButton();
+                  } else {
+                    msg.textContent = 'データ再読み込み失敗: ' + (clRes.error || '不明');
+                    msg.style.color = '#e74c3c';
+                  }
+                });
+              } else {
+                msg.textContent = 'インポート失敗: ' + (res.error || '不明');
+                msg.style.color = '#e74c3c';
+                btn.disabled = false;
+                btn.textContent = '初期データをインポート';
+              }
+            }).catch(function(e) {
+              msg.textContent = '通信エラー: ' + (e.message || e);
+              msg.style.color = '#e74c3c';
+              btn.disabled = false;
+              btn.textContent = '初期データをインポート';
+            });
+          });
           return;
         }
 

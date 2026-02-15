@@ -391,11 +391,11 @@
 
     /* チェック項目 */
     .checklist-item {
-      padding: 12px 16px;
+      padding: 12px 10px;
       border-bottom: 1px solid #ecf0f1;
       display: flex;
       align-items: flex-start;
-      gap: 12px;
+      gap: 8px;
     }
     .checklist-item:last-child {
       border-bottom: none;
@@ -782,7 +782,7 @@
 
     /* 編集モード */
     .item-drag-handle {
-      width: 28px;
+      width: 20px;
       height: 28px;
       border: none;
       background: transparent;
@@ -817,7 +817,7 @@
     }
     /* カテゴリ並び替えハンドル */
     .cat-drag-handle {
-      width: 28px;
+      width: 20px;
       height: 28px;
       border: none;
       background: transparent;
@@ -856,6 +856,16 @@
       border-radius: 8px;
       margin: 4px 0;
     }
+    .item-photo-thumb {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      object-fit: cover;
+      cursor: pointer;
+      flex-shrink: 0;
+      border: 1px solid #ddd;
+    }
+    .item-photo-thumb:active { opacity: 0.7; }
     .item-edit-btn {
       width: 24px;
       height: 24px;
@@ -1102,6 +1112,7 @@
   <!-- 非表示のファイル入力 -->
   <input type="file" id="photoInput" accept="image/*" capture="environment">
   <input type="file" id="examplePhotoInput" accept="image/*">
+  <input type="file" id="itemPhotoInput" accept="image/*">
 
   <script>
     // グローバル変数
@@ -1504,6 +1515,9 @@
         html += '</div>';
       }
       html += '</div>';
+      if (item.exampleFileId) {
+        html += '<img class="item-photo-thumb" src="https://drive.google.com/thumbnail?id=' + item.exampleFileId + '&sz=w56" onclick="showItemExamplePhoto(\'' + escapeHtml(item.id) + '\', \'' + item.exampleFileId + '\')" alt="見本">';
+      }
       html += '<button class="item-edit-btn" onclick="editItem(\'' + escapeHtml(item.id) + '\', this)" title="編集">✎</button>';
       html += '<button class="item-delete-btn" onclick="deleteItemPrompt(\'' + escapeHtml(item.id) + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\')" title="削除">✕</button>';
       html += '</div>';
@@ -2359,11 +2373,15 @@
       if (!nameEl) return;
       var currentText = nameEl.textContent;
       var container = nameEl.parentElement;
-      // 現在の要補充フラグを取得
+      // 現在の要補充フラグと見本写真IDを取得
       var currentSupply = false;
+      var currentPhotoId = '';
       if (checklistData && checklistData.items) {
         checklistData.items.forEach(function(item) {
-          if (item.id === itemId) currentSupply = !!item.supplyItem;
+          if (item.id === itemId) {
+            currentSupply = !!item.supplyItem;
+            currentPhotoId = item.exampleFileId || '';
+          }
         });
       }
       nameEl.style.display = 'none';
@@ -2372,10 +2390,21 @@
       if (supplyContainer) supplyContainer.style.display = 'none';
       var editDiv = document.createElement('div');
       editDiv.id = 'itemEdit_' + itemId;
+      var photoHtml = '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">' +
+        '<span style="font-size:13px;color:#555;">見本写真:</span>';
+      if (currentPhotoId) {
+        photoHtml += '<img src="https://drive.google.com/thumbnail?id=' + currentPhotoId + '&sz=w80" style="width:40px;height:40px;border-radius:4px;object-fit:cover;border:1px solid #ddd;">' +
+          '<button type="button" onclick="changeItemPhoto(\'' + itemId + '\')" style="padding:3px 8px;border:1px solid #e67e22;background:#fff;color:#e67e22;border-radius:4px;font-size:11px;cursor:pointer;">変更</button>' +
+          '<button type="button" onclick="removeItemPhoto(\'' + itemId + '\')" style="padding:3px 8px;border:1px solid #e74c3c;background:#fff;color:#e74c3c;border-radius:4px;font-size:11px;cursor:pointer;">削除</button>';
+      } else {
+        photoHtml += '<button type="button" onclick="changeItemPhoto(\'' + itemId + '\')" style="padding:3px 8px;border:1px solid #3498db;background:#fff;color:#3498db;border-radius:4px;font-size:11px;cursor:pointer;">写真を追加</button>';
+      }
+      photoHtml += '</div>';
       editDiv.innerHTML = '<input type="text" class="item-edit-input" value="' + escapeHtml(currentText) + '">' +
         '<label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:13px;color:#555;cursor:pointer;">' +
         '<input type="checkbox" class="item-edit-supply" ' + (currentSupply ? 'checked' : '') + ' style="width:18px;height:18px;">' +
         '要補充対象</label>' +
+        photoHtml +
         '<div class="item-edit-actions">' +
         '<button class="item-edit-save" onclick="saveItemEdit(\'' + itemId + '\')">保存</button>' +
         '<button class="item-edit-cancel" onclick="cancelItemEdit(\'' + itemId + '\')">取消</button>' +
@@ -2465,6 +2494,75 @@
         var supplyContainer = nameEl.parentElement.querySelector('.supply-checkbox-container');
         if (supplyContainer) supplyContainer.style.display = '';
       }
+    }
+
+    // === 項目の見本写真機能 ===
+    function showItemExamplePhoto(itemId, fileId) {
+      var overlay = document.createElement('div');
+      overlay.className = 'photo-modal-overlay';
+      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+      var modal = document.createElement('div');
+      modal.className = 'photo-modal';
+      modal.innerHTML = '<h3>見本写真</h3>' +
+        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;border:2px solid #3498db;" onerror="this.alt=\'画像を読み込めません\';"></div>' +
+        '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+    }
+
+    var currentItemPhotoId = null;
+    function changeItemPhoto(itemId) {
+      currentItemPhotoId = itemId;
+      document.getElementById('itemPhotoInput').click();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var ipInput = document.getElementById('itemPhotoInput');
+      if (ipInput) {
+        ipInput.addEventListener('change', function(event) {
+          var file = event.target.files[0];
+          if (!file || !currentItemPhotoId) return;
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            var base64 = e.target.result.split(',')[1];
+            showSaveStatus('saving');
+            callGAS('uploadChecklistItemPhoto', [currentItemPhotoId, base64]).then(function(res) {
+              if (res.success) {
+                showSaveStatus('saved');
+                checklistData.items.forEach(function(item) {
+                  if (item.id === currentItemPhotoId) item.exampleFileId = res.fileId;
+                });
+                // 編集フォームを閉じてから再描画
+                cancelItemEdit(currentItemPhotoId);
+                reRenderWithState();
+              } else {
+                showSaveStatus('error');
+                alert('アップロードに失敗しました: ' + (res.error || ''));
+              }
+            }).catch(function() { showSaveStatus('error'); });
+          };
+          reader.readAsDataURL(file);
+          event.target.value = '';
+        });
+      }
+    });
+
+    function removeItemPhoto(itemId) {
+      if (!confirm('見本写真を削除しますか？')) return;
+      showSaveStatus('saving');
+      callGAS('deleteChecklistItemPhoto', [itemId]).then(function(res) {
+        if (res.success) {
+          showSaveStatus('saved');
+          checklistData.items.forEach(function(item) {
+            if (item.id === itemId) item.exampleFileId = '';
+          });
+          cancelItemEdit(itemId);
+          reRenderWithState();
+        } else {
+          showSaveStatus('error');
+          alert('削除に失敗しました: ' + (res.error || ''));
+        }
+      }).catch(function() { showSaveStatus('error'); });
     }
 
     function deleteItemPrompt(itemId, itemName) {

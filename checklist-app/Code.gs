@@ -135,7 +135,7 @@ function getOrCreateChecklistSpreadsheet_() {
   // 初期シート作成
   var s1 = newSs.getActiveSheet();
   s1.setName(SHEET_CL_MASTER);
-  s1.getRange(1, 1, 1, 6).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象']]);
+  s1.getRange(1, 1, 1, 7).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象', '見本写真ID']]);
   var s2 = newSs.insertSheet(SHEET_CL_PHOTO_SPOTS);
   s2.getRange(1, 1, 1, 7).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効', 'カテゴリ']]);
   var s3 = newSs.insertSheet(SHEET_CL_RECORDS);
@@ -271,7 +271,7 @@ function clSheet_(name) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    if (name === SHEET_CL_MASTER) sheet.getRange(1, 1, 1, 6).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象']]);
+    if (name === SHEET_CL_MASTER) sheet.getRange(1, 1, 1, 7).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象', '見本写真ID']]);
     else if (name === SHEET_CL_PHOTO_SPOTS) sheet.getRange(1, 1, 1, 7).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効', 'カテゴリ']]);
     else if (name === SHEET_CL_RECORDS) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', 'チェック済', 'チェック者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_PHOTOS) sheet.getRange(1, 1, 1, 6).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ', '撮影タイミング']]);
@@ -384,7 +384,7 @@ function getChecklistMaster() {
   try {
     var sheet = clSheet_(SHEET_CL_MASTER);
     if (sheet.getLastRow() < 2) return JSON.stringify({ success: true, items: [] });
-    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
     var items = rows.map(function(row, i) {
       return {
         rowIndex: i + 2,
@@ -393,7 +393,8 @@ function getChecklistMaster() {
         name: String(row[2] || ''),
         sortOrder: parseInt(row[3], 10) || 0,
         active: String(row[4] || 'Y').trim().toUpperCase(),
-        supplyItem: String(row[5] || 'N') === 'Y'
+        supplyItem: String(row[5] || 'N') === 'Y',
+        exampleFileId: String(row[6] || '')
       };
     }).filter(function(item) { return item.id && item.name && item.active !== 'N'; });
     items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
@@ -1831,6 +1832,74 @@ function deleteChecklistPhoto(checkoutDate, spotId, fileId) {
     // Driveからも削除
     try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
     return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * チェックリスト項目の見本写真をアップロード
+ */
+function uploadChecklistItemPhoto(itemId, base64Data) {
+  try {
+    if (!itemId || !base64Data) return JSON.stringify({ success: false, error: 'データが不足しています' });
+    var props = PropertiesService.getScriptProperties();
+    var specificFolderId = props.getProperty('CL_PHOTO_FOLDER_EXAMPLE');
+    var exampleFolder;
+    if (specificFolderId) {
+      try { exampleFolder = DriveApp.getFolderById(specificFolderId); } catch (e) { exampleFolder = null; }
+    }
+    if (!exampleFolder) {
+      var folder = getOrCreateChecklistPhotoFolder_();
+      exampleFolder = getOrCreateSubFolder_(folder, '見本');
+    }
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'item_example_' + itemId + '_' + new Date().getTime() + '.jpg');
+    var file = exampleFolder.createFile(blob);
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+    // マスタシートの見本写真ID（列7）を更新
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(itemId)) {
+          // 既存の写真があれば削除
+          var oldFileId = String(sheet.getRange(i + 2, 7).getValue() || '').trim();
+          if (oldFileId) {
+            try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) {}
+          }
+          sheet.getRange(i + 2, 7).setValue(file.getId());
+          break;
+        }
+      }
+    }
+    return JSON.stringify({ success: true, fileId: file.getId() });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * チェックリスト項目の見本写真を削除
+ */
+function deleteChecklistItemPhoto(itemId) {
+  try {
+    if (!itemId) return JSON.stringify({ success: false, error: 'IDが空です' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(itemId)) {
+        var oldFileId = String(sheet.getRange(i + 2, 7).getValue() || '').trim();
+        sheet.getRange(i + 2, 7).setValue('');
+        if (oldFileId) {
+          try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) {}
+        }
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '項目が見つかりません' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

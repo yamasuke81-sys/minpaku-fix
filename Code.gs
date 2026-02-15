@@ -5302,6 +5302,8 @@ function checkAndSendReminders() {
     const maxCol = Math.max(recruitSheet.getLastColumn(), 9);
     const rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), maxCol).getValues();
     const today = new Date();
+    var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
+    var props = PropertiesService.getScriptProperties();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][3]).trim() !== '募集中') continue;
       if ((String(rows[i][8] || '').trim() || 'メール') === 'LINE') continue;
@@ -5323,6 +5325,9 @@ function checkAndSendReminders() {
         if (today >= nextRemind) shouldRemind = true;
       }
       if (shouldRemind) {
+        // 同日重複送信を防止
+        var propKey = 'staffRemind_' + rowIndex + '_' + todayStr;
+        if (props.getProperty(propKey)) continue;
         const staffSheet = ss.getSheetByName(SHEET_STAFF);
         if (staffSheet && staffSheet.getLastRow() >= 2) {
           const emails = staffSheet.getRange(2, 3, staffSheet.getLastRow(), 3).getValues();
@@ -5333,6 +5338,7 @@ function checkAndSendReminders() {
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
+        props.setProperty(propKey, '1');
       }
     }
   } catch (e) {
@@ -5539,6 +5545,7 @@ function checkAndSendReminderEmails() {
     var now = new Date();
     var nowHour = now.getHours();
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var props = PropertiesService.getScriptProperties();
 
     for (var ri = 0; ri < rData.length; ri++) {
       var status = String(rData[ri][3] || '').trim();
@@ -5572,10 +5579,15 @@ function checkAndSendReminderEmails() {
         triggerDate.setDate(triggerDate.getDate() - rem.daysBefore);
         var triggerHour = parseInt((rem.time || '09:00').split(':')[0], 10) || 9;
 
-        // 現在がトリガー日時を過ぎているかチェック
-        if (today > triggerDate || (today.getTime() === triggerDate.getTime() && nowHour >= triggerHour)) {
+        // 現在がトリガー日の指定時刻かチェック（同日の指定時間帯のみ送信）
+        var isOnTriggerDay = today.getTime() === triggerDate.getTime();
+        var isPastTriggerDay = today > triggerDate;
+        if (isOnTriggerDay ? (nowHour >= triggerHour) : isPastTriggerDay) {
           // 未来のチェックインのみ（過去は送らない）
           if (checkinDay >= today) {
+            // PropertiesService による重複送信防止
+            var propKey = 'ownerRemind_' + checkoutDateStr + '_' + remIdx;
+            if (props.getProperty(propKey)) continue;
             var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
             var detailLink = buildCleaningDetailUrl_(checkoutDateStr);
             var tmplVars = { 'チェックイン': checkinDateStr, 'チェックアウト': checkoutDateStr, '残り日数': daysLeft, '清掃詳細リンク': detailLink };
@@ -5593,6 +5605,7 @@ function checkAndSendReminderEmails() {
                   + '早めに清掃スタッフの手配をお願いします。';
               GmailApp.sendEmail(ownerEmail, subject, body);
               newSent.push(remIdx);
+              props.setProperty(propKey, Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
             } catch (mailErr) {
               Logger.log('reminderEmail error: ' + mailErr.toString());
             }

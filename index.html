@@ -2431,10 +2431,8 @@
               statusEl.removeAttribute('style');
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
-              if (!((d.cleaningStaff || '').trim()) && (cachedRec.status || '') === '募集中') {
-                volArea.style.display = 'block';
-                volList.innerHTML = renderStaffResponses(cachedRec.volunteers);
-              }
+              volArea.style.display = 'block';
+              volList.innerHTML = renderStaffResponses(cachedRec.volunteers);
             }
           }
           // キャッシュに次回予約データがない場合、セクションを展開して読み込み中を見せる
@@ -2493,14 +2491,8 @@
               }
               if (volArea && volList) {
                 if (r.success) {
-                  if (effectiveStatus === '募集中') {
-                    volArea.style.display = 'block';
-                    volList.innerHTML = renderStaffResponses(r.volunteers);
-                  } else {
-                    volArea.style.display = r.volunteers && r.volunteers.some(function(v) { return v.response && v.response !== '未回答'; }) ? 'block' : 'none';
-                    if (volArea.style.display === 'block') volList.innerHTML = renderStaffResponses(r.volunteers);
-                    else volList.innerHTML = '';
-                  }
+                  volArea.style.display = 'block';
+                  volList.innerHTML = renderStaffResponses(r.volunteers);
                 } else {
                   volArea.style.display = 'none';
                   volList.innerHTML = '';

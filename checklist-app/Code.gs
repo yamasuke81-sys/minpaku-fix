@@ -189,6 +189,82 @@ function getChecklistDiagnostics() {
   }
 }
 
+/**
+ * Googleドライブから「清掃チェックリスト管理」スプレッドシートを全て検索し、
+ * データが入っている元のスプレッドシートを見つける
+ */
+function findOriginalChecklistSpreadsheet() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var currentId = props.getProperty('CHECKLIST_SS_ID') || '';
+
+    var files = DriveApp.getFilesByName('清掃チェックリスト管理');
+    var results = [];
+    while (files.hasNext()) {
+      var file = files.next();
+      var fileId = file.getId();
+      try {
+        var ss = SpreadsheetApp.openById(fileId);
+        var masterSheet = ss.getSheetByName(SHEET_CL_MASTER);
+        var masterRows = masterSheet ? masterSheet.getLastRow() : 0;
+        var preview = [];
+        if (masterSheet && masterRows >= 2) {
+          var previewData = masterSheet.getRange(2, 1, Math.min(masterRows - 1, 3), Math.min(masterSheet.getLastColumn(), 4)).getValues();
+          preview = previewData.map(function(row) { return row.map(function(c) { return String(c); }); });
+        }
+        results.push({
+          id: fileId,
+          name: ss.getName(),
+          url: ss.getUrl(),
+          isCurrent: fileId === currentId,
+          masterRows: masterRows,
+          created: file.getDateCreated().toISOString(),
+          updated: file.getLastUpdated().toISOString(),
+          preview: preview
+        });
+      } catch (e) {
+        results.push({ id: fileId, name: file.getName(), error: e.toString() });
+      }
+    }
+
+    // データ行数が多い順にソート
+    results.sort(function(a, b) { return (b.masterRows || 0) - (a.masterRows || 0); });
+
+    return JSON.stringify({ success: true, currentId: currentId, found: results });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * CHECKLIST_SS_IDを指定のIDに変更する（元のスプレッドシートに戻す）
+ */
+function restoreChecklistSpreadsheetId(newId) {
+  try {
+    if (!newId) return JSON.stringify({ success: false, error: 'IDが指定されていません' });
+    // 指定IDのスプレッドシートが開けるか確認
+    var ss = SpreadsheetApp.openById(newId);
+    var masterSheet = ss.getSheetByName(SHEET_CL_MASTER);
+    if (!masterSheet) return JSON.stringify({ success: false, error: 'チェックリストマスタシートが見つかりません' });
+    var rows = masterSheet.getLastRow();
+    if (rows < 2) return JSON.stringify({ success: false, error: 'このスプレッドシートにもデータがありません（' + rows + '行）' });
+
+    var props = PropertiesService.getScriptProperties();
+    var oldId = props.getProperty('CHECKLIST_SS_ID');
+    props.setProperty('CHECKLIST_SS_ID', newId);
+
+    return JSON.stringify({
+      success: true,
+      oldId: oldId,
+      newId: newId,
+      masterRows: rows,
+      message: 'チェックリストスプレッドシートを復旧しました（データ' + (rows - 1) + '件）'
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 function clSheet_(name) {
   var ss = getOrCreateChecklistSpreadsheet_();
   var sheet = ss.getSheetByName(name);

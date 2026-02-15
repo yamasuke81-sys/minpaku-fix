@@ -861,6 +861,11 @@
       outline-offset: -2px;
       background: rgba(230, 126, 34, 0.06);
     }
+    .section-header.cat-drop-into-target {
+      outline: 3px dashed #e67e22;
+      outline-offset: -3px;
+      background: rgba(230, 126, 34, 0.15) !important;
+    }
     .item-photo-thumb {
       width: 28px;
       height: 28px;
@@ -3156,13 +3161,14 @@
       });
     })();
 
-    // === カテゴリ並び替えドラッグ＆ドロップ（タッチ対応・長押しで発動） ===
+    // === カテゴリ並び替えドラッグ＆ドロップ（タッチ対応・長押しで発動・クロスカテゴリ移動対応） ===
     (function() {
       var dragSection = null;
       var placeholder = null;
       var dragClone = null;
       var containerEl = null;
       var siblingSelector = null;
+      var dropIntoTarget = null; // 別カテゴリにドロップする先
 
       // 長押し検出用
       var longPressTimer = null;
@@ -3171,6 +3177,36 @@
       var pressX = 0, pressY = 0;
       var LONG_PRESS_MS = 400;
       var MOVE_THRESHOLD = 10;
+
+      function clearDropIntoHighlight() {
+        var highlighted = document.querySelectorAll('.cat-drop-into-target');
+        for (var i = 0; i < highlighted.length; i++) highlighted[i].classList.remove('cat-drop-into-target');
+      }
+
+      // ドロップ先のセクションヘッダーを探す（別カテゴリ内に移動用）
+      function findDropIntoHeader(x, y, dragCatPath) {
+        var allHeaders = document.querySelectorAll('#checklistContainer .section-header');
+        for (var i = 0; i < allHeaders.length; i++) {
+          var header = allHeaders[i];
+          var section = header.parentElement;
+          if (!section || !section.classList.contains('section')) continue;
+          var catPath = section.getAttribute('data-category');
+          if (!catPath) continue;
+          // 自分自身は除外
+          if (catPath === dragCatPath) continue;
+          // ドラッグ中カテゴリの子孫は除外
+          if (catPath.indexOf(dragCatPath + '\uff1a') === 0) continue;
+          // 現在の直接の親は除外（既に中にいるので）
+          var dragParts = dragCatPath.split('\uff1a');
+          var parentPath = dragParts.slice(0, -1).join('\uff1a');
+          if (catPath === parentPath) continue;
+          var rect = header.getBoundingClientRect();
+          if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
+            return { section: section, headerEl: header, catPath: catPath };
+          }
+        }
+        return null;
+      }
 
       function cancelCatLongPress() {
         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
@@ -3236,12 +3272,10 @@
           siblingSelector = ':scope > .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section)';
         }
 
-        // プレースホルダー作成
         placeholder = document.createElement('div');
         placeholder.className = 'cat-drag-placeholder';
         placeholder.style.height = dragSection.offsetHeight + 'px';
 
-        // ビジュアルクローン作成
         var rect = dragSection.getBoundingClientRect();
         dragClone = dragSection.cloneNode(true);
         dragClone.style.position = 'fixed';
@@ -3271,7 +3305,28 @@
         var touch = e.touches ? e.touches[0] : e;
         dragClone.style.top = (touch.clientY - dragClone.offsetHeight / 2) + 'px';
 
-        // ドロップ先を検索（同レベルのセクションのみ）
+        var dragCatPath = dragSection.getAttribute('data-category') || '';
+
+        // 別カテゴリのヘッダー上にいるか検出
+        var hitHeader = findDropIntoHeader(touch.clientX, touch.clientY, dragCatPath);
+        if (hitHeader) {
+          // 「中に入れる」モード
+          if (!dropIntoTarget || dropIntoTarget.catPath !== hitHeader.catPath) {
+            clearDropIntoHighlight();
+            dropIntoTarget = hitHeader;
+            hitHeader.headerEl.classList.add('cat-drop-into-target');
+            placeholder.style.display = 'none';
+          }
+          return;
+        }
+
+        // 通常の並び替えモード
+        if (dropIntoTarget) {
+          clearDropIntoHighlight();
+          dropIntoTarget = null;
+          placeholder.style.display = '';
+        }
+
         var sections = Array.prototype.slice.call(
           containerEl.querySelectorAll(siblingSelector)
         ).filter(function(el) { return el !== dragSection; });
@@ -3286,12 +3341,10 @@
           }
         }
         if (!inserted) {
-          // 最後の兄弟セクションの後に配置
           var lastSibling = sections[sections.length - 1];
           if (lastSibling && lastSibling.nextSibling) {
             containerEl.insertBefore(placeholder, lastSibling.nextSibling);
           } else {
-            // カテゴリ追加ボタンの前に配置
             var addBtn = containerEl.querySelector(':scope > .category-add-btn, :scope > .section-add-btn');
             if (addBtn) {
               containerEl.insertBefore(placeholder, addBtn);
@@ -3309,14 +3362,68 @@
         document.removeEventListener('mousemove', handleCatDragMove);
         document.removeEventListener('mouseup', handleCatDragEnd);
 
-        // 実際のセクションをプレースホルダーの位置に挿入
+        clearDropIntoHighlight();
+        var dragCatPath = dragSection.getAttribute('data-category') || '';
+
+        // === 別カテゴリ内にドロップ ===
+        if (dropIntoTarget) {
+          placeholder.remove();
+          dragSection.style.display = '';
+          dragSection.classList.remove('cat-dragging');
+          if (dragClone) { dragClone.remove(); dragClone = null; }
+
+          var newParentPath = dropIntoTarget.catPath;
+          showSaveStatus('saving');
+          google.script.run
+            .withSuccessHandler(function(json) {
+              try {
+                var res = JSON.parse(json);
+                if (res.success) {
+                  showSaveStatus('saved');
+                  // ローカルデータのカテゴリパスを更新
+                  var parts = dragCatPath.split('\uff1a');
+                  var catName = parts[parts.length - 1];
+                  var newPath = newParentPath + '\uff1a' + catName;
+                  if (checklistData && checklistData.items) {
+                    checklistData.items.forEach(function(item) {
+                      if (item.category === dragCatPath) {
+                        item.category = newPath;
+                      } else if (item.category.indexOf(dragCatPath + '\uff1a') === 0) {
+                        item.category = newPath + item.category.substring(dragCatPath.length);
+                      }
+                    });
+                  }
+                  if (checklistData && checklistData.categoryOrder) {
+                    checklistData.categoryOrder.forEach(function(o) {
+                      if (o.path === dragCatPath) {
+                        o.path = newPath;
+                      } else if (o.path.indexOf(dragCatPath + '\uff1a') === 0) {
+                        o.path = newPath + o.path.substring(dragCatPath.length);
+                      }
+                    });
+                  }
+                  reRenderWithState();
+                } else {
+                  showSaveStatus('error');
+                  alert('移動に失敗しました: ' + (res.error || ''));
+                }
+              } catch (ex) { showSaveStatus('error'); }
+            })
+            .withFailureHandler(function() { showSaveStatus('error'); })
+            .moveCategoryToParent(dragCatPath, newParentPath);
+
+          dragSection = null; placeholder = null; containerEl = null;
+          siblingSelector = null; dropIntoTarget = null;
+          return;
+        }
+
+        // === 通常の同レベル並び替え ===
         placeholder.parentElement.insertBefore(dragSection, placeholder);
         dragSection.style.display = '';
         dragSection.classList.remove('cat-dragging');
         placeholder.remove();
         if (dragClone) { dragClone.remove(); dragClone = null; }
 
-        // 新しい並び順を計算して保存
         var parentBody = dragSection.closest('.section-body') || document.getElementById('checklistContainer');
         var sameLevel = Array.prototype.slice.call(
           parentBody.querySelectorAll(siblingSelector)
@@ -3329,7 +3436,6 @@
           }
         }
         if (orders.length > 0) {
-          // ローカルのcategoryOrderも更新
           if (checklistData) {
             if (!checklistData.categoryOrder) checklistData.categoryOrder = [];
             var existingMap = {};
@@ -3343,7 +3449,6 @@
               }
             });
           }
-          // バックエンドに保存
           showSaveStatus('saving');
           google.script.run
             .withSuccessHandler(function(json) {
@@ -3356,10 +3461,8 @@
             .reorderCategories(orders);
         }
 
-        dragSection = null;
-        placeholder = null;
-        containerEl = null;
-        siblingSelector = null;
+        dragSection = null; placeholder = null; containerEl = null;
+        siblingSelector = null; dropIntoTarget = null;
       }
 
       // イベント委任でバインド（長押し開始）

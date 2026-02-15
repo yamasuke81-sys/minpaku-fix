@@ -5391,47 +5391,111 @@
                             });
                           }
                           var html = '';
+                          var jobIdx = 0;
                           jobRes.list.forEach(function(j) {
                             var comps = byJob[j.name] || {};
                             var specials = specialByJob[j.name] || [];
-                            html += '<div class="border rounded p-3 mb-3">';
-                            html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-                            html += '<strong>' + escapeHtml(j.name) + '</strong>';
-                            html += '<div><button type="button" class="btn btn-sm btn-outline-secondary btnEditJob" data-row="' + j.rowIndex + '" data-name="' + escapeHtml(j.name) + '" data-sort="' + (j.sortOrder || 99) + '">仕事内容を編集</button> ';
-                            html += '<button type="button" class="btn btn-sm btn-outline-primary btnEditJobComp" data-name="' + escapeHtml(j.name) + '">報酬を編集</button> ';
-                            html += '<button type="button" class="btn btn-sm btn-outline-danger btnDelJob" data-row="' + j.rowIndex + '">削除</button></div>';
+                            var jid = 'jb_' + jobIdx++;
+                            html += '<div class="border rounded mb-3" data-job-name="' + escapeHtml(j.name) + '">';
+                            // ヘッダー: 名称 + 鉛筆 + 削除
+                            html += '<div class="d-flex align-items-center px-3 py-2 border-bottom bg-light">';
+                            html += '<strong class="flex-grow-1" id="' + jid + '_name">' + escapeHtml(j.name) + '</strong>';
+                            html += '<button type="button" class="btn btn-sm btn-link p-0 me-2 btnRenameJob" data-jid="' + jid + '" data-row="' + j.rowIndex + '" data-name="' + escapeHtml(j.name) + '" data-sort="' + (j.sortOrder || 99) + '" title="名称変更" style="font-size:16px;text-decoration:none;line-height:1;">✎</button>';
+                            html += '<button type="button" class="btn btn-sm btn-link text-danger p-0 btnDelJob" data-row="' + j.rowIndex + '" title="削除" style="font-size:14px;text-decoration:none;line-height:1;">✕</button>';
                             html += '</div>';
-                            html += '<div class="ms-2 small text-muted">';
-                            staffOrder.forEach(function(staff) {
-                              var amt = comps[staff];
-                              html += '<span class="me-3">' + escapeHtml(staff) + ': ' + (amt ? escapeHtml(amt) + '円' : '未設定') + '</span>';
-                            });
-                            html += '</div>';
-                            if (specials.length) {
-                              html += '<div class="ms-2 small text-muted mt-1">特別: ';
-                              html += specials.map(function(s) {
-                                var range = s.startDate === (s.endDate || s.startDate) ? s.startDate : s.startDate + '～' + (s.endDate || s.startDate);
-                                return escapeHtml(s.itemName) + ' ' + range + ' +' + escapeHtml(s.amount) + '円';
-                              }).join(' / ');
+                            // 報酬セクション（折りたたみ）
+                            html += '<div class="px-3 py-2">';
+                            staffOrder.forEach(function(staff, si) {
+                              var amt = comps[staff] || '';
+                              html += '<div class="border-bottom py-1">';
+                              html += '<div class="d-flex align-items-center" style="cursor:pointer;" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'flex\':\'none\'">';
+                              html += '<small style="width:14px;color:#888;">&#9654;</small>';
+                              html += '<small class="fw-bold ms-1">' + escapeHtml(staff) + '</small>';
+                              html += '<small class="text-muted ms-auto">' + (amt ? escapeHtml(String(amt)) + '円' : '<span style="color:#ccc;">未設定</span>') + '</small>';
                               html += '</div>';
-                            }
+                              html += '<div class="align-items-center gap-2 ps-3 py-1" style="display:none;">';
+                              html += '<input type="number" class="form-control form-control-sm jobCompInlineAmt" data-job="' + escapeHtml(j.name) + '" data-staff="' + escapeHtml(staff) + '" value="' + escapeHtml(String(amt)) + '" placeholder="金額" min="0" style="width:100px;">';
+                              html += '<span class="small ms-1">円</span>';
+                              html += '<button type="button" class="btn btn-sm btn-primary ms-2 btnSaveJobCompInline" data-job="' + escapeHtml(j.name) + '">保存</button>';
+                              html += '</div></div>';
+                            });
+                            // 特別料金セクション（折りたたみ）
+                            html += '<div class="py-1">';
+                            html += '<div class="d-flex align-items-center" style="cursor:pointer;" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'block\':\'none\'">';
+                            html += '<small style="width:14px;color:#888;">&#9654;</small>';
+                            html += '<small class="fw-bold ms-1">特別料金</small>';
+                            html += '<small class="text-muted ms-auto">' + (specials.length ? specials.length + '件' : 'なし') + '</small>';
                             html += '</div>';
+                            html += '<div class="ps-3 py-1 small text-muted" style="display:none;">';
+                            if (specials.length) {
+                              specials.forEach(function(s) {
+                                var range = s.startDate === (s.endDate || s.startDate) ? s.startDate : s.startDate + '～' + (s.endDate || s.startDate);
+                                html += '<div>' + escapeHtml(s.itemName) + ' ' + range + ' +' + escapeHtml(String(s.amount)) + '円</div>';
+                              });
+                            }
+                            html += '<button type="button" class="btn btn-sm btn-outline-primary mt-1 btnEditJobComp" data-name="' + escapeHtml(j.name) + '">' + (specials.length ? '特別料金を編集' : '特別料金を設定') + '</button>';
+                            html += '</div></div>';
+                            html += '</div></div>';
                           });
                           document.getElementById('jobList').innerHTML = html || '<p class="text-muted">仕事内容がありません。</p>';
-                          document.querySelectorAll('.btnEditJob').forEach(function(btn) {
+                          // 名称変更（鉛筆アイコン）
+                          document.querySelectorAll('.btnRenameJob').forEach(function(btn) {
                             btn.addEventListener('click', function() {
-                              document.getElementById('jobFormRowIndex').value = this.getAttribute('data-row') || '';
-                              document.getElementById('jobFormSortOrder').value = this.getAttribute('data-sort') || '99';
-                              document.getElementById('jobFormName').value = this.getAttribute('data-name') || '';
-                              document.getElementById('jobFormError').style.display = 'none';
-                              new bootstrap.Modal(document.getElementById('jobFormModal')).show();
+                              var jid = this.getAttribute('data-jid');
+                              var row = this.getAttribute('data-row');
+                              var sort = this.getAttribute('data-sort');
+                              var nameEl = document.getElementById(jid + '_name');
+                              if (!nameEl) return;
+                              var currentName = nameEl.textContent;
+                              nameEl.innerHTML = '<div class="d-flex align-items-center gap-1"><input type="text" class="form-control form-control-sm" id="' + jid + '_input" value="' + escapeHtml(currentName) + '" style="max-width:200px;">' +
+                                '<button type="button" class="btn btn-sm btn-primary" id="' + jid + '_save">保存</button>' +
+                                '<button type="button" class="btn btn-sm btn-secondary" id="' + jid + '_cancel">取消</button></div>';
+                              var inp = document.getElementById(jid + '_input');
+                              inp.focus(); inp.select();
+                              document.getElementById(jid + '_cancel').addEventListener('click', function() {
+                                nameEl.innerHTML = ''; nameEl.textContent = currentName;
+                              });
+                              document.getElementById(jid + '_save').addEventListener('click', function() {
+                                var newName = inp.value.trim();
+                                if (!newName) { alert('名称を入力してください。'); return; }
+                                google.script.run.withSuccessHandler(function(jsonStr) {
+                                  var r = JSON.parse(jsonStr);
+                                  if (r.success) loadJobList();
+                                  else alert(r.error || '失敗');
+                                }).saveJobType(parseInt(row, 10), newName, parseInt(sort, 10) || 99);
+                              });
                             });
                           });
+                          // 報酬インライン保存
+                          document.querySelectorAll('.btnSaveJobCompInline').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                              var jobName = this.getAttribute('data-job');
+                              var card = this.closest('[data-job-name]');
+                              var entries = [];
+                              card.querySelectorAll('.jobCompInlineAmt').forEach(function(inp) {
+                                var staff = inp.getAttribute('data-staff');
+                                var amount = inp.value.trim();
+                                if (staff && amount) entries.push({ staffName: staff, amount: amount });
+                              });
+                              var saveBtn = this;
+                              saveBtn.disabled = true; saveBtn.textContent = '...';
+                              google.script.run.withSuccessHandler(function(jsonStr) {
+                                saveBtn.disabled = false; saveBtn.textContent = '保存';
+                                var r = JSON.parse(jsonStr);
+                                if (r.success) loadJobList();
+                                else alert(r.error || '失敗');
+                              }).withFailureHandler(function() {
+                                saveBtn.disabled = false; saveBtn.textContent = '保存';
+                              }).saveCompensationForJob(jobName, entries);
+                            });
+                          });
+                          // 特別料金編集
                           document.querySelectorAll('.btnEditJobComp').forEach(function(btn) {
                             btn.addEventListener('click', function() {
                               openJobCompFormModal(this.getAttribute('data-name'));
                             });
                           });
+                          // 削除
                           document.querySelectorAll('.btnDelJob').forEach(function(btn) {
                             btn.addEventListener('click', function() {
                               var rowToDelete = parseInt(btn.getAttribute('data-row'), 10);

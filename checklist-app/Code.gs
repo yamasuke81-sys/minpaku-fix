@@ -1906,6 +1906,63 @@ function deleteChecklistItemPhoto(itemId) {
 }
 
 /**
+ * カテゴリを別の親カテゴリ内に移動（下層の全項目も一緒に移動）
+ * @param {string} oldCategoryPath - 移動するカテゴリのフルパス（例: "テラス"）
+ * @param {string} newParentPath - 移動先の親カテゴリパス（例: "駐車場"）。空文字ならトップレベルに移動
+ */
+function moveCategoryToParent(oldCategoryPath, newParentPath) {
+  try {
+    if (!oldCategoryPath) return JSON.stringify({ success: false, error: 'カテゴリパスが空です' });
+    var parts = oldCategoryPath.split('：');
+    var categoryName = parts[parts.length - 1];
+    var newCategoryPath = newParentPath ? (newParentPath + '：' + categoryName) : categoryName;
+    if (oldCategoryPath === newCategoryPath) return JSON.stringify({ success: true });
+    // マスタシートの全項目のカテゴリを更新
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目がありません' });
+    var categories = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    var updated = 0;
+    for (var i = 0; i < categories.length; i++) {
+      var cat = String(categories[i][0]);
+      if (cat === oldCategoryPath) {
+        categories[i][0] = newCategoryPath;
+        updated++;
+      } else if (cat.indexOf(oldCategoryPath + '：') === 0) {
+        categories[i][0] = newCategoryPath + cat.substring(oldCategoryPath.length);
+        updated++;
+      }
+    }
+    if (updated > 0) {
+      sheet.getRange(2, 2, lastRow - 1, 1).setValues(categories);
+    }
+    // カテゴリ順序シートも更新
+    var orderSheet = clSheet_(SHEET_CL_CATEGORY_ORDER);
+    var orderLastRow = orderSheet.getLastRow();
+    if (orderLastRow >= 2) {
+      var orderPaths = orderSheet.getRange(2, 1, orderLastRow - 1, 1).getValues();
+      var orderUpdated = 0;
+      for (var j = 0; j < orderPaths.length; j++) {
+        var p = String(orderPaths[j][0]);
+        if (p === oldCategoryPath) {
+          orderPaths[j][0] = newCategoryPath;
+          orderUpdated++;
+        } else if (p.indexOf(oldCategoryPath + '：') === 0) {
+          orderPaths[j][0] = newCategoryPath + p.substring(oldCategoryPath.length);
+          orderUpdated++;
+        }
+      }
+      if (orderUpdated > 0) {
+        orderSheet.getRange(2, 1, orderLastRow - 1, 1).setValues(orderPaths);
+      }
+    }
+    return JSON.stringify({ success: true, updated: updated });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * チェックリスト項目を別カテゴリに移動（カテゴリ変更＋並び順更新）
  * @param {string} itemId - 移動する項目のID
  * @param {string} newCategory - 移動先カテゴリパス

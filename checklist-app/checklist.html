@@ -834,6 +834,19 @@
       margin-right: 2px;
     }
     .cat-drag-handle:active { cursor: grabbing; color: #fff; }
+    /* 長押し待機中のフィードバック */
+    .item-drag-handle.drag-handle-pending {
+      color: #3498db;
+      animation: drag-handle-pulse 0.4s ease-out forwards;
+    }
+    .cat-drag-handle.drag-handle-pending {
+      color: #fff;
+      animation: drag-handle-pulse 0.4s ease-out forwards;
+    }
+    @keyframes drag-handle-pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.3); }
+    }
     .section.cat-dragging {
       opacity: 0.4;
     }
@@ -2776,32 +2789,78 @@
              String(d.getMinutes()).padStart(2, '0');
     }
 
-    // === ドラッグ＆ドロップ並び替え（タッチ対応） ===
+    // === ドラッグ＆ドロップ並び替え（タッチ対応・長押しで発動） ===
     (function() {
       var dragItem = null;
       var placeholder = null;
-      var startY = 0;
       var dragClone = null;
       var containerEl = null;
 
-      function handleDragStart(e) {
+      // 長押し検出用
+      var longPressTimer = null;
+      var pendingItem = null;
+      var pendingHandle = null;
+      var pressX = 0, pressY = 0;
+      var LONG_PRESS_MS = 400;
+      var MOVE_THRESHOLD = 10;
+
+      function cancelLongPress() {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        if (pendingHandle) { pendingHandle.classList.remove('drag-handle-pending'); }
+        pendingItem = null; pendingHandle = null;
+        document.removeEventListener('touchmove', onWaitMove);
+        document.removeEventListener('touchend', cancelLongPress);
+        document.removeEventListener('touchcancel', cancelLongPress);
+        document.removeEventListener('mousemove', onWaitMove);
+        document.removeEventListener('mouseup', cancelLongPress);
+      }
+
+      function onWaitMove(e) {
+        var touch = e.touches ? e.touches[0] : e;
+        if (Math.abs(touch.clientX - pressX) > MOVE_THRESHOLD || Math.abs(touch.clientY - pressY) > MOVE_THRESHOLD) {
+          cancelLongPress();
+        }
+      }
+
+      function onHandlePress(e) {
         var handle = e.target.closest('.item-drag-handle');
         if (!handle) return;
-        dragItem = handle.closest('.checklist-item');
-        if (!dragItem) return;
+        var item = handle.closest('.checklist-item');
+        if (!item) return;
         e.preventDefault();
         e.stopPropagation();
-
+        cancelLongPress();
         var touch = e.touches ? e.touches[0] : e;
-        startY = touch.clientY;
+        pressX = touch.clientX; pressY = touch.clientY;
+        pendingItem = item; pendingHandle = handle;
+        handle.classList.add('drag-handle-pending');
+        longPressTimer = setTimeout(function() {
+          longPressTimer = null;
+          document.removeEventListener('touchmove', onWaitMove);
+          document.removeEventListener('touchend', cancelLongPress);
+          document.removeEventListener('touchcancel', cancelLongPress);
+          document.removeEventListener('mousemove', onWaitMove);
+          document.removeEventListener('mouseup', cancelLongPress);
+          if (pendingHandle) pendingHandle.classList.remove('drag-handle-pending');
+          if (navigator.vibrate) navigator.vibrate(30);
+          activateDrag();
+        }, LONG_PRESS_MS);
+        document.addEventListener('touchmove', onWaitMove, { passive: true });
+        document.addEventListener('touchend', cancelLongPress);
+        document.addEventListener('touchcancel', cancelLongPress);
+        document.addEventListener('mousemove', onWaitMove);
+        document.addEventListener('mouseup', cancelLongPress);
+      }
+
+      function activateDrag() {
+        dragItem = pendingItem; pendingItem = null; pendingHandle = null;
+        if (!dragItem) return;
         containerEl = dragItem.parentElement;
 
-        // Create placeholder
         placeholder = document.createElement('div');
         placeholder.className = 'drag-placeholder';
         placeholder.style.height = dragItem.offsetHeight + 'px';
 
-        // Create visual clone
         var rect = dragItem.getBoundingClientRect();
         dragClone = dragItem.cloneNode(true);
         dragClone.style.position = 'fixed';
@@ -2910,16 +2969,16 @@
         containerEl = null;
       }
 
-      // Bind events via delegation on checklistContainer
+      // Bind events via delegation（長押し開始）
       document.addEventListener('touchstart', function(e) {
-        if (e.target.closest('.item-drag-handle')) handleDragStart(e);
+        if (e.target.closest('.item-drag-handle')) onHandlePress(e);
       }, { passive: false });
       document.addEventListener('mousedown', function(e) {
-        if (e.target.closest('.item-drag-handle')) handleDragStart(e);
+        if (e.target.closest('.item-drag-handle')) onHandlePress(e);
       });
     })();
 
-    // === カテゴリ並び替えドラッグ＆ドロップ（タッチ対応） ===
+    // === カテゴリ並び替えドラッグ＆ドロップ（タッチ対応・長押しで発動） ===
     (function() {
       var dragSection = null;
       var placeholder = null;
@@ -2927,15 +2986,65 @@
       var containerEl = null;
       var siblingSelector = null;
 
-      function handleCatDragStart(e) {
+      // 長押し検出用
+      var longPressTimer = null;
+      var pendingSection = null;
+      var pendingHandle = null;
+      var pressX = 0, pressY = 0;
+      var LONG_PRESS_MS = 400;
+      var MOVE_THRESHOLD = 10;
+
+      function cancelCatLongPress() {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        if (pendingHandle) { pendingHandle.classList.remove('drag-handle-pending'); }
+        pendingSection = null; pendingHandle = null;
+        document.removeEventListener('touchmove', onCatWaitMove);
+        document.removeEventListener('touchend', cancelCatLongPress);
+        document.removeEventListener('touchcancel', cancelCatLongPress);
+        document.removeEventListener('mousemove', onCatWaitMove);
+        document.removeEventListener('mouseup', cancelCatLongPress);
+      }
+
+      function onCatWaitMove(e) {
+        var touch = e.touches ? e.touches[0] : e;
+        if (Math.abs(touch.clientX - pressX) > MOVE_THRESHOLD || Math.abs(touch.clientY - pressY) > MOVE_THRESHOLD) {
+          cancelCatLongPress();
+        }
+      }
+
+      function onCatHandlePress(e) {
         var handle = e.target.closest('.cat-drag-handle');
         if (!handle) return;
-        dragSection = handle.closest('.section');
-        if (!dragSection) return;
+        var section = handle.closest('.section');
+        if (!section) return;
         e.preventDefault();
         e.stopPropagation();
-
+        cancelCatLongPress();
         var touch = e.touches ? e.touches[0] : e;
+        pressX = touch.clientX; pressY = touch.clientY;
+        pendingSection = section; pendingHandle = handle;
+        handle.classList.add('drag-handle-pending');
+        longPressTimer = setTimeout(function() {
+          longPressTimer = null;
+          document.removeEventListener('touchmove', onCatWaitMove);
+          document.removeEventListener('touchend', cancelCatLongPress);
+          document.removeEventListener('touchcancel', cancelCatLongPress);
+          document.removeEventListener('mousemove', onCatWaitMove);
+          document.removeEventListener('mouseup', cancelCatLongPress);
+          if (pendingHandle) pendingHandle.classList.remove('drag-handle-pending');
+          if (navigator.vibrate) navigator.vibrate(30);
+          activateCatDrag();
+        }, LONG_PRESS_MS);
+        document.addEventListener('touchmove', onCatWaitMove, { passive: true });
+        document.addEventListener('touchend', cancelCatLongPress);
+        document.addEventListener('touchcancel', cancelCatLongPress);
+        document.addEventListener('mousemove', onCatWaitMove);
+        document.addEventListener('mouseup', cancelCatLongPress);
+      }
+
+      function activateCatDrag() {
+        dragSection = pendingSection; pendingSection = null; pendingHandle = null;
+        if (!dragSection) return;
         containerEl = dragSection.parentElement;
 
         // 同レベルの兄弟セクションのセレクタを決定
@@ -3075,12 +3184,12 @@
         siblingSelector = null;
       }
 
-      // イベント委任でバインド
+      // イベント委任でバインド（長押し開始）
       document.addEventListener('touchstart', function(e) {
-        if (e.target.closest('.cat-drag-handle')) handleCatDragStart(e);
+        if (e.target.closest('.cat-drag-handle')) onCatHandlePress(e);
       }, { passive: false });
       document.addEventListener('mousedown', function(e) {
-        if (e.target.closest('.cat-drag-handle')) handleCatDragStart(e);
+        if (e.target.closest('.cat-drag-handle')) onCatHandlePress(e);
       });
     })();
   </script>

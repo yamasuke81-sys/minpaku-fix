@@ -1053,24 +1053,30 @@ function deleteSubOwner(rowIndex) {
 function ensureSheetsExist() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  if (!ss.getSheetByName(SHEET_OWNER)) {
-    const s = ss.insertSheet(SHEET_OWNER);
+  function safeInsert(name, headerFn) {
+    if (ss.getSheetByName(name)) return;
+    try {
+      var s = ss.insertSheet(name);
+      if (headerFn) headerFn(s);
+    } catch (e) {
+      Logger.log('シート作成スキップ(' + name + '): ' + e.toString());
+    }
+  }
+
+  safeInsert(SHEET_OWNER, function(s) {
     s.getRange(1, 1).setValue('オーナーメールアドレス');
     s.getRange(2, 1).setValue('');
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_SUB_OWNERS)) {
-    const s = ss.insertSheet(SHEET_SUB_OWNERS);
+  safeInsert(SHEET_SUB_OWNERS, function(s) {
     s.getRange(1, 1, 1, 2).setValues([['メール', '表示名']]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_STAFF)) {
-    const s = ss.insertSheet(SHEET_STAFF);
+  safeInsert(SHEET_STAFF, function(s) {
     s.getRange(1, 1, 1, 9).setValues([['名前', '住所', 'メール', '金融機関名', '支店名', '口座種類', '口座番号', '口座名義', '有効']]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_JOB_TYPES)) {
-    const s = ss.insertSheet(SHEET_JOB_TYPES);
+  safeInsert(SHEET_JOB_TYPES, function(s) {
     s.getRange(1, 1, 1, 3).setValues([['仕事内容名', '表示順', '有効']]);
     s.getRange(2, 1, 2, 3).setValues([['1名で清掃', 1, 'Y']]);
     s.getRange(3, 1, 3, 3).setValues([['2名で清掃', 2, 'Y']]);
@@ -1078,61 +1084,57 @@ function ensureSheetsExist() {
     s.getRange(5, 1, 5, 3).setValues([['コインランドリー交通費', 4, 'Y']]);
     s.getRange(6, 1, 6, 3).setValues([['コインランドリー実費', 5, 'Y']]);
     s.getRange(7, 1, 7, 3).setValues([['直前点検', 6, 'Y']]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_COMPENSATION)) {
-    const s = ss.insertSheet(SHEET_COMPENSATION);
+  safeInsert(SHEET_COMPENSATION, function(s) {
     s.getRange(1, 1, 1, 4).setValues([['スタッフ名', '仕事内容名', '報酬額', '備考']]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_SPECIAL_RATES)) {
-    const s = ss.insertSheet(SHEET_SPECIAL_RATES);
+  safeInsert(SHEET_SPECIAL_RATES, function(s) {
     s.getRange(1, 1, 1, 5).setValues([['仕事内容名', '対象開始日', '対象終了日', '項目名', '追加金額']]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_RECRUIT_SETTINGS)) {
-    const s = ss.insertSheet(SHEET_RECRUIT_SETTINGS);
+  safeInsert(SHEET_RECRUIT_SETTINGS, function(s) {
     s.getRange(1, 1, 1, 2).setValues([['項目', '値']]);
     s.getRange(2, 1, 2, 2).setValues([['募集開始週数', 4]]);
     s.getRange(3, 1, 3, 2).setValues([['最少回答者数', 2]]);
     s.getRange(4, 1, 4, 2).setValues([['リマインド間隔週', 1]]);
     s.getRange(5, 1, 5, 2).setValues([['選定人数', 2]]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_RECRUIT)) {
-    const s = ss.insertSheet(SHEET_RECRUIT);
+  safeInsert(SHEET_RECRUIT, function(s) {
     s.getRange(1, 1, 1, 14).setValues([['チェックアウト日', '予約行番号', '告知日', 'ステータス', '選定スタッフ', 'リマインド最終日', '作成日', '予約ID', '告知方法', '予約日付', '予約人数', '予約BBQ', '予約国籍', 'メモ']]);
-  } else {
-    ensureRecruitNotifyMethodColumn_();
-    ensureRecruitDetailColumns_();
+  });
+  if (ss.getSheetByName(SHEET_RECRUIT)) {
+    try { ensureRecruitNotifyMethodColumn_(); } catch (e) { Logger.log('ensureRecruitNotifyMethodColumn_ error: ' + e); }
+    try { ensureRecruitDetailColumns_(); } catch (e) { Logger.log('ensureRecruitDetailColumns_ error: ' + e); }
   }
 
-  if (!ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS)) {
-    const s = ss.insertSheet(SHEET_RECRUIT_VOLUNTEERS);
+  safeInsert(SHEET_RECRUIT_VOLUNTEERS, function(s) {
     s.getRange(1, 1, 1, 7).setValues([['募集ID', 'スタッフ名', 'メール', '立候補日時', '対応可能条件', 'ステータス', '保留理由']]);
-  } else {
-    ensureVolunteerMemoColumn_();
-    ensureVolunteerStatusColumns_();
-  }
-  if (!ss.getSheetByName(SHEET_CANCEL_REQUESTS)) {
-    ss.insertSheet(SHEET_CANCEL_REQUESTS).getRange(1, 1, 1, 5).setValues([['募集ID', 'スタッフ名', 'メール', '申請日時', 'ステータス']]);
+  });
+  if (ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS)) {
+    try { ensureVolunteerMemoColumn_(); } catch (e) { Logger.log('ensureVolunteerMemoColumn_ error: ' + e); }
+    try { ensureVolunteerStatusColumns_(); } catch (e) { Logger.log('ensureVolunteerStatusColumns_ error: ' + e); }
   }
 
-  if (!ss.getSheetByName(SHEET_SYNC_SETTINGS)) {
-    const s = ss.insertSheet(SHEET_SYNC_SETTINGS);
+  safeInsert(SHEET_CANCEL_REQUESTS, function(s) {
+    s.getRange(1, 1, 1, 5).setValues([['募集ID', 'スタッフ名', 'メール', '申請日時', 'ステータス']]);
+  });
+
+  safeInsert(SHEET_SYNC_SETTINGS, function(s) {
     s.getRange(1, 1, 1, 4).setValues([['プラットフォーム名', 'iCal URL', '有効', '最終同期']]);
     s.getRange(2, 1, 2, 4).setValues([['Airbnb', '', 'Y', '']]);
     s.getRange(3, 1, 3, 4).setValues([['Booking.com', '', 'Y', '']]);
-  }
-  if (!ss.getSheetByName(SHEET_NOTIFICATIONS)) {
-    const s = ss.insertSheet(SHEET_NOTIFICATIONS);
-    s.getRange(1, 1, 1, 4).setValues([['日時', '種類', '内容', '既読']]);
-  }
+  });
 
-  if (!ss.getSheetByName(SHEET_LAUNDRY)) {
-    const s = ss.insertSheet(SHEET_LAUNDRY);
+  safeInsert(SHEET_NOTIFICATIONS, function(s) {
+    s.getRange(1, 1, 1, 4).setValues([['日時', '種類', '内容', '既読']]);
+  });
+
+  safeInsert(SHEET_LAUNDRY, function(s) {
     s.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '出した人', '出した日時', '受け取った人', '受け取った日時', '施設に戻した人', '施設に戻した日時']]);
-  }
+  });
 
 }
 

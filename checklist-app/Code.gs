@@ -1904,3 +1904,44 @@ function deleteChecklistItemPhoto(itemId) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
 }
+
+/**
+ * チェックリスト項目を別カテゴリに移動（カテゴリ変更＋並び順更新）
+ * @param {string} itemId - 移動する項目のID
+ * @param {string} newCategory - 移動先カテゴリパス
+ * @param {Array} itemOrders - 移動先カテゴリ内の全項目の並び順 [{id, sortOrder}, ...]
+ */
+function moveItemToCategory(itemId, newCategory, itemOrders) {
+  try {
+    if (!itemId || newCategory === undefined) return JSON.stringify({ success: false, error: 'パラメータが不足しています' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var found = false;
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(itemId)) {
+        sheet.getRange(i + 2, 2).setValue(newCategory);
+        found = true;
+        break;
+      }
+    }
+    if (!found) return JSON.stringify({ success: false, error: '項目が見つかりません' });
+    // 並び順も更新
+    if (itemOrders && itemOrders.length > 0) {
+      var sortCol = sheet.getRange(2, 4, lastRow - 1, 1).getValues();
+      var orderMap = {};
+      itemOrders.forEach(function(o) { orderMap[o.id] = o.sortOrder; });
+      for (var j = 0; j < ids.length; j++) {
+        var id = String(ids[j][0]);
+        if (orderMap[id] !== undefined) {
+          sortCol[j][0] = orderMap[id];
+        }
+      }
+      sheet.getRange(2, 4, lastRow - 1, 1).setValues(sortCol);
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}

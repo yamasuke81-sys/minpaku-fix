@@ -856,6 +856,11 @@
       border-radius: 8px;
       margin: 4px 0;
     }
+    .section-body.drag-target {
+      outline: 2px dashed #e67e22;
+      outline-offset: -2px;
+      background: rgba(230, 126, 34, 0.06);
+    }
     .item-photo-thumb {
       width: 28px;
       height: 28px;
@@ -2887,12 +2892,13 @@
              String(d.getMinutes()).padStart(2, '0');
     }
 
-    // === ドラッグ＆ドロップ並び替え（タッチ対応・長押しで発動） ===
+    // === ドラッグ＆ドロップ並び替え（タッチ対応・長押しで発動・クロスカテゴリ移動対応） ===
     (function() {
       var dragItem = null;
       var placeholder = null;
       var dragClone = null;
       var containerEl = null;
+      var originalContainerEl = null;
 
       // 長押し検出用
       var longPressTimer = null;
@@ -2901,6 +2907,37 @@
       var pressX = 0, pressY = 0;
       var LONG_PRESS_MS = 400;
       var MOVE_THRESHOLD = 10;
+
+      function getCategoryFromBody(sectionBody) {
+        if (!sectionBody) return '';
+        var section = sectionBody.parentElement;
+        return (section && section.getAttribute('data-category')) || '';
+      }
+
+      // カーソル位置にある最も深い非折りたたみ section-body を探す
+      function findTargetSectionBody(x, y) {
+        var allBodies = document.querySelectorAll('#checklistContainer .section-body:not(.collapsed)');
+        var best = null;
+        var bestDepth = -1;
+        for (var i = 0; i < allBodies.length; i++) {
+          var body = allBodies[i];
+          var rect = body.getBoundingClientRect();
+          if (rect.height < 2) continue; // 非表示扱い
+          if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
+            var depth = 0;
+            var p = body.parentElement;
+            while (p) {
+              if (p.classList && p.classList.contains('section-body')) depth++;
+              p = p.parentElement;
+            }
+            if (depth > bestDepth) {
+              bestDepth = depth;
+              best = body;
+            }
+          }
+        }
+        return best;
+      }
 
       function cancelLongPress() {
         if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
@@ -2954,6 +2991,7 @@
         dragItem = pendingItem; pendingItem = null; pendingHandle = null;
         if (!dragItem) return;
         containerEl = dragItem.parentElement;
+        originalContainerEl = containerEl;
 
         placeholder = document.createElement('div');
         placeholder.className = 'drag-placeholder';
@@ -2989,7 +3027,18 @@
         var touch = e.touches ? e.touches[0] : e;
         dragClone.style.top = (touch.clientY - dragClone.offsetHeight / 2) + 'px';
 
-        // Find drop target — containerEl 直下の .checklist-item を取得
+        // クロスカテゴリ: カーソル位置にある section-body を探す
+        var targetBody = findTargetSectionBody(touch.clientX, touch.clientY);
+        if (targetBody && targetBody !== containerEl) {
+          // ハイライトを切り替え
+          if (containerEl) containerEl.classList.remove('drag-target');
+          containerEl = targetBody;
+          if (containerEl !== originalContainerEl) {
+            containerEl.classList.add('drag-target');
+          }
+        }
+
+        // containerEl 直下の .checklist-item を取得して挿入位置を決定
         var items = Array.prototype.slice.call(
           containerEl.querySelectorAll(':scope > .checklist-item')
         ).filter(function(el) { return el !== dragItem; });
@@ -3004,7 +3053,7 @@
           }
         }
         if (!inserted) {
-          // Place after all items but before add buttons
+          // アイテムの後ろ、追加ボタンの前に配置
           var addBtn = containerEl.querySelector(':scope > .section-add-btn');
           if (addBtn) {
             containerEl.insertBefore(placeholder, addBtn);
@@ -3021,36 +3070,66 @@
         document.removeEventListener('mousemove', handleDragMove);
         document.removeEventListener('mouseup', handleDragEnd);
 
-        // Insert the real item where placeholder is
+        // ハイライトを除去
+        if (containerEl) containerEl.classList.remove('drag-target');
+
+        // placeholder の位置に実アイテムを挿入
         placeholder.parentElement.insertBefore(dragItem, placeholder);
         dragItem.style.display = '';
         dragItem.classList.remove('dragging');
         placeholder.remove();
         if (dragClone) { dragClone.remove(); dragClone = null; }
 
-        // Compute new sort orders and save
+        // 移動先の section-body を取得
         var section = dragItem.closest('.section-body');
-        if (section) {
-          var allItems = Array.prototype.slice.call(section.querySelectorAll(':scope > .checklist-item'));
-          var orders = [];
-          for (var i = 0; i < allItems.length; i++) {
-            var id = allItems[i].getAttribute('data-item-id');
-            if (id) {
-              orders.push({ id: id, sortOrder: i + 1 });
-              allItems[i].setAttribute('data-sort-order', i + 1);
-            }
+        if (!section) { dragItem = null; placeholder = null; containerEl = null; originalContainerEl = null; return; }
+
+        var movedItemId = dragItem.getAttribute('data-item-id');
+        var newCategory = getCategoryFromBody(section);
+        var oldCategory = getCategoryFromBody(originalContainerEl);
+        var categoryChanged = (newCategory !== oldCategory);
+
+        // 新しい並び順を計算
+        var allItems = Array.prototype.slice.call(section.querySelectorAll(':scope > .checklist-item'));
+        var orders = [];
+        for (var i = 0; i < allItems.length; i++) {
+          var id = allItems[i].getAttribute('data-item-id');
+          if (id) {
+            orders.push({ id: id, sortOrder: i + 1 });
+            allItems[i].setAttribute('data-sort-order', i + 1);
           }
-          if (orders.length > 0) {
-            // Update local data
-            var itemMap = {};
-            orders.forEach(function(o) { itemMap[o.id] = o.sortOrder; });
-            if (checklistData && checklistData.items) {
-              checklistData.items.forEach(function(item) {
-                if (itemMap[item.id] !== undefined) item.sortOrder = itemMap[item.id];
-              });
-            }
-            // Save to backend
-            showSaveStatus('saving');
+        }
+
+        if (orders.length > 0) {
+          // ローカルデータを更新
+          var itemMap = {};
+          orders.forEach(function(o) { itemMap[o.id] = o.sortOrder; });
+          if (checklistData && checklistData.items) {
+            checklistData.items.forEach(function(item) {
+              if (itemMap[item.id] !== undefined) item.sortOrder = itemMap[item.id];
+              if (categoryChanged && item.id === movedItemId) item.category = newCategory;
+            });
+          }
+
+          showSaveStatus('saving');
+          if (categoryChanged && movedItemId) {
+            // カテゴリ変更あり → moveItemToCategory を呼び出し
+            google.script.run
+              .withSuccessHandler(function(json) {
+                try {
+                  var res = JSON.parse(json);
+                  if (res.success) {
+                    showSaveStatus('saved');
+                    reRenderWithState();
+                  } else {
+                    showSaveStatus('error');
+                  }
+                } catch (e) { showSaveStatus('error'); }
+              })
+              .withFailureHandler(function() { showSaveStatus('error'); })
+              .moveItemToCategory(movedItemId, newCategory, orders);
+          } else {
+            // 同一カテゴリ内の並び替えのみ
             google.script.run
               .withSuccessHandler(function(json) {
                 try {
@@ -3065,6 +3144,7 @@
         dragItem = null;
         placeholder = null;
         containerEl = null;
+        originalContainerEl = null;
       }
 
       // Bind events via delegation（長押し開始）

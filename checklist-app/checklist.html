@@ -2667,12 +2667,6 @@
       var dragClone = null;
       var containerEl = null;
 
-      function getSiblingItems(el) {
-        var parent = el.parentElement;
-        if (!parent) return [];
-        return Array.prototype.slice.call(parent.querySelectorAll(':scope > .checklist-item'));
-      }
-
       function handleDragStart(e) {
         var handle = e.target.closest('.item-drag-handle');
         if (!handle) return;
@@ -2719,13 +2713,12 @@
         if (!dragItem || !dragClone || !placeholder) return;
         e.preventDefault();
         var touch = e.touches ? e.touches[0] : e;
-        var dy = touch.clientY - startY;
-        var origRect = placeholder.getBoundingClientRect();
-        dragClone.style.top = (origRect.top + dy) + 'px';
+        dragClone.style.top = (touch.clientY - dragClone.offsetHeight / 2) + 'px';
 
-        // Find drop target
-        var siblings = getSiblingItems(containerEl);
-        var items = siblings.filter(function(el) { return el !== dragItem; });
+        // Find drop target — containerEl 直下の .checklist-item を取得
+        var items = Array.prototype.slice.call(
+          containerEl.querySelectorAll(':scope > .checklist-item')
+        ).filter(function(el) { return el !== dragItem; });
         var inserted = false;
         for (var i = 0; i < items.length; i++) {
           var r = items[i].getBoundingClientRect();
@@ -2738,7 +2731,7 @@
         }
         if (!inserted) {
           // Place after all items but before add buttons
-          var addBtn = containerEl.querySelector('.section-add-btn');
+          var addBtn = containerEl.querySelector(':scope > .section-add-btn');
           if (addBtn) {
             containerEl.insertBefore(placeholder, addBtn);
           } else {

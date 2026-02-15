@@ -3382,17 +3382,21 @@
       }
 
       function loadAndRender() {
-        Promise.all([
-          fetchData(),
-          new Promise(function(res) {
-            google.script.run.withSuccessHandler(function(j) {
-              try { var r = JSON.parse(j); res(r.success ? r.map : {}); }
-              catch (e) { res({}); }
-            }).withFailureHandler(function() { res({}); }).getRecruitmentStatusMap();
-          })
-        ]).then(function(results) {
-          var res = results[0];
-          var recruitMap = results[1] || {};
+        document.getElementById('loadingOverlay').style.display = 'flex';
+        new Promise(function(resolve) {
+          google.script.run
+            .withSuccessHandler(function(jsonStr) {
+              try { resolve(JSON.parse(jsonStr)); }
+              catch (e) { resolve({ success: false, error: 'レスポンスの解析に失敗しました。' }); }
+            })
+            .withFailureHandler(function(err) {
+              resolve({ success: false, error: err.message || '通信エラー' });
+            })
+            .getInitData();
+        }).then(function(initResult) {
+          document.getElementById('loadingOverlay').style.display = 'none';
+          var res = initResult;
+          var recruitMap = initResult.recruitMap || {};
           if (!res.success) {
             alert(res.error || 'データの取得に失敗しました。');
             return;
@@ -5875,17 +5879,18 @@
       function doReloadData() {
         var btnSync = document.getElementById('btnReloadDataSync');
         if (btnSync) { btnSync.disabled = true; btnSync.textContent = '読み込み中...'; }
-        Promise.all([
-          fetchData(),
-          new Promise(function(res) {
-            google.script.run.withSuccessHandler(function(j) {
-              try { var r = JSON.parse(j); res(r.success ? r.map : {}); }
-              catch (e) { res({}); }
-            }).withFailureHandler(function() { res({}); }).getRecruitmentStatusMap();
-          })
-        ]).then(function(results) {
-          var res = results[0];
-          var recruitMap = results[1] || {};
+        new Promise(function(resolve) {
+          google.script.run
+            .withSuccessHandler(function(jsonStr) {
+              try { resolve(JSON.parse(jsonStr)); }
+              catch (e) { resolve({ success: false, error: 'レスポンスの解析に失敗しました。' }); }
+            })
+            .withFailureHandler(function(err) {
+              resolve({ success: false, error: err.message || '通信エラー' });
+            })
+            .getInitData();
+        }).then(function(res) {
+          var recruitMap = res.recruitMap || {};
           if (!res.success) {
             alert(res.error || 'データの取得に失敗しました。');
           } else {

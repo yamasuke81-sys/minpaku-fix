@@ -196,6 +196,10 @@ function getData() {
     const rawData = sheet.getRange(2, 1, lastRow, lastCol).getValues();
     const data = [];
 
+    // 90日以上前のチェックアウトをスキップ（パフォーマンス最適化）
+    var cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+
     for (let i = 0; i < rawData.length; i++) {
       const row = rawData[i];
       const rowNumber = i + 2; // スプレッドシートの行番号（1行目がヘッダー）
@@ -207,6 +211,9 @@ function getData() {
       const checkIn = parseDate(checkInVal);
       const checkOut = parseDate(checkOutVal);
       const isValidDates = checkIn && checkOut && checkOut >= checkIn;
+
+      // 古い予約をスキップ
+      if (isValidDates && checkOut < cutoffDate) continue;
 
       const guestName = columnMap.guestName >= 0 ? String(row[columnMap.guestName] || '').trim() : '';
       const icalSource = columnMap.icalSync >= 0 ? String(row[columnMap.icalSync] || '').trim() : '';
@@ -313,6 +320,27 @@ function getData() {
       data: null,
       columnMap: null
     });
+  }
+}
+
+/**
+ * 初期データ一括取得（getData + getRecruitmentStatusMap をまとめて1回で返す）
+ */
+function getInitData() {
+  try {
+    var dataJson = getData();
+    var recruitJson = getRecruitmentStatusMap();
+    var dataResult = JSON.parse(dataJson);
+    var recruitResult = JSON.parse(recruitJson);
+    return JSON.stringify({
+      success: dataResult.success,
+      data: dataResult.data,
+      columnMap: dataResult.columnMap,
+      recruitMap: recruitResult.success ? recruitResult.map : {},
+      error: dataResult.error || null
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
   }
 }
 

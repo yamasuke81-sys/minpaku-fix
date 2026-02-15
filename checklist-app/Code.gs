@@ -1482,6 +1482,33 @@ function addChecklistItemToMaster(category, name, isSupplyItem) {
 }
 
 /**
+ * チェックリスト項目の並び順を更新
+ * @param {Array} itemOrders - [{id: 'item_1', sortOrder: 1}, ...]
+ */
+function reorderChecklistItems(itemOrders) {
+  try {
+    if (!itemOrders || !itemOrders.length) return JSON.stringify({ success: true });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var sortCol = sheet.getRange(2, 4, lastRow - 1, 1).getValues();
+    var orderMap = {};
+    itemOrders.forEach(function(o) { orderMap[o.id] = o.sortOrder; });
+    for (var i = 0; i < ids.length; i++) {
+      var id = String(ids[i][0]);
+      if (orderMap[id] !== undefined) {
+        sortCol[i][0] = orderMap[id];
+      }
+    }
+    sheet.getRange(2, 4, lastRow - 1, 1).setValues(sortCol);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * カテゴリ名を変更（マスターシートの全該当項目のカテゴリ列を更新）
  */
 function renameCategoryInMaster(oldFullPath, newName) {

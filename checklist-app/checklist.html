@@ -1565,7 +1565,7 @@
       var html = '<div class="' + levelClass + '" data-category="' + escapeHtml(fullPath) + '">';
       html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
       html += '<div class="section-header-row1">';
-      html += '<button class="cat-drag-handle" onmousedown="event.stopPropagation();" ontouchstart="event.stopPropagation();" title="ドラッグで並び替え">☰</button>';
+      html += '<button class="cat-drag-handle" onclick="event.stopPropagation();" title="ドラッグで並び替え">☰</button>';
       html += '<span class="section-icon">▼</span>';
       html += '<span class="section-title">' + escapeHtml(name) + '</span>';
       html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';

@@ -2317,48 +2317,81 @@
           }
         }
 
-        // チェックリストボタンをヘッダーに追加（清掃詳細の場合）
+        // チェックリストボタンをヘッダーに追加（キャッシュ利用で2回目以降はAPI不要）
         if (type === 'cleaning') {
           var clBtnArea = document.getElementById('checklistBtnHeaderArea');
           if (clBtnArea) {
-            google.script.run
-              .withSuccessHandler(function(resStr) {
-                try {
-                  var res = JSON.parse(resStr);
-                  if (res.success && res.url) {
-                    var btnCl = document.createElement('button');
-                    btnCl.type = 'button';
-                    btnCl.className = 'btn btn-warning';
-                    btnCl.style.cssText = 'font-size:0.85rem;white-space:nowrap;padding:0.3rem 0.75rem;color:#000;font-weight:600;';
-                    btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリスト';
-                    btnCl.onclick = function() {
-                      var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
-                      var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
-                      if (checkoutDate) {
-                        window.open(res.url + '?date=' + encodeURIComponent(checkoutDate) + '&staff=' + encodeURIComponent(staffName || 'スタッフ'), '_blank');
-                      } else {
-                        alert('チェックアウト日が取得できません');
-                      }
-                    };
-                    clBtnArea.appendChild(btnCl);
-                    clBtnArea.style.display = '';
-                  }
-                } catch (e) { console.error('checklist button error:', e); }
-              })
-              .withFailureHandler(function(e) { console.error('getChecklistAppUrl failed:', e); })
-              .getChecklistAppUrl();
+            var _createChecklistBtn = function(area, url) {
+              var btnCl = document.createElement('button');
+              btnCl.type = 'button';
+              btnCl.className = 'btn btn-warning';
+              btnCl.style.cssText = 'font-size:0.85rem;white-space:nowrap;padding:0.3rem 0.75rem;color:#000;font-weight:600;';
+              btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリスト';
+              btnCl.onclick = function() {
+                var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+                var staffName = (d && d.cleaningStaff) ? String(d.cleaningStaff).split(/[,、]/)[0].trim() : '';
+                if (checkoutDate) {
+                  window.open(url + '?date=' + encodeURIComponent(checkoutDate) + '&staff=' + encodeURIComponent(staffName || 'スタッフ'), '_blank');
+                } else {
+                  alert('チェックアウト日が取得できません');
+                }
+              };
+              area.appendChild(btnCl);
+              area.style.display = '';
+            };
+            if (window._checklistAppUrl) {
+              _createChecklistBtn(clBtnArea, window._checklistAppUrl);
+            } else {
+              google.script.run
+                .withSuccessHandler(function(resStr) {
+                  try {
+                    var res = JSON.parse(resStr);
+                    if (res.success && res.url) {
+                      window._checklistAppUrl = res.url;
+                      _createChecklistBtn(clBtnArea, res.url);
+                    }
+                  } catch (e) { console.error('checklist button error:', e); }
+                })
+                .withFailureHandler(function(e) { console.error('getChecklistAppUrl failed:', e); })
+                .getChecklistAppUrl();
+            }
           }
         }
 
-        // クリーニング連絡カードを描画
+        // クリーニング状況 + 募集データをバッチ読み込み（2 API → 1 API）
         if (type === 'cleaning') {
-          var laundryArea = document.getElementById('laundryCardArea');
-          if (laundryArea) {
-            var checkoutDateForLaundry = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
-            if (checkoutDateForLaundry) {
-              renderCleaningLaundryCard(laundryArea, checkoutDateForLaundry, isStaffView);
-            }
+          var _batchCheckoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+          var _batchLaundryArea = document.getElementById('laundryCardArea');
+          if (_batchLaundryArea) {
+            _batchLaundryArea.innerHTML = '<div class="modal-next-res-card" style="margin-top:0.5rem;"><div class="text-muted small text-center"><span class="spinner-border spinner-border-sm me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div>';
           }
+          google.script.run
+            .withSuccessHandler(function(batchStr) {
+              if (modalGen !== window._eventModalGen) return;
+              try {
+                var batch = JSON.parse(batchStr);
+                if (!batch.success) return;
+                var bData = batch.data;
+                // クリーニング状況カード
+                if (_batchLaundryArea) {
+                  if (bData.laundry && bData.laundry.success && bData.laundry.data) {
+                    buildLaundryCardHtml(_batchLaundryArea, _batchCheckoutDate, bData.laundry.data, isStaffView);
+                  } else {
+                    _batchLaundryArea.innerHTML = '';
+                  }
+                }
+                // 募集データをハンドラに渡す
+                if (window._batchRecruitHandler) {
+                  window._batchRecruitHandler(JSON.stringify(bData.recruitment || {}));
+                }
+              } catch (e) { console.error('batch modal error:', e); }
+            })
+            .withFailureHandler(function(e) {
+              if (modalGen !== window._eventModalGen) return;
+              if (_batchLaundryArea) _batchLaundryArea.innerHTML = '';
+              if (window._batchRecruitFailHandler) window._batchRecruitFailHandler();
+            })
+            .getCleaningModalData(_batchCheckoutDate, props.rowNumber);
         }
 
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));
@@ -2414,7 +2447,7 @@
         }
 
         if (isStaff && type === 'cleaning') {
-          google.script.run.withSuccessHandler(function(rStr) {
+          window._batchRecruitHandler = function(rStr) {
             if (modalGen !== window._eventModalGen) return; // 古いコールバックを無視
             try {
               var r = JSON.parse(rStr);
@@ -2679,7 +2712,8 @@
                 }
               }
             } catch (e) {}
-          }).withFailureHandler(function() {
+          };
+          window._batchRecruitFailHandler = function() {
             if (modalGen !== window._eventModalGen) return;
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
@@ -2689,11 +2723,11 @@
             var _bl2 = document.getElementById('volBodyLoading'); if (_bl2) _bl2.remove();
             var vA = document.getElementById('eventModalVolunteersArea'); if (vA) vA.style.display = 'none';
             var vL = document.getElementById('eventModalVolunteersList'); if (vL) vL.innerHTML = '';
-          }).getRecruitmentForBooking(props.rowNumber);
+          };
         }
 
         if (type === 'cleaning' && !isStaff) {
-          google.script.run.withSuccessHandler(function(rStr) {
+          window._batchRecruitHandler = function(rStr) {
             if (modalGen !== window._eventModalGen) return; // 古いコールバックを無視
             try {
               var r = JSON.parse(rStr);
@@ -3033,7 +3067,8 @@
                 });
               }
             } catch (e) {}
-          }).withFailureHandler(function() {
+          };
+          window._batchRecruitFailHandler = function() {
             if (modalGen !== window._eventModalGen) return;
             var nEl = document.getElementById('eventModalStaffNextResContent');
             if (nEl) nEl.innerHTML = '<div class="nres-item" style="grid-column:1/-1;"><span class="text-muted">取得できませんでした</span></div>';
@@ -3043,7 +3078,7 @@
             var _bl2 = document.getElementById('volBodyLoading'); if (_bl2) _bl2.remove();
             var vA = document.getElementById('eventModalVolunteersArea'); if (vA) vA.style.display = 'none';
             var vL = document.getElementById('eventModalVolunteersList'); if (vL) vL.innerHTML = '';
-          }).getRecruitmentForBooking(props.rowNumber);
+          };
           setTimeout(function() {
             var addBtn = document.getElementById('eventModalAddStaff');
             var confirmBtn = document.getElementById('eventModalConfirmSelect');

@@ -5660,6 +5660,39 @@ function getChecklistAppUrl() {
   }
 }
 
+/**
+ * 清掃詳細モーダルに必要なデータをまとめて取得（3回のAPI呼び出しを1回に統合）
+ * @param {string} checkoutDate yyyy-MM-dd
+ * @param {number} rowNumber フォームシートの行番号
+ * @return {string} JSON { success, data: { checklistUrl, laundry, recruitment } }
+ */
+function getCleaningModalData(checkoutDate, rowNumber) {
+  try {
+    var result = {};
+
+    // 1. チェックリストURL（Script Propertiesから）
+    result.checklistUrl = PropertiesService.getScriptProperties().getProperty('CHECKLIST_APP_URL') || '';
+
+    // 2. クリーニング状況
+    try {
+      result.laundry = JSON.parse(getCleaningLaundryStatus(checkoutDate));
+    } catch (e) {
+      result.laundry = { success: false };
+    }
+
+    // 3. 募集・回答データ
+    try {
+      result.recruitment = JSON.parse(getRecruitmentForBooking(rowNumber));
+    } catch (e) {
+      result.recruitment = { success: false };
+    }
+
+    return JSON.stringify({ success: true, data: result });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 /* --- 以下、統合型チェックリストのコード（別アプリに移行済み、後方互換のため残置） --- */
 
 /**********************************************

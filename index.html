@@ -2374,7 +2374,7 @@
                 var bData = batch.data;
                 // クリーニング状況カード
                 if (_batchLaundryArea) {
-                  if (bData.laundry && bData.laundry.success && bData.laundry.data) {
+                  if (bData.laundry && bData.laundry.success) {
                     buildLaundryCardHtml(_batchLaundryArea, _batchCheckoutDate, bData.laundry.data, isStaffView);
                   } else {
                     _batchLaundryArea.innerHTML = '';

@@ -122,11 +122,13 @@ function getOrCreateChecklistSpreadsheet_() {
   var ssId = props.getProperty('CHECKLIST_SS_ID');
   if (ssId) {
     try { return SpreadsheetApp.openById(ssId); } catch (e) {
-      Logger.log('CHECKLIST_SS_ID=' + ssId + ' でスプレッドシートを開けません: ' + e.toString());
+      // 旧スプレッドシートが開けない場合、新規作成せずにエラーを投げる
+      // （データ消失を防ぐため）
+      throw new Error('チェックリストスプレッドシート(ID=' + ssId + ')を開けません。Googleドライブで確認してください: ' + e.toString());
     }
-  } else {
-    Logger.log('CHECKLIST_SS_ID が Script Properties に設定されていません。新規作成します。');
   }
+  // IDが未設定の場合のみ新規作成
+  Logger.log('CHECKLIST_SS_ID が Script Properties に設定されていません。新規作成します。');
   var newSs = SpreadsheetApp.create('清掃チェックリスト管理');
   props.setProperty('CHECKLIST_SS_ID', newSs.getId());
   // 初期シート作成
@@ -144,6 +146,47 @@ function getOrCreateChecklistSpreadsheet_() {
   var s6 = newSs.insertSheet(SHEET_CL_SUPPLIES);
   s6.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', '項目名', '記入者', 'タイムスタンプ']]);
   return newSs;
+}
+
+/**
+ * チェックリストスプレッドシートの診断情報を取得
+ */
+function getChecklistDiagnostics() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var ssId = props.getProperty('CHECKLIST_SS_ID');
+    if (!ssId) return JSON.stringify({ success: true, ssId: null, message: 'CHECKLIST_SS_IDが未設定' });
+
+    var ss;
+    try { ss = SpreadsheetApp.openById(ssId); } catch (e) {
+      return JSON.stringify({ success: true, ssId: ssId, message: 'スプレッドシートを開けません: ' + e.toString(), canOpen: false });
+    }
+
+    var sheets = ss.getSheets();
+    var sheetInfo = sheets.map(function(s) {
+      return { name: s.getName(), rows: s.getLastRow(), maxRows: s.getMaxRows(), maxCols: s.getMaxColumns() };
+    });
+
+    // マスタの先頭数行をプレビュー
+    var masterSheet = ss.getSheetByName(SHEET_CL_MASTER);
+    var masterPreview = [];
+    if (masterSheet && masterSheet.getLastRow() >= 2) {
+      var previewRows = masterSheet.getRange(1, 1, Math.min(masterSheet.getLastRow(), 5), Math.min(masterSheet.getLastColumn(), 6)).getValues();
+      masterPreview = previewRows.map(function(row) { return row.map(function(c) { return String(c); }); });
+    }
+
+    return JSON.stringify({
+      success: true,
+      ssId: ssId,
+      ssName: ss.getName(),
+      ssUrl: ss.getUrl(),
+      canOpen: true,
+      sheets: sheetInfo,
+      masterPreview: masterPreview
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
 }
 
 function clSheet_(name) {

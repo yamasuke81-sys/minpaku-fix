@@ -1533,15 +1533,50 @@
         var spots = checklistData.spots || [];
         var photos = checklistData.photos || {};
 
-        // 項目が0件の場合：インポート案内を表示
+        // 項目が0件の場合：診断＆インポート案内を表示
         if (items.length === 0) {
           document.getElementById('checklistContainer').innerHTML =
             '<div style="padding:30px 20px;text-align:center;color:#666;">' +
             '<p style="font-size:16px;margin-bottom:16px;">チェックリスト項目がありません</p>' +
-            '<p style="font-size:13px;margin-bottom:20px;color:#999;">項目が削除されたか、初期データが読み込まれていません。</p>' +
-            '<button id="btnReimportInline" style="padding:12px 28px;font-size:15px;border-radius:8px;border:none;background:#3498db;color:#fff;cursor:pointer;">初期データをインポート</button>' +
+            '<p style="font-size:13px;margin-bottom:12px;color:#999;">項目が削除されたか、初期データが読み込まれていません。</p>' +
+            '<button id="btnDiagnoseCL" style="padding:10px 24px;font-size:14px;border-radius:8px;border:1px solid #3498db;background:#fff;color:#3498db;cursor:pointer;margin-bottom:12px;">データ状態を診断</button>' +
+            '<div id="diagResult" style="margin:12px auto;max-width:320px;font-size:12px;text-align:left;display:none;background:#f8f9fa;padding:12px;border-radius:8px;"></div>' +
+            '<br>' +
+            '<button id="btnReimportInline" style="padding:12px 28px;font-size:15px;border-radius:8px;border:none;background:#e74c3c;color:#fff;cursor:pointer;">初期データをインポート（リセット）</button>' +
+            '<p style="font-size:11px;color:#e74c3c;margin-top:6px;">※カスタマイズした項目は消えます</p>' +
             '<div id="reimportInlineMsg" style="margin-top:12px;font-size:13px;display:none;"></div>' +
             '</div>';
+          document.getElementById('btnDiagnoseCL').addEventListener('click', function() {
+            var btn = this;
+            var res = document.getElementById('diagResult');
+            btn.disabled = true;
+            btn.textContent = '診断中…';
+            res.style.display = 'block';
+            res.textContent = '確認中…';
+            callGAS('getChecklistDiagnostics', []).then(function(d) {
+              var html = '';
+              if (d.ssId) html += '<b>スプレッドシートID:</b> ' + d.ssId + '<br>';
+              if (d.ssUrl) html += '<a href="' + d.ssUrl + '" target="_blank">スプレッドシートを開く</a><br>';
+              if (d.ssName) html += '<b>名前:</b> ' + d.ssName + '<br>';
+              if (d.canOpen === false) html += '<span style="color:#e74c3c;">開けません: ' + (d.message || '') + '</span><br>';
+              if (d.sheets) {
+                html += '<b>シート一覧:</b><br>';
+                d.sheets.forEach(function(s) { html += '・' + s.name + ': ' + s.rows + '行<br>'; });
+              }
+              if (d.masterPreview && d.masterPreview.length) {
+                html += '<b>マスタデータ(先頭):</b><br>';
+                d.masterPreview.forEach(function(row, i) { html += (i === 0 ? '<i>' : '') + row.join(' | ') + (i === 0 ? '</i>' : '') + '<br>'; });
+              }
+              if (d.message && !d.ssUrl) html += d.message;
+              res.innerHTML = html || '情報なし';
+              btn.disabled = false;
+              btn.textContent = 'データ状態を診断';
+            }).catch(function(e) {
+              res.textContent = 'エラー: ' + (e.message || e);
+              btn.disabled = false;
+              btn.textContent = 'データ状態を診断';
+            });
+          });
           document.getElementById('btnReimportInline').addEventListener('click', function() {
             var btn = this;
             var msg = document.getElementById('reimportInlineMsg');

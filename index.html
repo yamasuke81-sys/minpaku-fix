@@ -2328,8 +2328,8 @@
                   if (res.success && res.url) {
                     var btnCl = document.createElement('button');
                     btnCl.type = 'button';
-                    btnCl.className = 'btn btn-outline-success btn-sm';
-                    btnCl.style.cssText = 'font-size:0.7rem;white-space:nowrap;padding:0.15rem 0.5rem;';
+                    btnCl.className = 'btn btn-outline-success';
+                    btnCl.style.cssText = 'font-size:0.85rem;white-space:nowrap;padding:0.3rem 0.75rem;';
                     btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリスト';
                     btnCl.onclick = function() {
                       var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';

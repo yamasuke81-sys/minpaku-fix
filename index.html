@@ -1062,6 +1062,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿リマインダー</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsStaff">
         <button type="button" class="btn btn-sm btn-primary mb-2" id="btnAddStaff">スタッフ追加</button>
@@ -1179,6 +1180,11 @@
       <div id="settingsNotifications" style="display:none;">
         <p class="small text-muted mb-2">回答・回答取消・予約追加・予約削除・フォーム回答などの通知履歴です。</p>
         <div id="notificationList"></div>
+      </div>
+      <div id="settingsMaintenance" style="display:none;">
+        <p class="small text-muted mb-2">スプレッドシートの空白行・空白列を削除してセル数を最適化します。Google Sheetsの1000万セル上限に近づいた場合に実行してください。</p>
+        <button type="button" class="btn btn-sm btn-primary mb-2" id="btnTrimSpreadsheet">スプレッドシートを最適化</button>
+        <div id="trimResult" class="small mt-2" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -5861,6 +5867,38 @@
         });
       }
       document.getElementById('btnReloadDataSync').addEventListener('click', doReloadData);
+      var btnTrim = document.getElementById('btnTrimSpreadsheet');
+      if (btnTrim) {
+        btnTrim.addEventListener('click', function() {
+          var btn = this;
+          var resEl = document.getElementById('trimResult');
+          btn.disabled = true;
+          btn.textContent = '最適化中…';
+          resEl.style.display = 'block';
+          resEl.textContent = '処理中…';
+          resEl.style.color = '#666';
+          google.script.run
+            .withSuccessHandler(function(str) {
+              var res = JSON.parse(str);
+              if (res.success) {
+                resEl.textContent = '完了: 約' + res.freedCells.toLocaleString() + 'セルを削減しました。';
+                resEl.style.color = '#27ae60';
+              } else {
+                resEl.textContent = 'エラー: ' + (res.error || '不明');
+                resEl.style.color = '#e74c3c';
+              }
+              btn.disabled = false;
+              btn.textContent = 'スプレッドシートを最適化';
+            })
+            .withFailureHandler(function(e) {
+              resEl.textContent = 'エラー: ' + (e.message || e);
+              resEl.style.color = '#e74c3c';
+              btn.disabled = false;
+              btn.textContent = 'スプレッドシートを最適化';
+            })
+            .trimSpreadsheet();
+        });
+      }
       document.getElementById('btnAddBooking').addEventListener('click', function() {
         document.getElementById('addBookingCheckIn').value = '';
         document.getElementById('addBookingCheckOut').value = '';
@@ -5999,6 +6037,8 @@
           document.getElementById('settingsSync').style.display = t === 'sync' ? 'block' : 'none';
           var notifEl = document.getElementById('settingsNotifications');
           if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
+          var maintEl = document.getElementById('settingsMaintenance');
+          if (maintEl) maintEl.style.display = t === 'maintenance' ? 'block' : 'none';
           if (t === 'staff') loadStaffList();
           if (t === 'jobs') loadJobList();
           if (t === 'recruitSettings') loadRecruitSettingsForm();

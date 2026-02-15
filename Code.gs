@@ -1050,6 +1050,59 @@ function deleteSubOwner(rowIndex) {
 /**
  * 設定用シートを自動作成（存在しない場合）
  */
+/**
+ * シートの空白行・空白列を削除してセル数を削減
+ */
+function trimAllSheets_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var totalFreed = 0;
+  sheets.forEach(function(sheet) {
+    try {
+      var maxRows = sheet.getMaxRows();
+      var maxCols = sheet.getMaxColumns();
+      var lastRow = Math.max(sheet.getLastRow(), 1);
+      var lastCol = Math.max(sheet.getLastColumn(), 1);
+      var targetRows = lastRow + 5;
+      var targetCols = lastCol + 1;
+      if (maxRows > targetRows) {
+        sheet.deleteRows(targetRows + 1, maxRows - targetRows);
+        totalFreed += (maxRows - targetRows) * maxCols;
+      }
+      if (maxCols > targetCols) {
+        sheet.deleteColumns(targetCols + 1, maxCols - targetCols);
+        totalFreed += Math.min(maxRows, targetRows) * (maxCols - targetCols);
+      }
+    } catch (e) {
+      Logger.log('trimSheet skip(' + sheet.getName() + '): ' + e);
+    }
+  });
+  return totalFreed;
+}
+
+function trimSheet_(sheet) {
+  try {
+    var maxRows = sheet.getMaxRows();
+    var maxCols = sheet.getMaxColumns();
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var lastCol = Math.max(sheet.getLastColumn(), 1);
+    if (maxRows > lastRow + 5) sheet.deleteRows(lastRow + 6, maxRows - lastRow - 5);
+    if (maxCols > lastCol + 1) sheet.deleteColumns(lastCol + 2, maxCols - lastCol - 1);
+  } catch (e) {}
+}
+
+/**
+ * スプレッドシートのセル数を最適化（設定画面から呼び出し可能）
+ */
+function trimSpreadsheet() {
+  try {
+    var freed = trimAllSheets_();
+    return JSON.stringify({ success: true, freedCells: freed });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 function ensureSheetsExist() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -1058,8 +1111,20 @@ function ensureSheetsExist() {
     try {
       var s = ss.insertSheet(name);
       if (headerFn) headerFn(s);
+      trimSheet_(s);
     } catch (e) {
-      Logger.log('シート作成スキップ(' + name + '): ' + e.toString());
+      if (String(e).indexOf('10000000') !== -1 || String(e).indexOf('セル数') !== -1) {
+        try {
+          trimAllSheets_();
+          var s = ss.insertSheet(name);
+          if (headerFn) headerFn(s);
+          trimSheet_(s);
+        } catch (e2) {
+          Logger.log('シート作成スキップ(トリム後も失敗)(' + name + '): ' + e2.toString());
+        }
+      } else {
+        Logger.log('シート作成スキップ(' + name + '): ' + e.toString());
+      }
     }
   }
 

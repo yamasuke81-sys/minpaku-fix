@@ -2773,6 +2773,12 @@ function checkRosterReminder() {
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     var today = new Date();
     today.setHours(0, 0, 0, 0);
+    var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
+
+    // 重複送信防止: 本日分を既に送信済みなら中止
+    var lastSent = PropertiesService.getScriptProperties().getProperty('rosterReminderLastSent');
+    if (lastSent === todayStr) return;
+
     var targetDate = new Date(today);
     targetDate.setDate(targetDate.getDate() + daysBefore);
 
@@ -2802,6 +2808,9 @@ function checkRosterReminder() {
     });
     var message = '宿泊者名簿が未記入の予約が ' + missing.length + ' 件あります: ' + msgLines.join(', ');
     addNotification_('名簿', message, { type: 'rosterReminder', missing: missing });
+
+    // 本日送信済みとして記録（1日1回まで）
+    PropertiesService.getScriptProperties().setProperty('rosterReminderLastSent', todayStr);
 
     if (ownerEmail) {
       try {

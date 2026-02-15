@@ -1058,8 +1058,8 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="subOwners">サブオーナー</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="jobs">仕事内容</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="recruitSettings">募集設定</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="reminderEmail">リマインドメール</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿リマインダー</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="reminderEmail">スタッフ未決定リマインド</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿未入力リマインド</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
@@ -1079,7 +1079,7 @@
         <div id="jobList"></div>
       </div>
       <div id="settingsRecruitSettings" style="display:none;">
-        <div class="mb-2"><label>募集開始（チェックアウト何週間前から）</label><input type="number" class="form-control form-control-sm" id="recruitStartWeeks" min="1" value="4"></div>
+
         <div class="mb-2"><label>最少回答者数（これ未満でリマインド）</label><input type="number" class="form-control form-control-sm" id="minRespondents" min="1" value="2"></div>
         <div class="mb-2"><label>リマインド間隔（週）</label><input type="number" class="form-control form-control-sm" id="reminderIntervalWeeks" min="1" value="1"></div>
         <div class="mb-2"><label>選定人数（基本何人選ぶか）</label><input type="number" class="form-control form-control-sm" id="selectCount" min="1" value="2"></div>
@@ -1161,11 +1161,11 @@
         <p class="small text-muted mb-2">チェックイン日が近い予約について、宿泊者名簿が未記入の場合にオーナー宛に通知とメールを送ります。オーナーは通知を見て、宿泊者に名簿記入を催促してください。</p>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="rosterReminderEnabled">
-          <label class="form-check-label" for="rosterReminderEnabled">名簿リマインダーを有効にする</label>
+          <label class="form-check-label" for="rosterReminderEnabled">名簿未入力リマインドを有効にする</label>
         </div>
         <div class="mb-2"><label class="form-label small">チェックイン何日前に通知</label><input type="number" class="form-control form-control-sm" id="rosterReminderDaysBefore" min="1" max="30" value="3" style="max-width:100px;"></div>
         <div class="mb-2"><label class="form-label small">通知時刻</label><select class="form-select form-select-sm" id="rosterReminderHour" style="max-width:120px;"></select></div>
-        <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿リマインダー設定を保存</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿未入力リマインド設定を保存</button>
       </div>
       <div id="settingsSync" style="display:none;">
         <p class="small text-muted">Airbnb・Booking.comなどのiCal URLを登録すると、予約を自動取り込みできます。宿泊者がフォームで詳細入力すると、既存予約にマージされます。</p>
@@ -2328,8 +2328,8 @@
                   if (res.success && res.url) {
                     var btnCl = document.createElement('button');
                     btnCl.type = 'button';
-                    btnCl.className = 'btn btn-outline-success';
-                    btnCl.style.cssText = 'font-size:0.85rem;white-space:nowrap;padding:0.3rem 0.75rem;';
+                    btnCl.className = 'btn btn-warning';
+                    btnCl.style.cssText = 'font-size:0.85rem;white-space:nowrap;padding:0.3rem 0.75rem;color:#000;font-weight:600;';
                     btnCl.innerHTML = '<i class="bi bi-check2-square"></i> 清掃チェックリスト';
                     btnCl.onclick = function() {
                       var checkoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
@@ -5575,7 +5575,6 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
-              document.getElementById('recruitStartWeeks').value = r.settings.recruitStartWeeks || 4;
               document.getElementById('minRespondents').value = r.settings.minRespondents || 2;
               document.getElementById('reminderIntervalWeeks').value = r.settings.reminderIntervalWeeks || 1;
               document.getElementById('selectCount').value = r.settings.selectCount || 2;
@@ -5586,7 +5585,6 @@
 
       document.getElementById('btnSaveRecruitSettings').addEventListener('click', function() {
         var settings = {
-          recruitStartWeeks: parseInt(document.getElementById('recruitStartWeeks').value, 10) || 4,
           minRespondents: parseInt(document.getElementById('minRespondents').value, 10) || 2,
           reminderIntervalWeeks: parseInt(document.getElementById('reminderIntervalWeeks').value, 1) || 1,
           selectCount: parseInt(document.getElementById('selectCount').value, 10) || 2
@@ -6304,7 +6302,7 @@
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)">取消</button>';
           }
         } else {
-          html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundrySent" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)"><i class="bi bi-box-arrow-up-right me-1"></i>クリーニングに出した</button>';
+          html += '<button type="button" class="btn btn-sm btn-warning flex-grow-1" id="btnLaundrySent" style="color:#000;font-weight:600;" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)"><i class="bi bi-box-arrow-up-right me-1"></i>クリーニングに出した</button>';
         }
         html += '</div>';
 
@@ -6317,7 +6315,7 @@
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)">取消</button>';
           }
         } else if (hasSent) {
-          html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundryReceived" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)"><i class="bi bi-box-arrow-in-down me-1"></i>受け取った</button>';
+          html += '<button type="button" class="btn btn-sm btn-warning flex-grow-1" id="btnLaundryReceived" style="color:#000;font-weight:600;" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)"><i class="bi bi-box-arrow-in-down me-1"></i>受け取った</button>';
         } else {
           html += '<span class="small text-muted">受け取り（出した後に有効）</span>';
         }
@@ -6332,7 +6330,7 @@
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)">取消</button>';
           }
         } else if (hasReceived) {
-          html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundryReturned" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)"><i class="bi bi-house-check me-1"></i>施設に戻した</button>';
+          html += '<button type="button" class="btn btn-sm btn-warning flex-grow-1" id="btnLaundryReturned" style="color:#000;font-weight:600;" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)"><i class="bi bi-house-check me-1"></i>施設に戻した</button>';
         } else {
           html += '<span class="small text-muted">施設に戻す（受取後に有効）</span>';
         }

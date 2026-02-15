@@ -2354,8 +2354,8 @@
               checklistData.items.forEach(function(item) {
                 if (item.id === itemId) item.supplyItem = newSupply;
               });
-              // UIを再描画して要補充チェックボックスの表示を反映
-              renderChecklist();
+              // UIを再描画して要補充チェックボックスの表示を反映（状態保持）
+              reRenderWithState();
             } else {
               showSaveStatus('error');
               alert('要補充設定の保存に失敗しました: ' + (res2.error || ''));

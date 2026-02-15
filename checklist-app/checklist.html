@@ -1642,14 +1642,26 @@
         html += '<button class="inline-photo-add-btn" onclick="addPhotoSpotPrompt(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">＋ 撮影項目を追加</button>';
         html += '</div>';
       }
-      // 直属アイテム
+      // 直属アイテムと子カテゴリを統一sortOrderで混合描画
+      var catOrderMap = {};
+      if (checklistData && checklistData.categoryOrder) {
+        checklistData.categoryOrder.forEach(function(o) { catOrderMap[o.path] = o.sortOrder; });
+      }
+      var mixed = [];
       node.items.forEach(function(item) {
-        html += renderChecklistItem(item, checked, supplyNeeded);
+        mixed.push({ type: 'item', data: item, sortOrder: item.sortOrder || 0 });
       });
-      // 子カテゴリ（再帰）
       node.childOrder.forEach(function(childName) {
-        var childPath = fullPath + '：' + childName;
-        html += renderCategoryNode(childName, node.children[childName], level + 1, childPath, checked, supplyNeeded, null, null);
+        var childPath = fullPath + '\uff1a' + childName;
+        mixed.push({ type: 'cat', name: childName, path: childPath, sortOrder: catOrderMap[childPath] !== undefined ? catOrderMap[childPath] : 99999 });
+      });
+      mixed.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+      mixed.forEach(function(child) {
+        if (child.type === 'item') {
+          html += renderChecklistItem(child.data, checked, supplyNeeded);
+        } else {
+          html += renderCategoryNode(child.name, node.children[child.name], level + 1, child.path, checked, supplyNeeded, null, null);
+        }
       });
       // 追加ボタン
       html += '<button class="section-add-btn" onclick="addItemPrompt(\'' + escapedPath + '\')">＋ 項目を追加</button>';
@@ -3043,22 +3055,22 @@
           }
         }
 
-        // containerEl 直下の .checklist-item を取得して挿入位置を決定
-        var items = Array.prototype.slice.call(
-          containerEl.querySelectorAll(':scope > .checklist-item')
+        // containerEl 直下の .checklist-item と .section を取得して挿入位置を決定
+        var siblings = Array.prototype.slice.call(
+          containerEl.querySelectorAll(':scope > .checklist-item, :scope > .section')
         ).filter(function(el) { return el !== dragItem; });
         var inserted = false;
-        for (var i = 0; i < items.length; i++) {
-          var r = items[i].getBoundingClientRect();
+        for (var i = 0; i < siblings.length; i++) {
+          var r = siblings[i].getBoundingClientRect();
           var mid = r.top + r.height / 2;
           if (touch.clientY < mid) {
-            containerEl.insertBefore(placeholder, items[i]);
+            containerEl.insertBefore(placeholder, siblings[i]);
             inserted = true;
             break;
           }
         }
         if (!inserted) {
-          // アイテムの後ろ、追加ボタンの前に配置
+          // 最後の要素の後ろ、追加ボタンの前に配置
           var addBtn = containerEl.querySelector(':scope > .section-add-btn');
           if (addBtn) {
             containerEl.insertBefore(placeholder, addBtn);
@@ -3094,57 +3106,92 @@
         var oldCategory = getCategoryFromBody(originalContainerEl);
         var categoryChanged = (newCategory !== oldCategory);
 
-        // 新しい並び順を計算
-        var allItems = Array.prototype.slice.call(section.querySelectorAll(':scope > .checklist-item'));
-        var orders = [];
-        for (var i = 0; i < allItems.length; i++) {
-          var id = allItems[i].getAttribute('data-item-id');
-          if (id) {
-            orders.push({ id: id, sortOrder: i + 1 });
-            allItems[i].setAttribute('data-sort-order', i + 1);
+        // 項目＋カテゴリの統一sortOrderを計算
+        var allChildren = Array.prototype.slice.call(
+          section.querySelectorAll(':scope > .checklist-item, :scope > .section')
+        );
+        var itemOrders = [];
+        var catOrders = [];
+        for (var i = 0; i < allChildren.length; i++) {
+          var child = allChildren[i];
+          var sortVal = i + 1;
+          if (child.classList.contains('checklist-item')) {
+            var cid = child.getAttribute('data-item-id');
+            if (cid) {
+              itemOrders.push({ id: cid, sortOrder: sortVal });
+              child.setAttribute('data-sort-order', sortVal);
+            }
+          } else if (child.classList.contains('section')) {
+            var catPath = child.getAttribute('data-category');
+            if (catPath) catOrders.push({ path: catPath, sortOrder: sortVal });
           }
         }
 
-        if (orders.length > 0) {
-          // ローカルデータを更新
+        if (itemOrders.length > 0 || catOrders.length > 0) {
+          // ローカルデータを更新（項目）
           var itemMap = {};
-          orders.forEach(function(o) { itemMap[o.id] = o.sortOrder; });
+          itemOrders.forEach(function(o) { itemMap[o.id] = o.sortOrder; });
           if (checklistData && checklistData.items) {
             checklistData.items.forEach(function(item) {
               if (itemMap[item.id] !== undefined) item.sortOrder = itemMap[item.id];
               if (categoryChanged && item.id === movedItemId) item.category = newCategory;
             });
           }
+          // ローカルデータを更新（カテゴリ順序）
+          if (catOrders.length > 0 && checklistData) {
+            if (!checklistData.categoryOrder) checklistData.categoryOrder = [];
+            var existingCatMap = {};
+            checklistData.categoryOrder.forEach(function(o, idx) { existingCatMap[o.path] = idx; });
+            catOrders.forEach(function(o) {
+              var idx = existingCatMap[o.path];
+              if (idx !== undefined) checklistData.categoryOrder[idx].sortOrder = o.sortOrder;
+              else checklistData.categoryOrder.push(o);
+            });
+          }
 
           showSaveStatus('saving');
-          if (categoryChanged && movedItemId) {
-            // カテゴリ変更あり → moveItemToCategory を呼び出し
-            google.script.run
-              .withSuccessHandler(function(json) {
-                try {
-                  var res = JSON.parse(json);
-                  if (res.success) {
-                    showSaveStatus('saved');
-                    reRenderWithState();
-                  } else {
-                    showSaveStatus('error');
-                  }
-                } catch (e) { showSaveStatus('error'); }
-              })
-              .withFailureHandler(function() { showSaveStatus('error'); })
-              .moveItemToCategory(movedItemId, newCategory, orders);
-          } else {
-            // 同一カテゴリ内の並び替えのみ
-            google.script.run
-              .withSuccessHandler(function(json) {
-                try {
-                  var res = JSON.parse(json);
-                  showSaveStatus(res.success ? 'saved' : 'error');
-                } catch (e) { showSaveStatus('error'); }
-              })
-              .withFailureHandler(function() { showSaveStatus('error'); })
-              .reorderChecklistItems(orders);
+          var pendingSaves = 0;
+          var anyError = false;
+          function onItemDragSaveDone() {
+            pendingSaves--;
+            if (pendingSaves <= 0) {
+              showSaveStatus(anyError ? 'error' : 'saved');
+              if (categoryChanged) reRenderWithState();
+            }
           }
+
+          // 項目の保存
+          if (categoryChanged && movedItemId) {
+            pendingSaves++;
+            google.script.run
+              .withSuccessHandler(function(json) {
+                try { var res = JSON.parse(json); if (!res.success) anyError = true; } catch (e) { anyError = true; }
+                onItemDragSaveDone();
+              })
+              .withFailureHandler(function() { anyError = true; onItemDragSaveDone(); })
+              .moveItemToCategory(movedItemId, newCategory, itemOrders);
+          } else if (itemOrders.length > 0) {
+            pendingSaves++;
+            google.script.run
+              .withSuccessHandler(function(json) {
+                try { var res = JSON.parse(json); if (!res.success) anyError = true; } catch (e) { anyError = true; }
+                onItemDragSaveDone();
+              })
+              .withFailureHandler(function() { anyError = true; onItemDragSaveDone(); })
+              .reorderChecklistItems(itemOrders);
+          }
+          // カテゴリ順序の保存
+          if (catOrders.length > 0) {
+            pendingSaves++;
+            google.script.run
+              .withSuccessHandler(function(json) {
+                try { var res = JSON.parse(json); if (!res.success) anyError = true; } catch (e) { anyError = true; }
+                onItemDragSaveDone();
+              })
+              .withFailureHandler(function() { anyError = true; onItemDragSaveDone(); })
+              .reorderCategories(catOrders);
+          }
+          if (pendingSaves === 0) showSaveStatus('saved');
         }
         dragItem = null;
         placeholder = null;

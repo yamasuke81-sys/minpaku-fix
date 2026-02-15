@@ -3471,23 +3471,42 @@
         placeholder.remove();
         if (dragClone) { dragClone.remove(); dragClone = null; }
 
+        // 全子要素（項目＋カテゴリ）の統一sortOrderを計算
         var parentBody = dragSection.closest('.section-body') || document.getElementById('checklistContainer');
-        var sameLevel = Array.prototype.slice.call(
-          parentBody.querySelectorAll(siblingSelector)
+        var allChildren = Array.prototype.slice.call(
+          parentBody.querySelectorAll(':scope > .checklist-item, :scope > .section')
         );
-        var orders = [];
-        for (var i = 0; i < sameLevel.length; i++) {
-          var catPath = sameLevel[i].getAttribute('data-category');
-          if (catPath) {
-            orders.push({ path: catPath, sortOrder: i + 1 });
+        var itemOrders = [];
+        var catOrders = [];
+        for (var i = 0; i < allChildren.length; i++) {
+          var child = allChildren[i];
+          var sortVal = i + 1;
+          if (child.classList.contains('checklist-item')) {
+            var itemId = child.getAttribute('data-item-id');
+            if (itemId) {
+              itemOrders.push({ id: itemId, sortOrder: sortVal });
+              child.setAttribute('data-sort-order', sortVal);
+            }
+          } else if (child.classList.contains('section')) {
+            var cp = child.getAttribute('data-category');
+            if (cp) catOrders.push({ path: cp, sortOrder: sortVal });
           }
         }
-        if (orders.length > 0) {
-          if (checklistData) {
+
+        // ローカルデータを更新
+        if (checklistData) {
+          if (itemOrders.length > 0 && checklistData.items) {
+            var iMap = {};
+            itemOrders.forEach(function(o) { iMap[o.id] = o.sortOrder; });
+            checklistData.items.forEach(function(item) {
+              if (iMap[item.id] !== undefined) item.sortOrder = iMap[item.id];
+            });
+          }
+          if (catOrders.length > 0) {
             if (!checklistData.categoryOrder) checklistData.categoryOrder = [];
             var existingMap = {};
             checklistData.categoryOrder.forEach(function(o, idx) { existingMap[o.path] = idx; });
-            orders.forEach(function(o) {
+            catOrders.forEach(function(o) {
               var idx = existingMap[o.path];
               if (idx !== undefined) {
                 checklistData.categoryOrder[idx].sortOrder = o.sortOrder;
@@ -3496,16 +3515,38 @@
               }
             });
           }
+        }
+
+        // バックエンドに保存（項目＋カテゴリ両方）
+        if (itemOrders.length > 0 || catOrders.length > 0) {
           showSaveStatus('saving');
-          google.script.run
-            .withSuccessHandler(function(json) {
-              try {
-                var res = JSON.parse(json);
-                showSaveStatus(res.success ? 'saved' : 'error');
-              } catch (e) { showSaveStatus('error'); }
-            })
-            .withFailureHandler(function() { showSaveStatus('error'); })
-            .reorderCategories(orders);
+          var catPending = 0;
+          var catAnyErr = false;
+          function onCatReorderDone() {
+            catPending--;
+            if (catPending <= 0) showSaveStatus(catAnyErr ? 'error' : 'saved');
+          }
+          if (itemOrders.length > 0) {
+            catPending++;
+            google.script.run
+              .withSuccessHandler(function(json) {
+                try { var res = JSON.parse(json); if (!res.success) catAnyErr = true; } catch (e) { catAnyErr = true; }
+                onCatReorderDone();
+              })
+              .withFailureHandler(function() { catAnyErr = true; onCatReorderDone(); })
+              .reorderChecklistItems(itemOrders);
+          }
+          if (catOrders.length > 0) {
+            catPending++;
+            google.script.run
+              .withSuccessHandler(function(json) {
+                try { var res = JSON.parse(json); if (!res.success) catAnyErr = true; } catch (e) { catAnyErr = true; }
+                onCatReorderDone();
+              })
+              .withFailureHandler(function() { catAnyErr = true; onCatReorderDone(); })
+              .reorderCategories(catOrders);
+          }
+          if (catPending === 0) showSaveStatus('saved');
         }
 
         dragSection = null; placeholder = null; containerEl = null;

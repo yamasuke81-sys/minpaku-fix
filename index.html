@@ -6288,11 +6288,17 @@
         var html = '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
         html += '<div class="card-title-sm" style="display:flex;align-items:center;gap:0.3rem;"><i class="bi bi-basket2"></i> クリーニング状況</div>';
 
+        // 最後に完了したステップを判定（そのステップのみ取消可能）
+        var lastCompletedStep = hasReturned ? 'returned' : (hasReceived ? 'received' : (hasSent ? 'sent' : null));
+
         // ステップ1: 出す
         html += '<div class="mt-2" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
         html += '<span class="badge ' + (hasSent ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasSent ? '<i class="bi bi-check"></i>' : '1') + '</span>';
         if (hasSent) {
-          html += '<span class="small">' + escapeHtml(d.sentBy) + '　' + formatLaundryTime(d.sentAt) + '</span>';
+          html += '<span class="small flex-grow-1">' + escapeHtml(d.sentBy) + '　' + formatLaundryTime(d.sentAt) + '</span>';
+          if (lastCompletedStep === 'sent') {
+            html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)">取消</button>';
+          }
         } else {
           html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundrySent" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)"><i class="bi bi-box-arrow-up-right me-1"></i>クリーニングに出した</button>';
         }
@@ -6302,7 +6308,10 @@
         html += '<div class="mt-1" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
         html += '<span class="badge ' + (hasReceived ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasReceived ? '<i class="bi bi-check"></i>' : '2') + '</span>';
         if (hasReceived) {
-          html += '<span class="small">' + escapeHtml(d.receivedBy) + '　' + formatLaundryTime(d.receivedAt) + '</span>';
+          html += '<span class="small flex-grow-1">' + escapeHtml(d.receivedBy) + '　' + formatLaundryTime(d.receivedAt) + '</span>';
+          if (lastCompletedStep === 'received') {
+            html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)">取消</button>';
+          }
         } else if (hasSent) {
           html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundryReceived" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'received\', this)"><i class="bi bi-box-arrow-in-down me-1"></i>受け取った</button>';
         } else {
@@ -6314,18 +6323,16 @@
         html += '<div class="mt-1" style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
         html += '<span class="badge ' + (hasReturned ? 'bg-success' : 'bg-secondary') + '" style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:0.75rem;">' + (hasReturned ? '<i class="bi bi-check"></i>' : '3') + '</span>';
         if (hasReturned) {
-          html += '<span class="small">' + escapeHtml(d.returnedBy) + '　' + formatLaundryTime(d.returnedAt) + '</span>';
+          html += '<span class="small flex-grow-1">' + escapeHtml(d.returnedBy) + '　' + formatLaundryTime(d.returnedAt) + '</span>';
+          if (lastCompletedStep === 'returned') {
+            html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)">取消</button>';
+          }
         } else if (hasReceived) {
           html += '<button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" id="btnLaundryReturned" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'returned\', this)"><i class="bi bi-house-check me-1"></i>施設に戻した</button>';
         } else {
           html += '<span class="small text-muted">施設に戻す（受取後に有効）</span>';
         }
         html += '</div>';
-
-        // リセットボタン（オーナーのみ、何かしら記録がある場合）
-        if (!isStaffView && (hasSent || hasReceived || hasReturned)) {
-          html += '<div class="mt-2 text-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="resetLaundry(\'' + escapeHtml(checkoutDate) + '\', this)"><i class="bi bi-arrow-counterclockwise me-1"></i>リセット</button></div>';
-        }
 
         html += '</div>';
         container.innerHTML = html;
@@ -6380,6 +6387,27 @@
           })
           .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
           .resetCleaningLaundry(checkoutDate);
+      };
+
+      window.cancelLaundryStep = function(checkoutDate, step, btn) {
+        var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
+        if (!confirm('「' + labels[step] + '」を取り消しますか？')) return;
+        setButtonLoading(btn, true);
+        google.script.run
+          .withSuccessHandler(function(resStr) {
+            try {
+              var res = JSON.parse(resStr);
+              if (res.success) {
+                var area = document.getElementById('laundryCardArea');
+                if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
+              } else {
+                alert('エラー: ' + (res.error || '不明なエラー'));
+                setButtonLoading(btn, false);
+              }
+            } catch (e) { alert('エラーが発生しました'); setButtonLoading(btn, false); }
+          })
+          .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
+          .cancelCleaningLaundryStep(checkoutDate, step);
       };
 
       if (document.readyState === 'loading') {

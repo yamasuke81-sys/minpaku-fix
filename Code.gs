@@ -6777,6 +6777,39 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
 }
 
 /**
+ * クリーニングステップを個別キャンセル
+ * 該当ステップ以降のデータをクリアする（例: sentキャンセル→received,returnedもクリア）
+ */
+function cancelCleaningLaundryStep(checkoutDate, step) {
+  try {
+    ensureSheetsExist();
+    var dateKey = normDateStr_(checkoutDate);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_LAUNDRY);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '記録がありません' });
+    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < dates.length; i++) {
+      if (normDateStr_(dates[i][0]) === dateKey) {
+        var row = i + 2;
+        if (step === 'sent') {
+          sheet.getRange(row, 2, 1, 6).clearContent();
+        } else if (step === 'received') {
+          sheet.getRange(row, 4, 1, 4).clearContent();
+        } else if (step === 'returned') {
+          sheet.getRange(row, 6, 1, 2).clearContent();
+        }
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '記録がありません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * クリーニング連絡をリセット（オーナーのみ）
  * @param {string} checkoutDate yyyy-MM-dd
  * @return {string} JSON { success }

@@ -815,6 +815,34 @@
       border-radius: 4px;
       margin: 2px 16px;
     }
+    /* カテゴリ並び替えハンドル */
+    .cat-drag-handle {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.5);
+      font-size: 16px;
+      cursor: grab;
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 2px;
+    }
+    .cat-drag-handle:active { cursor: grabbing; color: #fff; }
+    .section.cat-dragging {
+      opacity: 0.4;
+    }
+    .cat-drag-placeholder {
+      background: #d4e6f1;
+      border: 2px dashed #3498db;
+      border-radius: 8px;
+      margin: 4px 0;
+    }
     .item-edit-btn {
       width: 24px;
       height: 24px;
@@ -1470,7 +1498,7 @@
     }
 
     // === ツリー構造でカテゴリを管理（4階層対応） ===
-    function buildCategoryTree(items) {
+    function buildCategoryTree(items, categoryOrder) {
       var tree = { children: {}, childOrder: [], items: [] };
       items.forEach(function(item) {
         var parts = (item.category || 'その他').split('：');
@@ -1485,7 +1513,39 @@
         }
         node.items.push(item);
       });
+      // カテゴリ順序を適用
+      if (categoryOrder && categoryOrder.length > 0) {
+        applyCategoryOrder(tree, '', categoryOrder);
+      }
       return tree;
+    }
+
+    function applyCategoryOrder(node, parentPath, categoryOrder) {
+      if (node.childOrder.length <= 1) {
+        // 子が1つ以下なら並び替え不要、再帰のみ
+        node.childOrder.forEach(function(childName) {
+          var childPath = parentPath ? (parentPath + '：' + childName) : childName;
+          applyCategoryOrder(node.children[childName], childPath, categoryOrder);
+        });
+        return;
+      }
+      // 保存済み順序をマップ化
+      var orderMap = {};
+      categoryOrder.forEach(function(o) { orderMap[o.path] = o.sortOrder; });
+      // 子カテゴリのフルパスに基づいてソート
+      node.childOrder.sort(function(a, b) {
+        var pathA = parentPath ? (parentPath + '：' + a) : a;
+        var pathB = parentPath ? (parentPath + '：' + b) : b;
+        var orderA = orderMap[pathA] !== undefined ? orderMap[pathA] : 99999;
+        var orderB = orderMap[pathB] !== undefined ? orderMap[pathB] : 99999;
+        if (orderA !== orderB) return orderA - orderB;
+        return 0; // 同じ順序なら元の順序を維持
+      });
+      // 子ノードにも再帰的に適用
+      node.childOrder.forEach(function(childName) {
+        var childPath = parentPath ? (parentPath + '：' + childName) : childName;
+        applyCategoryOrder(node.children[childName], childPath, categoryOrder);
+      });
     }
 
     function getAllNodeItems(node) {
@@ -1505,6 +1565,7 @@
       var html = '<div class="' + levelClass + '" data-category="' + escapeHtml(fullPath) + '">';
       html += '<div class="section-header collapsed" onclick="toggleSection(this)">';
       html += '<div class="section-header-row1">';
+      html += '<button class="cat-drag-handle" onmousedown="event.stopPropagation();" ontouchstart="event.stopPropagation();" title="ドラッグで並び替え">☰</button>';
       html += '<span class="section-icon">▼</span>';
       html += '<span class="section-title">' + escapeHtml(name) + '</span>';
       html += '<span class="section-count">(' + checkedCount + '/' + totalCount + ')</span>';
@@ -1715,7 +1776,8 @@
           return;
         }
 
-        var tree = buildCategoryTree(items);
+        var categoryOrder = checklistData.categoryOrder || [];
+        var tree = buildCategoryTree(items, categoryOrder);
         var html = '';
         tree.childOrder.forEach(function(majorName) {
           html += renderCategoryNode(majorName, tree.children[majorName], 0, majorName, checked, supplyNeeded, spots, photos);
@@ -2854,6 +2916,171 @@
       }, { passive: false });
       document.addEventListener('mousedown', function(e) {
         if (e.target.closest('.item-drag-handle')) handleDragStart(e);
+      });
+    })();
+
+    // === カテゴリ並び替えドラッグ＆ドロップ（タッチ対応） ===
+    (function() {
+      var dragSection = null;
+      var placeholder = null;
+      var dragClone = null;
+      var containerEl = null;
+      var siblingSelector = null;
+
+      function handleCatDragStart(e) {
+        var handle = e.target.closest('.cat-drag-handle');
+        if (!handle) return;
+        dragSection = handle.closest('.section');
+        if (!dragSection) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        var touch = e.touches ? e.touches[0] : e;
+        containerEl = dragSection.parentElement;
+
+        // 同レベルの兄弟セクションのセレクタを決定
+        if (dragSection.classList.contains('sub-sub-sub-section')) {
+          siblingSelector = ':scope > .sub-sub-sub-section';
+        } else if (dragSection.classList.contains('sub-sub-section')) {
+          siblingSelector = ':scope > .sub-sub-section';
+        } else if (dragSection.classList.contains('sub-section')) {
+          siblingSelector = ':scope > .sub-section';
+        } else {
+          siblingSelector = ':scope > .section:not(.sub-section):not(.sub-sub-section):not(.sub-sub-sub-section)';
+        }
+
+        // プレースホルダー作成
+        placeholder = document.createElement('div');
+        placeholder.className = 'cat-drag-placeholder';
+        placeholder.style.height = dragSection.offsetHeight + 'px';
+
+        // ビジュアルクローン作成
+        var rect = dragSection.getBoundingClientRect();
+        dragClone = dragSection.cloneNode(true);
+        dragClone.style.position = 'fixed';
+        dragClone.style.left = rect.left + 'px';
+        dragClone.style.top = rect.top + 'px';
+        dragClone.style.width = rect.width + 'px';
+        dragClone.style.zIndex = '9999';
+        dragClone.style.opacity = '0.85';
+        dragClone.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)';
+        dragClone.style.pointerEvents = 'none';
+        dragClone.style.transition = 'none';
+        document.body.appendChild(dragClone);
+
+        dragSection.classList.add('cat-dragging');
+        containerEl.insertBefore(placeholder, dragSection);
+        dragSection.style.display = 'none';
+
+        document.addEventListener('touchmove', handleCatDragMove, { passive: false });
+        document.addEventListener('touchend', handleCatDragEnd);
+        document.addEventListener('mousemove', handleCatDragMove);
+        document.addEventListener('mouseup', handleCatDragEnd);
+      }
+
+      function handleCatDragMove(e) {
+        if (!dragSection || !dragClone || !placeholder) return;
+        e.preventDefault();
+        var touch = e.touches ? e.touches[0] : e;
+        dragClone.style.top = (touch.clientY - dragClone.offsetHeight / 2) + 'px';
+
+        // ドロップ先を検索（同レベルのセクションのみ）
+        var sections = Array.prototype.slice.call(
+          containerEl.querySelectorAll(siblingSelector)
+        ).filter(function(el) { return el !== dragSection; });
+        var inserted = false;
+        for (var i = 0; i < sections.length; i++) {
+          var r = sections[i].getBoundingClientRect();
+          var mid = r.top + r.height / 2;
+          if (touch.clientY < mid) {
+            containerEl.insertBefore(placeholder, sections[i]);
+            inserted = true;
+            break;
+          }
+        }
+        if (!inserted) {
+          // 最後の兄弟セクションの後に配置
+          var lastSibling = sections[sections.length - 1];
+          if (lastSibling && lastSibling.nextSibling) {
+            containerEl.insertBefore(placeholder, lastSibling.nextSibling);
+          } else {
+            // カテゴリ追加ボタンの前に配置
+            var addBtn = containerEl.querySelector(':scope > .category-add-btn, :scope > .section-add-btn');
+            if (addBtn) {
+              containerEl.insertBefore(placeholder, addBtn);
+            } else {
+              containerEl.appendChild(placeholder);
+            }
+          }
+        }
+      }
+
+      function handleCatDragEnd(e) {
+        if (!dragSection || !placeholder) return;
+        document.removeEventListener('touchmove', handleCatDragMove);
+        document.removeEventListener('touchend', handleCatDragEnd);
+        document.removeEventListener('mousemove', handleCatDragMove);
+        document.removeEventListener('mouseup', handleCatDragEnd);
+
+        // 実際のセクションをプレースホルダーの位置に挿入
+        placeholder.parentElement.insertBefore(dragSection, placeholder);
+        dragSection.style.display = '';
+        dragSection.classList.remove('cat-dragging');
+        placeholder.remove();
+        if (dragClone) { dragClone.remove(); dragClone = null; }
+
+        // 新しい並び順を計算して保存
+        var parentBody = dragSection.closest('.section-body') || document.getElementById('checklistContainer');
+        var sameLevel = Array.prototype.slice.call(
+          parentBody.querySelectorAll(siblingSelector)
+        );
+        var orders = [];
+        for (var i = 0; i < sameLevel.length; i++) {
+          var catPath = sameLevel[i].getAttribute('data-category');
+          if (catPath) {
+            orders.push({ path: catPath, sortOrder: i + 1 });
+          }
+        }
+        if (orders.length > 0) {
+          // ローカルのcategoryOrderも更新
+          if (checklistData) {
+            if (!checklistData.categoryOrder) checklistData.categoryOrder = [];
+            var existingMap = {};
+            checklistData.categoryOrder.forEach(function(o, idx) { existingMap[o.path] = idx; });
+            orders.forEach(function(o) {
+              var idx = existingMap[o.path];
+              if (idx !== undefined) {
+                checklistData.categoryOrder[idx].sortOrder = o.sortOrder;
+              } else {
+                checklistData.categoryOrder.push(o);
+              }
+            });
+          }
+          // バックエンドに保存
+          showSaveStatus('saving');
+          google.script.run
+            .withSuccessHandler(function(json) {
+              try {
+                var res = JSON.parse(json);
+                showSaveStatus(res.success ? 'saved' : 'error');
+              } catch (e) { showSaveStatus('error'); }
+            })
+            .withFailureHandler(function() { showSaveStatus('error'); })
+            .reorderCategories(orders);
+        }
+
+        dragSection = null;
+        placeholder = null;
+        containerEl = null;
+        siblingSelector = null;
+      }
+
+      // イベント委任でバインド
+      document.addEventListener('touchstart', function(e) {
+        if (e.target.closest('.cat-drag-handle')) handleCatDragStart(e);
+      }, { passive: false });
+      document.addEventListener('mousedown', function(e) {
+        if (e.target.closest('.cat-drag-handle')) handleCatDragStart(e);
       });
     })();
   </script>

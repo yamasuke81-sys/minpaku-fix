@@ -26,6 +26,7 @@ const SHEET_CL_RECORDS = 'チェックリスト記録';
 const SHEET_CL_PHOTOS = 'チェックリスト写真';
 const SHEET_CL_MEMOS = 'チェックリストメモ';
 const SHEET_CL_SUPPLIES = '要補充記録';
+const SHEET_CL_CATEGORY_ORDER = 'カテゴリ順序';
 
 // 予約管理スプレッドシートのシート名（チェックリストアプリ用）
 const CL_BOOKING_SHEET = 'フォームの回答 1';
@@ -276,6 +277,7 @@ function clSheet_(name) {
     else if (name === SHEET_CL_PHOTOS) sheet.getRange(1, 1, 1, 6).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ', '撮影タイミング']]);
     else if (name === SHEET_CL_MEMOS) sheet.getRange(1, 1, 1, 4).setValues([['チェックアウト日', 'メモ内容', '記入者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_SUPPLIES) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', '項目名', '記入者', 'タイムスタンプ']]);
+    else if (name === SHEET_CL_CATEGORY_ORDER) sheet.getRange(1, 1, 1, 2).setValues([['カテゴリパス', '表示順']]);
   }
   return sheet;
 }
@@ -435,6 +437,7 @@ function getChecklistForDate(checkoutDate) {
   try {
     var masterRes = JSON.parse(getChecklistMaster());
     var spotRes = JSON.parse(getPhotoSpotMaster());
+    var catOrderRes = JSON.parse(getCategoryOrder());
     if (!masterRes.success || !spotRes.success) {
       var detail = '';
       if (!masterRes.success) detail += 'チェックリストマスタ: ' + (masterRes.error || '不明');
@@ -511,7 +514,8 @@ function getChecklistForDate(checkoutDate) {
       supplyNeeded: supplyNeeded,
       memos: memos,
       checkedCount: checkedCount,
-      totalItems: totalItems
+      totalItems: totalItems,
+      categoryOrder: catOrderRes.success ? catOrderRes.orders : []
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -1524,6 +1528,67 @@ function reorderChecklistItems(itemOrders) {
       }
     }
     sheet.getRange(2, 4, lastRow - 1, 1).setValues(sortCol);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * カテゴリ順序を取得
+ */
+function getCategoryOrder() {
+  try {
+    var sheet = clSheet_(SHEET_CL_CATEGORY_ORDER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, orders: [] });
+    var rows = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    var orders = [];
+    for (var i = 0; i < rows.length; i++) {
+      var path = String(rows[i][0] || '');
+      var sortOrder = parseInt(rows[i][1], 10) || 0;
+      if (path) orders.push({ path: path, sortOrder: sortOrder });
+    }
+    return JSON.stringify({ success: true, orders: orders });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * カテゴリ順序を保存
+ * @param {Array} categoryOrders - [{path: 'カテゴリパス', sortOrder: 1}, ...]
+ */
+function reorderCategories(categoryOrders) {
+  try {
+    if (!categoryOrders || !categoryOrders.length) return JSON.stringify({ success: true });
+    var sheet = clSheet_(SHEET_CL_CATEGORY_ORDER);
+    var lastRow = sheet.getLastRow();
+
+    // 既存データを読み込みマップ化
+    var existingMap = {};
+    if (lastRow >= 2) {
+      var existing = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (var i = 0; i < existing.length; i++) {
+        existingMap[String(existing[i][0])] = i + 2; // row number
+      }
+    }
+
+    // 更新または追加
+    var toAppend = [];
+    categoryOrders.forEach(function(o) {
+      var rowNum = existingMap[o.path];
+      if (rowNum) {
+        sheet.getRange(rowNum, 2).setValue(o.sortOrder);
+      } else {
+        toAppend.push([o.path, o.sortOrder]);
+      }
+    });
+    if (toAppend.length > 0) {
+      var startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, toAppend.length, 2).setValues(toAppend);
+    }
+
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

@@ -2284,16 +2284,29 @@
       if (!nameEl) return;
       var currentText = nameEl.textContent;
       var container = nameEl.parentElement;
+      // 現在の要補充フラグを取得
+      var currentSupply = false;
+      if (checklistData && checklistData.items) {
+        checklistData.items.forEach(function(item) {
+          if (item.id === itemId) currentSupply = !!item.supplyItem;
+        });
+      }
       nameEl.style.display = 'none';
+      // 要補充チェックボックスコンテナも非表示にする
+      var supplyContainer = container.querySelector('.supply-checkbox-container');
+      if (supplyContainer) supplyContainer.style.display = 'none';
       var editDiv = document.createElement('div');
       editDiv.id = 'itemEdit_' + itemId;
       editDiv.innerHTML = '<input type="text" class="item-edit-input" value="' + escapeHtml(currentText) + '">' +
+        '<label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:13px;color:#555;cursor:pointer;">' +
+        '<input type="checkbox" class="item-edit-supply" ' + (currentSupply ? 'checked' : '') + ' style="width:18px;height:18px;">' +
+        '要補充対象</label>' +
         '<div class="item-edit-actions">' +
         '<button class="item-edit-save" onclick="saveItemEdit(\'' + itemId + '\')">保存</button>' +
         '<button class="item-edit-cancel" onclick="cancelItemEdit(\'' + itemId + '\')">取消</button>' +
         '</div>';
       container.insertBefore(editDiv, nameEl.nextSibling);
-      var input = editDiv.querySelector('input');
+      var input = editDiv.querySelector('input[type="text"]');
       input.focus();
       input.select();
       input.addEventListener('keydown', function(e) {
@@ -2306,24 +2319,61 @@
       var editDiv = document.getElementById('itemEdit_' + itemId);
       var nameEl = document.getElementById('itemName_' + itemId);
       if (!editDiv || !nameEl) return;
-      var input = editDiv.querySelector('input');
+      var input = editDiv.querySelector('input[type="text"]');
+      var supplyCheckbox = editDiv.querySelector('.item-edit-supply');
       var newText = input.value.trim();
+      var newSupply = supplyCheckbox ? supplyCheckbox.checked : false;
       if (!newText) { cancelItemEdit(itemId); return; }
+      // 現在の値を取得して変更があるかチェック
+      var currentSupply = false;
+      if (checklistData && checklistData.items) {
+        checklistData.items.forEach(function(item) {
+          if (item.id === itemId) currentSupply = !!item.supplyItem;
+        });
+      }
+      var supplyChanged = newSupply !== currentSupply;
       showSaveStatus('saving');
+      // テキスト保存
       callGAS('updateChecklistItemText', [itemId, newText]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          nameEl.textContent = newText;
-          // ローカルデータも更新
-          checklistData.items.forEach(function(item) {
-            if (item.id === itemId) item.name = newText;
-          });
-        } else {
+        if (!res.success) {
           showSaveStatus('error');
           alert('保存に失敗しました: ' + (res.error || ''));
+          editDiv.remove();
+          nameEl.style.display = '';
+          return;
         }
-        editDiv.remove();
-        nameEl.style.display = '';
+        nameEl.textContent = newText;
+        checklistData.items.forEach(function(item) {
+          if (item.id === itemId) item.name = newText;
+        });
+        // 要補充フラグも変更があれば保存
+        if (supplyChanged) {
+          callGAS('updateChecklistItemSupply', [itemId, newSupply]).then(function(res2) {
+            if (res2.success) {
+              showSaveStatus('saved');
+              checklistData.items.forEach(function(item) {
+                if (item.id === itemId) item.supplyItem = newSupply;
+              });
+              // UIを再描画して要補充チェックボックスの表示を反映
+              renderChecklist();
+            } else {
+              showSaveStatus('error');
+              alert('要補充設定の保存に失敗しました: ' + (res2.error || ''));
+              editDiv.remove();
+              nameEl.style.display = '';
+            }
+          }).catch(function() {
+            showSaveStatus('error');
+            editDiv.remove();
+            nameEl.style.display = '';
+          });
+        } else {
+          showSaveStatus('saved');
+          editDiv.remove();
+          nameEl.style.display = '';
+          var supplyContainer = nameEl.parentElement.querySelector('.supply-checkbox-container');
+          if (supplyContainer) supplyContainer.style.display = '';
+        }
       }).catch(function() {
         showSaveStatus('error');
         editDiv.remove();
@@ -2335,7 +2385,11 @@
       var editDiv = document.getElementById('itemEdit_' + itemId);
       var nameEl = document.getElementById('itemName_' + itemId);
       if (editDiv) editDiv.remove();
-      if (nameEl) nameEl.style.display = '';
+      if (nameEl) {
+        nameEl.style.display = '';
+        var supplyContainer = nameEl.parentElement.querySelector('.supply-checkbox-container');
+        if (supplyContainer) supplyContainer.style.display = '';
+      }
     }
 
     function deleteItemPrompt(itemId, itemName) {
@@ -2355,8 +2409,9 @@
     function addItemPrompt(category) {
       var name = prompt('追加する項目名を入力してください:');
       if (!name || !name.trim()) return;
+      var isSupply = confirm('この項目を「要補充対象」にしますか？\n\n要補充対象にすると、清掃時に補充が必要かチェックできます。');
       showSaveStatus('saving');
-      callGAS('addChecklistItemToMaster', [category, name.trim(), false]).then(function(res) {
+      callGAS('addChecklistItemToMaster', [category, name.trim(), isSupply]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
           reloadAndRender();

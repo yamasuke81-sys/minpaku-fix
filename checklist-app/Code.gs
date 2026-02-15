@@ -1420,6 +1420,28 @@ function updateChecklistItemText(itemId, newText) {
 }
 
 /**
+ * チェックリスト項目の要補充対象フラグを更新
+ */
+function updateChecklistItemSupply(itemId, isSupply) {
+  try {
+    if (!itemId) return JSON.stringify({ success: false, error: '項目IDが空です' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(itemId)) {
+        sheet.getRange(i + 2, 6).setValue(isSupply ? 'Y' : 'N');
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '項目が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * チェックリスト項目をマスタから削除
  */
 function deleteChecklistItemFromMaster(itemId) {

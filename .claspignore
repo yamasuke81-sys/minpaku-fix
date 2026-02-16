@@ -7,7 +7,16 @@ deploy-all.js
 **/package-lock.json
 **/.git/**
 checklist-app/**
+manual-generator/**
 ChecklistApp.gs
 HANDOFF.md
 SESSION_HANDOFF.md
-deploy-all.js
+**/*.md
+**/*.bat
+staff-manual.html
+generate-manual.bat
+generate-staff-manual.bat
+deploy-all.bat
+deploy.bat
+setup-check.bat
+.gitignore

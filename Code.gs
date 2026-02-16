@@ -708,14 +708,8 @@ function getStaffDeployUrl() {
   try {
     var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
     if (stored && String(stored).trim()) return JSON.stringify({ success: true, url: String(stored).trim(), isStored: true });
-    var base = '';
-    try { base = ScriptApp.getService().getUrl(); } catch (e) {}
-    var url = base ? (base.indexOf('?') >= 0 ? base + '&staff=1' : base + '?staff=1') : '';
-    // 自動生成URLがあれば自動保存
-    if (url) {
-      try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
-    }
-    return JSON.stringify({ success: true, url: url, isStored: !!url });
+    // 保存済みURLがない場合、空で返す（フロントエンドがbaseUrlから自動生成＆保存する）
+    return JSON.stringify({ success: true, url: '', isStored: false });
   } catch (e) { return JSON.stringify({ success: false, url: '', isStored: false, error: e.toString() }); }
 }
 

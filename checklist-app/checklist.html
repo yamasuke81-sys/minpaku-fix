@@ -1364,6 +1364,10 @@
     var checklistData = null;
     // ローカルで要補充を外した項目を追跡（リフレッシュ時の復活を防止）
     var localSupplyRemoved = {};
+    // 保存中（インフライト）のトグル操作を追跡（同期時の巻き戻し防止）
+    var pendingToggles = {};
+    // 同期が実行中かどうかを追跡（同期の重複実行防止用）
+    var syncInProgress = false;
     var bookingData = null;
     var staffList = [];
     var staffRowCount = 1;
@@ -1398,11 +1402,16 @@
 
       // 定期リフレッシュ（60秒ごと、2人同時利用対応）
       // 折りたたみ状態とタブ状態を保持してリフレッシュ
-      // 他のGAS呼び出し中はスキップして競合を回避
-      setInterval(function() {
+      // 同期の重複実行のみをスキップ（他のGAS呼び出しとは並行可能）
+      setInterval(function() { doSync(); }, 60000);
+
+      function doSync() {
         if (!checklistData) return;
-        if (gasRunning > 0) return;
+        // 同期が既に実行中の場合のみスキップ（他のGAS呼び出しは許可）
+        if (syncInProgress) return;
+        syncInProgress = true;
         callGAS('getChecklistForDate', [checkoutDate]).then(function(res) {
+          syncInProgress = false;
           if (res.success) {
             // 現在の折りたたみ状態を保存
             var collapseState = saveCollapseState();
@@ -1413,6 +1422,17 @@
                 delete res.supplyNeeded[removedId];
               });
             }
+            // インフライト（保存中）のトグル変更をサーバーデータにマージ
+            // サーバーにまだ反映されていないローカルの操作を保護する
+            Object.keys(pendingToggles).forEach(function(itemId) {
+              if (pendingToggles[itemId]) {
+                // チェック中の項目: サーバーデータに上書き
+                res.checked[itemId] = pendingToggles[itemId];
+              } else {
+                // チェック解除中の項目: サーバーデータから削除
+                delete res.checked[itemId];
+              }
+            });
             checklistData = res;
             renderChecklist();
             renderPhotoSection();
@@ -1424,8 +1444,8 @@
             restoreCollapseState(collapseState);
             if (activeTab) switchTab(activeTab);
           }
-        }).catch(function() {});
-      }, 60000);
+        }).catch(function() { syncInProgress = false; });
+      }
 
       // イベントリスナー
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
@@ -2426,8 +2446,16 @@
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
 
+      // インフライト追跡: 同期時にサーバーデータで巻き戻されないよう保護
+      if (checked) {
+        pendingToggles[itemId] = { checked: true, by: who, at: new Date() };
+      } else {
+        pendingToggles[itemId] = false;
+      }
+
       showSaveStatus('saving');
       callGAS('toggleChecklistItem', [checkoutDate, itemId, checked, who]).then(function(res) {
+        delete pendingToggles[itemId];
         if (res.success) {
           showSaveStatus('saved');
           if (checked) {
@@ -2442,7 +2470,7 @@
           showSaveStatus('error');
           checkbox.checked = !checked;
         }
-      }).catch(function() { showSaveStatus('error'); });
+      }).catch(function() { delete pendingToggles[itemId]; showSaveStatus('error'); });
     }
 
     function toggleSupply(checkbox) {
@@ -2793,11 +2821,19 @@
         btn.textContent = '全✓解除';
         btn.title = '全チェック解除';
         btn.classList.add('is-all-checked');
+        // インフライト追跡: 全項目をチェック中としてマーク
+        allItemIds.forEach(function(id) {
+          pendingToggles[id] = { checked: true, by: who, at: new Date() };
+        });
         // バックエンドに一括保存（1回のGAS呼び出し）
         showSaveStatus('saving');
         callGAS('checkAllItems', [checkoutDate, allItemIds, who]).then(function(res) {
+          allItemIds.forEach(function(id) { delete pendingToggles[id]; });
           showSaveStatus(res.success ? 'saved' : 'error');
-        }).catch(function() { showSaveStatus('error'); });
+        }).catch(function() {
+          allItemIds.forEach(function(id) { delete pendingToggles[id]; });
+          showSaveStatus('error');
+        });
       } else {
         if (!confirm('全てのチェックを外しますか？')) return;
         uncheckAllItems();
@@ -2818,11 +2854,18 @@
       btn.classList.remove('is-all-checked');
       updateProgress();
       updateSectionCounts();
+      // インフライト追跡: 全項目をアンチェック中としてマーク
+      var allItemIds = checklistData.items.map(function(item) { return item.id; });
+      allItemIds.forEach(function(id) { pendingToggles[id] = false; });
       // バックエンドに一括削除（1回のGAS呼び出し）
       showSaveStatus('saving');
       callGAS('uncheckAllItems', [checkoutDate]).then(function(res) {
+        allItemIds.forEach(function(id) { delete pendingToggles[id]; });
         showSaveStatus(res.success ? 'saved' : 'error');
-      }).catch(function() { showSaveStatus('error'); });
+      }).catch(function() {
+        allItemIds.forEach(function(id) { delete pendingToggles[id]; });
+        showSaveStatus('error');
+      });
     }
 
     function updateCheckAllButton() {
@@ -2865,11 +2908,16 @@
             var itemId = cb.getAttribute('data-item-id');
             uncheckIds.push(itemId);
             delete checklistData.checked[itemId];
+            pendingToggles[itemId] = false;
           }
         });
         callGAS('uncheckItems', [checkoutDate, uncheckIds]).then(function(res) {
+          uncheckIds.forEach(function(id) { delete pendingToggles[id]; });
           showSaveStatus(res.success ? 'saved' : 'error');
-        }).catch(function() { showSaveStatus('error'); });
+        }).catch(function() {
+          uncheckIds.forEach(function(id) { delete pendingToggles[id]; });
+          showSaveStatus('error');
+        });
       } else {
         var checkIds = [];
         unchecked.forEach(function(cb) {
@@ -2877,10 +2925,15 @@
           var itemId = cb.getAttribute('data-item-id');
           checkIds.push(itemId);
           checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
+          pendingToggles[itemId] = { checked: true, by: who, at: new Date() };
         });
         callGAS('checkAllItems', [checkoutDate, checkIds, who]).then(function(res) {
+          checkIds.forEach(function(id) { delete pendingToggles[id]; });
           showSaveStatus(res.success ? 'saved' : 'error');
-        }).catch(function() { showSaveStatus('error'); });
+        }).catch(function() {
+          checkIds.forEach(function(id) { delete pendingToggles[id]; });
+          showSaveStatus('error');
+        });
       }
       updateProgress();
       updateSectionCounts();

@@ -537,6 +537,12 @@ function getChecklistForDate(checkoutDate) {
  * チェック項目のトグル
  */
 function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' });
+  }
   try {
     var sheet = clSheet_(SHEET_CL_RECORDS);
     var targetDate = normDateStr_(checkoutDate);
@@ -568,6 +574,8 @@ function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -578,6 +586,12 @@ function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
  * @param {string} staffName
  */
 function checkAllItems(checkoutDate, itemIds, staffName) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' });
+  }
   try {
     var sheet = clSheet_(SHEET_CL_RECORDS);
     var targetDate = normDateStr_(checkoutDate);
@@ -607,6 +621,8 @@ function checkAllItems(checkoutDate, itemIds, staffName) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -615,11 +631,17 @@ function checkAllItems(checkoutDate, itemIds, staffName) {
  * @param {string} checkoutDate
  */
 function uncheckAllItems(checkoutDate) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' });
+  }
   try {
     var sheet = clSheet_(SHEET_CL_RECORDS);
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return JSON.stringify({ success: true });
+    if (lastRow < 2) { lock.releaseLock(); return JSON.stringify({ success: true }); }
     var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
     // 下から削除（行番号ずれ防止）
     for (var i = data.length - 1; i >= 0; i--) {
@@ -630,6 +652,8 @@ function uncheckAllItems(checkoutDate) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -639,11 +663,17 @@ function uncheckAllItems(checkoutDate) {
  * @param {string[]} itemIds - 解除する項目IDの配列
  */
 function uncheckItems(checkoutDate, itemIds) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' });
+  }
   try {
     var sheet = clSheet_(SHEET_CL_RECORDS);
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return JSON.stringify({ success: true });
+    if (lastRow < 2) { lock.releaseLock(); return JSON.stringify({ success: true }); }
     var idSet = {};
     itemIds.forEach(function(id) { idSet[String(id)] = true; });
     var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
@@ -655,6 +685,8 @@ function uncheckItems(checkoutDate, itemIds) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -662,6 +694,12 @@ function uncheckItems(checkoutDate, itemIds) {
  * 要補充のトグル
  */
 function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName, category) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' });
+  }
   try {
     var sheet = clSheet_(SHEET_CL_SUPPLIES);
     var targetDate = normDateStr_(checkoutDate);
@@ -691,6 +729,8 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName, c
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 

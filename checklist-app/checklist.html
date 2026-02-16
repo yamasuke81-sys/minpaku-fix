@@ -418,6 +418,26 @@
       -webkit-user-select: none;
       user-select: none;
     }
+    .item-memo {
+      font-size: 11px;
+      color: #888;
+      line-height: 1.4;
+      margin-top: 2px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .item-edit-memo {
+      width: 100%;
+      min-height: 40px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      resize: vertical;
+      margin-top: 4px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
     .item-name.missing {
       color: #e74c3c;
       font-weight: bold;
@@ -1557,6 +1577,9 @@
       html += '<input type="checkbox" class="item-checkbox" data-item-id="' + escapeHtml(item.id) + '" ' + (isChecked ? 'checked' : '') + ' onchange="toggleItem(this)">';
       html += '<div class="item-content">';
       html += '<div class="item-name" id="itemName_' + escapeHtml(item.id) + '">' + escapeHtml(item.name) + '</div>';
+      if (item.memo) {
+        html += '<div class="item-memo">' + escapeHtml(item.memo) + '</div>';
+      }
       if (item.supplyItem) {
         html += '<div class="supply-checkbox-container">';
         html += '<input type="checkbox" class="supply-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" ' + (isSupplyNeeded ? 'checked' : '') + ' onchange="toggleSupply(this)">';
@@ -2436,14 +2459,16 @@
       if (!nameEl) return;
       var currentText = nameEl.textContent;
       var container = nameEl.parentElement;
-      // 現在の要補充フラグと見本写真IDを取得
+      // 現在の要補充フラグ・見本写真ID・メモを取得
       var currentSupply = false;
       var currentPhotoId = '';
+      var currentMemo = '';
       if (checklistData && checklistData.items) {
         checklistData.items.forEach(function(item) {
           if (item.id === itemId) {
             currentSupply = !!item.supplyItem;
             currentPhotoId = item.exampleFileId || '';
+            currentMemo = item.memo || '';
           }
         });
       }
@@ -2451,6 +2476,9 @@
       // 要補充チェックボックスコンテナも非表示にする
       var supplyContainer = container.querySelector('.supply-checkbox-container');
       if (supplyContainer) supplyContainer.style.display = 'none';
+      // メモ表示も非表示にする
+      var memoDisplay = container.querySelector('.item-memo');
+      if (memoDisplay) memoDisplay.style.display = 'none';
       var editDiv = document.createElement('div');
       editDiv.id = 'itemEdit_' + itemId;
       var photoHtml = '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">' +
@@ -2464,6 +2492,7 @@
       }
       photoHtml += '</div>';
       editDiv.innerHTML = '<input type="text" class="item-edit-input" value="' + escapeHtml(currentText) + '">' +
+        '<textarea class="item-edit-memo" placeholder="メモ（任意）">' + escapeHtml(currentMemo) + '</textarea>' +
         '<label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:13px;color:#555;cursor:pointer;">' +
         '<input type="checkbox" class="item-edit-supply" ' + (currentSupply ? 'checked' : '') + ' style="width:18px;height:18px;">' +
         '要補充対象</label>' +
@@ -2488,17 +2517,24 @@
       if (!editDiv || !nameEl) return;
       var input = editDiv.querySelector('input[type="text"]');
       var supplyCheckbox = editDiv.querySelector('.item-edit-supply');
+      var memoTextarea = editDiv.querySelector('.item-edit-memo');
       var newText = input.value.trim();
       var newSupply = supplyCheckbox ? supplyCheckbox.checked : false;
+      var newMemo = memoTextarea ? memoTextarea.value.trim() : '';
       if (!newText) { cancelItemEdit(itemId); return; }
       // 現在の値を取得して変更があるかチェック
       var currentSupply = false;
+      var currentMemo = '';
       if (checklistData && checklistData.items) {
         checklistData.items.forEach(function(item) {
-          if (item.id === itemId) currentSupply = !!item.supplyItem;
+          if (item.id === itemId) {
+            currentSupply = !!item.supplyItem;
+            currentMemo = item.memo || '';
+          }
         });
       }
       var supplyChanged = newSupply !== currentSupply;
+      var memoChanged = newMemo !== currentMemo;
       showSaveStatus('saving');
       // テキスト保存
       callGAS('updateChecklistItemText', [itemId, newText]).then(function(res) {
@@ -2513,34 +2549,44 @@
         checklistData.items.forEach(function(item) {
           if (item.id === itemId) item.name = newText;
         });
-        // 要補充フラグも変更があれば保存
-        if (supplyChanged) {
-          callGAS('updateChecklistItemSupply', [itemId, newSupply]).then(function(res2) {
-            if (res2.success) {
-              showSaveStatus('saved');
-              checklistData.items.forEach(function(item) {
-                if (item.id === itemId) item.supplyItem = newSupply;
-              });
-              // UIを再描画して要補充チェックボックスの表示を反映（状態保持）
-              reRenderWithState();
-            } else {
-              showSaveStatus('error');
-              alert('要補充設定の保存に失敗しました: ' + (res2.error || ''));
-              editDiv.remove();
-              nameEl.style.display = '';
-            }
-          }).catch(function() {
-            showSaveStatus('error');
+        // メモ変更があれば保存
+        var memoPromise = memoChanged
+          ? callGAS('updateChecklistItemMemo', [itemId, newMemo]).then(function(res3) {
+              if (res3.success) {
+                checklistData.items.forEach(function(item) {
+                  if (item.id === itemId) item.memo = newMemo;
+                });
+              }
+              return res3;
+            })
+          : Promise.resolve({ success: true });
+        // 要補充フラグ変更があれば保存
+        var supplyPromise = supplyChanged
+          ? callGAS('updateChecklistItemSupply', [itemId, newSupply]).then(function(res2) {
+              if (res2.success) {
+                checklistData.items.forEach(function(item) {
+                  if (item.id === itemId) item.supplyItem = newSupply;
+                });
+              }
+              return res2;
+            })
+          : Promise.resolve({ success: true });
+        Promise.all([memoPromise, supplyPromise]).then(function(results) {
+          var allOk = results.every(function(r) { return r.success; });
+          showSaveStatus(allOk ? 'saved' : 'error');
+          if (supplyChanged || memoChanged) {
+            reRenderWithState();
+          } else {
             editDiv.remove();
             nameEl.style.display = '';
-          });
-        } else {
-          showSaveStatus('saved');
+            var supplyContainer = nameEl.parentElement.querySelector('.supply-checkbox-container');
+            if (supplyContainer) supplyContainer.style.display = '';
+          }
+        }).catch(function() {
+          showSaveStatus('error');
           editDiv.remove();
           nameEl.style.display = '';
-          var supplyContainer = nameEl.parentElement.querySelector('.supply-checkbox-container');
-          if (supplyContainer) supplyContainer.style.display = '';
-        }
+        });
       }).catch(function() {
         showSaveStatus('error');
         editDiv.remove();
@@ -2556,6 +2602,8 @@
         nameEl.style.display = '';
         var supplyContainer = nameEl.parentElement.querySelector('.supply-checkbox-container');
         if (supplyContainer) supplyContainer.style.display = '';
+        var memoDisplay = nameEl.parentElement.querySelector('.item-memo');
+        if (memoDisplay) memoDisplay.style.display = '';
       }
     }
 

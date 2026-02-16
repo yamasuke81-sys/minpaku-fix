@@ -135,7 +135,7 @@ function getOrCreateChecklistSpreadsheet_() {
   // 初期シート作成
   var s1 = newSs.getActiveSheet();
   s1.setName(SHEET_CL_MASTER);
-  s1.getRange(1, 1, 1, 7).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象', '見本写真ID']]);
+  s1.getRange(1, 1, 1, 8).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象', '見本写真ID', 'メモ']]);
   var s2 = newSs.insertSheet(SHEET_CL_PHOTO_SPOTS);
   s2.getRange(1, 1, 1, 7).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効', 'カテゴリ']]);
   var s3 = newSs.insertSheet(SHEET_CL_RECORDS);
@@ -271,7 +271,7 @@ function clSheet_(name) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    if (name === SHEET_CL_MASTER) sheet.getRange(1, 1, 1, 7).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象', '見本写真ID']]);
+    if (name === SHEET_CL_MASTER) sheet.getRange(1, 1, 1, 8).setValues([['ID', 'カテゴリ', '項目名', '表示順', '有効', '要補充対象', '見本写真ID', 'メモ']]);
     else if (name === SHEET_CL_PHOTO_SPOTS) sheet.getRange(1, 1, 1, 7).setValues([['ID', '箇所名', '撮影タイミング', '撮影例ファイルID', '表示順', '有効', 'カテゴリ']]);
     else if (name === SHEET_CL_RECORDS) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', 'チェック済', 'チェック者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_PHOTOS) sheet.getRange(1, 1, 1, 6).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ', '撮影タイミング']]);
@@ -384,7 +384,7 @@ function getChecklistMaster() {
   try {
     var sheet = clSheet_(SHEET_CL_MASTER);
     if (sheet.getLastRow() < 2) return JSON.stringify({ success: true, items: [] });
-    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues();
     var items = rows.map(function(row, i) {
       return {
         rowIndex: i + 2,
@@ -394,7 +394,8 @@ function getChecklistMaster() {
         sortOrder: parseInt(row[3], 10) || 0,
         active: String(row[4] || 'Y').trim().toUpperCase(),
         supplyItem: String(row[5] || 'N') === 'Y',
-        exampleFileId: String(row[6] || '')
+        exampleFileId: String(row[6] || ''),
+        memo: String(row[7] || '')
       };
     }).filter(function(item) { return item.id && item.name && item.active !== 'N'; });
     items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
@@ -1447,6 +1448,28 @@ function updateChecklistItemSupply(itemId, isSupply) {
 }
 
 /**
+ * チェックリスト項目のメモを更新
+ */
+function updateChecklistItemMemo(itemId, memo) {
+  try {
+    if (!itemId) return JSON.stringify({ success: false, error: '項目IDが空です' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目が見つかりません' });
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(itemId)) {
+        sheet.getRange(i + 2, 8).setValue(memo || '');
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '項目が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * チェックリスト項目をマスタから削除
  */
 function deleteChecklistItemFromMaster(itemId) {
@@ -1501,7 +1524,7 @@ function addChecklistItemToMaster(category, name, isSupplyItem) {
       allSorts.forEach(function(row) { maxSort = Math.max(maxSort, parseInt(row[0], 10) || 0); });
     }
     var nextRow = lastRow + 1;
-    sheet.getRange(nextRow, 1, 1, 6).setValues([[newId, category, name, maxSort + 1, 'Y', isSupplyItem ? 'Y' : 'N']]);
+    sheet.getRange(nextRow, 1, 1, 8).setValues([[newId, category, name, maxSort + 1, 'Y', isSupplyItem ? 'Y' : 'N', '', '']]);
     return JSON.stringify({ success: true, itemId: newId });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

@@ -554,13 +554,17 @@
       flex-shrink: 0;
     }
     .supply-item-category {
-      font-size: 11px;
+      font-size: 10px;
       color: #fff;
       background: #2c3e50;
       padding: 2px 6px;
       border-radius: 3px;
-      flex-shrink: 0;
+      flex-shrink: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
+      max-width: 50%;
     }
     .supply-item-name {
       flex: 1;
@@ -2071,14 +2075,20 @@
         return;
       }
 
-      // アイテムIDからカテゴリを検索するマップを作成
+      // アイテムIDからカテゴリ（フルパス）を検索するマップを作成
       var itemCategoryMap = {};
       if (checklistData.items) {
         checklistData.items.forEach(function(item) {
-          var majorCategory = (item.category || 'その他').split('：')[0];
-          itemCategoryMap[item.id] = majorCategory;
+          itemCategoryMap[item.id] = item.category || 'その他';
         });
       }
+
+      // カテゴリ順にソートして同じカテゴリの項目をまとめる
+      keys.sort(function(a, b) {
+        var catA = itemCategoryMap[a] || '';
+        var catB = itemCategoryMap[b] || '';
+        return catA.localeCompare(catB, 'ja');
+      });
 
       var html = '<div class="supply-list-card"><h3>⚠️ 要補充リスト</h3>';
       keys.forEach(function(k) {
@@ -2086,7 +2096,7 @@
         var category = itemCategoryMap[k] || '';
         html += '<div class="supply-item">';
         if (category) {
-          html += '<span class="supply-item-category">' + escapeHtml(category) + '</span>';
+          html += '<span class="supply-item-category">' + escapeHtml(category).replace(/：/g, ' &gt; ') + '</span>';
         }
         html += '<span class="supply-item-name">' + escapeHtml(item.name) + '</span>';
         html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\')">表示</button>';

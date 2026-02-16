@@ -1,9 +1,9 @@
 # minpaku-fix プロジェクト引き継ぎ資料
 
 > **最終更新**: 2026-02-16
-> **作業ブランチ**: `claude/update-handoff-docs-897D8`
-> **最新コミット**: `4a75a76 要補充対象を外した時に要補充タブからも項目を削除`
-> **前回の開発ブランチ**: `claude/create-handoff-docs-tRAuI`（コード変更はこちらに含まれる）
+> **作業ブランチ**: `claude/setup-deployment-rules-EbLOg`
+> **最新コミット**: `6fef543 docs: 引き継ぎ資料を最新状態に更新（要補充タブ改善・バグ修正）`
+> **前回の開発ブランチ**: `claude/update-handoff-docs-897D8`
 
 ---
 
@@ -13,7 +13,7 @@
 どのブランチにいても、未コミットの変更があっても、これ1つでOK。
 
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/setup-deployment-rules-EbLOg && git reset --hard origin/claude/setup-deployment-rules-EbLOg && node deploy-all.js
 ```
 
 ---
@@ -27,7 +27,7 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/upda
 |------|--------------------------|------------------------------|
 | 用途 | 予約カレンダー表示、清掃募集、iCal同期 | 清掃チェックリスト（スタッフ用） |
 | Script ID | `1cFH0kD81gR6DC1RPBFyMJNXLI52nGYSOl6w461bkz_Byx1nE-4C0yD4w` | `18PILN4GA1DyQY9nkf2lV1GVxAXV95LT51vh2erWB1NZ8uNX54kVqlx3w` |
-| 主要ファイル | `Code.gs` (main: 3802行 / 開発: 6609行), `index.html` (main: 4362行 / 開発: 6150行) | `checklist-app/Code.gs` (1604行), `checklist-app/checklist.html` (2423行) |
+| 主要ファイル | `Code.gs` (~6927行), `index.html` (~6530行) | `checklist-app/Code.gs` (~2176行), `checklist-app/checklist.html` (~3860行) |
 | デプロイ | オーナー用 + スタッフ用（2つのデプロイ） | 1つのデプロイ |
 
 ## 2. ユーザー環境
@@ -40,13 +40,10 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/upda
 
 ## 3. ファイル構成
 
-> **注意**: checklist-app/ 以下のファイルは `claude/create-handoff-docs-tRAuI` ブランチにのみ存在します。
-> mainブランチの Code.gs は3802行、index.html は4362行です。
-
 ```
 minpaku-fix/
-├── Code.gs                      # メインアプリ GAS コード（開発: 6164行 / main: 3802行）
-├── index.html                   # メインアプリ UI（開発: 6004行 / main: 4362行）
+├── Code.gs                      # メインアプリ GAS コード（~6927行）
+├── index.html                   # メインアプリ UI（~6530行）
 ├── appsscript.json              # GASマニフェスト（デプロイ時に自動切替）
 ├── .clasp.json                  # メインアプリのclasp設定
 ├── .claspignore                 # メインアプリ push 時の除外ルール
@@ -58,15 +55,17 @@ minpaku-fix/
 ├── package.json                 # Node.js依存（@google/clasp）
 │
 ├── checklist-app/               # チェックリストアプリ（別GASプロジェクト）
-│   ├── Code.gs                  # チェックリストアプリ GAS コード（698行）
-│   ├── checklist.html           # チェックリストアプリ UI（2239行）
+│   ├── Code.gs                  # チェックリストアプリ GAS コード（~2176行）
+│   ├── checklist.html           # チェックリストアプリ UI（~3860行）
 │   ├── .clasp.json              # チェックリストアプリのclasp設定
 │   ├── .claspignore             # チェックリストアプリ push 時の除外ルール
 │   ├── deploy-checklist.js      # チェックリストアプリ デプロイスクリプト
 │   ├── deploy-checklist.bat     # チェックリストアプリ 単体デプロイ
+│   ├── cleaning_checklist.csv   # チェックリスト初期データ（558項目）
 │   └── appsscript.json
 │
 ├── HANDOFF.md                   # ← この引き継ぎ資料
+├── SESSION_HANDOFF.md           # セッション別引き継ぎ
 └── .gitignore                   # deploy-config.json, node_modules/ を除外
 ```
 
@@ -75,34 +74,27 @@ minpaku-fix/
 | ブランチ | 用途 | 状態 |
 |---------|------|------|
 | `main` | 本番 | 安定版 |
-| `claude/update-handoff-docs-897D8` | 引き継ぎ資料更新 | **現在のアクティブブランチ** |
-| `claude/create-handoff-docs-tRAuI` | 前回の開発（コード変更含む） | 要マージ |
-| `claude/minpaku-fix-ui-updates-af95w` | 旧UI改修 | 過去のブランチ |
-| `claude/fix-sheet-name-variable-tBTum` | 旧開発 | 過去のブランチ |
+| `claude/setup-deployment-rules-EbLOg` | 現在の開発 | **現在のアクティブブランチ** |
+| `claude/update-handoff-docs-897D8` | 前回の開発 | setup-deployment-rules にマージ済み |
+| `claude/create-handoff-docs-tRAuI` | 過去の開発 | update-handoff-docs にマージ済み |
 
-### 最新コミット履歴（claude/update-handoff-docs-897D8 ブランチ）
+### 最新コミット履歴
 ```
+6fef543 docs: 引き継ぎ資料を最新状態に更新（要補充タブ改善・バグ修正）
 4a75a76 要補充対象を外した時に要補充タブからも項目を削除
 b3d7295 要補充タブに「表示」ボタンと大カテゴリ名を追加
 716b3b6 fix: 全チェック/全解除で個別GAS呼び出しを一括化しチェック復活バグを修正
 c0c54c2 fix: GAS同時実行数エラーを防止するキュー制御を追加
 3012fcc チェックリスト並び替えの長押し時間を400ms→600msに変更
-```
-
-### 過去コミット履歴（claude/create-handoff-docs-tRAuI ブランチ）
-```
-1873adf docs: 引き継ぎ資料を最新状態に更新
-d0a1a50 チェックリスト：全展開/全折り・カテゴリ名編集・カテゴリ削除機能を追加
-9f30e11 清掃ステータスマーク：applyConfirmOptimisticを根本的に改良
-9acf17d 清掃ステータスマーク：confirmRecruitment成功時に楽観的キャッシュ更新を追加
-a5530c3 fix: 小・細カテゴリの視認性改善 + 展開時の見切れ修正
-5ad84f8 fix: 中カテゴリの視認性を改善 - 青背景+白文字に変更
-f70e821 fix: 清掃スタッフ確定後にカレンダーのステータスマークが赤のまま残るバグを修正
-2bb73e4 feat: オーナー宿泊詳細画面に宿泊人数の編集機能を追加
-c13137f 大カテゴリと中カテゴリの見出しデザインを差別化
-0db3da6 feat: チェックリスト4階層対応 + CSV全558項目を網羅
-04a0617 feat: チェックリストUI改善 - サムネ3倍化・ボタン右寄せ・項目削除・状態維持
-966085e feat: チェックアプリUI全面改修 - タブ移動・漏れチェック統合・サムネイル等
+a082eb1 feat: チェックリスト項目にメモ機能を追加
+e553303 feat: チェックアプリの並び替え・移動・リネーム操作に一度だけUNDO機能を追加
+af37c91 fix: カテゴリ名変更時にカテゴリ順序シートのパスも更新して位置を維持
+4d752e6 fix: カテゴリ並び替え時に項目のsortOrderもズレないよう修正
+036fb16 feat: チェック項目を中カテゴリの間や下にも配置可能に
+7acc9e9 feat: カテゴリ階層移動・スタッフURL自動反映・仕事内容UI改修
+271a195 feat: チェック項目を別のカテゴリにドラッグ移動できるように改善
+5cf7950 feat: ドラッグハンドルの幅縮小 & チェックリスト項目に見本写真機能を追加
+bfc0322 feat: ドラッグハンドル(☰)を長押し(400ms)しないと並び替えが発動しないように変更
 ```
 
 ### mainブランチのコミット履歴（マージ済みPR #1〜#7）
@@ -135,23 +127,27 @@ fdcb1dc 清掃詳細・宿泊詳細モーダルのUIを全面リデザイン
 | 大カテゴリ未完了時 | 赤背景(`#c0392b`)で表示 | **完了** |
 | 全展開/全折りたたみ | 子カテゴリがあるカテゴリ見出しに「全展開/全折り」ボタンを追加 | **完了** |
 | カテゴリ名称変更 | ✎ ボタンでカテゴリ名を変更可能。GAS側 `renameCategoryInMaster()` | **完了** |
-| カテゴリ削除 | ✕ ボタンでカテゴリ削除。中身も削除 or 親カテゴリに移動の選択可。GAS側 `deleteCategoryFromMaster()` | **完了** |
-| 要補充タブ「表示」ボタン | 要補充リストに大カテゴリ名バッジ+「表示」ボタンを追加。押すとチェックリスト内の該当項目へスクロール | **完了** |
-| 要補充対象解除時のバグ修正 | アイテム編集で「要補充対象」を外した時、要補充タブからも表示を削除するよう修正 | **完了** |
+| カテゴリ削除 | ✕ ボタンでカテゴリ削除。中身も削除 or 親カテゴリに移動の選択可 | **完了** |
+| 要補充タブ「表示」ボタン | 要補充リストに大カテゴリ名バッジ+「表示」ボタンを追加 | **完了** |
+| 要補充対象解除時のバグ修正 | アイテム編集で「要補充対象」を外した時、要補充タブからも削除 | **完了** |
+| 項目メモ機能 | チェック項目ごとのメモ入力・保存 | **完了** |
+| UNDO機能 | 並び替え・移動・リネーム操作に一度だけUNDO可能 | **完了** |
+| カテゴリ間ドラッグ移動 | チェック項目を別カテゴリにドラッグで移動可能 | **完了** |
+| ドラッグ並び替え | 長押し(600ms)でドラッグ並び替え発動 | **完了** |
+| カテゴリ並び替え | 大カテゴリ・中カテゴリの並び替え機能 | **完了** |
+| 見本写真機能 | チェック項目に見本写真を追加・変更・削除可能 | **完了** |
 
-### チェックリストアプリ (`checklist-app/checklist.html`)
+### チェックリストアプリ UI改修
 
 | 項目 | 変更内容 | 状態 |
 |------|----------|------|
-| **タブナビ移動** | 画面下部固定 → ヘッダー+プログレスバー直下にボタン形式配置（sticky対応、`top:52px`） | **完了** |
-| **漏れチェック統合** | 「漏れチェック」ボタン削除。「清掃完了」ボタン押下時に自動で漏れチェック実行。未チェック項目・未撮影箇所を赤くハイライト+件数表示。未完了でも確認後に送信可能 | **完了** |
-| **メモ自動保存** | 「送信」ボタン削除。入力後1.5秒デバウンスで自動保存。Enter即時保存も対応 | **完了** |
-| **項目名タッチ** | チェックボックスだけでなく項目名テキストをタッチしてもチェック切替（イベント委譲） | **完了** |
-| **見本写真サムネイル** | テキスト「見本」ボタン → 28x28px圧縮サムネイル画像に変更。タップでモーダル表示（変更・削除オプション付き） | **完了** |
-| **撮影箇所レイアウト** | `[見本thumb] 名前 📷前/📷後 ✏️✕` の順に整列 | **完了** |
-| **編集・削除ボタン** | `margin-left:auto` で右端に配置（誤タップ防止） | **完了** |
-| **カテゴリ階層ボタン** | 大カテゴリ内に「中カテゴリを追加」、中カテゴリ内に「小カテゴリを追加」ボタン追加 | **完了** |
-| **追加ボタンデザイン** | 「撮影項目を追加」「項目を追加」「カテゴリを追加」を控えめデザインに（左寄せ・薄い点線ボーダー） | **完了** |
+| タブナビ移動 | 画面下部固定 → ヘッダー直下にボタン形式配置（sticky対応） | **完了** |
+| 漏れチェック統合 | 清掃完了ボタン押下時に自動で漏れチェック実行 | **完了** |
+| メモ自動保存 | 入力後1.5秒デバウンスで自動保存。Enter即時保存 | **完了** |
+| 項目名タッチ | テキストタッチでもチェック切替（イベント委譲） | **完了** |
+| 見本写真サムネイル | テキスト「見本」→ 28x28px圧縮サムネイル画像に変更 | **完了** |
+| 追加ボタンデザイン | 控えめデザイン（左寄せ・薄い点線ボーダー） | **完了** |
+| カテゴリ階層ボタン | カテゴリ内に「中カテゴリを追加」等のボタン追加 | **完了** |
 
 ---
 
@@ -194,45 +190,6 @@ fdcb1dc 清掃詳細・宿泊詳細モーダルのUIを全面リデザイン
 └─────────────────────────────────────┘
 ```
 
-### 主要CSS変更ポイント
-
-| セレクター | 変更 |
-|-----------|------|
-| `body` | `padding-bottom: 60px` → `16px`（タブが上部に移動） |
-| `.tab-nav` | `position:sticky; top:52px; z-index:99;` 追加 |
-| `.tab-nav-btn` | ボタン風デザイン（rounded, border, active時は#2c3e50背景） |
-| `.complete-area` | 新CSS。旧`.bottom-bar`を置換 |
-| `.complete-msg` | 漏れチェック時のエラーメッセージ表示用 |
-| `.item-name` | `cursor:pointer; user-select:none;` 追加 |
-| `.memo-input` | full width、旧`.memo-input-group`ラッパー削除 |
-| `.section-add-btn`, `.category-add-btn` | `inline-block; border:1px dashed #ccc; color:#aaa;` 控えめ化 |
-| `.inline-photo-add-btn` | 同上、控えめ化 |
-| `.inline-example-thumb` | `width:28px; height:28px; border-radius:4px; object-fit:cover;` |
-| `.inline-spot-actions` | `margin-left:auto;` で右端寄せ |
-
-### 主要JavaScript変更ポイント
-
-| 関数/機能 | 変更 |
-|-----------|------|
-| `window.onload` | `btnCheckMissing` リスナー削除、`memoBtn` リスナー削除 |
-| 新: 項目名タッチ | `checklistContainer` にイベント委譲で `.item-name` クリック時にチェック切替 |
-| 新: メモ自動保存 | `memoInput` の `input` イベントで1.5秒デバウンス、`keydown` Enter で即時保存 |
-| `completeChecklist()` | 漏れチェック統合。未チェック項目＋未撮影箇所を検出→ `highlightMissing()` →赤ハイライト＋件数表示→確認ダイアログ |
-| `toggleMissingCheck()` | **削除**（もう使わない） |
-| `missingCheckActive` | **削除**（各所の `if (missingCheckActive)` も削除） |
-| `updateProgress()` | `btnComplete.disabled` の設定を削除（常にクリック可能） |
-| `renderChecklist()` | 見本写真を`<img class="inline-example-thumb">`で表示。レイアウト順序変更。階層ボタン追加 |
-| `renderPhotoSection()` | 撮影タブ内でも見本サムネイル表示+edit/deleteを右端配置 |
-| 新: `addSubCategoryPrompt()` | 親カテゴリを受け取り、`親：子` 形式で新サブカテゴリ追加 |
-| `addCategoryPrompt()` | プロンプト文言から「サブカテゴリの場合は…」の説明を削除（専用ボタンがあるため） |
-| 新: `toggleCategorySections()` | 子カテゴリの全展開/全折りたたみをトグル |
-| 新: `renameCategoryPrompt()` | プロンプトでカテゴリ名を変更、GAS `renameCategoryInMaster()` を呼び出し |
-| 新: `deleteCategoryPrompt()` | カテゴリ削除（中身も削除 or 親に移動を選択）、GAS `deleteCategoryFromMaster()` を呼び出し |
-| 新: `reloadChecklist()` | データ再取得＋再描画のヘルパー |
-| 新: `scrollToSupplyItem(itemId)` | 要補充タブ→チェックリストタブ切替→親セクション展開→該当項目スクロール+ハイライト |
-| 変更: `renderSupplyList()` | 大カテゴリ名バッジ+「表示」ボタンを各項目に追加 |
-| 変更: `saveItemEdit()` | 要補充対象を外した時に `supplyNeeded` からも削除+GASバックエンドに反映 |
-
 ---
 
 ## 7. 未完了タスク・今後の調査事項
@@ -242,11 +199,7 @@ fdcb1dc 清掃詳細・宿泊詳細モーダルのUIを全面リデザイン
 1. **清掃ステータスマーク修正の確認**
    - スタッフ確定後にカレンダーのステータスドットが即座に赤→緑に変わるか
    - 特に「スタッフ一覧にない名前を手入力で指定」した場合のフロー
-   - `applyConfirmOptimistic()` で楽観的キャッシュ更新を実装済み（4回の修正を経た最終版）
-   - **根本原因**: 清掃イベント初回表示時に `saveRecruitmentDetail(null, ...)` で募集エントリがサーバー側に新規作成される。しかし `window._recruitFullMap` はページロード時のデータで、この新規エントリを含まない。Fix 1-2では存在しないエントリを検索していたため空振りしていた
-   - **関連GAS関数**: `updateCleaningStaff()` (550行), `confirmRecruitment()` (4959行), `selectStaffForRecruitment()` (4921行), `getRecruitmentStatusMap()` (4465行), `saveRecruitmentDetail()` (3234行)
-   - **関連フロントエンド**: `buildCalendarEvents()` (1858-1878行), `loadAndRender()` (3297行), `applyConfirmOptimistic()` (3383行)
-   - **再発パターン**: 新しい募集関連のモーダルやフローを追加する場合、`applyConfirmOptimistic()` の呼び出しを忘れると同じ問題が起きる
+   - `applyConfirmOptimistic()` で楽観的キャッシュ更新を実装済み
 
 2. **チェックリスト新機能の動作確認**
    - 全展開/全折りたたみボタンの動作
@@ -257,7 +210,6 @@ fdcb1dc 清掃詳細・宿泊詳細モーダルのUIを全面リデザイン
 
 3. **2026/2/23 日付背景の黄色問題**
    - メインアプリで2/23のセルが黄色背景のまま残る
-   - 「西山PCテスト」スタッフの▲回答が削除後も残存
    - **推定原因**: スプレッドシートの募集・立候補データにゴミが残っている可能性
 
 ### 見本写真の日付非依存化（要確認）
@@ -288,7 +240,8 @@ fdcb1dc 清掃詳細・宿泊詳細モーダルのUIを全面リデザイン
     ├── 撮影箇所マスタ → spots（撮影箇所 + exampleFileId）
     ├── チェックリスト記録 → checked（日付別チェック状態）
     ├── チェックリスト写真 → photos（日付別撮影写真）
-    └── チェックリストメモ → memos（日付別メモ）
+    ├── チェックリストメモ → memos（日付別メモ）
+    └── 要補充記録 → supplyNeeded（要補充フラグ）
 ```
 
 ### callGAS() の仕組み
@@ -311,10 +264,10 @@ function callGAS(functionName, args) {
 ```
 大カテゴリ（majorName）     例: "2階寝室"
   └─ 中カテゴリ（subName）  例: "2階寝室：ベッドメイク"
-      └─（小カテゴリは中カテゴリのさらにネスト、フルカテゴリ名で管理）
+      └─ 小カテゴリ         例: "2階寝室：ベッドメイク：枕"
+          └─ 細カテゴリ      例: "2階寝室：ベッドメイク：枕：詳細"
 
-カテゴリ名のフォーマット: "大カテゴリ" または "大カテゴリ：中カテゴリ"
-区切り文字: 全角コロン（\uff1a = ：）
+カテゴリ名のフォーマット: 全角コロン（\uff1a = ：）で区切り
 ```
 
 ### 写真保存構造 (Google Drive)
@@ -414,6 +367,9 @@ function callGAS(functionName, args) {
 チェックリスト記録   ... チェック実績（日付別）
 チェックリスト写真   ... 撮影写真（日付別）
 チェックリストメモ   ... メモ（日付別）
+要補充記録          ... 要補充フラグ（アイテムID別）
+カテゴリ順序        ... カテゴリの並び順
+アイテムメモ        ... チェック項目ごとのメモ
 ```
 
 ---
@@ -427,6 +383,7 @@ function callGAS(functionName, args) {
 | clasp push JSON5 エラー | npx経由のclasp | node_modules/.bin/clasp直接実行（対応済み） |
 | マスタデータ読み込み失敗 | ScriptProperties未設定/OAuth未許可 | GASエディタで `diagChecklistSetup()` 実行 |
 | @HEAD deployment修正不可 | HEADはread-only | `@HEAD` 除外済み |
+| GAS同時実行数エラー | 複数API呼び出しの競合 | キュー制御で順序実行（c0c54c2で対応済み） |
 
 ---
 
@@ -456,6 +413,10 @@ function callGAS(functionName, args) {
 - 「カテゴリ削除（中身も削除 or 親に移動）」→ **完了**
 - 「要補充タブに表示ボタンと大カテゴリ名を表示」→ **完了**
 - 「要補充対象を外したら要補充タブからも消す」→ **完了**
+- 「チェック項目にメモ機能を追加」→ **完了**
+- 「並び替え・移動操作にUNDO機能」→ **完了**
+- 「項目をカテゴリ間でドラッグ移動」→ **完了**
+- 「カテゴリの並び替え」→ **完了**
 
 ### 運用ルール
 - 「変更をプッシュしたら毎回デプロイ手順を表示して」→ **ルール化済み**

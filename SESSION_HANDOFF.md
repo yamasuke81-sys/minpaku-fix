@@ -1,9 +1,9 @@
 # セッション引き継ぎファイル
 
 > **最終更新**: 2026-02-16
-> **作業ブランチ**: `claude/update-handoff-docs-897D8`
-> **最新コミット**: `4a75a76 要補充対象を外した時に要補充タブからも項目を削除`
-> **前回の開発ブランチ**: `claude/create-handoff-docs-tRAuI`
+> **作業ブランチ**: `claude/setup-deployment-rules-EbLOg`
+> **最新コミット**: `6fef543 docs: 引き継ぎ資料を最新状態に更新（要補充タブ改善・バグ修正）`
+> **前回の開発ブランチ**: `claude/update-handoff-docs-897D8`
 
 ---
 
@@ -21,7 +21,7 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <現在の�
 
 **現時点のコマンド:**
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/setup-deployment-rules-EbLOg && git reset --hard origin/claude/setup-deployment-rules-EbLOg && node deploy-all.js
 ```
 
 ### ルール2: チャット行数が5000行を超えたら移行を提案すること
@@ -87,63 +87,33 @@ git log origin/<作業ブランチ> --oneline -10
 ## 必須デプロイコマンド（ユーザーのWindows PCで実行）
 
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/setup-deployment-rules-EbLOg && git reset --hard origin/claude/setup-deployment-rules-EbLOg && node deploy-all.js
 ```
 
 ---
 
 ## 今回のセッションで完了した作業
 
-### 1. 清掃ステータスマーク修正（メインアプリ）
-- **問題**: 清掃スタッフ確定後、カレンダーのステータスドットが赤のまま変わらない
-- **原因**: 清掃イベント初回表示時にauto-createされた募集エントリが `window._recruitFullMap` に存在しないため、楽観的キャッシュ更新が空振りしていた
-- **修正内容** (4回の修正を経た最終版):
-  - `applyConfirmOptimistic(recruitRowIdx, bookingRowNum, staffName)` を根本的に書き直し
-  - `recruitRowIndex` で既存エントリを検索 → なければ `bookingRowNumber` で新規エントリ作成
-  - `allBookings.cleaningStaff` も同時更新
-  - カレンダーを即座に再描画
-  - 3つの確定フロー（eventModal, recruitSelectModal, recruitEditModal）全てで呼び出し
-- **コミット**: f70e821, 9acf17d, 9f30e11
-- **状態**: **要テスト** - ユーザーが「スタッフ一覧にない名前を手入力で指定してスタッフ確定」するフローで確認が必要
+（このセッションではまだコード変更なし。ブランチ統合のみ実施。）
 
-### 2. 宿泊人数編集機能（メインアプリ）
-- オーナー宿泊詳細画面に宿泊人数の編集ボタンを追加
-- GAS側 `updateGuestCount()` 関数を追加
-- **コミット**: 2bb73e4
+---
 
-### 3. カテゴリ見出し視認性改善（チェックリストアプリ）
-- 小カテゴリ・細カテゴリの視認性を改善（オレンジ/紫アイコン）
-- 展開時の見切れ（overflow）を修正
-- **コミット**: 5ad84f8, a5530c3
+## 過去セッションで完了した主な作業
 
-### 4. 全展開/全折りたたみボタン（チェックリストアプリ）
-- 子カテゴリがあるカテゴリ見出しに「全展開/全折り」ボタンを追加
-- `toggleCategorySections()` 関数で子カテゴリの開閉をトグル
+### メインアプリ
 
-### 5. カテゴリ名称変更（チェックリストアプリ）
-- ✎ ボタンでカテゴリ名をプロンプト入力で変更
-- GAS側 `renameCategoryInMaster()` でマスタシートのカテゴリ列を更新
+1. **清掃ステータスマーク修正** - スタッフ確定後にカレンダーのステータスドットが即座に緑に変わるよう修正。`applyConfirmOptimistic()` による楽観的キャッシュ更新（4回の修正を経た最終版）
+2. **宿泊人数編集機能** - オーナー宿泊詳細画面に宿泊人数の編集ボタンを追加
+3. **凡例マーク変更** - 「日付背景-募集中」を「赤丸」の凡例に統合
 
-### 6. カテゴリ削除（チェックリストアプリ）
-- ✕ ボタンでカテゴリ削除
-- 2つのオプション: ① 中身も全て削除 ② 中身は親カテゴリに移動して残す
-- GAS側 `deleteCategoryFromMaster()` で実装
+### チェックリストアプリ
 
-### 7. 引き継ぎ資料の整備
-- `HANDOFF.md` と `SESSION_HANDOFF.md` を最新状態に更新
-- **コミット**: 4つ目と5つ目は d0a1a50 に含む
-
-### 8. 要補充タブに「表示」ボタンと大カテゴリ名を追加（チェックリストアプリ）
-- 要補充リストの各項目に大カテゴリ名（テラス、駐車場等）を濃紺バッジで表示
-- 「表示」ボタンを追加：押すとチェックリストタブに切り替え→親セクション自動展開→該当項目へスクロール→黄色ハイライト（2秒）
-- supply-item を flexbox レイアウトに変更
-- **コミット**: b3d7295
-
-### 9. 要補充対象を外した時に要補充タブからも項目を削除（バグ修正）
-- **問題**: アイテム編集で「要補充対象」チェックを外しても、要補充タブに表示が残り続ける
-- **原因**: `saveItemEdit` で `item.supplyItem` は `false` に更新されるが、`checklistData.supplyNeeded[itemId]` のエントリが削除されていなかった
-- **修正**: `supplyPromise` 内で `!newSupply` の場合、`checklistData.supplyNeeded` からエントリを削除し、GASバックエンド（`toggleSupplyNeeded`）も呼び出して要補充記録シートからも削除
-- **コミット**: 4a75a76
+1. **UI全面改修** - タブ上部移動、漏れチェック統合、メモ自動保存、項目名タッチ、見本写真サムネイル
+2. **カテゴリ操作** - 4階層対応、カテゴリ名変更(✎)、カテゴリ削除(✕)、全展開/全折りたたみ
+3. **並び替え機能** - 項目のドラッグ並び替え（長押し600ms）、カテゴリ間移動、UNDO機能
+4. **要補充タブ改善** - 大カテゴリ名バッジ+「表示」ボタン、要補充解除時のタブ連動削除
+5. **メモ機能** - チェック項目ごとのメモ入力・保存
+6. **バグ修正多数** - GAS同時実行数制御、チェック復活バグ、カテゴリ順序維持など
 
 ---
 
@@ -176,12 +146,12 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/upda
 
 | ファイル | 行数（概算） | 役割 |
 |----------|-------------|------|
-| `Code.gs` | ~6609行 | メインアプリ（予約管理）サーバー |
-| `index.html` | ~6150行 | メインアプリ フロントエンド |
-| `checklist-app/Code.gs` | ~1604行 | チェックリストアプリ サーバー |
-| `checklist-app/checklist.html` | ~2423行 | チェックリストアプリ フロントエンド |
-| `deploy-all.js` | 166行 | 一括デプロイスクリプト |
-| `HANDOFF.md` | ~400行 | プロジェクト全体の技術資料 |
+| `Code.gs` | ~6927行 | メインアプリ（予約管理）サーバー |
+| `index.html` | ~6530行 | メインアプリ フロントエンド |
+| `checklist-app/Code.gs` | ~2176行 | チェックリストアプリ サーバー |
+| `checklist-app/checklist.html` | ~3860行 | チェックリストアプリ フロントエンド |
+| `deploy-all.js` | ~219行 | 一括デプロイスクリプト |
+| `HANDOFF.md` | ~460行 | プロジェクト全体の技術資料 |
 
 ---
 

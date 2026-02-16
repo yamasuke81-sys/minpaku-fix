@@ -271,29 +271,47 @@ async function main() {
     // モーダル表示待機
     await waitFor(frame, () => !!document.querySelector('.modal.show'), 10000);
 
-    // 清掃モーダル固有のデータ読み込み待機:
-    // - 募集ステータスバッジ（「読み込み中…」から変化するまで）
-    // - 次回予約情報
-    // - ランドリーカード
-    console.log('    清掃データ読み込み待機中...');
-    const dataLoaded = await waitFor(frame, () => {
-      const status = document.getElementById('eventModalStaffRecruitStatus');
-      // 「読み込み中」テキストが消えたらデータ読み込み完了
-      if (status && status.textContent.includes('読み込み中')) return false;
-      // ボディに十分なコンテンツがあるか
-      const body = document.querySelector('#eventModalBody');
-      return body && body.textContent.trim().length > 30;
-    }, 30000);
+    // ── 清掃モーダルの非同期データ読み込み完了を確実に待機 ──
+    // GASサーバーから getCleaningModalData を呼び出し、結果が返るまで
+    // 各エリアに spinner + 「読み込み中…」が表示される。
+    // 完了すると volBodyLoading 要素がDOMから削除される。
+    console.log('    清掃データ読み込み待機中（最大30秒）...');
 
-    if (!dataLoaded) {
-      console.log('    ⚠ データ読み込みがタイムアウトしました（現在の状態で撮影します）');
+    // (1) volBodyLoading スピナーが消えるまで待機（最も確実な完了シグナル）
+    const spinnerGone = await waitFor(frame, () => {
+      return !document.getElementById('volBodyLoading');
+    }, 30000);
+    if (!spinnerGone) {
+      console.log('    ⚠ 回答ボタン読み込みがタイムアウト');
     }
-    // ランドリーカードも非同期で読み込まれるので追加待機
+
+    // (2) 募集ステータスバッジの「読み込み中…」が消えるまで待機
+    const statusLoaded = await waitFor(frame, () => {
+      const el = document.getElementById('eventModalStaffRecruitStatus');
+      return el && !el.textContent.includes('読み込み中');
+    }, 15000);
+    if (!statusLoaded) {
+      console.log('    ⚠ 募集ステータス読み込みがタイムアウト');
+    }
+
+    // (3) ランドリーカードのデータ読み込み待機
+    const laundryLoaded = await waitFor(frame, () => {
+      const el = document.getElementById('laundryCardArea');
+      return el && !el.textContent.includes('読み込み中');
+    }, 15000);
+    if (!laundryLoaded) {
+      console.log('    ⚠ ランドリーカード読み込みがタイムアウト');
+    }
+
+    // (4) 次回予約情報の読み込み待機
     await waitFor(frame, () => {
-      const laundry = document.getElementById('laundryCardArea');
-      return laundry && laundry.innerHTML.trim().length > 0;
+      const el = document.getElementById('nextResHeaderStatus');
+      return !el || !el.textContent.includes('読み込み中');
     }, 10000);
-    await sleep(2000);
+
+    // 全データ到着後、描画の安定化を待つ
+    await sleep(3000);
+    console.log('    データ読み込み完了');
 
     await take(page, 'cleaning-detail', results);
 
@@ -301,7 +319,14 @@ async function main() {
     // 5. 回答ボタン部分
     // ══════════════════════════════════════════════════════════
     console.log('  [5/8] 回答ボタン...');
-    // 回答ボタンの場所を探す（ボディ内 or フッター内）
+    // 回答ボタン（対応可/条件付/不可）が描画されるまで待機
+    await waitFor(frame, () => {
+      const area = document.getElementById('eventModalVolunteerBodyArea');
+      if (area && area.querySelector('button')) return true;
+      const center = document.getElementById('eventModalVolunteerCenter');
+      return center && center.querySelector('button');
+    }, 10000);
+    await sleep(500);
     await takeElement(frame, page, [
       '#eventModalVolunteerBodyArea',
       '#eventModalVolunteerCenter',

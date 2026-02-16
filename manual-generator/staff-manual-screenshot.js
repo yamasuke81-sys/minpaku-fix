@@ -194,6 +194,54 @@ async function closeModal(frame, page) {
   await sleep(1000);
 }
 
+// ── Braveを通常起動してPuppeteerで接続（自動テスト検出を回避） ──
+async function launchBrowserNatively(browserPath, userDataDir) {
+  const { spawn } = require('child_process');
+  const http = require('http');
+  const DEBUG_PORT = 9234;
+
+  const args = [
+    `--remote-debugging-port=${DEBUG_PORT}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-features=IsolateOrigins,site-per-process',
+    'about:blank',
+  ];
+  if (userDataDir) {
+    args.unshift(`--user-data-dir=${userDataDir}`);
+  }
+
+  console.log('  Braveを通常モードで起動中...');
+  const proc = spawn(browserPath, args, {
+    detached: true,
+    stdio: 'ignore',
+  });
+  proc.unref();
+
+  // DevToolsポートが開くまで待機
+  console.log('  DevTools接続待機中...');
+  for (let i = 0; i < 30; i++) {
+    const ok = await new Promise(resolve => {
+      const req = http.get(`http://127.0.0.1:${DEBUG_PORT}/json/version`, res => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => resolve(data));
+      });
+      req.on('error', () => resolve(null));
+      req.setTimeout(2000, () => { req.destroy(); resolve(null); });
+    });
+    if (ok) break;
+    await sleep(1000);
+  }
+
+  const browser = await puppeteer.connect({
+    browserURL: `http://127.0.0.1:${DEBUG_PORT}`,
+    defaultViewport: null,
+  });
+
+  return { browser, proc };
+}
+
 // ════════════════════════════════════════════════════════════
 //  メイン処理
 // ════════════════════════════════════════════════════════════
@@ -214,23 +262,28 @@ async function main() {
   // ブラウザ検出
   const browserPath = detectBrowserPath();
   const userDataDir = needsLogin() ? detectUserDataDir(browserPath) : null;
+  // --login かつ Brave/Chrome が見つかった場合は通常起動方式を使う
+  const useNativeLaunch = needsLogin() && browserPath && userDataDir;
 
   if (browserPath) {
     console.log(`  ブラウザ: ${path.basename(browserPath)}`);
   } else {
     console.log('  ブラウザ: Puppeteer内蔵Chromium');
   }
-  if (userDataDir) {
+  if (useNativeLaunch) {
+    console.log('  モード: 通常起動 + DevTools接続（自動テスト検出を回避）');
     console.log('  プロファイル: 既存のログイン情報を使用');
   }
   console.log();
 
-  // --login + 既存プロファイル使用時はBraveを閉じる必要がある
-  if (userDataDir) {
+  let browser, nativeProc;
+
+  if (useNativeLaunch) {
+    // Braveを閉じてもらう
     const readline = require('readline');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     console.log('  ╔══════════════════════════════════════════════════════════╗');
-    console.log('  ║  既存のブラウザプロファイルを使用します。               ║');
+    console.log('  ║  既存のログイン情報を使ってスクリーンショットを撮影します║');
     console.log('  ║  Brave（Chrome）が開いている場合は閉じてください。      ║');
     console.log('  ║  閉じたらEnterキーを押してください。                    ║');
     console.log('  ╚══════════════════════════════════════════════════════════╝\n');
@@ -240,23 +293,22 @@ async function main() {
         resolve();
       });
     });
-  }
 
-  const launchOptions = {
-    headless: isHeaded() ? false : 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security',
-           '--disable-features=IsolateOrigins,site-per-process',
-           '--disable-blink-features=AutomationControlled'],
-    ignoreDefaultArgs: ['--enable-automation'],
-  };
-  if (browserPath) {
-    launchOptions.executablePath = browserPath;
+    const result = await launchBrowserNatively(browserPath, userDataDir);
+    browser = result.browser;
+    nativeProc = result.proc;
+  } else {
+    // 従来方式（Puppeteer内蔵ブラウザ）
+    const launchOptions = {
+      headless: isHeaded() ? false : 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security',
+             '--disable-features=IsolateOrigins,site-per-process'],
+    };
+    if (browserPath) {
+      launchOptions.executablePath = browserPath;
+    }
+    browser = await puppeteer.launch(launchOptions);
   }
-  if (userDataDir) {
-    launchOptions.args.push(`--user-data-dir=${userDataDir}`);
-  }
-
-  const browser = await puppeteer.launch(launchOptions);
 
   const page = await browser.newPage();
   await page.setViewport(VIEWPORT);
@@ -271,8 +323,8 @@ async function main() {
   console.log('  ページ読み込み中（GASアプリは時間がかかります）...');
   await page.goto(staffUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-  // --login（既存プロファイルなし）: 手動ログインを促す
-  if (needsLogin() && !userDataDir) {
+  // --login（通常起動方式でない場合）: 手動ログインを促す
+  if (needsLogin() && !useNativeLaunch) {
     await waitForLogin(page, staffUrl);
   }
 
@@ -495,7 +547,16 @@ async function main() {
     console.log('    スキップ: 清掃イベントが見つかりません');
   }
 
-  await browser.close();
+  // ブラウザ終了
+  if (nativeProc) {
+    // 通常起動方式: disconnect後にプロセスを終了
+    browser.disconnect();
+    try {
+      process.kill(nativeProc.pid);
+    } catch (_) {}
+  } else {
+    await browser.close();
+  }
 
   // ── 結果レポート ──
   const resultPath = path.join(OUT_DIR, 'result.json');

@@ -1796,6 +1796,11 @@ function deleteChecklistItemFromMaster(itemId) {
     var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
     for (var i = 0; i < ids.length; i++) {
       if (String(ids[i][0]) === String(itemId)) {
+        // 見本写真があればDriveから削除
+        var exampleFileId = String(sheet.getRange(i + 2, 7).getValue() || '').trim();
+        if (exampleFileId) {
+          try { DriveApp.getFileById(exampleFileId).setTrashed(true); } catch (e) {}
+        }
         sheet.deleteRow(i + 2);
         return JSON.stringify({ success: true });
       }
@@ -2401,4 +2406,177 @@ function moveItemToCategory(itemId, newCategory, itemOrders) {
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+// ======================================================
+// 自動クリーンアップ（古いデータ・写真の定期削除）
+// ======================================================
+
+/**
+ * 古いデータを自動クリーンアップ（日次トリガーで実行）
+ *
+ * ルール:
+ *   - チェックリスト記録・メモ・要補充・スタッフ選択: 1年経過後に削除
+ *   - チェックリスト写真（Driveファイル含む）: 3か月経過後に削除
+ *   - メモ添付写真（Driveファイル）: 3か月経過後に削除（メモ本文は1年保持）
+ *   - 見本写真: 期限なし（マスタから削除時にDriveからも即時削除済み）
+ */
+function cleanupOldData() {
+  var now = new Date();
+  var oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+  var threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+  var log = [];
+
+  // 1. チェックリスト写真: 3か月経過 → シート行削除 + Driveファイル削除
+  log.push(cleanupPhotos_(threeMonthsAgo));
+
+  // 2. メモ添付写真: 3か月経過 → Driveファイル削除 + シートの写真ID列をクリア（メモ本文は保持）
+  log.push(cleanupMemoPhotos_(threeMonthsAgo));
+
+  // 3. チェックリスト記録: 1年経過 → 行削除
+  log.push(cleanupSheetRows_(SHEET_CL_RECORDS, 5, oneYearAgo, 'チェックリスト記録'));
+
+  // 4. チェックリストメモ: 1年経過 → 行削除（残存写真があればDriveからも削除）
+  log.push(cleanupMemosWithPhotos_(oneYearAgo));
+
+  // 5. 要補充記録: 1年経過 → 行削除
+  log.push(cleanupSheetRows_(SHEET_CL_SUPPLIES, 6, oneYearAgo, '要補充記録'));
+
+  // 6. スタッフ選択記録: 1年経過 → 行削除
+  log.push(cleanupSheetRows_(SHEET_CL_STAFF_SELECTION, 3, oneYearAgo, 'スタッフ選択記録'));
+
+  Logger.log('クリーンアップ完了: ' + log.join(' / '));
+}
+
+/**
+ * チェックリスト写真を3か月経過後に削除（シート行 + Driveファイル）
+ */
+function cleanupPhotos_(cutoffDate) {
+  var sheet = clSheet_(SHEET_CL_PHOTOS);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '写真: 0件削除';
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  var deleted = 0;
+
+  // 下から削除して行ずれ防止
+  for (var i = data.length - 1; i >= 0; i--) {
+    var ts = data[i][4]; // タイムスタンプ(列5)
+    if (ts instanceof Date && ts < cutoffDate) {
+      // Driveファイルを削除
+      var fileId = String(data[i][2] || '').trim();
+      if (fileId) {
+        try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+      }
+      sheet.deleteRow(i + 2);
+      deleted++;
+    }
+  }
+
+  return '写真: ' + deleted + '件削除';
+}
+
+/**
+ * メモ添付写真を3か月経過後にDriveから削除（メモ本文は保持、写真ID列をクリア）
+ */
+function cleanupMemoPhotos_(cutoffDate) {
+  var sheet = clSheet_(SHEET_CL_MEMOS);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 'メモ写真: 0件削除';
+
+  var cols = Math.max(sheet.getLastColumn(), 5);
+  var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
+  var deleted = 0;
+
+  for (var i = 0; i < data.length; i++) {
+    var ts = data[i][3]; // タイムスタンプ(列4)
+    var photoFileId = String(data[i][4] || '').trim(); // 写真ファイルID(列5)
+    if (ts instanceof Date && ts < cutoffDate && photoFileId) {
+      // Driveファイルを削除
+      try { DriveApp.getFileById(photoFileId).setTrashed(true); } catch (e) {}
+      // シートの写真ID列をクリア（メモ本文は残す）
+      sheet.getRange(i + 2, 5).setValue('');
+      deleted++;
+    }
+  }
+
+  return 'メモ写真: ' + deleted + '件削除';
+}
+
+/**
+ * メモを1年経過後に行削除（残存する写真があればDriveからも削除）
+ */
+function cleanupMemosWithPhotos_(cutoffDate) {
+  var sheet = clSheet_(SHEET_CL_MEMOS);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 'メモ: 0件削除';
+
+  var cols = Math.max(sheet.getLastColumn(), 5);
+  var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
+  var deleted = 0;
+
+  for (var i = data.length - 1; i >= 0; i--) {
+    var ts = data[i][3]; // タイムスタンプ(列4)
+    if (ts instanceof Date && ts < cutoffDate) {
+      // 残存する写真があればDriveから削除
+      var photoFileId = String(data[i][4] || '').trim();
+      if (photoFileId) {
+        try { DriveApp.getFileById(photoFileId).setTrashed(true); } catch (e) {}
+      }
+      sheet.deleteRow(i + 2);
+      deleted++;
+    }
+  }
+
+  return 'メモ: ' + deleted + '件削除';
+}
+
+/**
+ * 指定シートからタイムスタンプ列が期限より古い行を削除
+ * @param {string} sheetName - シート名定数
+ * @param {number} tsCol - タイムスタンプの列番号（1始まり）
+ * @param {Date} cutoffDate - この日付より古い行を削除
+ * @param {string} label - ログ用ラベル
+ */
+function cleanupSheetRows_(sheetName, tsCol, cutoffDate, label) {
+  var sheet = clSheet_(sheetName);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return label + ': 0件削除';
+
+  var data = sheet.getRange(2, 1, lastRow - 1, tsCol).getValues();
+  var deleted = 0;
+
+  for (var i = data.length - 1; i >= 0; i--) {
+    var ts = data[i][tsCol - 1];
+    if (ts instanceof Date && ts < cutoffDate) {
+      sheet.deleteRow(i + 2);
+      deleted++;
+    }
+  }
+
+  return label + ': ' + deleted + '件削除';
+}
+
+/**
+ * クリーンアップ用の日次トリガーを設定
+ * GASエディタから1回だけ手動実行してください
+ */
+function installCleanupTrigger() {
+  // 既存のクリーンアップトリガーを削除（重複防止）
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'cleanupOldData') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  // 毎日午前3時に実行
+  ScriptApp.newTrigger('cleanupOldData')
+    .timeBased()
+    .everyDays(1)
+    .atHour(3)
+    .create();
+
+  Logger.log('クリーンアップトリガーを設定しました（毎日午前3時）');
 }

@@ -5,7 +5,10 @@
   "scripts": {
     "screenshot": "node screenshot.js",
     "generate": "node generate-manual.js",
-    "all": "node screenshot.js && node generate-manual.js"
+    "all": "node screenshot.js && node generate-manual.js",
+    "staff-screenshot": "node staff-manual-screenshot.js",
+    "staff-generate": "node generate-staff-manual.js",
+    "staff-manual": "node staff-manual-screenshot.js && node generate-staff-manual.js"
   },
   "dependencies": {
     "puppeteer": "^22.0.0"

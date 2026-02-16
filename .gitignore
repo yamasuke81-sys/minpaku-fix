@@ -2,3 +2,7 @@
 deploy-config.json
 
 node_modules/
+
+# マニュアル生成の成果物（スクショ・HTML）
+manual-generator/screenshots/
+manual-generator/manual.html

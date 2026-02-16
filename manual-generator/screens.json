@@ -1,0 +1,152 @@
+{
+  "comment": "撮影対象の画面定義。actions は Puppeteer で順番に実行される操作リスト。",
+  "baseUrl": "",
+  "viewport": { "width": 390, "height": 844, "deviceScaleFactor": 2 },
+  "waitAfterLoad": 4000,
+  "screens": [
+    {
+      "id": "owner-calendar",
+      "title": "カレンダー（オーナー画面）",
+      "description": "予約と清掃のスケジュールを月表示で確認できます。宿泊は青、清掃は黄色で表示されます。",
+      "mode": "owner",
+      "actions": [
+        { "type": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "owner-recruit",
+      "title": "清掃募集",
+      "description": "清掃スタッフの募集状況を確認・管理できます。募集中・確定済みなどのステータスが色分け表示されます。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='recruit']" },
+        { "type": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "owner-notifications",
+      "title": "通知一覧",
+      "description": "スタッフの立候補や確定通知などの履歴を確認できます。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='notifications']" },
+        { "type": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "owner-settings-staff",
+      "title": "設定 - 清掃スタッフ",
+      "description": "清掃スタッフの追加・削除、連絡先や振込先情報を管理します。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1500 },
+        { "type": "click", "selector": "[data-subtab='staff']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-subowners",
+      "title": "設定 - サブオーナー",
+      "description": "サブオーナーを追加すると、オーナーと同じ権限で管理できます。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='subOwners']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-jobs",
+      "title": "設定 - 仕事内容",
+      "description": "清掃の仕事種別と報酬額を設定します。スタッフごとの個別料金も設定可能です。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='jobs']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-recruit",
+      "title": "設定 - 募集設定",
+      "description": "募集の最低人数、リマインド間隔、メールテンプレートなどを設定します。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='recruitSettings']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-reminder",
+      "title": "設定 - スタッフ未決定リマインド",
+      "description": "清掃スタッフが未決定のとき、自動でリマインドメールを送信する設定です。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='reminderEmail']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-roster",
+      "title": "設定 - 名簿未入力リマインド",
+      "description": "宿泊者名簿が未入力のとき、チェックイン前にリマインド通知を送る設定です。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='rosterReminder']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-sync",
+      "title": "設定 - 予約連携（iCal）",
+      "description": "Airbnb・Booking.com等のiCalカレンダーURLを登録して予約を自動同期します。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='sync']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "owner-settings-maintenance",
+      "title": "設定 - メンテナンス",
+      "description": "スプレッドシートの最適化（空白行・列の削除）を実行できます。",
+      "mode": "owner",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='settings']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[data-subtab='maintenance']" },
+        { "type": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "staff-calendar",
+      "title": "カレンダー（スタッフ画面）",
+      "description": "スタッフ用の画面です。予約・清掃スケジュールを確認できます。自分が担当の清掃には赤枠が表示されます。",
+      "mode": "staff",
+      "actions": [
+        { "type": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "staff-schedule",
+      "title": "出勤一覧（スタッフ画面）",
+      "description": "自分に割り当てられた清掃スケジュールの一覧を月別に確認できます。",
+      "mode": "staff",
+      "actions": [
+        { "type": "click", "selector": "[data-tab='staffSchedule']" },
+        { "type": "wait", "ms": 2000 }
+      ]
+    }
+  ]
+}

@@ -710,6 +710,38 @@
       color: #888;
       margin-bottom: 4px;
     }
+    .memo-submit-btn {
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #3498db;
+      color: #fff;
+      transition: opacity 0.2s;
+    }
+    .memo-submit-btn:disabled {
+      background: #bdc3c7;
+      cursor: default;
+    }
+    .memo-submit-btn:not(:disabled):active {
+      opacity: 0.8;
+    }
+    .memo-delete-btn {
+      background: none;
+      border: none;
+      color: #bbb;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+      float: right;
+    }
+    .memo-delete-btn:active {
+      color: #e74c3c;
+    }
 
     /* 清掃完了エリア */
     .complete-area {
@@ -1246,6 +1278,7 @@
           <input type="text" id="memoInput" class="memo-input" placeholder="コメントを入力...（写真も添付可）">
           <button class="memo-photo-btn" onclick="openMemoPhotoUpload()" title="写真を添付">📷</button>
         </div>
+        <button id="memoSubmitBtn" class="memo-submit-btn" disabled onclick="addMemo()">登録</button>
       </div>
 
       <!-- 清掃完了エリア（漏れチェック統合） -->
@@ -1383,6 +1416,7 @@
             checklistData = res;
             renderChecklist();
             renderPhotoSection();
+            renderMemos();
             renderSupplyList();
             updateProgress();
             updateCheckAllButton();
@@ -1411,20 +1445,11 @@
         }
       });
 
-      // メモ自動保存（デバウンス）- 写真添付時はテキスト空でもOK
-      var memoTimer = null;
-      document.getElementById('memoInput').addEventListener('input', function() {
-        var input = this;
-        if (memoTimer) clearTimeout(memoTimer);
-        memoTimer = setTimeout(function() {
-          var text = input.value.trim();
-          if (!text && !pendingMemoPhotoFileId) return;
-          addMemo();
-        }, 1500);
-      });
+      // メモ入力時に登録ボタンの有効/無効を切り替え
+      document.getElementById('memoInput').addEventListener('input', updateMemoSubmitBtn);
       document.getElementById('memoInput').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
-          if (memoTimer) clearTimeout(memoTimer);
+          e.preventDefault();
           addMemo();
         }
       });
@@ -2156,8 +2181,9 @@
     function renderMemos() {
       var memos = checklistData.memos;
       var html = '';
-      memos.forEach(function(memo) {
+      memos.forEach(function(memo, idx) {
         html += '<div class="memo-item">';
+        html += '<button class="memo-delete-btn" onclick="deleteMemo(' + idx + ')" title="削除">&times;</button>';
         if (memo.text) html += escapeHtml(memo.text);
         if (memo.photoFileId) {
           html += '<div class="memo-photo-thumb">';
@@ -2610,22 +2636,49 @@
       event.target.value = '';
     }
 
+    function updateMemoSubmitBtn() {
+      var btn = document.getElementById('memoSubmitBtn');
+      var text = document.getElementById('memoInput').value.trim();
+      var hasPhoto = !!pendingMemoPhotoFileId;
+      var uploading = document.getElementById('memoUploading').style.display !== 'none';
+      btn.disabled = (!text && !hasPhoto) || uploading;
+    }
+
     function addMemo() {
       var input = document.getElementById('memoInput');
       var text = input.value.trim();
       var photoId = pendingMemoPhotoFileId || '';
       if (!text && !photoId) return;
+      var btn = document.getElementById('memoSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = '登録中...';
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
 
       callGAS('addChecklistMemo', [checkoutDate, text, who, photoId]).then(function(res) {
         if (res.success) {
-          checklistData.memos.push({ text: text, by: who, at: new Date(), photoFileId: photoId });
+          checklistData.memos.push({ text: text, by: who, at: new Date().toISOString(), photoFileId: photoId });
           renderMemos();
           input.value = '';
           clearMemoPhotoPreview();
         } else {
           alert('メモの追加に失敗しました: ' + res.error);
+        }
+        btn.textContent = '登録';
+        updateMemoSubmitBtn();
+      });
+    }
+
+    function deleteMemo(index) {
+      if (!confirm('このメモを削除しますか？')) return;
+      var memo = checklistData.memos[index];
+      if (!memo) return;
+      callGAS('deleteChecklistMemo', [checkoutDate, String(memo.at), memo.text]).then(function(res) {
+        if (res.success) {
+          checklistData.memos.splice(index, 1);
+          renderMemos();
+        } else {
+          alert('削除に失敗しました: ' + (res.error || ''));
         }
       });
     }
@@ -2659,6 +2712,7 @@
           if (res.success) {
             pendingMemoPhotoFileId = res.fileId;
             showSaveStatus('saved');
+            updateMemoSubmitBtn();
           } else {
             alert('写真のアップロードに失敗しました: ' + res.error);
             clearMemoPhotoPreview();
@@ -2690,6 +2744,7 @@
       pendingMemoPhotoDataUrl = null;
       document.getElementById('memoPhotoPreview').innerHTML = '';
       document.getElementById('memoUploading').style.display = 'none';
+      updateMemoSubmitBtn();
     }
 
     // === 全体操作 ===

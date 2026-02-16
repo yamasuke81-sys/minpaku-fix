@@ -816,6 +816,37 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
 }
 
 /**
+ * メモを削除
+ */
+function deleteChecklistMemo(checkoutDate, memoTimestamp, memoText) {
+  try {
+    var sheet = clSheet_(SHEET_CL_MEMOS);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '削除対象が見つかりません' });
+
+    var cols = Math.max(sheet.getLastColumn(), 5);
+    var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (normDateStr_(data[i][0]) === targetDate &&
+          String(data[i][1] || '') === String(memoText || '') &&
+          String(data[i][3] || '') === String(memoTimestamp || '')) {
+        // Drive上の写真も削除
+        var photoFileId = String(data[i][4] || '');
+        if (photoFileId) {
+          try { DriveApp.getFileById(photoFileId).setTrashed(true); } catch (e) {}
+        }
+        sheet.deleteRow(i + 2);
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '削除対象が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * メモ用写真をアップロード
  */
 function uploadMemoPhoto(checkoutDate, base64Data, staffName) {

@@ -2241,21 +2241,41 @@
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
 
+      // 楽観的更新：GAS完了を待たずに即座にデータとUIを更新
+      var prevEntry = checklistData.supplyNeeded[itemId];
+      if (needed) {
+        checklistData.supplyNeeded[itemId] = { name: itemName, by: who, at: new Date() };
+      } else {
+        delete checklistData.supplyNeeded[itemId];
+      }
+      renderSupplyList();
+
       showSaveStatus('saving');
       callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          if (needed) {
-            checklistData.supplyNeeded[itemId] = { name: itemName, by: who, at: new Date() };
+        } else {
+          // 失敗時はロールバック
+          showSaveStatus('error');
+          if (prevEntry) {
+            checklistData.supplyNeeded[itemId] = prevEntry;
           } else {
             delete checklistData.supplyNeeded[itemId];
           }
-          renderSupplyList();
-        } else {
-          showSaveStatus('error');
           checkbox.checked = !needed;
+          renderSupplyList();
         }
-      }).catch(function() { showSaveStatus('error'); });
+      }).catch(function() {
+        // エラー時もロールバック
+        showSaveStatus('error');
+        if (prevEntry) {
+          checklistData.supplyNeeded[itemId] = prevEntry;
+        } else {
+          delete checklistData.supplyNeeded[itemId];
+        }
+        checkbox.checked = !needed;
+        renderSupplyList();
+      });
     }
 
     function updateProgress() {

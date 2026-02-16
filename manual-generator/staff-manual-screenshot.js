@@ -49,6 +49,32 @@ function detectBrowserPath() {
   return null; // Puppeteer内蔵Chromiumを使用
 }
 
+// ── ブラウザのユーザーデータディレクトリ検出 ──
+function detectUserDataDir(browserPath) {
+  if (!browserPath) return null;
+  const isBrave = browserPath.toLowerCase().includes('brave');
+  const candidates = isBrave ? [
+    // Brave (Windows)
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'BraveSoftware', 'Brave-Browser', 'User Data'),
+    // Brave (macOS)
+    process.env.HOME && path.join(process.env.HOME, 'Library', 'Application Support', 'BraveSoftware', 'Brave-Browser'),
+    // Brave (Linux)
+    process.env.HOME && path.join(process.env.HOME, '.config', 'BraveSoftware', 'Brave-Browser'),
+  ] : [
+    // Chrome (Windows)
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'User Data'),
+    // Chrome (macOS)
+    process.env.HOME && path.join(process.env.HOME, 'Library', 'Application Support', 'Google', 'Chrome'),
+    // Chrome (Linux)
+    process.env.HOME && path.join(process.env.HOME, '.config', 'google-chrome'),
+  ];
+
+  for (const p of candidates.filter(Boolean)) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 // ── CLI / deploy-config.json からURL取得 ──
 function getUrl() {
   const args = process.argv.slice(2);
@@ -187,23 +213,47 @@ async function main() {
 
   // ブラウザ検出
   const browserPath = detectBrowserPath();
+  const userDataDir = needsLogin() ? detectUserDataDir(browserPath) : null;
+
   if (browserPath) {
     console.log(`  ブラウザ: ${path.basename(browserPath)}`);
   } else {
     console.log('  ブラウザ: Puppeteer内蔵Chromium');
-    if (needsLogin()) {
-      console.log('  ⚠ Brave/Chromeが見つかりません。Googleログインがブロックされる可能性があります。');
-    }
+  }
+  if (userDataDir) {
+    console.log('  プロファイル: 既存のログイン情報を使用');
   }
   console.log();
+
+  // --login + 既存プロファイル使用時はBraveを閉じる必要がある
+  if (userDataDir) {
+    const readline = require('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    console.log('  ╔══════════════════════════════════════════════════════════╗');
+    console.log('  ║  既存のブラウザプロファイルを使用します。               ║');
+    console.log('  ║  Brave（Chrome）が開いている場合は閉じてください。      ║');
+    console.log('  ║  閉じたらEnterキーを押してください。                    ║');
+    console.log('  ╚══════════════════════════════════════════════════════════╝\n');
+    await new Promise(resolve => {
+      rl.question('  → Braveを閉じたらEnterを押してください... ', () => {
+        rl.close();
+        resolve();
+      });
+    });
+  }
 
   const launchOptions = {
     headless: isHeaded() ? false : 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security',
-           '--disable-features=IsolateOrigins,site-per-process'],
+           '--disable-features=IsolateOrigins,site-per-process',
+           '--disable-blink-features=AutomationControlled'],
+    ignoreDefaultArgs: ['--enable-automation'],
   };
   if (browserPath) {
     launchOptions.executablePath = browserPath;
+  }
+  if (userDataDir) {
+    launchOptions.args.push(`--user-data-dir=${userDataDir}`);
   }
 
   const browser = await puppeteer.launch(launchOptions);
@@ -221,8 +271,8 @@ async function main() {
   console.log('  ページ読み込み中（GASアプリは時間がかかります）...');
   await page.goto(staffUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-  // --login: Googleログインが必要な場合、ユーザーに手動ログインを促す
-  if (needsLogin()) {
+  // --login（既存プロファイルなし）: 手動ログインを促す
+  if (needsLogin() && !userDataDir) {
     await waitForLogin(page, staffUrl);
   }
 

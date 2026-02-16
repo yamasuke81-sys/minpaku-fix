@@ -276,7 +276,7 @@ function clSheet_(name) {
     else if (name === SHEET_CL_RECORDS) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', 'チェック済', 'チェック者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_PHOTOS) sheet.getRange(1, 1, 1, 6).setValues([['チェックアウト日', '撮影箇所ID', 'ファイルID', 'アップロード者', 'タイムスタンプ', '撮影タイミング']]);
     else if (name === SHEET_CL_MEMOS) sheet.getRange(1, 1, 1, 4).setValues([['チェックアウト日', 'メモ内容', '記入者', 'タイムスタンプ']]);
-    else if (name === SHEET_CL_SUPPLIES) sheet.getRange(1, 1, 1, 5).setValues([['チェックアウト日', '項目ID', '項目名', '記入者', 'タイムスタンプ']]);
+    else if (name === SHEET_CL_SUPPLIES) sheet.getRange(1, 1, 1, 6).setValues([['チェックアウト日', '項目ID', '項目名', 'カテゴリ', '記入者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_CATEGORY_ORDER) sheet.getRange(1, 1, 1, 2).setValues([['カテゴリパス', '表示順']]);
   }
   return sheet;
@@ -686,6 +686,7 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName, c
       sheet.getRange(nextRow, 1, 1, 6).setValues([[checkoutDate, itemId, itemName, category || '', staffName || '', new Date()]]);
     }
 
+    SpreadsheetApp.flush();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

@@ -584,6 +584,21 @@
     .supply-item-show-btn:active {
       background: #2980b9;
     }
+    .supply-item-remove-btn {
+      font-size: 12px;
+      color: #fff;
+      background: #e74c3c;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      white-space: nowrap;
+      margin-left: 4px;
+    }
+    .supply-item-remove-btn:active {
+      background: #c0392b;
+    }
     @keyframes supply-highlight {
       0% { background: #ffeaa7; }
       100% { background: transparent; }
@@ -1230,6 +1245,8 @@
     var checkoutDate = '<?= checkoutDate ?>' || '';
     var staffName = '<?= staffName ?>' || '';
     var checklistData = null;
+    // ローカルで要補充を外した項目を追跡（リフレッシュ時の復活を防止）
+    var localSupplyRemoved = {};
     var bookingData = null;
     var staffList = [];
     var staffRowCount = 1;
@@ -1270,6 +1287,12 @@
             // 現在の折りたたみ状態を保存
             var collapseState = saveCollapseState();
             var activeTab = getActiveTab();
+            // ローカルで要補充を外した項目をサーバーデータから除外（復活防止）
+            if (res.supplyNeeded) {
+              Object.keys(localSupplyRemoved).forEach(function(removedId) {
+                delete res.supplyNeeded[removedId];
+              });
+            }
             checklistData = res;
             renderChecklist();
             renderPhotoSection();
@@ -2119,10 +2142,32 @@
         }
         html += '<span class="supply-item-name">' + escapeHtml(item.name) + '</span>';
         html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\')">表示</button>';
+        html += '<button class="supply-item-remove-btn" onclick="removeSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\', \'' + escapeHtml(category).replace(/'/g, "\\'") + '\')">解除</button>';
         html += '</div>';
       });
       html += '</div>';
       el.innerHTML = html;
+    }
+
+    // === 要補充タブから直接解除 ===
+    function removeSupplyItem(itemId, itemName, category) {
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
+      delete checklistData.supplyNeeded[itemId];
+      localSupplyRemoved[itemId] = Date.now();
+      renderSupplyList();
+      // チェックリスト側の供給チェックボックスも連動解除
+      var cb = document.querySelector('.supply-checkbox[data-item-id="' + itemId + '"]');
+      if (cb) cb.checked = false;
+      showSaveStatus('saving');
+      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, false, who, category]).then(function(res) {
+        if (res.success) {
+          showSaveStatus('saved');
+          delete localSupplyRemoved[itemId];
+        } else {
+          showSaveStatus('error');
+        }
+      }).catch(function() { showSaveStatus('error'); });
     }
 
     // === 要補充項目へスクロール ===
@@ -2292,8 +2337,10 @@
       var prevEntry = checklistData.supplyNeeded[itemId];
       if (needed) {
         checklistData.supplyNeeded[itemId] = { name: itemName, category: itemCategory, by: who, at: new Date() };
+        delete localSupplyRemoved[itemId];
       } else {
         delete checklistData.supplyNeeded[itemId];
+        localSupplyRemoved[itemId] = Date.now();
       }
       renderSupplyList();
 
@@ -2301,9 +2348,12 @@
       callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who, itemCategory]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
+          // GAS成功: 削除が確定したのでトラッキングから外す
+          delete localSupplyRemoved[itemId];
         } else {
           // 失敗時はロールバック
           showSaveStatus('error');
+          delete localSupplyRemoved[itemId];
           if (prevEntry) {
             checklistData.supplyNeeded[itemId] = prevEntry;
           } else {
@@ -2315,6 +2365,7 @@
       }).catch(function() {
         // エラー時もロールバック
         showSaveStatus('error');
+        delete localSupplyRemoved[itemId];
         if (prevEntry) {
           checklistData.supplyNeeded[itemId] = prevEntry;
         } else {

@@ -1,9 +1,9 @@
 # セッション引き継ぎファイル
 
-> **最終更新**: 2026-02-13
+> **最終更新**: 2026-02-16
 > **作業ブランチ**: `claude/update-handoff-docs-897D8`
+> **最新コミット**: `4a75a76 要補充対象を外した時に要補充タブからも項目を削除`
 > **前回の開発ブランチ**: `claude/create-handoff-docs-tRAuI`
-> **前回ブランチの最新コミット**: `1873adf docs: 引き継ぎ資料を最新状態に更新`
 
 ---
 
@@ -132,6 +132,18 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/upda
 ### 7. 引き継ぎ資料の整備
 - `HANDOFF.md` と `SESSION_HANDOFF.md` を最新状態に更新
 - **コミット**: 4つ目と5つ目は d0a1a50 に含む
+
+### 8. 要補充タブに「表示」ボタンと大カテゴリ名を追加（チェックリストアプリ）
+- 要補充リストの各項目に大カテゴリ名（テラス、駐車場等）を濃紺バッジで表示
+- 「表示」ボタンを追加：押すとチェックリストタブに切り替え→親セクション自動展開→該当項目へスクロール→黄色ハイライト（2秒）
+- supply-item を flexbox レイアウトに変更
+- **コミット**: b3d7295
+
+### 9. 要補充対象を外した時に要補充タブからも項目を削除（バグ修正）
+- **問題**: アイテム編集で「要補充対象」チェックを外しても、要補充タブに表示が残り続ける
+- **原因**: `saveItemEdit` で `item.supplyItem` は `false` に更新されるが、`checklistData.supplyNeeded[itemId]` のエントリが削除されていなかった
+- **修正**: `supplyPromise` 内で `!newSupply` の場合、`checklistData.supplyNeeded` からエントリを削除し、GASバックエンド（`toggleSupplyNeeded`）も呼び出して要補充記録シートからも削除
+- **コミット**: 4a75a76
 
 ---
 

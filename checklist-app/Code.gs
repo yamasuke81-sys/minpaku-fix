@@ -482,13 +482,21 @@ function getChecklistForDate(checkoutDate) {
       });
     }
 
-    // 要補充記録を取得
+    // 要補充記録を取得（6列目: カテゴリ対応、旧5列データも互換）
     var supplyNeeded = {};
     if (supplySheet.getLastRow() >= 2) {
-      var supplyRecords = supplySheet.getRange(2, 1, supplySheet.getLastRow() - 1, 5).getValues();
+      var supplyRecords = supplySheet.getRange(2, 1, supplySheet.getLastRow() - 1, 6).getValues();
       supplyRecords.forEach(function(row) {
         if (normDateStr_(row[0]) === targetDate) {
-          supplyNeeded[String(row[1])] = { name: String(row[2]), by: String(row[3] || ''), at: String(row[4] || '') };
+          var itemId = String(row[1]);
+          // 新形式: [date, id, name, category, staff, timestamp]  ← row[5]がDate
+          // 旧形式: [date, id, name, staff, timestamp, ""]        ← row[5]が空
+          var isNewFormat = (row[5] instanceof Date) || (row[5] && String(row[5]) !== '');
+          if (isNewFormat) {
+            supplyNeeded[itemId] = { name: String(row[2]), category: String(row[3] || ''), by: String(row[4] || ''), at: String(row[5] || '') };
+          } else {
+            supplyNeeded[itemId] = { name: String(row[2]), category: '', by: String(row[3] || ''), at: String(row[4] || '') };
+          }
         }
       });
     }
@@ -652,7 +660,7 @@ function uncheckItems(checkoutDate, itemIds) {
 /**
  * 要補充のトグル
  */
-function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName) {
+function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName, category) {
   try {
     var sheet = clSheet_(SHEET_CL_SUPPLIES);
     var targetDate = normDateStr_(checkoutDate);
@@ -660,21 +668,22 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName) {
     var found = false;
 
     if (lastRow >= 2) {
-      var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
-      for (var i = 0; i < data.length; i++) {
+      var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      // 逆順で削除して行インデックスのズレを防止
+      for (var i = data.length - 1; i >= 0; i--) {
         if (normDateStr_(data[i][0]) === targetDate && String(data[i][1]) === String(itemId)) {
           if (!needed) {
             sheet.deleteRow(i + 2);
           }
           found = true;
-          break;
+          // break しない: 重複行があれば全て削除
         }
       }
     }
 
     if (!found && needed) {
       var nextRow = sheet.getLastRow() + 1;
-      sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, itemId, itemName, staffName || '', new Date()]]);
+      sheet.getRange(nextRow, 1, 1, 6).setValues([[checkoutDate, itemId, itemName, category || '', staffName || '', new Date()]]);
     }
 
     return JSON.stringify({ success: true });

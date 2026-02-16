@@ -1626,7 +1626,7 @@
       }
       if (item.supplyItem) {
         html += '<div class="supply-checkbox-container">';
-        html += '<input type="checkbox" class="supply-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" ' + (isSupplyNeeded ? 'checked' : '') + ' onchange="toggleSupply(this)">';
+        html += '<input type="checkbox" class="supply-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" data-item-category="' + escapeHtml(item.category || '') + '" ' + (isSupplyNeeded ? 'checked' : '') + ' onchange="toggleSupply(this)">';
         html += '<label>要補充</label>';
         html += '</div>';
       }
@@ -2089,7 +2089,10 @@
       }
 
       // 要補充アイテムのカテゴリを正しく解決する
-      function resolveSupplyCategory(itemId, itemName) {
+      // 保存済みカテゴリ → マスタID一致 → 名前フォールバック の優先順
+      function resolveSupplyCategory(itemId, itemName, storedCategory) {
+        // 保存済みカテゴリがあればそれを優先（記録時点のカテゴリ）
+        if (storedCategory) return storedCategory;
         var master = itemById[itemId];
         // IDで見つかり、名前も一致すれば確実
         if (master && master.name === itemName) return master.category;
@@ -2101,15 +2104,15 @@
 
       // カテゴリ順にソートして同じカテゴリの項目をまとめる
       keys.sort(function(a, b) {
-        var catA = resolveSupplyCategory(a, supplyNeeded[a].name);
-        var catB = resolveSupplyCategory(b, supplyNeeded[b].name);
+        var catA = resolveSupplyCategory(a, supplyNeeded[a].name, supplyNeeded[a].category);
+        var catB = resolveSupplyCategory(b, supplyNeeded[b].name, supplyNeeded[b].category);
         return catA.localeCompare(catB, 'ja');
       });
 
       var html = '<div class="supply-list-card"><h3>⚠️ 要補充リスト</h3>';
       keys.forEach(function(k) {
         var item = supplyNeeded[k];
-        var category = resolveSupplyCategory(k, item.name);
+        var category = resolveSupplyCategory(k, item.name, item.category);
         html += '<div class="supply-item">';
         if (category) {
           html += '<span class="supply-item-category">' + escapeHtml(category).replace(/：/g, ' &gt; ') + '</span>';
@@ -2280,6 +2283,7 @@
     function toggleSupply(checkbox) {
       var itemId = checkbox.getAttribute('data-item-id');
       var itemName = checkbox.getAttribute('data-item-name');
+      var itemCategory = checkbox.getAttribute('data-item-category') || '';
       var needed = checkbox.checked;
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
@@ -2287,14 +2291,14 @@
       // 楽観的更新：GAS完了を待たずに即座にデータとUIを更新
       var prevEntry = checklistData.supplyNeeded[itemId];
       if (needed) {
-        checklistData.supplyNeeded[itemId] = { name: itemName, by: who, at: new Date() };
+        checklistData.supplyNeeded[itemId] = { name: itemName, category: itemCategory, by: who, at: new Date() };
       } else {
         delete checklistData.supplyNeeded[itemId];
       }
       renderSupplyList();
 
       showSaveStatus('saving');
-      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who]).then(function(res) {
+      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who, itemCategory]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
         } else {
@@ -2738,7 +2742,9 @@
                   delete checklistData.supplyNeeded[itemId];
                   var names = getSelectedStaffNames();
                   var who = names.length > 0 ? names.join(', ') : staffName;
-                  callGAS('toggleSupplyNeeded', [checkoutDate, itemId, newText, false, who]);
+                  var itemCat = '';
+                  checklistData.items.forEach(function(it) { if (it.id === itemId) itemCat = it.category || ''; });
+                  callGAS('toggleSupplyNeeded', [checkoutDate, itemId, newText, false, who, itemCat]);
                 }
               }
               return res2;

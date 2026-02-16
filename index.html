@@ -5397,32 +5397,31 @@
                             var specials = specialByJob[j.name] || [];
                             var jid = 'jb_' + jobIdx++;
                             html += '<div class="border rounded mb-3" data-job-name="' + escapeHtml(j.name) + '">';
-                            // ヘッダー: 名称 + 鉛筆 + 削除
-                            html += '<div class="d-flex align-items-center px-3 py-2 border-bottom bg-light">';
-                            html += '<strong class="flex-grow-1" id="' + jid + '_name">' + escapeHtml(j.name) + '</strong>';
-                            html += '<button type="button" class="btn btn-sm btn-link p-0 me-2 btnRenameJob" data-jid="' + jid + '" data-row="' + j.rowIndex + '" data-name="' + escapeHtml(j.name) + '" data-sort="' + (j.sortOrder || 99) + '" title="名称変更" style="font-size:16px;text-decoration:none;line-height:1;">✎</button>';
-                            html += '<button type="button" class="btn btn-sm btn-link text-danger p-0 btnDelJob" data-row="' + j.rowIndex + '" title="削除" style="font-size:14px;text-decoration:none;line-height:1;">✕</button>';
+                            // ヘッダー: 折りたたみ見出し + 鉛筆 + 削除
+                            html += '<div class="d-flex align-items-center px-3 py-2 bg-light" style="cursor:pointer;" onclick="var b=this.nextElementSibling;var a=this.querySelector(\'.jb-arrow\');if(b.style.display===\'none\'){b.style.display=\'block\';a.style.transform=\'rotate(90deg)\';}else{b.style.display=\'none\';a.style.transform=\'rotate(0deg)\';}">';
+                            html += '<small class="jb-arrow" style="width:14px;color:#888;transition:transform 0.15s;display:inline-block;">&#9654;</small>';
+                            html += '<strong class="flex-grow-1 ms-1" id="' + jid + '_name">' + escapeHtml(j.name) + '</strong>';
+                            html += '<button type="button" class="btn btn-sm btn-link p-0 me-2 btnRenameJob" data-jid="' + jid + '" data-row="' + j.rowIndex + '" data-name="' + escapeHtml(j.name) + '" data-sort="' + (j.sortOrder || 99) + '" title="名称変更" style="font-size:16px;text-decoration:none;line-height:1;" onclick="event.stopPropagation();">✎</button>';
+                            html += '<button type="button" class="btn btn-sm btn-link text-danger p-0 btnDelJob" data-row="' + j.rowIndex + '" title="削除" style="font-size:14px;text-decoration:none;line-height:1;" onclick="event.stopPropagation();">✕</button>';
                             html += '</div>';
-                            // 報酬セクション（折りたたみ）
-                            html += '<div class="px-3 py-2">';
-                            staffOrder.forEach(function(staff, si) {
+                            // 報酬セクション（見出しタッチで展開、初期非表示）
+                            html += '<div class="px-3 py-2 border-top" style="display:none;">';
+                            staffOrder.forEach(function(staff) {
                               var amt = comps[staff] || '';
-                              html += '<div class="border-bottom py-1">';
-                              html += '<div class="d-flex align-items-center" style="cursor:pointer;" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'flex\':\'none\'">';
-                              html += '<small style="width:14px;color:#888;">&#9654;</small>';
-                              html += '<small class="fw-bold ms-1">' + escapeHtml(staff) + '</small>';
-                              html += '<small class="text-muted ms-auto">' + (amt ? escapeHtml(String(amt)) + '円' : '<span style="color:#ccc;">未設定</span>') + '</small>';
-                              html += '</div>';
-                              html += '<div class="align-items-center gap-2 ps-3 py-1" style="display:none;">';
-                              html += '<input type="number" class="form-control form-control-sm jobCompInlineAmt" data-job="' + escapeHtml(j.name) + '" data-staff="' + escapeHtml(staff) + '" value="' + escapeHtml(String(amt)) + '" placeholder="金額" min="0" style="width:100px;">';
+                              html += '<div class="d-flex align-items-center py-1 border-bottom">';
+                              html += '<small class="fw-bold" style="min-width:80px;">' + escapeHtml(staff) + '</small>';
+                              html += '<input type="number" class="form-control form-control-sm jobCompInlineAmt ms-2" data-job="' + escapeHtml(j.name) + '" data-staff="' + escapeHtml(staff) + '" value="' + escapeHtml(String(amt)) + '" placeholder="金額" min="0" style="width:100px;">';
                               html += '<span class="small ms-1">円</span>';
-                              html += '<button type="button" class="btn btn-sm btn-primary ms-2 btnSaveJobCompInline" data-job="' + escapeHtml(j.name) + '">保存</button>';
-                              html += '</div></div>';
+                              html += '</div>';
                             });
+                            // 保存ボタン（一括）
+                            html += '<div class="d-flex justify-content-end pt-2">';
+                            html += '<button type="button" class="btn btn-sm btn-primary btnSaveJobCompInline" data-job="' + escapeHtml(j.name) + '">保存</button>';
+                            html += '</div>';
                             // 特別料金セクション（折りたたみ）
-                            html += '<div class="py-1">';
-                            html += '<div class="d-flex align-items-center" style="cursor:pointer;" onclick="var t=this.nextElementSibling;t.style.display=t.style.display===\'none\'?\'block\':\'none\'">';
-                            html += '<small style="width:14px;color:#888;">&#9654;</small>';
+                            html += '<div class="py-1 mt-1">';
+                            html += '<div class="d-flex align-items-center" style="cursor:pointer;" onclick="var t=this.nextElementSibling;var a=this.querySelector(\'.sp-arrow\');if(t.style.display===\'none\'){t.style.display=\'block\';a.style.transform=\'rotate(90deg)\';}else{t.style.display=\'none\';a.style.transform=\'rotate(0deg)\';}">';
+                            html += '<small class="sp-arrow" style="width:14px;color:#888;transition:transform 0.15s;display:inline-block;">&#9654;</small>';
                             html += '<small class="fw-bold ms-1">特別料金</small>';
                             html += '<small class="text-muted ms-auto">' + (specials.length ? specials.length + '件' : 'なし') + '</small>';
                             html += '</div>';

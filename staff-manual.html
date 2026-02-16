@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>民泊管理システム スタッフ操作マニュアル</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --success: #16a34a;
+    --success-light: #dcfce7;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --danger: #dc2626;
+    --danger-light: #fee2e2;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-800);
+    line-height: 1.7;
+    padding: 0;
+  }
+
+  /* ===== Cover ===== */
+  .cover {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+    color: white;
+    text-align: center;
+    padding: 60px 24px;
+    margin-bottom: 32px;
+  }
+  .cover h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  .cover .subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    font-weight: 400;
+  }
+
+  /* ===== TOC ===== */
+  .toc {
+    max-width: 720px;
+    margin: 0 auto 40px;
+    padding: 0 20px;
+  }
+  .toc h2 {
+    font-size: 1.3rem;
+    color: var(--gray-800);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary);
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: toc-counter;
+  }
+  .toc ol li {
+    counter-increment: toc-counter;
+    margin-bottom: 8px;
+  }
+  .toc ol li a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--gray-700);
+    padding: 10px 16px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    font-size: 1rem;
+  }
+  .toc ol li a:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+  .toc ol li a::before {
+    content: counter(toc-counter);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  /* ===== Sections ===== */
+  .section {
+    max-width: 720px;
+    margin: 0 auto 48px;
+    padding: 0 20px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 3px solid var(--primary);
+  }
+  .section-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 1.4rem;
+    color: var(--gray-900);
+    font-weight: 700;
+  }
+
+  /* ===== Steps ===== */
+  .steps {
+    list-style: none;
+    padding: 0;
+    position: relative;
+  }
+  .steps::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--gray-200);
+  }
+  .step {
+    position: relative;
+    padding-left: 52px;
+    margin-bottom: 28px;
+  }
+  .step:last-child { margin-bottom: 0; }
+  .step-number {
+    position: absolute;
+    left: 8px;
+    top: 2px;
+    width: 24px;
+    height: 24px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.75rem;
+    z-index: 1;
+  }
+  .step-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--gray-800);
+    margin-bottom: 6px;
+  }
+  .step-desc {
+    color: var(--gray-600);
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  /* ===== Mock UI ===== */
+  .mock-ui {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    margin: 16px 0;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .mock-header {
+    background: var(--gray-100);
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mock-header .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block;
+  }
+  .mock-header .dot.red { background: #ef4444; }
+  .mock-header .dot.yellow { background: #eab308; }
+  .mock-header .dot.green { background: #22c55e; }
+  .mock-body {
+    padding: 20px;
+  }
+
+  /* Mock overlay */
+  .mock-overlay {
+    background: rgba(0,0,0,0.45);
+    border-radius: 8px;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+  }
+  .mock-modal {
+    background: white;
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    min-width: 280px;
+    max-width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .mock-modal h4 {
+    font-size: 0.95rem;
+    margin-bottom: 14px;
+    text-align: center;
+    color: var(--gray-800);
+  }
+  .mock-select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    background: white;
+    margin-bottom: 14px;
+  }
+  .mock-btn {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-align: center;
+    cursor: default;
+    border: none;
+  }
+  .mock-btn-primary {
+    background: var(--primary);
+    color: white;
+    width: 100%;
+  }
+  .mock-btn-success {
+    background: var(--success);
+    color: white;
+  }
+  .mock-btn-warning {
+    background: var(--warning);
+    color: white;
+  }
+  .mock-btn-danger {
+    background: var(--danger);
+    color: white;
+  }
+  .mock-btn-outline {
+    background: white;
+    color: var(--gray-600);
+    border: 1px solid var(--gray-300);
+  }
+  .mock-btn-sm {
+    padding: 5px 12px;
+    font-size: 0.78rem;
+  }
+
+  /* Calendar mock */
+  .mock-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    font-size: 0.75rem;
+  }
+  .mock-calendar .day-header {
+    text-align: center;
+    font-weight: 700;
+    color: var(--gray-600);
+    padding: 4px 0;
+  }
+  .mock-calendar .day {
+    text-align: center;
+    padding: 6px 2px;
+    border-radius: 4px;
+  }
+  .mock-calendar .day.booking {
+    background: #fbbf24;
+    color: var(--gray-800);
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+  }
+  .mock-calendar .day.cleaning {
+    background: #67e8f9;
+    color: var(--gray-800);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mock-calendar .day.highlight {
+    outline: 3px solid var(--danger);
+    outline-offset: -1px;
+  }
+  .mock-event-bar {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Detail rows */
+  .mock-detail-row {
+    display: flex;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.88rem;
+  }
+  .mock-detail-row:last-child { border-bottom: none; }
+  .mock-detail-label {
+    width: 100px;
+    color: var(--gray-600);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+  .mock-detail-value {
+    color: var(--gray-800);
+    font-weight: 500;
+  }
+
+  /* Response buttons area */
+  .response-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .response-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 12px 8px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border: 2px solid transparent;
+  }
+  .response-btn .symbol {
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .response-btn.ok {
+    background: var(--success-light);
+    color: var(--success);
+    border-color: var(--success);
+  }
+  .response-btn.cond {
+    background: var(--warning-light);
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+  .response-btn.ng {
+    background: var(--danger-light);
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  /* Stepper */
+  .stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin: 16px 0;
+  }
+  .stepper-item {
+    flex: 1;
+    text-align: center;
+    position: relative;
+  }
+  .stepper-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    right: -50%;
+    width: 100%;
+    height: 2px;
+    background: var(--gray-200);
+    z-index: 0;
+  }
+  .stepper-item.done:not(:last-child)::after {
+    background: var(--success);
+  }
+  .stepper-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--gray-200);
+    color: var(--gray-600);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 6px;
+  }
+  .stepper-item.done .stepper-circle {
+    background: var(--success);
+    color: white;
+  }
+  .stepper-item.active .stepper-circle {
+    background: var(--warning);
+    color: white;
+    box-shadow: 0 0 0 4px var(--warning-light);
+  }
+  .stepper-label {
+    font-size: 0.72rem;
+    color: var(--gray-600);
+    line-height: 1.3;
+  }
+
+  /* Callouts */
+  .callout {
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .callout-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .callout-info {
+    background: var(--primary-light);
+    color: #1e40af;
+    border-left: 4px solid var(--primary);
+  }
+  .callout-tip {
+    background: var(--success-light);
+    color: #15803d;
+    border-left: 4px solid var(--success);
+  }
+  .callout-warn {
+    background: var(--warning-light);
+    color: #92400e;
+    border-left: 4px solid var(--warning);
+  }
+
+  /* Arrow pointer */
+  .arrow-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--danger);
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin: 4px 0;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-600);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--gray-200);
+    margin-top: 40px;
+  }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .cover { padding: 40px 20px; }
+    .section { break-inside: avoid; }
+    .mock-ui { box-shadow: none; border: 1px solid #ccc; }
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .cover h1 { font-size: 1.5rem; }
+    .section-header h2 { font-size: 1.2rem; }
+    .response-btn { min-width: 70px; padding: 10px 6px; }
+    .stepper-label { font-size: 0.65rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== COVER ========== -->
+<div class="cover">
+  <h1>民泊管理システム<br>スタッフ操作マニュアル</h1>
+  <p class="subtitle">清掃スタッフ向け 基本操作ガイド</p>
+</div>
+
+<!-- ========== TOC ========== -->
+<nav class="toc">
+  <h2>もくじ</h2>
+  <ol>
+    <li><a href="#sec1">スタッフ名の選択（初回ログイン）</a></li>
+    <li><a href="#sec2">宿泊詳細の開き方</a></li>
+    <li><a href="#sec3">清掃詳細の開き方</a></li>
+    <li><a href="#sec4">清掃の回答方法（対応可 / 条件付 / 不可）</a></li>
+    <li><a href="#sec5">チェックリストの開き方</a></li>
+    <li><a href="#sec6">コインランドリーの報告方法</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: スタッフ名の選択 -->
+<!-- ============================================================ -->
+<div class="section" id="sec1">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2>スタッフ名の選択（初回ログイン）</h2>
+  </div>
+
+  <p>スタッフ画面を初めて開くと、名前の選択画面が自動で表示されます。</p>
+
+  <!-- Mock UI -->
+  <div class="mock-ui">
+    <div class="mock-header">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      スタッフ画面
+    </div>
+    <div class="mock-body">
+      <div class="mock-overlay">
+        <div class="mock-modal">
+          <h4>スタッフのお名前を<br>選択してください</h4>
+          <select class="mock-select">
+            <option>▼ 名前を選択...</option>
+          </select>
+          <div class="mock-btn mock-btn-primary">決定</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-number">1</div>
+      <div class="step-title">スタッフ画面のURLを開く</div>
+      <div class="step-desc">
+        共有されたスタッフ用URLをブラウザで開きます。<br>
+        画面が暗くなり、名前選択のダイアログが自動で表示されます。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">2</div>
+      <div class="step-title">ドロップダウンから自分の名前を選ぶ</div>
+      <div class="step-desc">
+        「▼ 名前を選択...」をタップし、表示されるリストから<strong>自分の名前</strong>を選びます。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">3</div>
+      <div class="step-title">「決定」ボタンをタップ</div>
+      <div class="step-desc">
+        名前を選んだら「決定」ボタンをタップします。<br>
+        ダイアログが閉じ、画面上部にあなたの名前が表示されたらログイン完了です。
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">&#x2139;&#xFE0F;</span>
+    <div>名前の選択は<strong>セッション中</strong>保持されます。ブラウザを閉じると再度選択が必要になります。</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: 宿泊詳細の開き方 -->
+<!-- ============================================================ -->
+<div class="section" id="sec2">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2>宿泊詳細の開き方</h2>
+  </div>
+
+  <p>カレンダー上の<strong style="color:#d97706">黄色い予約バー</strong>をタップすると、宿泊の詳細情報が表示されます。</p>
+
+  <!-- Mock calendar -->
+  <div class="mock-ui">
+    <div class="mock-header">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      カレンダー画面
+    </div>
+    <div class="mock-body">
+      <div class="mock-calendar">
+        <div class="day-header">月</div>
+        <div class="day-header">火</div>
+        <div class="day-header">水</div>
+        <div class="day-header">木</div>
+        <div class="day-header">金</div>
+        <div class="day-header">土</div>
+        <div class="day-header">日</div>
+        <div class="day">9</div>
+        <div class="day">10</div>
+        <div class="day booking highlight" style="position:relative">11<div class="mock-event-bar" style="background:#fbbf24;color:#1f2937">予約: 田中様</div><span class="arrow-label" style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:0.7rem">&#x1F446; ここをタップ</span></div>
+        <div class="day booking">12<div class="mock-event-bar" style="background:#fbbf24;color:#1f2937">予約: 田中様</div></div>
+        <div class="day cleaning">13<div class="mock-event-bar" style="background:#67e8f9;color:#1f2937">清掃</div></div>
+        <div class="day">14</div>
+        <div class="day">15</div>
+      </div>
+    </div>
+  </div>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-number">1</div>
+      <div class="step-title">カレンダーで予約（黄色のバー）を探す</div>
+      <div class="step-desc">
+        カレンダー上で<strong style="background:#fbbf24;padding:1px 6px;border-radius:3px">黄色い背景のバー</strong>が予約を表しています。
+        「予約: ○○様」とゲスト名が表示されています。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">2</div>
+      <div class="step-title">予約バーをタップ</div>
+      <div class="step-desc">
+        見たい予約のバーをタップすると、宿泊詳細の画面（モーダル）が開きます。
+      </div>
+    </li>
+  </ol>
+
+  <p style="margin-top:16px;font-weight:600;font-size:0.95rem">表示される情報の例：</p>
+  <div class="mock-ui">
+    <div class="mock-header">
+      宿泊詳細
+    </div>
+    <div class="mock-body" style="padding:14px 18px">
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">チェックイン</div>
+        <div class="mock-detail-value">2/15（土）15:00</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">チェックアウト</div>
+        <div class="mock-detail-value">2/17（月）10:00</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">人数</div>
+        <div class="mock-detail-value">大人 3名</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">ベッド</div>
+        <div class="mock-detail-value">シングル × 2</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">予約サイト</div>
+        <div class="mock-detail-value">Airbnb</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">交通手段</div>
+        <div class="mock-detail-value">レンタカー</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">BBQ</div>
+        <div class="mock-detail-value">なし</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">&#x1F4A1;</span>
+    <div>スタッフ画面では、ゲストの連絡先やパスポート情報など個人情報は表示されません。</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: 清掃詳細の開き方 -->
+<!-- ============================================================ -->
+<div class="section" id="sec3">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2>清掃詳細の開き方</h2>
+  </div>
+
+  <p>カレンダー上の<strong style="color:#0891b2">水色の清掃バー</strong>をタップすると、清掃の詳細情報が表示されます。</p>
+
+  <!-- Mock calendar -->
+  <div class="mock-ui">
+    <div class="mock-header">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      カレンダー画面
+    </div>
+    <div class="mock-body">
+      <div class="mock-calendar">
+        <div class="day-header">月</div>
+        <div class="day-header">火</div>
+        <div class="day-header">水</div>
+        <div class="day-header">木</div>
+        <div class="day-header">金</div>
+        <div class="day-header">土</div>
+        <div class="day-header">日</div>
+        <div class="day">9</div>
+        <div class="day">10</div>
+        <div class="day booking">11<div class="mock-event-bar" style="background:#fbbf24;color:#1f2937">予約: 田中様</div></div>
+        <div class="day booking">12<div class="mock-event-bar" style="background:#fbbf24;color:#1f2937">予約: 田中様</div></div>
+        <div class="day cleaning highlight" style="position:relative">13<div class="mock-event-bar" style="background:#67e8f9;color:#1f2937">清掃</div><span class="arrow-label" style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:0.7rem">&#x1F446; ここをタップ</span></div>
+        <div class="day">14</div>
+        <div class="day">15</div>
+      </div>
+    </div>
+  </div>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-number">1</div>
+      <div class="step-title">カレンダーで清掃（水色のバー）を探す</div>
+      <div class="step-desc">
+        <strong style="background:#67e8f9;padding:1px 6px;border-radius:3px">水色の背景のバー</strong>が清掃タスクを表しています。
+        予約のチェックアウト日に配置されています。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">2</div>
+      <div class="step-title">清掃バーをタップ</div>
+      <div class="step-desc">
+        タップすると清掃詳細の画面が開きます。<br>
+        次の予約情報、担当スタッフ、募集ステータスなどが表示されます。
+      </div>
+    </li>
+  </ol>
+
+  <p style="margin-top:16px;font-weight:600;font-size:0.95rem">清掃詳細画面に含まれる主な情報：</p>
+  <div class="mock-ui">
+    <div class="mock-header">
+      清掃詳細
+    </div>
+    <div class="mock-body" style="padding:14px 18px">
+      <div style="background:var(--primary-light);padding:10px 14px;border-radius:8px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:0.85rem;color:var(--primary);margin-bottom:6px">次の予約情報</div>
+        <div class="mock-detail-row" style="border:none;padding:4px 0">
+          <div class="mock-detail-label">チェックイン</div>
+          <div class="mock-detail-value">2/13 15:00</div>
+        </div>
+        <div class="mock-detail-row" style="border:none;padding:4px 0">
+          <div class="mock-detail-label">人数</div>
+          <div class="mock-detail-value">大人 2名</div>
+        </div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">担当スタッフ</div>
+        <div class="mock-detail-value">山田さん</div>
+      </div>
+      <div class="mock-detail-row">
+        <div class="mock-detail-label">募集状況</div>
+        <div class="mock-detail-value"><span style="background:var(--success);color:white;padding:2px 8px;border-radius:4px;font-size:0.78rem">確定済</span></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <span class="mock-btn mock-btn-warning mock-btn-sm">&#x2611; 清掃チェックリスト</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: 清掃の回答方法 -->
+<!-- ============================================================ -->
+<div class="section" id="sec4">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2>清掃の回答方法（対応可 / 条件付 / 不可）</h2>
+  </div>
+
+  <p>清掃の募集が届いたら、対応できるかどうかを3つの選択肢から回答します。</p>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-number">1</div>
+      <div class="step-title">清掃詳細画面を開く</div>
+      <div class="step-desc">
+        カレンダーの水色バーをタップして清掃詳細を開きます（<a href="#sec3">セクション3</a>参照）。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">2</div>
+      <div class="step-title">回答ボタンを選ぶ</div>
+      <div class="step-desc">
+        画面に以下の3つのボタンが表示されます。自分の状況に合ったものをタップしてください。
+      </div>
+      <!-- Response buttons mock -->
+      <div class="response-buttons">
+        <div class="response-btn ok">
+          <span class="symbol">&#x25CE;</span>
+          対応可
+        </div>
+        <div class="response-btn cond">
+          <span class="symbol">&#x25B3;</span>
+          条件付
+        </div>
+        <div class="response-btn ng">
+          <span class="symbol">&#x00D7;</span>
+          不可
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">3</div>
+      <div class="step-title">（条件付の場合）備考を入力</div>
+      <div class="step-desc">
+        「条件付」を選んだ場合は、備考欄に条件を入力してください。
+      </div>
+      <!-- Memo mock -->
+      <div class="mock-ui" style="margin-top:10px">
+        <div class="mock-body" style="padding:12px">
+          <div style="font-size:0.8rem;color:var(--gray-600);margin-bottom:6px">備考（例：14時以降なら対応可能）</div>
+          <div style="border:1px solid var(--gray-300);border-radius:6px;padding:8px 10px;font-size:0.88rem;color:var(--gray-800);background:white">
+            14時以降なら対応可能です
+          </div>
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">4</div>
+      <div class="step-title">回答完了</div>
+      <div class="step-desc">
+        ボタンをタップすると回答が送信されます。<br>
+        回答後は画面に「現在の回答: ◎」のように表示されます。
+      </div>
+    </li>
+  </ol>
+
+  <div style="margin-top:20px">
+    <p style="font-weight:700;font-size:0.95rem;margin-bottom:10px">各回答の意味：</p>
+    <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+      <thead>
+        <tr style="background:var(--gray-100)">
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--gray-200);width:100px">回答</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--gray-200)">意味</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid var(--gray-100)"><strong style="color:var(--success)">◎ 対応可</strong></td>
+          <td style="padding:8px 12px;border-bottom:1px solid var(--gray-100)">問題なく対応できます</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;border-bottom:1px solid var(--gray-100)"><strong style="color:var(--warning)">△ 条件付</strong></td>
+          <td style="padding:8px 12px;border-bottom:1px solid var(--gray-100)">条件次第で対応可能（備考に条件を記入）</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px"><strong style="color:var(--danger)">× 不可</strong></td>
+          <td style="padding:8px 12px">対応できません</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-warn">
+    <span class="callout-icon">&#x26A0;&#xFE0F;</span>
+    <div>回答後に変更したい場合は「<strong>回答削除</strong>」ボタンで取り消してから、改めて回答してください。</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 5: チェックリストの開き方 -->
+<!-- ============================================================ -->
+<div class="section" id="sec5">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2>チェックリストの開き方</h2>
+  </div>
+
+  <p>清掃詳細画面から、専用のチェックリストアプリを開くことができます。</p>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-number">1</div>
+      <div class="step-title">清掃詳細画面を開く</div>
+      <div class="step-desc">
+        カレンダーの水色バーをタップして清掃詳細を開きます（<a href="#sec3">セクション3</a>参照）。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">2</div>
+      <div class="step-title">「清掃チェックリスト」ボタンをタップ</div>
+      <div class="step-desc">
+        清掃詳細画面の中にある黄色い<strong>「&#x2611; 清掃チェックリスト」</strong>ボタンをタップします。
+      </div>
+
+      <div class="mock-ui" style="margin-top:10px">
+        <div class="mock-body" style="padding:12px;text-align:center">
+          <div style="display:inline-block;position:relative">
+            <span class="mock-btn mock-btn-warning" style="font-size:0.95rem;padding:10px 24px">&#x2611; 清掃チェックリスト</span>
+            <span class="arrow-label" style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);white-space:nowrap">&#x1F446; このボタン</span>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">3</div>
+      <div class="step-title">チェックリストアプリが開く</div>
+      <div class="step-desc">
+        新しいタブ（またはウィンドウ）でチェックリストアプリが開きます。<br>
+        清掃日とスタッフ名が自動でセットされています。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">4</div>
+      <div class="step-title">チェック項目を確認しながら清掃する</div>
+      <div class="step-desc">
+        各チェック項目を一つずつ確認・実施し、完了したらチェックを付けていきます。
+      </div>
+    </li>
+  </ol>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">&#x1F4A1;</span>
+    <div>チェックリストは別アプリで開くため、元の清掃詳細画面はそのまま残ります。行き来しながら作業できます。</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 6: コインランドリーの報告方法 -->
+<!-- ============================================================ -->
+<div class="section" id="sec6">
+  <div class="section-header">
+    <div class="section-number">6</div>
+    <h2>コインランドリーの報告方法</h2>
+  </div>
+
+  <p>清掃で出たリネン類のクリーニング状況を、3ステップで報告します。</p>
+
+  <!-- Stepper mock -->
+  <div class="mock-ui">
+    <div class="mock-header">
+      クリーニング状況
+    </div>
+    <div class="mock-body" style="padding:20px">
+      <div class="stepper">
+        <div class="stepper-item done">
+          <div class="stepper-circle">&#x2713;</div>
+          <div class="stepper-label">クリーニングに<br>出した</div>
+        </div>
+        <div class="stepper-item active">
+          <div class="stepper-circle">2</div>
+          <div class="stepper-label">受け取った</div>
+        </div>
+        <div class="stepper-item">
+          <div class="stepper-circle">3</div>
+          <div class="stepper-label">施設に<br>戻した</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-number">1</div>
+      <div class="step-title">清掃詳細画面を開く</div>
+      <div class="step-desc">
+        カレンダーの水色バーをタップして清掃詳細を開きます（<a href="#sec3">セクション3</a>参照）。<br>
+        画面の下部に「クリーニング状況」カードが表示されています。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">2</div>
+      <div class="step-title">ステップ1:「クリーニングに出した」をタップ</div>
+      <div class="step-desc">
+        コインランドリーにリネンを持ち込んだら、<strong>「クリーニングに出した」</strong>ボタンをタップします。
+      </div>
+      <div class="mock-ui" style="margin-top:8px">
+        <div class="mock-body" style="padding:10px;text-align:center">
+          <span class="mock-btn mock-btn-warning">クリーニングに出した</span>
+        </div>
+      </div>
+      <div class="step-desc" style="margin-top:8px">
+        確認メッセージが出たら「OK」を押します。あなたの名前と日時が記録されます。
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">3</div>
+      <div class="step-title">ステップ2:「受け取った」をタップ</div>
+      <div class="step-desc">
+        コインランドリーからリネンを受け取ったら、<strong>「受け取った」</strong>ボタンをタップします。
+      </div>
+      <div class="mock-ui" style="margin-top:8px">
+        <div class="mock-body" style="padding:10px;text-align:center">
+          <span class="mock-btn mock-btn-warning">受け取った</span>
+        </div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-number">4</div>
+      <div class="step-title">ステップ3:「施設に戻した」をタップ</div>
+      <div class="step-desc">
+        リネンを施設にセットし直したら、<strong>「施設に戻した」</strong>ボタンをタップします。<br>
+        3つのステップすべてが完了すると、全ステップに緑のチェックマーク（&#x2713;）が付きます。
+      </div>
+      <div class="mock-ui" style="margin-top:8px">
+        <div class="mock-body" style="padding:10px;text-align:center">
+          <span class="mock-btn mock-btn-warning">施設に戻した</span>
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <p style="margin-top:20px;font-weight:700;font-size:0.95rem;margin-bottom:10px">3ステップの流れ：</p>
+  <div class="mock-ui">
+    <div class="mock-body" style="padding:16px">
+      <div class="stepper">
+        <div class="stepper-item done">
+          <div class="stepper-circle">&#x2713;</div>
+          <div class="stepper-label">クリーニングに<br>出した</div>
+        </div>
+        <div class="stepper-item done">
+          <div class="stepper-circle">&#x2713;</div>
+          <div class="stepper-label">受け取った</div>
+        </div>
+        <div class="stepper-item done">
+          <div class="stepper-circle">&#x2713;</div>
+          <div class="stepper-label">施設に<br>戻した</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:12px;color:var(--success);font-weight:700;font-size:0.9rem">&#x2705; すべて完了！</div>
+    </div>
+  </div>
+
+  <div class="callout callout-warn">
+    <span class="callout-icon">&#x26A0;&#xFE0F;</span>
+    <div>間違ってボタンを押した場合は、各ステップの横にある<strong>「取消」</strong>ボタンで取り消せます。</div>
+  </div>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">&#x2139;&#xFE0F;</span>
+    <div>各ステップは<strong>順番に</strong>進める必要があります。「出した」を記録していない場合は「受け取った」は押せません。</div>
+  </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<div class="footer">
+  <p>民泊管理システム スタッフ操作マニュアル</p>
+  <p style="margin-top:4px;font-size:0.8rem;color:var(--gray-400)">不明点がある場合はオーナーにお問い合わせください</p>
+</div>
+
+</body>
+</html>

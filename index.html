@@ -1582,7 +1582,7 @@
       'use strict';
       // staffModeは文字列比較で確実に判定（GASテンプレートのboolean出力問題を回避）
       window.staffMode = ('<?= staffModeStr ?>' === 'yes');
-      window.appBaseUrl = '<?= baseUrl ?>' || '';
+      window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
       // デバッグ: デプロイ確認用

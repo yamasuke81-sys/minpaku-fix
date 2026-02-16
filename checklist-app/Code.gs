@@ -1619,6 +1619,26 @@ function renameCategoryInMaster(oldFullPath, newName) {
         updated++;
       }
     }
+    // カテゴリ順序シートのパスも更新（リネーム後もソート位置を維持）
+    var orderSheet = clSheet_(SHEET_CL_CATEGORY_ORDER);
+    var orderLastRow = orderSheet.getLastRow();
+    if (orderLastRow >= 2) {
+      var orderPaths = orderSheet.getRange(2, 1, orderLastRow - 1, 1).getValues();
+      var orderUpdated = 0;
+      for (var j = 0; j < orderPaths.length; j++) {
+        var p = String(orderPaths[j][0]);
+        if (p === oldFullPath) {
+          orderPaths[j][0] = newFullPath;
+          orderUpdated++;
+        } else if (p.indexOf(oldFullPath + '：') === 0) {
+          orderPaths[j][0] = newFullPath + p.substring(oldFullPath.length);
+          orderUpdated++;
+        }
+      }
+      if (orderUpdated > 0) {
+        orderSheet.getRange(2, 1, orderLastRow - 1, 1).setValues(orderPaths);
+      }
+    }
     return JSON.stringify({ success: true, updated: updated });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

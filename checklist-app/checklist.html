@@ -1219,8 +1219,10 @@
 
       // 定期リフレッシュ（60秒ごと、2人同時利用対応）
       // 折りたたみ状態とタブ状態を保持してリフレッシュ
+      // 他のGAS呼び出し中はスキップして競合を回避
       setInterval(function() {
         if (!checklistData) return;
+        if (gasRunning > 0) return;
         callGAS('getChecklistForDate', [checkoutDate]).then(function(res) {
           if (res.success) {
             // 現在の折りたたみ状態を保存
@@ -3024,19 +3026,40 @@
     }
 
     // === ユーティリティ ===
+    var gasRunning = 0;
+    var GAS_MAX_CONCURRENT = 3;
+    var gasQueue = [];
+
     function callGAS(functionName, args) {
       return new Promise(function(resolve, reject) {
-        google.script.run
-          .withSuccessHandler(function(jsonStr) {
-            try {
-              resolve(JSON.parse(jsonStr));
-            } catch (e) {
-              reject(e);
-            }
-          })
-          .withFailureHandler(reject)
-          [functionName].apply(null, args);
+        function execute() {
+          gasRunning++;
+          google.script.run
+            .withSuccessHandler(function(jsonStr) {
+              gasRunning--;
+              drainGasQueue();
+              try { resolve(JSON.parse(jsonStr)); } catch (e) { reject(e); }
+            })
+            .withFailureHandler(function(err) {
+              gasRunning--;
+              drainGasQueue();
+              reject(err);
+            })
+            [functionName].apply(null, args);
+        }
+        if (gasRunning < GAS_MAX_CONCURRENT) {
+          execute();
+        } else {
+          gasQueue.push(execute);
+        }
       });
+    }
+
+    function drainGasQueue() {
+      while (gasQueue.length > 0 && gasRunning < GAS_MAX_CONCURRENT) {
+        var next = gasQueue.shift();
+        next();
+      }
     }
 
     function escapeHtml(text) {
@@ -3310,33 +3333,36 @@
 
           // 項目の保存
           if (categoryChanged && movedItemId) {
-            pendingSaves++;
+            pendingSaves++; gasRunning++;
             google.script.run
               .withSuccessHandler(function(json) {
+                gasRunning--;
                 try { var res = JSON.parse(json); if (!res.success) anyError = true; } catch (e) { anyError = true; }
                 onItemDragSaveDone();
               })
-              .withFailureHandler(function() { anyError = true; onItemDragSaveDone(); })
+              .withFailureHandler(function() { gasRunning--; anyError = true; onItemDragSaveDone(); })
               .moveItemToCategory(movedItemId, newCategory, itemOrders);
           } else if (itemOrders.length > 0) {
-            pendingSaves++;
+            pendingSaves++; gasRunning++;
             google.script.run
               .withSuccessHandler(function(json) {
+                gasRunning--;
                 try { var res = JSON.parse(json); if (!res.success) anyError = true; } catch (e) { anyError = true; }
                 onItemDragSaveDone();
               })
-              .withFailureHandler(function() { anyError = true; onItemDragSaveDone(); })
+              .withFailureHandler(function() { gasRunning--; anyError = true; onItemDragSaveDone(); })
               .reorderChecklistItems(itemOrders);
           }
           // カテゴリ順序の保存
           if (catOrders.length > 0) {
-            pendingSaves++;
+            pendingSaves++; gasRunning++;
             google.script.run
               .withSuccessHandler(function(json) {
+                gasRunning--;
                 try { var res = JSON.parse(json); if (!res.success) anyError = true; } catch (e) { anyError = true; }
                 onItemDragSaveDone();
               })
-              .withFailureHandler(function() { anyError = true; onItemDragSaveDone(); })
+              .withFailureHandler(function() { gasRunning--; anyError = true; onItemDragSaveDone(); })
               .reorderCategories(catOrders);
           }
           if (pendingSaves === 0) showSaveStatus('saved');
@@ -3570,8 +3596,10 @@
           var undoSnap = captureUndoSnapshot();
           var newParentPath = dropIntoTarget.catPath;
           showSaveStatus('saving');
+          gasRunning++;
           google.script.run
             .withSuccessHandler(function(json) {
+              gasRunning--;
               try {
                 var res = JSON.parse(json);
                 if (res.success) {
@@ -3606,7 +3634,7 @@
                 }
               } catch (ex) { showSaveStatus('error'); }
             })
-            .withFailureHandler(function() { showSaveStatus('error'); })
+            .withFailureHandler(function() { gasRunning--; showSaveStatus('error'); })
             .moveCategoryToParent(dragCatPath, newParentPath);
 
           dragSection = null; placeholder = null; containerEl = null;
@@ -3683,23 +3711,25 @@
             }
           }
           if (itemOrders.length > 0) {
-            catPending++;
+            catPending++; gasRunning++;
             google.script.run
               .withSuccessHandler(function(json) {
+                gasRunning--;
                 try { var res = JSON.parse(json); if (!res.success) catAnyErr = true; } catch (e) { catAnyErr = true; }
                 onCatReorderDone();
               })
-              .withFailureHandler(function() { catAnyErr = true; onCatReorderDone(); })
+              .withFailureHandler(function() { gasRunning--; catAnyErr = true; onCatReorderDone(); })
               .reorderChecklistItems(itemOrders);
           }
           if (catOrders.length > 0) {
-            catPending++;
+            catPending++; gasRunning++;
             google.script.run
               .withSuccessHandler(function(json) {
+                gasRunning--;
                 try { var res = JSON.parse(json); if (!res.success) catAnyErr = true; } catch (e) { catAnyErr = true; }
                 onCatReorderDone();
               })
-              .withFailureHandler(function() { catAnyErr = true; onCatReorderDone(); })
+              .withFailureHandler(function() { gasRunning--; catAnyErr = true; onCatReorderDone(); })
               .reorderCategories(catOrders);
           }
           if (catPending === 0) showSaveStatus('saved');

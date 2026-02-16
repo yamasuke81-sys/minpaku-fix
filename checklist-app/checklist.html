@@ -2075,31 +2075,47 @@
         return;
       }
 
-      // アイテムIDからカテゴリ（フルパス）を検索するマップを作成
-      var itemCategoryMap = {};
+      // アイテムIDからカテゴリ・名前を検索するマップを作成
+      var itemById = {};
+      var itemsByName = {};
       if (checklistData.items) {
         checklistData.items.forEach(function(item) {
-          itemCategoryMap[item.id] = item.category || 'その他';
+          itemById[item.id] = { category: item.category || 'その他', name: item.name };
+          // 名前→カテゴリの逆引き（名前でフォールバック検索用）
+          if (!itemsByName[item.name]) {
+            itemsByName[item.name] = item.category || 'その他';
+          }
         });
+      }
+
+      // 要補充アイテムのカテゴリを正しく解決する
+      function resolveSupplyCategory(itemId, itemName) {
+        var master = itemById[itemId];
+        // IDで見つかり、名前も一致すれば確実
+        if (master && master.name === itemName) return master.category;
+        // IDが別アイテムを指す or 見つからない場合、名前で検索
+        if (itemsByName[itemName]) return itemsByName[itemName];
+        // どちらも見つからない場合
+        return master ? master.category : '';
       }
 
       // カテゴリ順にソートして同じカテゴリの項目をまとめる
       keys.sort(function(a, b) {
-        var catA = itemCategoryMap[a] || '';
-        var catB = itemCategoryMap[b] || '';
+        var catA = resolveSupplyCategory(a, supplyNeeded[a].name);
+        var catB = resolveSupplyCategory(b, supplyNeeded[b].name);
         return catA.localeCompare(catB, 'ja');
       });
 
       var html = '<div class="supply-list-card"><h3>⚠️ 要補充リスト</h3>';
       keys.forEach(function(k) {
         var item = supplyNeeded[k];
-        var category = itemCategoryMap[k] || '';
+        var category = resolveSupplyCategory(k, item.name);
         html += '<div class="supply-item">';
         if (category) {
           html += '<span class="supply-item-category">' + escapeHtml(category).replace(/：/g, ' &gt; ') + '</span>';
         }
         html += '<span class="supply-item-name">' + escapeHtml(item.name) + '</span>';
-        html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\')">表示</button>';
+        html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\')">表示</button>';
         html += '</div>';
       });
       html += '</div>';
@@ -2107,13 +2123,30 @@
     }
 
     // === 要補充項目へスクロール ===
-    function scrollToSupplyItem(itemId) {
+    function scrollToSupplyItem(itemId, itemName) {
       // チェックリストタブに切り替え
       switchTab('checklist');
 
       // 少し待ってからスクロール（タブ切り替えのDOM反映待ち）
       setTimeout(function() {
         var target = document.querySelector('.checklist-item[data-item-id="' + itemId + '"]');
+        // IDで見つかった要素の名前が一致しない場合、名前で再検索
+        if (target && itemName) {
+          var nameEl = target.querySelector('.item-name');
+          if (nameEl && nameEl.textContent.trim() !== itemName) {
+            target = null; // IDずれ：名前で探し直す
+          }
+        }
+        if (!target && itemName) {
+          var allItems = document.querySelectorAll('.checklist-item');
+          for (var i = 0; i < allItems.length; i++) {
+            var n = allItems[i].querySelector('.item-name');
+            if (n && n.textContent.trim() === itemName) {
+              target = allItems[i];
+              break;
+            }
+          }
+        }
         if (!target) return;
 
         // 親セクションを全て展開

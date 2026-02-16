@@ -1720,7 +1720,7 @@
       if (level === 0 && spots && photos) {
         var categorySpots = spots.filter(function(s) {
           var sc = s.category || '';
-          return sc === name || s.name === name || s.name.indexOf(name) === 0;
+          return sc === name;
         });
         html += '<div class="inline-photo-spots">';
         categorySpots.forEach(function(spot) {

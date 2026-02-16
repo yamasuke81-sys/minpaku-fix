@@ -1368,6 +1368,8 @@
     var pendingToggles = {};
     // 同期が実行中かどうかを追跡（同期の重複実行防止用）
     var syncInProgress = false;
+    // スタッフ選択の保存中フラグ（同期による上書き防止）
+    var staffSelectionSaving = false;
     var bookingData = null;
     var staffList = [];
     var staffRowCount = 1;
@@ -1440,6 +1442,8 @@
             renderSupplyList();
             updateProgress();
             updateCheckAllButton();
+            // スタッフ選択を反映
+            applyStaffSelection(res.selectedStaff);
             // 折りたたみ状態とタブを復元
             restoreCollapseState(collapseState);
             if (activeTab) switchTab(activeTab);
@@ -1450,7 +1454,13 @@
       // イベントリスナー
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
       document.getElementById('memoPhotoInput').addEventListener('change', handleMemoPhotoSelect);
-      document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); });
+      document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); saveStaffSelectionToServer(); });
+      // スタッフ追加行のchange検知（イベント委譲）
+      document.getElementById('staffSelector').addEventListener('change', function(e) {
+        if (e.target.classList.contains('staff-select') && e.target.id !== 'staffSelect0') {
+          saveStaffSelectionToServer();
+        }
+      });
 
       // 項目名タッチでチェック切替（イベント委譲）
       document.getElementById('checklistContainer').addEventListener('click', function(e) {
@@ -1589,7 +1599,10 @@
 
     function removeStaffRow(idx) {
       var row = document.getElementById('staffRow' + idx);
-      if (row) row.remove();
+      if (row) {
+        row.remove();
+        saveStaffSelectionToServer();
+      }
     }
 
     function getSelectedStaffNames() {
@@ -1599,6 +1612,47 @@
         if (v && names.indexOf(v) === -1) names.push(v);
       });
       return names;
+    }
+
+    // スタッフ選択をバックエンドに保存（他端末との同期用）
+    function saveStaffSelectionToServer() {
+      var names = getSelectedStaffNames();
+      staffSelectionSaving = true;
+      callGAS('saveStaffSelection', [checkoutDate, names]).then(function(res) {
+        staffSelectionSaving = false;
+      }).catch(function() {
+        staffSelectionSaving = false;
+      });
+    }
+
+    // サーバーから受信したスタッフ選択をUIに反映
+    function applyStaffSelection(selectedStaff) {
+      if (!selectedStaff || !Array.isArray(selectedStaff) || selectedStaff.length === 0) return;
+      // 保存中は同期データで上書きしない
+      if (staffSelectionSaving) return;
+      // 現在の選択と同じなら何もしない
+      var current = getSelectedStaffNames();
+      if (JSON.stringify(current) === JSON.stringify(selectedStaff)) return;
+
+      var container = document.getElementById('staffSelector');
+      // 既存の追加行を削除（staffSelect0以外）
+      var extraRows = container.querySelectorAll('.staff-row:not(:first-child)');
+      extraRows.forEach(function(row) { row.remove(); });
+      staffRowCount = 1;
+
+      // 1人目をstaffSelect0に設定
+      var firstSelect = document.getElementById('staffSelect0');
+      if (firstSelect) firstSelect.value = selectedStaff[0] || '';
+
+      // 2人目以降の行を追加
+      for (var i = 1; i < selectedStaff.length; i++) {
+        addStaffRow();
+        var sel = document.getElementById('staffSelect' + (staffRowCount - 1));
+        if (sel) sel.value = selectedStaff[i];
+      }
+
+      updateStaffLabel();
+      updateSettingsTabVisibility();
     }
 
     // === タブ切り替え ===
@@ -1738,6 +1792,8 @@
             renderMemos();
             renderSupplyList();
             updateProgress();
+            // サーバーに保存済みのスタッフ選択を反映
+            applyStaffSelection(checklistRes.selectedStaff);
           } catch (e) {
             console.error('初期レンダリングエラー:', e);
           }

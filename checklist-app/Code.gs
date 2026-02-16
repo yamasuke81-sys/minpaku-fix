@@ -27,6 +27,7 @@ const SHEET_CL_PHOTOS = 'チェックリスト写真';
 const SHEET_CL_MEMOS = 'チェックリストメモ';
 const SHEET_CL_SUPPLIES = '要補充記録';
 const SHEET_CL_CATEGORY_ORDER = 'カテゴリ順序';
+const SHEET_CL_STAFF_SELECTION = 'スタッフ選択記録';
 
 // 予約管理スプレッドシートのシート名（チェックリストアプリ用）
 const CL_BOOKING_SHEET = 'フォームの回答 1';
@@ -278,6 +279,7 @@ function clSheet_(name) {
     else if (name === SHEET_CL_MEMOS) sheet.getRange(1, 1, 1, 4).setValues([['チェックアウト日', 'メモ内容', '記入者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_SUPPLIES) sheet.getRange(1, 1, 1, 6).setValues([['チェックアウト日', '項目ID', '項目名', 'カテゴリ', '記入者', 'タイムスタンプ']]);
     else if (name === SHEET_CL_CATEGORY_ORDER) sheet.getRange(1, 1, 1, 2).setValues([['カテゴリパス', '表示順']]);
+    else if (name === SHEET_CL_STAFF_SELECTION) sheet.getRange(1, 1, 1, 3).setValues([['チェックアウト日', 'スタッフ名(JSON)', 'タイムスタンプ']]);
   }
   return sheet;
 }
@@ -516,6 +518,9 @@ function getChecklistForDate(checkoutDate) {
     var checkedCount = Object.keys(checkedItems).length;
     var totalItems = masterRes.items.length;
 
+    // スタッフ選択を取得
+    var selectedStaff = getStaffSelection_(checkoutDate);
+
     return JSON.stringify({
       success: true,
       items: masterRes.items,
@@ -526,7 +531,8 @@ function getChecklistForDate(checkoutDate) {
       memos: memos,
       checkedCount: checkedCount,
       totalItems: totalItems,
-      categoryOrder: catOrderRes.success ? catOrderRes.orders : []
+      categoryOrder: catOrderRes.success ? catOrderRes.orders : [],
+      selectedStaff: selectedStaff
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -731,6 +737,70 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName, c
     return JSON.stringify({ success: false, error: e.toString() });
   } finally {
     lock.releaseLock();
+  }
+}
+
+/**
+ * スタッフ選択を保存（複数端末間で同期用）
+ * @param {string} checkoutDate
+ * @param {string[]} staffNames - 選択されたスタッフ名の配列
+ */
+function saveStaffSelection(checkoutDate, staffNames) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' });
+  }
+  try {
+    var sheet = clSheet_(SHEET_CL_STAFF_SELECTION);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+
+    // 既存レコードを削除（下から削除して行ずれ防止）
+    if (lastRow >= 2) {
+      var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = data.length - 1; i >= 0; i--) {
+        if (normDateStr_(data[i][0]) === targetDate) {
+          sheet.deleteRow(i + 2);
+        }
+      }
+    }
+
+    // 新規レコードを追加
+    var now = new Date();
+    var namesJson = JSON.stringify(staffNames || []);
+    var nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1, 1, 3).setValues([[checkoutDate, namesJson, now]]);
+
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * スタッフ選択を取得
+ * @param {string} checkoutDate
+ * @return {string[]} 選択されたスタッフ名の配列
+ */
+function getStaffSelection_(checkoutDate) {
+  try {
+    var sheet = clSheet_(SHEET_CL_STAFF_SELECTION);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+    var data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (normDateStr_(data[i][0]) === targetDate) {
+        try { return JSON.parse(data[i][1]); } catch (e) { return []; }
+      }
+    }
+    return [];
+  } catch (e) {
+    return [];
   }
 }
 

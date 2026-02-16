@@ -2670,6 +2670,13 @@
                 checklistData.items.forEach(function(item) {
                   if (item.id === itemId) item.supplyItem = newSupply;
                 });
+                // 要補充対象を外した場合、要補充リストからも削除
+                if (!newSupply && checklistData.supplyNeeded[itemId]) {
+                  delete checklistData.supplyNeeded[itemId];
+                  var names = getSelectedStaffNames();
+                  var who = names.length > 0 ? names.join(', ') : staffName;
+                  callGAS('toggleSupplyNeeded', [checkoutDate, itemId, newText, false, who]);
+                }
               }
               return res2;
             })

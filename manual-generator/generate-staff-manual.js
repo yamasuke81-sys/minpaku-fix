@@ -235,6 +235,8 @@ function buildHtml() {
   </div>
   <p>カレンダー上の<b>黄色い清掃バー</b>をタップすると、清掃の詳細情報が表示されます。</p>
 
+  ${img('calendar', 'カレンダー画面（黄色い清掃バーを探す）')}
+
   <div class="call call-info"><i>ℹ</i>
     <div>募集中の清掃がある日はカレンダーの<b>背景が黄色</b>にハイライトされます。</div>
   </div>
@@ -242,7 +244,7 @@ function buildHtml() {
   <ol class="steps">
     <li class="stp"><span class="stp-n">1</span>
       <b>カレンダーで黄色い「清掃」バーをタップ</b>
-      <span class="desc">チェックアウト日に配置されています。</span>
+      <span class="desc">チェックアウト日に配置されています（上の画像参照）。</span>
     </li>
     <li class="stp"><span class="stp-n">2</span>
       <b>清掃詳細モーダルが開く</b>

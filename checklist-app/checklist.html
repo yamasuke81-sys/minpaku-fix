@@ -995,6 +995,45 @@
       cursor: pointer;
       margin-top: 12px;
     }
+    /* UNDO トースト */
+    #undoToast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #323232;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+      z-index: 10000;
+      font-size: 14px;
+      animation: undoSlideUp 0.25s ease-out;
+    }
+    #undoToast.fade-out {
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #undoToast button {
+      background: none;
+      border: none;
+      color: #4fc3f7;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    #undoToast button:active {
+      background: rgba(255,255,255,0.1);
+    }
+    @keyframes undoSlideUp {
+      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
   </style>
 </head>
 <body>
@@ -2003,10 +2042,12 @@
     function renameCategoryPrompt(fullPath, currentName) {
       var newName = prompt('カテゴリ名を変更:', currentName);
       if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+      var undoSnap = captureUndoSnapshot();
       showSaveStatus('saving');
       callGAS('renameCategoryInMaster', [fullPath, newName.trim()]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
+          setUndo(undoSnap);
           reloadChecklist();
         } else {
           showSaveStatus('error');
@@ -2879,6 +2920,61 @@
       });
     }
 
+    // === UNDO機能 ===
+    var lastUndoData = null;
+    var undoToastTimer = null;
+
+    function captureUndoSnapshot() {
+      if (!checklistData) return null;
+      return {
+        items: checklistData.items ? checklistData.items.map(function(item) {
+          return { id: item.id, category: item.category, sortOrder: item.sortOrder || 0 };
+        }) : [],
+        categoryOrder: checklistData.categoryOrder ? checklistData.categoryOrder.map(function(o) {
+          return { path: o.path, sortOrder: o.sortOrder };
+        }) : []
+      };
+    }
+
+    function setUndo(snapshot) {
+      if (!snapshot) return;
+      lastUndoData = snapshot;
+      showUndoToast();
+    }
+
+    function showUndoToast() {
+      var existing = document.getElementById('undoToast');
+      if (existing) existing.remove();
+      if (undoToastTimer) { clearTimeout(undoToastTimer); undoToastTimer = null; }
+      var toast = document.createElement('div');
+      toast.id = 'undoToast';
+      toast.innerHTML = '<span>変更しました</span><button onclick="performUndo()">元に戻す</button>';
+      document.body.appendChild(toast);
+      undoToastTimer = setTimeout(function() {
+        toast.classList.add('fade-out');
+        setTimeout(function() { if (toast.parentNode) toast.remove(); lastUndoData = null; }, 300);
+      }, 8000);
+    }
+
+    function performUndo() {
+      if (!lastUndoData) return;
+      var snapshot = lastUndoData;
+      lastUndoData = null;
+      var toast = document.getElementById('undoToast');
+      if (toast) toast.remove();
+      if (undoToastTimer) { clearTimeout(undoToastTimer); undoToastTimer = null; }
+      showSaveStatus('saving');
+      callGAS('restoreChecklistSnapshot', [snapshot]).then(function(res) {
+        if (res.success) {
+          showSaveStatus('saved');
+          reloadChecklist();
+        } else {
+          showSaveStatus('error');
+          alert('元に戻せませんでした: ' + (res.error || ''));
+        }
+      }).catch(function() { showSaveStatus('error'); });
+    }
+
     // === ユーティリティ ===
     function callGAS(functionName, args) {
       return new Promise(function(resolve, reject) {
@@ -3128,6 +3224,9 @@
         }
 
         if (itemOrders.length > 0 || catOrders.length > 0) {
+          // UNDO用スナップショット（ローカル更新前に取得）
+          var undoSnap = captureUndoSnapshot();
+
           // ローカルデータを更新（項目）
           var itemMap = {};
           itemOrders.forEach(function(o) { itemMap[o.id] = o.sortOrder; });
@@ -3156,6 +3255,7 @@
             pendingSaves--;
             if (pendingSaves <= 0) {
               showSaveStatus(anyError ? 'error' : 'saved');
+              if (!anyError) setUndo(undoSnap);
               if (categoryChanged) reRenderWithState();
             }
           }
@@ -3419,6 +3519,7 @@
           dragSection.classList.remove('cat-dragging');
           if (dragClone) { dragClone.remove(); dragClone = null; }
 
+          var undoSnap = captureUndoSnapshot();
           var newParentPath = dropIntoTarget.catPath;
           showSaveStatus('saving');
           google.script.run
@@ -3427,6 +3528,7 @@
                 var res = JSON.parse(json);
                 if (res.success) {
                   showSaveStatus('saved');
+                  setUndo(undoSnap);
                   // ローカルデータのカテゴリパスを更新
                   var parts = dragCatPath.split('\uff1a');
                   var catName = parts[parts.length - 1];
@@ -3493,6 +3595,9 @@
           }
         }
 
+        // UNDO用スナップショット（ローカル更新前に取得）
+        var undoSnap = captureUndoSnapshot();
+
         // ローカルデータを更新
         if (checklistData) {
           if (itemOrders.length > 0 && checklistData.items) {
@@ -3524,7 +3629,10 @@
           var catAnyErr = false;
           function onCatReorderDone() {
             catPending--;
-            if (catPending <= 0) showSaveStatus(catAnyErr ? 'error' : 'saved');
+            if (catPending <= 0) {
+              showSaveStatus(catAnyErr ? 'error' : 'saved');
+              if (!catAnyErr) setUndo(undoSnap);
+            }
           }
           if (itemOrders.length > 0) {
             catPending++;

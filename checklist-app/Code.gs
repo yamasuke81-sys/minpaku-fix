@@ -1597,6 +1597,48 @@ function reorderCategories(categoryOrders) {
 }
 
 /**
+ * チェックリストのスナップショットを復元（UNDO用）
+ * @param {Object} snapshot - { items: [{id, category, sortOrder}], categoryOrder: [{path, sortOrder}] }
+ */
+function restoreChecklistSnapshot(snapshot) {
+  try {
+    if (!snapshot || !snapshot.items) return JSON.stringify({ success: false, error: 'スナップショットが不正です' });
+    var sheet = clSheet_(SHEET_CL_MASTER);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '項目がありません' });
+    // マスターシートの項目を復元（カテゴリ+表示順）
+    var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    var itemMap = {};
+    snapshot.items.forEach(function(item) { itemMap[String(item.id)] = item; });
+    var changed = false;
+    for (var i = 0; i < data.length; i++) {
+      var id = String(data[i][0]);
+      if (itemMap[id]) {
+        data[i][1] = itemMap[id].category;
+        data[i][3] = itemMap[id].sortOrder;
+        changed = true;
+      }
+    }
+    if (changed) {
+      sheet.getRange(2, 1, lastRow - 1, 4).setValues(data);
+    }
+    // カテゴリ順序シートを復元
+    var orderSheet = clSheet_(SHEET_CL_CATEGORY_ORDER);
+    var orderLastRow = orderSheet.getLastRow();
+    if (orderLastRow >= 2) {
+      orderSheet.deleteRows(2, orderLastRow - 1);
+    }
+    if (snapshot.categoryOrder && snapshot.categoryOrder.length > 0) {
+      var values = snapshot.categoryOrder.map(function(o) { return [o.path, o.sortOrder]; });
+      orderSheet.getRange(2, 1, values.length, 2).setValues(values);
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * カテゴリ名を変更（マスターシートの全該当項目のカテゴリ列を更新）
  */
 function renameCategoryInMaster(oldFullPath, newName) {

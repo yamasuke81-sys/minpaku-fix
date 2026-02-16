@@ -943,6 +943,22 @@
       outline-offset: -3px;
       background: rgba(230, 126, 34, 0.15) !important;
     }
+    .root-drop-zone {
+      background: rgba(39, 174, 96, 0.1);
+      border: 2px dashed #27ae60;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      color: #27ae60;
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 8px;
+      transition: background 0.2s;
+    }
+    .root-drop-zone.active {
+      background: rgba(39, 174, 96, 0.25);
+      border-color: #1e8449;
+    }
     .item-photo-thumb {
       width: 28px;
       height: 28px;
@@ -3618,6 +3634,7 @@
       var containerEl = null;
       var siblingSelector = null;
       var dropIntoTarget = null; // 別カテゴリにドロップする先
+      var rootDropZone = null;   // ルートレベルへの昇格用ドロップゾーン
 
       // 長押し検出用
       var longPressTimer = null;
@@ -3742,6 +3759,18 @@
         containerEl.insertBefore(placeholder, dragSection);
         dragSection.style.display = 'none';
 
+        // サブカテゴリをドラッグ中の場合、ルートレベル昇格用ドロップゾーンを表示
+        var isSubCategory = dragSection.classList.contains('sub-section')
+          || dragSection.classList.contains('sub-sub-section')
+          || dragSection.classList.contains('sub-sub-sub-section');
+        if (isSubCategory) {
+          rootDropZone = document.createElement('div');
+          rootDropZone.className = 'root-drop-zone';
+          rootDropZone.textContent = '\u25b2 \u5927\u30ab\u30c6\u30b4\u30ea\u3068\u3057\u3066\u79fb\u52d5';
+          var clContainer = document.getElementById('checklistContainer');
+          clContainer.insertBefore(rootDropZone, clContainer.firstChild);
+        }
+
         document.addEventListener('touchmove', handleCatDragMove, { passive: false });
         document.addEventListener('touchend', handleCatDragEnd);
         document.addEventListener('mousemove', handleCatDragMove);
@@ -3755,6 +3784,20 @@
         dragClone.style.top = (touch.clientY - dragClone.offsetHeight / 2) + 'px';
 
         var dragCatPath = dragSection.getAttribute('data-category') || '';
+
+        // ルートドロップゾーン上にいるか検出
+        if (rootDropZone) {
+          var rzRect = rootDropZone.getBoundingClientRect();
+          if (touch.clientY >= rzRect.top && touch.clientY <= rzRect.bottom && touch.clientX >= rzRect.left && touch.clientX <= rzRect.right) {
+            rootDropZone.classList.add('active');
+            clearDropIntoHighlight();
+            dropIntoTarget = null;
+            placeholder.style.display = 'none';
+            return;
+          } else {
+            rootDropZone.classList.remove('active');
+          }
+        }
 
         // 別カテゴリのヘッダー上にいるか検出
         var hitHeader = findDropIntoHeader(touch.clientX, touch.clientY, dragCatPath);
@@ -3813,6 +3856,65 @@
 
         clearDropIntoHighlight();
         var dragCatPath = dragSection.getAttribute('data-category') || '';
+        var isRootDrop = rootDropZone && rootDropZone.classList.contains('active');
+
+        // ルートドロップゾーンを除去
+        if (rootDropZone) { rootDropZone.remove(); rootDropZone = null; }
+
+        // === ルートレベル（大カテゴリ）に昇格 ===
+        if (isRootDrop) {
+          placeholder.remove();
+          dragSection.style.display = '';
+          dragSection.classList.remove('cat-dragging');
+          if (dragClone) { dragClone.remove(); dragClone = null; }
+
+          var undoSnap = captureUndoSnapshot();
+          showSaveStatus('saving');
+          gasRunning++;
+          google.script.run
+            .withSuccessHandler(function(json) {
+              gasRunning--;
+              try {
+                var res = JSON.parse(json);
+                if (res.success) {
+                  showSaveStatus('saved');
+                  setUndo(undoSnap);
+                  // ローカルデータのカテゴリパスを更新
+                  var parts = dragCatPath.split('\uff1a');
+                  var catName = parts[parts.length - 1];
+                  var newPath = catName;
+                  if (checklistData && checklistData.items) {
+                    checklistData.items.forEach(function(item) {
+                      if (item.category === dragCatPath) {
+                        item.category = newPath;
+                      } else if (item.category.indexOf(dragCatPath + '\uff1a') === 0) {
+                        item.category = newPath + item.category.substring(dragCatPath.length);
+                      }
+                    });
+                  }
+                  if (checklistData && checklistData.categoryOrder) {
+                    checklistData.categoryOrder.forEach(function(o) {
+                      if (o.path === dragCatPath) {
+                        o.path = newPath;
+                      } else if (o.path.indexOf(dragCatPath + '\uff1a') === 0) {
+                        o.path = newPath + o.path.substring(dragCatPath.length);
+                      }
+                    });
+                  }
+                  reRenderWithState();
+                } else {
+                  showSaveStatus('error');
+                  alert('\u79fb\u52d5\u306b\u5931\u6557\u3057\u307e\u3057\u305f: ' + (res.error || ''));
+                }
+              } catch (ex) { showSaveStatus('error'); }
+            })
+            .withFailureHandler(function() { gasRunning--; showSaveStatus('error'); })
+            .moveCategoryToParent(dragCatPath, '');
+
+          dragSection = null; placeholder = null; containerEl = null;
+          siblingSelector = null; dropIntoTarget = null;
+          return;
+        }
 
         // === 別カテゴリ内にドロップ ===
         if (dropIntoTarget) {

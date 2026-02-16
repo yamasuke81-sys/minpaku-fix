@@ -20,6 +20,35 @@ const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/6
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── ブラウザ実行パス検出（Brave > Chrome > Puppeteer内蔵） ──
+function detectBrowserPath() {
+  const candidates = [
+    // Brave (Windows)
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+    'C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+    'C:\\Program Files (x86)\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+    // Chrome (Windows)
+    process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    // Brave (macOS)
+    '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+    // Chrome (macOS)
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    // Brave (Linux)
+    '/usr/bin/brave-browser',
+    '/usr/bin/brave',
+    // Chrome (Linux)
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+  ].filter(Boolean);
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null; // Puppeteer内蔵Chromiumを使用
+}
+
 // ── CLI / deploy-config.json からURL取得 ──
 function getUrl() {
   const args = process.argv.slice(2);
@@ -156,11 +185,28 @@ async function main() {
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
-  const browser = await puppeteer.launch({
+  // ブラウザ検出
+  const browserPath = detectBrowserPath();
+  if (browserPath) {
+    console.log(`  ブラウザ: ${path.basename(browserPath)}`);
+  } else {
+    console.log('  ブラウザ: Puppeteer内蔵Chromium');
+    if (needsLogin()) {
+      console.log('  ⚠ Brave/Chromeが見つかりません。Googleログインがブロックされる可能性があります。');
+    }
+  }
+  console.log();
+
+  const launchOptions = {
     headless: isHeaded() ? false : 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security',
            '--disable-features=IsolateOrigins,site-per-process'],
-  });
+  };
+  if (browserPath) {
+    launchOptions.executablePath = browserPath;
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   const page = await browser.newPage();
   await page.setViewport(VIEWPORT);

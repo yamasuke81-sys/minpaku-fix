@@ -2365,16 +2365,22 @@
         if (!confirm('全項目（' + unchecked.length + '件）にチェックを入れますか？')) return;
         var names = getSelectedStaffNames();
         var who = names.length > 0 ? names.join(', ') : staffName;
-        unchecked.forEach(function(cb) {
-          cb.checked = true;
-          var itemId = cb.getAttribute('data-item-id');
-          callGAS('toggleChecklistItem', [checkoutDate, itemId, true, who]);
-          checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
+        // 全項目IDを収集
+        var allItemIds = checklistData.items.map(function(item) { return item.id; });
+        // UIを即時更新
+        unchecked.forEach(function(cb) { cb.checked = true; });
+        allItemIds.forEach(function(id) {
+          checklistData.checked[id] = { checked: true, by: who, at: new Date() };
         });
         allChecked = true;
         btn.textContent = '全✓解除';
         btn.title = '全チェック解除';
         btn.classList.add('is-all-checked');
+        // バックエンドに一括保存（1回のGAS呼び出し）
+        showSaveStatus('saving');
+        callGAS('checkAllItems', [checkoutDate, allItemIds, who]).then(function(res) {
+          showSaveStatus(res.success ? 'saved' : 'error');
+        }).catch(function() { showSaveStatus('error'); });
       } else {
         if (!confirm('全てのチェックを外しますか？')) return;
         uncheckAllItems();
@@ -2384,22 +2390,22 @@
     }
 
     function uncheckAllItems() {
+      // UIを即時更新
       var checked = document.querySelectorAll('.item-checkbox:checked');
-      var names = getSelectedStaffNames();
-      var who = names.length > 0 ? names.join(', ') : staffName;
-      checked.forEach(function(cb) {
-        cb.checked = false;
-        var itemId = cb.getAttribute('data-item-id');
-        callGAS('toggleChecklistItem', [checkoutDate, itemId, false, who]);
-        delete checklistData.checked[itemId];
-      });
+      checked.forEach(function(cb) { cb.checked = false; });
+      checklistData.checked = {};
       allChecked = false;
       var btn = document.getElementById('btnCheckAll');
-      btn.textContent = '✓';
+      btn.textContent = '全✓';
       btn.title = '全チェック';
       btn.classList.remove('is-all-checked');
       updateProgress();
       updateSectionCounts();
+      // バックエンドに一括削除（1回のGAS呼び出し）
+      showSaveStatus('saving');
+      callGAS('uncheckAllItems', [checkoutDate]).then(function(res) {
+        showSaveStatus(res.success ? 'saved' : 'error');
+      }).catch(function() { showSaveStatus('error'); });
     }
 
     function updateCheckAllButton() {
@@ -2432,23 +2438,32 @@
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
 
+      showSaveStatus('saving');
       if (allDone) {
-        // 全チェック済み → 解除
+        // 全チェック済み → 解除（対象IDを収集して一括削除）
+        var uncheckIds = [];
         Array.from(checkboxes).forEach(function(cb) {
           if (cb.checked) {
             cb.checked = false;
             var itemId = cb.getAttribute('data-item-id');
-            callGAS('toggleChecklistItem', [checkoutDate, itemId, false, who]);
+            uncheckIds.push(itemId);
             delete checklistData.checked[itemId];
           }
         });
+        callGAS('uncheckItems', [checkoutDate, uncheckIds]).then(function(res) {
+          showSaveStatus(res.success ? 'saved' : 'error');
+        }).catch(function() { showSaveStatus('error'); });
       } else {
+        var checkIds = [];
         unchecked.forEach(function(cb) {
           cb.checked = true;
           var itemId = cb.getAttribute('data-item-id');
-          callGAS('toggleChecklistItem', [checkoutDate, itemId, true, who]);
+          checkIds.push(itemId);
           checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
         });
+        callGAS('checkAllItems', [checkoutDate, checkIds, who]).then(function(res) {
+          showSaveStatus(res.success ? 'saved' : 'error');
+        }).catch(function() { showSaveStatus('error'); });
       }
       updateProgress();
       updateSectionCounts();

@@ -563,6 +563,93 @@ function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
 }
 
 /**
+ * 複数項目を一括チェック
+ * @param {string} checkoutDate
+ * @param {string[]} itemIds - チェックする項目IDの配列
+ * @param {string} staffName
+ */
+function checkAllItems(checkoutDate, itemIds, staffName) {
+  try {
+    var sheet = clSheet_(SHEET_CL_RECORDS);
+    var targetDate = normDateStr_(checkoutDate);
+    // 既存レコードを取得
+    var existingIds = {};
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (normDateStr_(data[i][0]) === targetDate) {
+          existingIds[String(data[i][1])] = i + 2;
+        }
+      }
+    }
+    // 未登録の項目だけ追加
+    var newRows = [];
+    var now = new Date();
+    itemIds.forEach(function(id) {
+      if (!existingIds[String(id)]) {
+        newRows.push([checkoutDate, id, 'Y', staffName || '', now]);
+      }
+    });
+    if (newRows.length > 0) {
+      var startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, newRows.length, 5).setValues(newRows);
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 該当日の全チェック記録を一括削除
+ * @param {string} checkoutDate
+ */
+function uncheckAllItems(checkoutDate) {
+  try {
+    var sheet = clSheet_(SHEET_CL_RECORDS);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true });
+    var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    // 下から削除（行番号ずれ防止）
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (normDateStr_(data[i][0]) === targetDate) {
+        sheet.deleteRow(i + 2);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 指定した項目のチェック記録を一括削除
+ * @param {string} checkoutDate
+ * @param {string[]} itemIds - 解除する項目IDの配列
+ */
+function uncheckItems(checkoutDate, itemIds) {
+  try {
+    var sheet = clSheet_(SHEET_CL_RECORDS);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true });
+    var idSet = {};
+    itemIds.forEach(function(id) { idSet[String(id)] = true; });
+    var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (normDateStr_(data[i][0]) === targetDate && idSet[String(data[i][1])]) {
+        sheet.deleteRow(i + 2);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * 要補充のトグル
  */
 function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName) {

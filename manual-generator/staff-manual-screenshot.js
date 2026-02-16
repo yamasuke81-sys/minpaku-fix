@@ -38,13 +38,21 @@ function isHeaded() {
   return process.argv.includes('--headed');
 }
 
-// ── GASフレーム取得 ──
+// ── GASフレーム取得（再取得可能） ──
 function getAppFrame(page) {
   for (const f of page.frames()) {
     const name = f.name();
     if (name === 'userHtmlFrame' || name.includes('sandboxFrame')) return f;
   }
   return page.mainFrame();
+}
+
+// ── 条件付き待機（タイムアウトしてもエラーにならない） ──
+async function waitFor(frame, fn, timeoutMs = 30000) {
+  try {
+    await frame.waitForFunction(fn, { timeout: timeoutMs });
+    return true;
+  } catch (_) { return false; }
 }
 
 // ── スクリーンショット保存 ──
@@ -55,46 +63,53 @@ async function take(page, id, results) {
   console.log(`    ✓ ${id}.png`);
 }
 
-// ── 要素スクリーンショット ──
-async function takeElement(frame, page, selector, id, results) {
-  let el = await frame.$(selector);
-  if (!el) el = await page.$(selector);
+// ── 要素スクリーンショット（中身があるか確認） ──
+async function takeElement(frame, page, selectors, id, results) {
+  // 複数セレクタを順番に試す
+  const selectorList = Array.isArray(selectors) ? selectors : [selectors];
+  let el = null;
+
+  for (const sel of selectorList) {
+    // frame内で検索
+    el = await frame.$(sel);
+    if (el) {
+      // 要素が空でないか確認（表示サイズが1px以上）
+      const box = await el.boundingBox();
+      if (box && box.width > 1 && box.height > 1) break;
+      el = null;
+    }
+    // page全体で検索
+    el = await page.$(sel);
+    if (el) {
+      const box = await el.boundingBox();
+      if (box && box.width > 1 && box.height > 1) break;
+      el = null;
+    }
+  }
+
   if (!el) {
-    console.log(`    - ${id}: 要素が見つかりません (${selector})`);
-    results.push({ id, ok: false, reason: 'not found' });
+    console.log(`    - ${id}: 表示可能な要素が見つかりません`);
+    results.push({ id, ok: false, reason: 'not found or empty' });
     return;
   }
+
   const filePath = path.join(OUT_DIR, `${id}.png`);
   await el.screenshot({ path: filePath });
   results.push({ id, ok: true, file: filePath });
   console.log(`    ✓ ${id}.png`);
 }
 
-// ── イベントクリック試行 ──
-async function tryClick(frame, selector) {
-  try {
-    await frame.waitForSelector(selector, { timeout: 5000 });
-    await frame.click(selector);
-    return true;
-  } catch (_) { return false; }
-}
-
-// ── モーダル待機 ──
-async function waitModal(frame) {
-  try {
-    await frame.waitForSelector('.modal.show', { timeout: 8000 });
-    await sleep(2000); // データ読み込み待ち
-  } catch (_) {}
-}
-
 // ── モーダル閉じる ──
 async function closeModal(frame, page) {
+  // 閉じるボタンをクリック
   try {
     await frame.click('.modal.show [data-bs-dismiss="modal"]');
   } catch (_) {
     try { await page.click('.modal.show [data-bs-dismiss="modal"]'); } catch (__) {}
   }
-  await sleep(800);
+  // モーダルが閉じるまで待機
+  await waitFor(frame, () => !document.querySelector('.modal.show'), 5000);
+  await sleep(1000);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -127,134 +142,204 @@ async function main() {
   const staffUrl = url + (url.includes('?') ? '&' : '?') + 'staff=1';
   const results = [];
 
-  // ── ページ読み込み ──
-  console.log('  ページ読み込み中...');
-  await page.goto(staffUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+  // ══════════════════════════════════════════════════════════
+  // ページ読み込み
+  // ══════════════════════════════════════════════════════════
+  console.log('  ページ読み込み中（GASアプリは時間がかかります）...');
+  await page.goto(staffUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-  // GAS中間ページ処理
+  // GAS中間ページ（「このアプリはGoogleで確認されていません」等）の処理
   try {
     const advBtn = await page.$('#details-button, [id*="proceed"], a[href*="continue"]');
     if (advBtn) {
+      console.log('  GAS中間ページを通過中...');
       await advBtn.click();
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
     }
   } catch (_) {}
 
-  const frame = getAppFrame(page);
-  await sleep(4000);
+  let frame = getAppFrame(page);
 
-  // ════════════════════════════════════════════════════════
+  // GASアプリのHTMLが読み込まれるまで十分待機
+  console.log('  アプリ初期化待機中...');
+  await sleep(6000);
+  // フレームが変わっている可能性があるので再取得
+  frame = getAppFrame(page);
+
+  // ══════════════════════════════════════════════════════════
   // 1. スタッフ選択オーバーレイ
-  // ════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════
   console.log('  [1/8] スタッフ選択オーバーレイ...');
-  try {
-    await frame.waitForFunction(() => {
-      const el = document.getElementById('staffSelectOverlay');
-      return el && getComputedStyle(el).display !== 'none';
-    }, { timeout: 10000 });
-    await sleep(500);
+  const overlayShown = await waitFor(frame, () => {
+    const el = document.getElementById('staffSelectOverlay');
+    return el && getComputedStyle(el).display !== 'none';
+  }, 20000);
+
+  if (overlayShown) {
+    // ドロップダウンにスタッフ名が読み込まれるまで待機
+    console.log('    スタッフリスト読み込み待機中...');
+    await waitFor(frame, () => {
+      const sel = document.getElementById('staffSelectModalSelect');
+      return sel && sel.options.length > 1;
+    }, 30000);
+    await sleep(1000);
     await take(page, 'staff-select', results);
-  } catch (e) {
+  } else {
     console.log('    スキップ: オーバーレイが表示されませんでした');
   }
 
   // ── スタッフ選択実行 ──
   console.log('  スタッフを選択中...');
   try {
-    // ドロップダウンにオプションが読み込まれるまで待機
-    await frame.waitForFunction(() => {
-      const sel = document.getElementById('staffSelectModalSelect');
-      return sel && sel.options.length > 1;
-    }, { timeout: 20000 });
-
     await frame.evaluate(() => {
       const sel = document.getElementById('staffSelectModalSelect');
-      sel.selectedIndex = 1;
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      if (sel && sel.options.length > 1) {
+        sel.selectedIndex = 1;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     });
-    await sleep(500);
+    await sleep(800);
     await frame.click('#staffSelectModalConfirm');
-    await sleep(3000);
   } catch (e) {
     console.log('    警告: スタッフ選択失敗 - ' + e.message);
   }
 
-  // FullCalendar 待機
-  try {
-    await frame.waitForSelector('.fc-daygrid-body, .fc-view-harness, #calendar', { timeout: 15000 });
-    await sleep(2000);
-  } catch (_) {
-    console.log('    警告: カレンダーが見つかりません');
-  }
+  // オーバーレイが閉じるまで待機
+  console.log('  カレンダー読み込み待機中...');
+  await waitFor(frame, () => {
+    const el = document.getElementById('staffSelectOverlay');
+    return !el || getComputedStyle(el).display === 'none';
+  }, 15000);
 
-  // ════════════════════════════════════════════════════════
+  // FullCalendar のイベントが描画されるまで待機
+  const hasEvents = await waitFor(frame, () => {
+    return document.querySelectorAll('.fc-event').length > 0;
+  }, 30000);
+
+  if (!hasEvents) {
+    console.log('  ⚠ カレンダーにイベントが見つかりません。予約・清掃がある月で再実行してください。');
+  }
+  // イベント描画後の安定化待ち
+  await sleep(2000);
+
+  // ══════════════════════════════════════════════════════════
   // 2. カレンダー画面
-  // ════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════
   console.log('  [2/8] カレンダー画面...');
   await take(page, 'calendar', results);
 
-  // ════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════
   // 3. 宿泊詳細モーダル
-  // ════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════
   console.log('  [3/8] 宿泊詳細モーダル...');
-  if (await tryClick(frame, '.fc-event-booking')) {
-    await waitModal(frame);
+  const hasBooking = await waitFor(frame, () => {
+    return !!document.querySelector('.fc-event-booking');
+  }, 5000);
+
+  if (hasBooking) {
+    await frame.click('.fc-event-booking');
+
+    // モーダルが表示されるまで待機
+    await waitFor(frame, () => !!document.querySelector('.modal.show'), 10000);
+
+    // モーダル内のデータが読み込まれるまで待機
+    // （チェックイン日時などの detail-row が表示されるまで）
+    console.log('    モーダルデータ読み込み待機中...');
+    await waitFor(frame, () => {
+      const body = document.querySelector('#eventModalBody');
+      return body && body.textContent.trim().length > 50;
+    }, 15000);
+    await sleep(1500);
+
     await take(page, 'booking-detail', results);
     await closeModal(frame, page);
   } else {
-    console.log('    スキップ: 予約イベントが見つかりません（カレンダーに予約がない月です）');
+    console.log('    スキップ: 予約イベントが見つかりません');
   }
 
-  // ════════════════════════════════════════════════════════
-  // 4. 清掃詳細モーダル（全体）
-  // ════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════
+  // 4. 清掃詳細モーダル
+  // ══════════════════════════════════════════════════════════
   console.log('  [4/8] 清掃詳細モーダル...');
-  if (await tryClick(frame, '.fc-event-cleaning')) {
-    await waitModal(frame);
-    // 清掃データ（ランドリー・募集状況）の読み込みを待つ
-    await sleep(3000);
+  const hasCleaning = await waitFor(frame, () => {
+    return !!document.querySelector('.fc-event-cleaning');
+  }, 5000);
+
+  if (hasCleaning) {
+    await frame.click('.fc-event-cleaning');
+
+    // モーダル表示待機
+    await waitFor(frame, () => !!document.querySelector('.modal.show'), 10000);
+
+    // 清掃モーダル固有のデータ読み込み待機:
+    // - 募集ステータスバッジ（「読み込み中…」から変化するまで）
+    // - 次回予約情報
+    // - ランドリーカード
+    console.log('    清掃データ読み込み待機中...');
+    const dataLoaded = await waitFor(frame, () => {
+      const status = document.getElementById('eventModalStaffRecruitStatus');
+      // 「読み込み中」テキストが消えたらデータ読み込み完了
+      if (status && status.textContent.includes('読み込み中')) return false;
+      // ボディに十分なコンテンツがあるか
+      const body = document.querySelector('#eventModalBody');
+      return body && body.textContent.trim().length > 30;
+    }, 30000);
+
+    if (!dataLoaded) {
+      console.log('    ⚠ データ読み込みがタイムアウトしました（現在の状態で撮影します）');
+    }
+    // ランドリーカードも非同期で読み込まれるので追加待機
+    await waitFor(frame, () => {
+      const laundry = document.getElementById('laundryCardArea');
+      return laundry && laundry.innerHTML.trim().length > 0;
+    }, 10000);
+    await sleep(2000);
+
     await take(page, 'cleaning-detail', results);
 
-    // ════════════════════════════════════════════════════════
-    // 5. 回答ボタン部分（要素スクリーンショット）
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
+    // 5. 回答ボタン部分
+    // ══════════════════════════════════════════════════════════
     console.log('  [5/8] 回答ボタン...');
-    // 回答ボタンはフッター or ボディ内のどちらかにある
-    await takeElement(frame, page,
-      '#eventModalVolunteerCenter, #eventModalVolunteerBodyArea',
-      'response-buttons', results);
+    // 回答ボタンの場所を探す（ボディ内 or フッター内）
+    await takeElement(frame, page, [
+      '#eventModalVolunteerBodyArea',
+      '#eventModalVolunteerCenter',
+    ], 'response-buttons', results);
 
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
     // 6. チェックリストボタン（ヘッダー部分）
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
     console.log('  [6/8] チェックリストボタン...');
-    await takeElement(frame, page,
+    // ヘッダー全体を撮影（ボタンが小さいため）
+    await takeElement(frame, page, [
       '#checklistBtnHeaderArea',
-      'checklist-btn', results);
+      '#eventModalHeader',
+    ], 'checklist-btn', results);
 
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
     // 7. クリーニング状況カード
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
     console.log('  [7/8] クリーニング状況...');
-    // モーダル本体を下までスクロール
+    // モーダルを下までスクロールしてランドリーカードを見える位置にする
     await frame.evaluate(() => {
       const body = document.querySelector('#eventModal .modal-body');
       if (body) body.scrollTop = body.scrollHeight;
     });
-    await sleep(500);
-    await takeElement(frame, page,
+    await sleep(800);
+    await takeElement(frame, page, [
       '#laundryCardArea',
-      'laundry-card', results);
+    ], 'laundry-card', results);
 
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
     // 8. 清掃詳細モーダル（スクロール後）
-    // ════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════
     console.log('  [8/8] 清掃詳細モーダル（下部）...');
     await take(page, 'cleaning-detail-bottom', results);
 
     await closeModal(frame, page);
   } else {
-    console.log('    スキップ: 清掃イベントが見つかりません（カレンダーに清掃がない月です）');
+    console.log('    スキップ: 清掃イベントが見つかりません');
   }
 
   await browser.close();

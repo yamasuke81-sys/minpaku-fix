@@ -501,13 +501,14 @@ function getChecklistForDate(checkoutDate) {
       });
     }
 
-    // メモを取得
+    // メモを取得（5列目: 写真ファイルID）
     var memos = [];
     if (memoSheet.getLastRow() >= 2) {
-      var memoRecords = memoSheet.getRange(2, 1, memoSheet.getLastRow() - 1, 4).getValues();
+      var memoCols = Math.max(memoSheet.getLastColumn(), 5);
+      var memoRecords = memoSheet.getRange(2, 1, memoSheet.getLastRow() - 1, memoCols).getValues();
       memoRecords.forEach(function(row) {
         if (normDateStr_(row[0]) === targetDate) {
-          memos.push({ text: String(row[1] || ''), by: String(row[2] || ''), at: String(row[3] || '') });
+          memos.push({ text: String(row[1] || ''), by: String(row[2] || ''), at: String(row[3] || ''), photoFileId: String(row[4] || '') });
         }
       });
     }
@@ -803,12 +804,29 @@ function getPhotoFolderSettings() {
 /**
  * メモを追加
  */
-function addChecklistMemo(checkoutDate, text, staffName) {
+function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
   try {
     var sheet = clSheet_(SHEET_CL_MEMOS);
     var nextRow = sheet.getLastRow() + 1;
-    sheet.getRange(nextRow, 1, 1, 4).setValues([[checkoutDate, text, staffName || '', new Date()]]);
+    sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, text, staffName || '', new Date(), photoFileId || '']]);
     return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * メモ用写真をアップロード
+ */
+function uploadMemoPhoto(checkoutDate, base64Data, staffName) {
+  try {
+    var parentFolder = getOrCreateChecklistPhotoFolder_();
+    var folder = getOrCreateSubFolder_(parentFolder, 'メモ');
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'memo_' + new Date().getTime() + '.jpg');
+    var file = folder.createFile(blob);
+    file.setName(checkoutDate + '_memo_' + new Date().getTime() + '.jpg');
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+    return JSON.stringify({ success: true, fileId: file.getId() });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -829,15 +847,29 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       return JSON.stringify({ success: false, error: 'オーナーメールアドレスが設定されていません' });
     }
 
+    var targetDate = normDateStr_(checkoutDate);
+
     // 要補充リストを取得
     var supplyList = [];
     var supplySheet = clSheet_(SHEET_CL_SUPPLIES);
     if (supplySheet.getLastRow() >= 2) {
       var supplyData = supplySheet.getRange(2, 1, supplySheet.getLastRow() - 1, 5).getValues();
-      var targetDate = normDateStr_(checkoutDate);
       supplyData.forEach(function(row) {
         if (normDateStr_(row[0]) === targetDate) {
           supplyList.push(String(row[2]));
+        }
+      });
+    }
+
+    // メモ（写真付き含む）を取得
+    var memoList = [];
+    var memoSheet = clSheet_(SHEET_CL_MEMOS);
+    if (memoSheet.getLastRow() >= 2) {
+      var memoCols = Math.max(memoSheet.getLastColumn(), 5);
+      var memoData = memoSheet.getRange(2, 1, memoSheet.getLastRow() - 1, memoCols).getValues();
+      memoData.forEach(function(row) {
+        if (normDateStr_(row[0]) === targetDate) {
+          memoList.push({ text: String(row[1] || ''), by: String(row[2] || ''), photoFileId: String(row[4] || '') });
         }
       });
     }
@@ -856,9 +888,54 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       body += '\n';
     }
 
+    if (memoList.length > 0) {
+      body += '【特記事項・メモ】\n';
+      memoList.forEach(function(memo) {
+        var line = '- ';
+        if (memo.text) line += memo.text;
+        if (memo.photoFileId) {
+          if (memo.text) line += ' ';
+          line += '[写真: https://drive.google.com/file/d/' + memo.photoFileId + '/view]';
+        }
+        line += ' (' + memo.by + ')';
+        body += line + '\n';
+      });
+      body += '\n';
+    }
+
     body += '詳細はチェックリストをご確認ください。';
 
-    GmailApp.sendEmail(ownerEmail, subject, body);
+    // HTML版メール（写真インライン表示）
+    var htmlBody = '<div style="font-family:sans-serif;font-size:14px;">';
+    htmlBody += '<p>清掃が完了しました。</p>';
+    htmlBody += '<p>チェックアウト日: ' + checkoutDate + '<br>';
+    htmlBody += '清掃担当: ' + (staffName || '不明') + '<br>';
+    htmlBody += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '</p>';
+
+    if (supplyList.length > 0) {
+      htmlBody += '<p><strong>【要補充項目】</strong></p><ul>';
+      supplyList.forEach(function(item) { htmlBody += '<li>' + item + '</li>'; });
+      htmlBody += '</ul>';
+    }
+
+    if (memoList.length > 0) {
+      htmlBody += '<p><strong>【特記事項・メモ】</strong></p>';
+      memoList.forEach(function(memo) {
+        htmlBody += '<div style="margin-bottom:12px;padding:8px;background:#f8f9fa;border-radius:4px;">';
+        if (memo.text) htmlBody += '<p style="margin:0 0 4px;">' + memo.text + '</p>';
+        if (memo.photoFileId) {
+          htmlBody += '<a href="https://drive.google.com/file/d/' + memo.photoFileId + '/view" target="_blank">';
+          htmlBody += '<img src="https://drive.google.com/thumbnail?id=' + memo.photoFileId + '&sz=w400" style="max-width:400px;border-radius:4px;">';
+          htmlBody += '</a>';
+        }
+        htmlBody += '<p style="margin:4px 0 0;font-size:12px;color:#888;">' + memo.by + '</p>';
+        htmlBody += '</div>';
+      });
+    }
+
+    htmlBody += '<p>詳細はチェックリストをご確認ください。</p></div>';
+
+    GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
 
     // メインアプリの通知にも追加
     try {

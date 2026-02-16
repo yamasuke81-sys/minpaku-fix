@@ -641,12 +641,74 @@
       color: #7f8c8d;
       margin-top: 4px;
     }
+    .memo-input-area {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
     .memo-input {
-      width: 100%;
+      flex: 1;
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 14px;
+    }
+    .memo-photo-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #f8f9fa;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .memo-photo-btn:active {
+      background: #e9ecef;
+    }
+    .memo-photo-preview {
+      margin-bottom: 8px;
+      position: relative;
+      display: inline-block;
+    }
+    .memo-photo-preview img {
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+    .memo-photo-preview .remove-btn {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      font-size: 14px;
+      line-height: 22px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .memo-photo-thumb {
+      margin-top: 6px;
+    }
+    .memo-photo-thumb img {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+    }
+    .memo-uploading {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
     }
 
     /* 清掃完了エリア */
@@ -1178,7 +1240,12 @@
       <div id="memoSection" class="memo-section">
         <h3>📝 特記事項・備品不足など</h3>
         <div id="memoList" class="memo-list"></div>
-        <input type="text" id="memoInput" class="memo-input" placeholder="備品不足やメモを入力...（入力後に自動保存）">
+        <div id="memoPhotoPreview"></div>
+        <div id="memoUploading" class="memo-uploading" style="display:none;">写真アップロード中...</div>
+        <div class="memo-input-area">
+          <input type="text" id="memoInput" class="memo-input" placeholder="コメントを入力...（写真も添付可）">
+          <button class="memo-photo-btn" onclick="openMemoPhotoUpload()" title="写真を添付">📷</button>
+        </div>
       </div>
 
       <!-- 清掃完了エリア（漏れチェック統合） -->
@@ -1255,6 +1322,7 @@
   <input type="file" id="photoInput" accept="image/*" capture="environment">
   <input type="file" id="examplePhotoInput" accept="image/*">
   <input type="file" id="itemPhotoInput" accept="image/*">
+  <input type="file" id="memoPhotoInput" accept="image/*" capture="environment">
 
   <script>
     // グローバル変数
@@ -1267,6 +1335,9 @@
     var staffList = [];
     var staffRowCount = 1;
     var saveIndicatorTimer = null;
+    // メモ写真用
+    var pendingMemoPhotoFileId = null;
+    var pendingMemoPhotoDataUrl = null;
 
     // 保存インジケーター
     function showSaveStatus(status) {
@@ -1324,6 +1395,7 @@
 
       // イベントリスナー
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
+      document.getElementById('memoPhotoInput').addEventListener('change', handleMemoPhotoSelect);
       document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); });
 
       // 項目名タッチでチェック切替（イベント委譲）
@@ -1339,14 +1411,14 @@
         }
       });
 
-      // メモ自動保存（デバウンス）
+      // メモ自動保存（デバウンス）- 写真添付時はテキスト空でもOK
       var memoTimer = null;
       document.getElementById('memoInput').addEventListener('input', function() {
         var input = this;
         if (memoTimer) clearTimeout(memoTimer);
         memoTimer = setTimeout(function() {
           var text = input.value.trim();
-          if (!text) return;
+          if (!text && !pendingMemoPhotoFileId) return;
           addMemo();
         }, 1500);
       });
@@ -2086,7 +2158,13 @@
       var html = '';
       memos.forEach(function(memo) {
         html += '<div class="memo-item">';
-        html += escapeHtml(memo.text);
+        if (memo.text) html += escapeHtml(memo.text);
+        if (memo.photoFileId) {
+          html += '<div class="memo-photo-thumb">';
+          html += '<a href="https://drive.google.com/file/d/' + memo.photoFileId + '/view" target="_blank">';
+          html += '<img src="https://drive.google.com/thumbnail?id=' + memo.photoFileId + '&sz=w300" alt="memo photo">';
+          html += '</a></div>';
+        }
         html += '<div class="memo-meta">' + escapeHtml(memo.by) + ' - ' + formatDateTime(memo.at) + '</div>';
         html += '</div>';
       });
@@ -2535,19 +2613,83 @@
     function addMemo() {
       var input = document.getElementById('memoInput');
       var text = input.value.trim();
-      if (!text) return;
+      var photoId = pendingMemoPhotoFileId || '';
+      if (!text && !photoId) return;
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
 
-      callGAS('addChecklistMemo', [checkoutDate, text, who]).then(function(res) {
+      callGAS('addChecklistMemo', [checkoutDate, text, who, photoId]).then(function(res) {
         if (res.success) {
-          checklistData.memos.push({ text: text, by: who, at: new Date() });
+          checklistData.memos.push({ text: text, by: who, at: new Date(), photoFileId: photoId });
           renderMemos();
           input.value = '';
+          clearMemoPhotoPreview();
         } else {
           alert('メモの追加に失敗しました: ' + res.error);
         }
       });
+    }
+
+    // === メモ写真 ===
+    function openMemoPhotoUpload() {
+      document.getElementById('memoPhotoInput').click();
+    }
+
+    function handleMemoPhotoSelect(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
+
+      // プレビュー表示
+      var previewReader = new FileReader();
+      previewReader.onload = function(e) {
+        pendingMemoPhotoDataUrl = e.target.result;
+        renderMemoPhotoPreview();
+      };
+      previewReader.readAsDataURL(file);
+
+      // アップロード開始
+      document.getElementById('memoUploading').style.display = 'block';
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var base64 = e.target.result.split(',')[1];
+        callGAS('uploadMemoPhoto', [checkoutDate, base64, who]).then(function(res) {
+          document.getElementById('memoUploading').style.display = 'none';
+          if (res.success) {
+            pendingMemoPhotoFileId = res.fileId;
+            showSaveStatus('saved');
+          } else {
+            alert('写真のアップロードに失敗しました: ' + res.error);
+            clearMemoPhotoPreview();
+          }
+        }).catch(function() {
+          document.getElementById('memoUploading').style.display = 'none';
+          clearMemoPhotoPreview();
+          showSaveStatus('error');
+        });
+      };
+      reader.readAsDataURL(file);
+      event.target.value = '';
+    }
+
+    function renderMemoPhotoPreview() {
+      var container = document.getElementById('memoPhotoPreview');
+      if (!pendingMemoPhotoDataUrl) {
+        container.innerHTML = '';
+        return;
+      }
+      container.innerHTML = '<div class="memo-photo-preview">' +
+        '<img src="' + pendingMemoPhotoDataUrl + '" alt="preview">' +
+        '<button class="remove-btn" onclick="clearMemoPhotoPreview()">&times;</button>' +
+        '</div>';
+    }
+
+    function clearMemoPhotoPreview() {
+      pendingMemoPhotoFileId = null;
+      pendingMemoPhotoDataUrl = null;
+      document.getElementById('memoPhotoPreview').innerHTML = '';
+      document.getElementById('memoUploading').style.display = 'none';
     }
 
     // === 全体操作 ===

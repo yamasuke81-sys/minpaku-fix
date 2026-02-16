@@ -6,6 +6,7 @@
  *   node staff-manual-screenshot.js
  *   node staff-manual-screenshot.js --url <URL>
  *   node staff-manual-screenshot.js --headed   (ブラウザ表示デバッグ)
+ *   node staff-manual-screenshot.js --login    (Googleログイン後に撮影)
  *
  * 出力先: screenshots/staff-manual/
  */
@@ -35,7 +36,33 @@ function getUrl() {
 }
 
 function isHeaded() {
-  return process.argv.includes('--headed');
+  return process.argv.includes('--headed') || process.argv.includes('--login');
+}
+
+function needsLogin() {
+  return process.argv.includes('--login');
+}
+
+// ── Googleログイン完了を待機 ──
+async function waitForLogin(page, url) {
+  const readline = require('readline');
+  console.log('\n  ╔══════════════════════════════════════════════════════════╗');
+  console.log('  ║  Googleログインモード                                   ║');
+  console.log('  ║  ブラウザでGoogleアカウントにログインしてください。       ║');
+  console.log('  ║  ログイン完了後、Enterキーを押すと撮影を開始します。     ║');
+  console.log('  ╚══════════════════════════════════════════════════════════╝\n');
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  await new Promise(resolve => {
+    rl.question('  → Googleログインが完了したらEnterを押してください... ', () => {
+      rl.close();
+      resolve();
+    });
+  });
+
+  // ログイン後にアプリURLへ再遷移（リダイレクトされている可能性があるため）
+  console.log('  アプリページへ遷移中...');
+  await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
 }
 
 // ── GASフレーム取得（再取得可能） ──
@@ -147,6 +174,11 @@ async function main() {
   // ══════════════════════════════════════════════════════════
   console.log('  ページ読み込み中（GASアプリは時間がかかります）...');
   await page.goto(staffUrl, { waitUntil: 'networkidle2', timeout: 90000 });
+
+  // --login: Googleログインが必要な場合、ユーザーに手動ログインを促す
+  if (needsLogin()) {
+    await waitForLogin(page, staffUrl);
+  }
 
   // GAS中間ページ（「このアプリはGoogleで確認されていません」等）の処理
   try {

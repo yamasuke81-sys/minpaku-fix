@@ -63,10 +63,10 @@ if not exist "manual-generator\node_modules" (
 )
 
 echo [2/3] アプリのスクリーンショット撮影中...
-echo       （ブラウザが自動起動し、各画面を撮影します）
+echo       （ブラウザが自動起動します。Googleログイン後にEnterで撮影開始）
 echo.
 cd manual-generator
-call node staff-manual-screenshot.js
+call node staff-manual-screenshot.js --login
 if errorlevel 1 (
     echo.
     echo [警告] スクリーンショット撮影でエラーがありました。

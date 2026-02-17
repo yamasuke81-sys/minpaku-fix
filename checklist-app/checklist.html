@@ -2623,7 +2623,9 @@
         return p.before.length > 0 || p.after.length > 0;
       }).length;
 
-      var html = '<div style="padding:12px;"><div style="font-size:14px;font-weight:bold;color:#2c3e50;margin-bottom:8px;">撮影進捗: ' + doneSpots + ' / ' + totalSpots + ' 箇所</div>';
+      var html = '<div style="padding:12px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><div style="font-size:14px;font-weight:bold;color:#2c3e50;flex:1;">撮影進捗: ' + doneSpots + ' / ' + totalSpots + ' 箇所</div>';
+      html += '<button onclick="toggleAllPhotoCategories(false)" style="font-size:12px;padding:4px 10px;border:1px solid #bdc3c7;border-radius:4px;background:#fff;cursor:pointer;">全展開</button>';
+      html += '<button onclick="toggleAllPhotoCategories(true)" style="font-size:12px;padding:4px 10px;border:1px solid #bdc3c7;border-radius:4px;background:#fff;cursor:pointer;">全折り</button></div>';
       html += '<div style="height:6px;background:#ecf0f1;border-radius:3px;overflow:hidden;margin-bottom:16px;"><div style="height:100%;background:#e67e22;width:' + (totalSpots > 0 ? Math.round(doneSpots / totalSpots * 100) : 0) + '%;border-radius:3px;"></div></div></div>';
 
       catOrder.forEach(function(cat) {
@@ -2671,7 +2673,7 @@
           if (spotPhotos.before.length > 0) {
             html += '<div class="photo-grid" style="margin-top:6px;">';
             spotPhotos.before.forEach(function(photo) {
-              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200)"></div>';
+              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="showPhotoModal(\'' + spot.id + '\', \'' + photo.fileId + '\', \'' + spot.name.replace(/'/g, "\\'") + '\')"></div>';
               html += '<button class="photo-delete-btn" onclick="deletePhoto(\'' + spot.id + '\', \'' + photo.fileId + '\')">✕</button></div>';
             });
             html += '</div>';
@@ -2685,7 +2687,7 @@
           if (spotPhotos.after.length > 0) {
             html += '<div class="photo-grid" style="margin-top:6px;">';
             spotPhotos.after.forEach(function(photo) {
-              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200)"></div>';
+              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="showPhotoModal(\'' + spot.id + '\', \'' + photo.fileId + '\', \'' + spot.name.replace(/'/g, "\\'") + '\')"></div>';
               html += '<button class="photo-delete-btn" onclick="deletePhoto(\'' + spot.id + '\', \'' + photo.fileId + '\')">✕</button></div>';
             });
             html += '</div>';
@@ -3273,6 +3275,36 @@
       if (!body) return;
       body.classList.toggle('collapsed');
       if (toggle) toggle.classList.toggle('collapsed');
+    }
+
+    function toggleAllPhotoCategories(collapse) {
+      document.querySelectorAll('.photo-cat-body').forEach(function(body) {
+        var toggleId = body.id.replace('body_', 'toggle_');
+        var toggle = document.getElementById(toggleId);
+        if (collapse) {
+          body.classList.add('collapsed');
+          if (toggle) toggle.classList.add('collapsed');
+        } else {
+          body.classList.remove('collapsed');
+          if (toggle) toggle.classList.remove('collapsed');
+        }
+      });
+    }
+
+    function showPhotoModal(spotId, fileId, spotName) {
+      var overlay = document.createElement('div');
+      overlay.className = 'photo-modal-overlay';
+      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+      var modal = document.createElement('div');
+      modal.className = 'photo-modal';
+      modal.innerHTML = '<h3>📷 ' + (spotName || '') + '</h3>' +
+        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;" onerror="this.alt=\'画像を読み込めません\';"></div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+        '<button class="photo-modal-close" style="flex:1;background:#e74c3c;color:white;border-color:#e74c3c;" onclick="this.closest(\'.photo-modal-overlay\').remove();deletePhoto(\'' + spotId + '\', \'' + fileId + '\')">削除</button>' +
+        '</div>' +
+        '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
     }
 
     // === まとめてアップロード ===

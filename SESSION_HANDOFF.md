@@ -113,8 +113,13 @@ git log origin/<作業ブランチ> --oneline -10
 
 ## 必須デプロイコマンド（ユーザーのWindows PCで実行）
 
+**方式A: deploy-all.bat をダブルクリック（推奨）**
+- 現在のローカルブランチのコードを自動pullしてデプロイ
+- 初回のみ `git checkout <ブランチ名>` が必要（以降は不要）
+
+**方式B: コマンド1行で実行**
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/review-handoff-docs-5WgKR && git reset --hard origin/claude/review-handoff-docs-5WgKR && node deploy-all.js
 ```
 
 ---

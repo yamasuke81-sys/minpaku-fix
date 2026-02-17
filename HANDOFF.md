@@ -9,10 +9,19 @@
 ## 必須デプロイコマンド
 
 ユーザーのWindows PCで下記を実行すること。**変更を反映するには必ずこの手順が必要。**
-どのブランチにいても、未コミットの変更があっても、これ1つでOK。
 
+**方式A: deploy-all.bat をダブルクリック（推奨）**
+- 現在のローカルブランチのコードを `git fetch` + `git reset --hard` で最新化してデプロイ
+- 初回のみ `git checkout <ブランチ名>` が必要（以降は不要）
+
+**方式B: コマンド1行で実行**（どのブランチにいても、未コミットの変更があっても、これ1つでOK）
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <現在の作業ブランチ名> && git reset --hard origin/<現在の作業ブランチ名> && node deploy-all.js
+```
+
+**現時点のコマンド:**
+```
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/review-handoff-docs-5WgKR && git reset --hard origin/claude/review-handoff-docs-5WgKR && node deploy-all.js
 ```
 
 ---
@@ -85,7 +94,8 @@ minpaku-fix/
 | ブランチ | 用途 | 状態 |
 |---------|------|------|
 | `main` | 本番 | 安定版 |
-| `claude/update-handoff-docs-897D8` | 現在の開発・引き継ぎ | **現在のアクティブブランチ** |
+| `claude/review-handoff-docs-5WgKR` | 現在の開発 | **現在のアクティブブランチ** |
+| `claude/update-handoff-docs-897D8` | 過去の開発・引き継ぎ | 897D8の変更は5WgKRに含む |
 | `claude/create-handoff-docs-tRAuI` | 過去の開発 | マージ不要（変更は897D8に含む） |
 
 ### 最新コミット履歴（claude/update-handoff-docs-897D8 ブランチ）
@@ -381,6 +391,34 @@ function callGAS(functionName, args) {
 - 「募集」シートの `currentRowNum` が予約行番号のマッピングに使われる
 - 行の挿入/削除でずれる可能性あり → `getRecruitmentForBooking()` に自己修復メカニズムあり
 - 行番号は1ベースで、ヘッダー行を含む
+
+### deploy-all.bat のブランチ取得方式に関する注意（重要）
+
+`deploy-all.bat` はgit pullからデプロイまでをワンクリックで実行するラッパー。
+ブランチ取得方式について以下のレビュー結果を踏まえること：
+
+**方式比較:**
+| 方式 | メリット | リスク |
+|------|---------|--------|
+| ハードコード (`set BRANCH=claude/xxx`) | 確実 | 毎回書き換えが必要 |
+| 自動検出 (`git for-each-ref --sort=-committerdate`) | 手間なし | 古いブランチにCI/botがpushすると誤検出 |
+| `git branch --show-current` | 安全・シンプル | 初回は手動checkoutが必要 |
+| `deploy-config.json` にブランチ名保持 | 安全 | 設定ファイル管理が必要 |
+
+**現在の採用方式**: `git branch --show-current`（ローカルの現在ブランチを使用）
+- 初回のみ `git checkout <ブランチ名>` が必要
+- 以降は `deploy-all.bat` ダブルクリックだけでOK
+- 古いブランチを誤って拾うリスクがゼロ
+
+**`deploy-config.json` について:**
+- `.gitignore` 対象のためcheckout/resetで上書きされない
+- `git clean -f` を使うと消えるので**絶対に使わないこと**
+- bat内のバックアップ＆リストア処理は安全側に残している
+
+**bat実行中のcheckoutリスク:**
+- Windowsの CMD は bat を行単位で読むため、checkout でファイルが変わっても通常は問題ない
+- ただし行位置がずれると後続処理がおかしくなる可能性はある
+- ロジックは `deploy-all.js` に集約し、bat は短いラッパーに保つのが安全
 
 ### デプロイ時の注意
 - `deploy-config.json` は `.gitignore` 対象。紛失するとURLが変わる

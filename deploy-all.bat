@@ -16,30 +16,23 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Get latest code - auto-detect latest claude/* branch
+:: Get latest code - use current local branch
 echo [1/3] Fetching latest code ...
-if exist "deploy-config.json" copy /y "deploy-config.json" "deploy-config.json.bak" >nul 2>nul
-git stash -u -q 2>nul
-git fetch origin
 
-:: Find the most recently updated claude/* branch on origin
+:: Get current branch name
 set BRANCH=
-for /f "delims=" %%b in ('git for-each-ref --sort=-committerdate --format="%%(refname:lstrip=3)" "refs/remotes/origin/claude/*" --count=1') do set BRANCH=%%b
+for /f "delims=" %%b in ('git branch --show-current') do set BRANCH=%%b
 
 if "%BRANCH%"=="" (
-    echo [Error] No claude/* branch found on origin.
-    echo         Try: git fetch origin
+    echo [Error] Not on any branch (detached HEAD?).
+    echo         Run: git checkout claude/xxx
     pause
     exit /b 1
 )
 
-echo    Auto-detected branch: %BRANCH%
-git checkout -f %BRANCH% 2>nul
+echo    Current branch: %BRANCH%
+git fetch origin %BRANCH%
 git reset --hard origin/%BRANCH%
-if exist "deploy-config.json.bak" (
-    copy /y "deploy-config.json.bak" "deploy-config.json" >nul 2>nul
-    del "deploy-config.json.bak" >nul 2>nul
-)
 for /f "tokens=*" %%a in ('git log --oneline -1 2^>nul') do echo    Latest: %%a
 echo.
 

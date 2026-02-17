@@ -21,7 +21,7 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <現在の�
 
 **現時点のコマンド:**
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/review-handoff-docs-5WgKR && git reset --hard origin/claude/review-handoff-docs-5WgKR && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/setup-deployment-rules-EbLOg && git reset --hard origin/claude/setup-deployment-rules-EbLOg && node deploy-all.js
 ```
 
 ---
@@ -94,9 +94,10 @@ minpaku-fix/
 | ブランチ | 用途 | 状態 |
 |---------|------|------|
 | `main` | 本番 | 安定版 |
-| `claude/review-handoff-docs-5WgKR` | 現在の開発 | **現在のアクティブブランチ** |
-| `claude/update-handoff-docs-897D8` | 過去の開発・引き継ぎ | 897D8の変更は5WgKRに含む |
-| `claude/create-handoff-docs-tRAuI` | 過去の開発 | マージ不要（変更は897D8に含む） |
+| `claude/setup-deployment-rules-EbLOg` | 最新デプロイ対象 | **デプロイはこのブランチから** |
+| `claude/review-handoff-docs-5WgKR` | 引き継ぎ資料・編集ロック機能開発 | 開発中 |
+| `claude/update-handoff-docs-897D8` | 過去の開発・引き継ぎ | 897D8の変更はEbLOgに含む |
+| `claude/create-handoff-docs-tRAuI` | 過去の開発 | マージ不要 |
 
 ### 最新コミット履歴（claude/update-handoff-docs-897D8 ブランチ）
 ```

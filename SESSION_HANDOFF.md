@@ -119,7 +119,7 @@ git log origin/<作業ブランチ> --oneline -10
 
 **方式B: コマンド1行で実行**
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/review-handoff-docs-5WgKR && git reset --hard origin/claude/review-handoff-docs-5WgKR && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/setup-deployment-rules-EbLOg && git reset --hard origin/claude/setup-deployment-rules-EbLOg && node deploy-all.js
 ```
 
 ---

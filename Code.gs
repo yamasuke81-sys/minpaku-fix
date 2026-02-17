@@ -127,7 +127,12 @@ function doGet(e) {
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
   const template = HtmlService.createTemplateFromFile('index');
-  template.baseUrl = ScriptApp.getService().getUrl() || '';
+  var baseUrl = ScriptApp.getService().getUrl() || '';
+  // デプロイURLをプロパティに保存（getStaffDeployUrlのフォールバック用）
+  if (baseUrl) {
+    try { PropertiesService.getScriptProperties().setProperty('APP_BASE_URL', baseUrl); } catch(e) {}
+  }
+  template.baseUrl = baseUrl;
   var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
   template.isStaffMode = isStaff;
   // GASテンプレートでbooleanが正しく出力されない場合の対策: 明示的に文字列で渡す
@@ -706,18 +711,23 @@ function getAccountSwitchUrl() {
  */
 function getStaffDeployUrl() {
   try {
-    var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
-    if (stored && String(stored).trim()) return JSON.stringify({ success: true, url: String(stored).trim(), isStored: true });
-    // 保存済みURLがない場合、ScriptApp.getService().getUrl()から自動生成
+    // まずベースURLを取得（複数ソースからフォールバック）
     var base = '';
     try { base = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+    if (!base) {
+      try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
+    }
+    // ベースURLがあれば常に最新のスタッフURLを生成して返す
     if (base) {
       var url = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
       try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
-      return JSON.stringify({ success: true, url: url, isStored: true });
+      return JSON.stringify({ success: true, url: url, baseUrl: base });
     }
-    return JSON.stringify({ success: true, url: '', isStored: false });
-  } catch (e) { return JSON.stringify({ success: false, url: '', isStored: false, error: e.toString() }); }
+    // ベースURLが取得できない場合は保存済みURLを返す
+    var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
+    if (stored && String(stored).trim()) return JSON.stringify({ success: true, url: String(stored).trim() });
+    return JSON.stringify({ success: true, url: '' });
+  } catch (e) { return JSON.stringify({ success: false, url: '', error: e.toString() }); }
 }
 
 /**

@@ -4992,13 +4992,23 @@
       }
 
       function loadSettings() {
-        // スタッフ用URLはオーナーURLから自動生成
+        // スタッフ用URLはオーナーURLから自動生成（常にバックエンドから最新を取得）
         var staffInp = document.getElementById('staffDeployUrlInput');
-        if (staffInp && window.appBaseUrl) {
-          var staffUrl = window.appBaseUrl + (window.appBaseUrl.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
-          staffInp.value = staffUrl;
-          // バックエンドにも保存（コピー・共有用）
-          google.script.run.setStaffDeployUrl(staffUrl);
+        if (staffInp) {
+          // まずローカルのappBaseUrlで即座に表示
+          var base = window.appBaseUrl || '';
+          if (base) {
+            staffInp.value = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
+          }
+          // バックエンドからも取得して確実に反映
+          google.script.run.withSuccessHandler(function(jsonStr) {
+            try {
+              var r = JSON.parse(jsonStr);
+              if (r.success && r.url) {
+                staffInp.value = r.url;
+              }
+            } catch (e) {}
+          }).getStaffDeployUrl();
         }
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {

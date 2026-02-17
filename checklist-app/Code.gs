@@ -881,7 +881,7 @@ function setChecklistPhotoFolderId(folderId) {
 function setPhotoSubFolderId(type, folderId) {
   try {
     var id = String(folderId || '').trim();
-    var keyMap = { 'before': 'CL_PHOTO_FOLDER_BEFORE', 'after': 'CL_PHOTO_FOLDER_AFTER', 'example': 'CL_PHOTO_FOLDER_EXAMPLE' };
+    var keyMap = { 'before': 'CL_PHOTO_FOLDER_BEFORE', 'after': 'CL_PHOTO_FOLDER_AFTER', 'example': 'CL_PHOTO_FOLDER_EXAMPLE', 'memo': 'CL_PHOTO_FOLDER_MEMO' };
     var key = keyMap[type];
     if (!key) return JSON.stringify({ success: false, error: '無効なタイプです' });
     if (!id) {
@@ -907,7 +907,8 @@ function getPhotoFolderSettings() {
     var beforeId = props.getProperty('CL_PHOTO_FOLDER_BEFORE') || '';
     var afterId = props.getProperty('CL_PHOTO_FOLDER_AFTER') || '';
     var exampleId = props.getProperty('CL_PHOTO_FOLDER_EXAMPLE') || '';
-    return JSON.stringify({ success: true, parentId: parentId, beforeId: beforeId, afterId: afterId, exampleId: exampleId });
+    var memoId = props.getProperty('CL_PHOTO_FOLDER_MEMO') || '';
+    return JSON.stringify({ success: true, parentId: parentId, beforeId: beforeId, afterId: afterId, exampleId: exampleId, memoId: memoId });
   } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
 }
 
@@ -961,8 +962,16 @@ function deleteChecklistMemo(checkoutDate, memoTimestamp, memoText) {
  */
 function uploadMemoPhoto(checkoutDate, base64Data, staffName) {
   try {
-    var parentFolder = getOrCreateChecklistPhotoFolder_();
-    var folder = getOrCreateSubFolder_(parentFolder, 'メモ');
+    var props = PropertiesService.getScriptProperties();
+    var specificFolderId = props.getProperty('CL_PHOTO_FOLDER_MEMO');
+    var folder = null;
+    if (specificFolderId) {
+      try { folder = DriveApp.getFolderById(specificFolderId); } catch (e) { folder = null; }
+    }
+    if (!folder) {
+      var parentFolder = getOrCreateChecklistPhotoFolder_();
+      folder = getOrCreateSubFolder_(parentFolder, 'メモ');
+    }
     var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', 'memo_' + new Date().getTime() + '.jpg');
     var file = folder.createFile(blob);
     file.setName(checkoutDate + '_memo_' + new Date().getTime() + '.jpg');

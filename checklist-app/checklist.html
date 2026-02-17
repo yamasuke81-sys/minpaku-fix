@@ -1342,11 +1342,19 @@
             </div>
           </div>
 
-          <div style="margin-bottom:4px;">
+          <div style="margin-bottom:10px;">
             <label style="font-size:12px;font-weight:bold;color:#555;">見本写真フォルダ</label>
             <div style="display:flex;gap:6px;margin-top:4px;">
               <input type="text" id="folderExampleInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
               <button onclick="saveSubFolder('example')" style="padding:6px 12px;background:#9b59b6;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:4px;">
+            <label style="font-size:12px;font-weight:bold;color:#555;">メモ写真フォルダ</label>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <input type="text" id="folderMemoInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+              <button onclick="saveSubFolder('memo')" style="padding:6px 12px;background:#27ae60;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
             </div>
           </div>
           <div id="folderSaveResult" style="display:none;margin-top:8px;font-size:12px;"></div>
@@ -1708,16 +1716,18 @@
           var bi = document.getElementById('folderBeforeInput');
           var ai = document.getElementById('folderAfterInput');
           var ei = document.getElementById('folderExampleInput');
+          var mi = document.getElementById('folderMemoInput');
           if (bi && res.beforeId) bi.value = 'https://drive.google.com/drive/folders/' + res.beforeId;
           if (ai && res.afterId) ai.value = 'https://drive.google.com/drive/folders/' + res.afterId;
           if (ei && res.exampleId) ei.value = 'https://drive.google.com/drive/folders/' + res.exampleId;
+          if (mi && res.memoId) mi.value = 'https://drive.google.com/drive/folders/' + res.memoId;
         }
       });
     }
 
     // フォルダ保存
     function saveSubFolder(type) {
-      var inputMap = { 'before': 'folderBeforeInput', 'after': 'folderAfterInput', 'example': 'folderExampleInput' };
+      var inputMap = { 'before': 'folderBeforeInput', 'after': 'folderAfterInput', 'example': 'folderExampleInput', 'memo': 'folderMemoInput' };
       var input = document.getElementById(inputMap[type]);
       if (!input) return;
       var val = input.value.trim();

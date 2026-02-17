@@ -36,6 +36,7 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/upda
 - デプロイ方法: `node deploy-all.js` または `deploy-all.bat` をダブルクリック
 - **常に日本語で応答すること**
 - **変更をプッシュしたら毎回デプロイ手順を表示すること**
+- **必須ルールの詳細は `SESSION_HANDOFF.md` の「必須ルール」セクションを参照すること**（ルール1〜5）
 
 ## 3. ファイル構成
 

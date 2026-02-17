@@ -745,6 +745,19 @@
     }
 
     /* 清掃完了エリア */
+    .laundry-action-btn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #ffc107;
+      color: #000;
+      cursor: pointer;
+    }
+    .laundry-action-btn:disabled {
+      opacity: 0.6;
+    }
     .complete-area {
       background: white;
       padding: 12px;
@@ -1246,6 +1259,9 @@
   <div id="loadingArea" class="loading">読み込み中...</div>
 
   <div id="contentArea" class="hidden">
+    <!-- ストレージ容量警告 -->
+    <div id="storageWarning" style="display:none;margin:8px 12px;padding:10px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px;color:#856404;"></div>
+
     <!-- 次回予約情報 -->
     <div id="bookingInfo" class="booking-info hidden"></div>
 
@@ -1271,7 +1287,7 @@
 
       <!-- メモセクション -->
       <div id="memoSection" class="memo-section">
-        <h3>📝 特記事項・備品不足など</h3>
+        <h3>📝 特記事項・備品不足など（複数登録可能）</h3>
         <div id="memoList" class="memo-list"></div>
         <div id="memoPhotoPreview"></div>
         <div id="memoUploading" class="memo-uploading" style="display:none;">写真アップロード中...</div>
@@ -1282,10 +1298,17 @@
         <button id="memoSubmitBtn" class="memo-submit-btn" disabled onclick="addMemo()">登録</button>
       </div>
 
+      <!-- コインランドリー状況 -->
+      <div id="laundrySection" class="laundry-section" style="margin:16px 12px 8px;padding:12px;background:#f8f9fa;border-radius:10px;border:1px solid #dee2e6;">
+        <div style="font-size:14px;font-weight:700;color:#2c3e50;margin-bottom:10px;display:flex;align-items:center;gap:6px;">🧺 コインランドリー状況</div>
+        <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
+      </div>
+
       <!-- 清掃完了エリア（漏れチェック統合） -->
       <div class="complete-area">
         <div id="completeMsg" class="complete-msg"></div>
         <button id="btnComplete" class="btn-complete" onclick="completeChecklist()">清掃完了</button>
+        <div id="completionInfo" style="display:none;margin-top:8px;padding:8px 10px;background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;font-size:13px;color:#155724;text-align:center;"></div>
       </div>
     </div>
 
@@ -1815,6 +1838,10 @@
 
         document.getElementById('loadingArea').classList.add('hidden');
         document.getElementById('contentArea').classList.remove('hidden');
+        // ランドリー状況・完了ステータス・ストレージチェックを非同期で読み込み
+        loadLaundryStatus();
+        loadCompletionStatus();
+        checkDriveStorage();
       }).catch(function(err) {
         alert('データの読み込みに失敗しました: ' + err);
       });
@@ -3549,6 +3576,7 @@
       callGAS('notifyCleaningComplete', [checkoutDate, who]).then(function(res) {
         if (res.success) {
           alert('清掃完了通知を送信しました！お疲れ様でした！');
+          loadCompletionStatus();
         } else {
           alert('通知の送信に失敗しました: ' + res.error);
         }
@@ -4418,6 +4446,144 @@
         if (e.target.closest('.cat-drag-handle')) onCatHandlePress(e);
       });
     })();
+
+    // ==========================================
+    // コインランドリー状況
+    // ==========================================
+    function loadLaundryStatus() {
+      var container = document.getElementById('laundryContent');
+      if (!container) return;
+      container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div>';
+      callGAS('getCleaningLaundryStatus', [checkoutDate]).then(function(res) {
+        if (!res.success) { container.innerHTML = '<div style="color:#999;font-size:13px;">取得できませんでした</div>'; return; }
+        renderLaundryCard(container, res.data);
+      }).catch(function() {
+        container.innerHTML = '<div style="color:#999;font-size:13px;">取得できませんでした</div>';
+      });
+    }
+
+    function renderLaundryCard(container, data) {
+      var d = data || {};
+      var hasSent = !!d.sentBy;
+      var hasReceived = !!d.receivedBy;
+      var hasReturned = !!d.returnedBy;
+      var lastStep = hasReturned ? 'returned' : (hasReceived ? 'received' : (hasSent ? 'sent' : null));
+      var html = '';
+
+      // ステップ1: 出す
+      html += '<div style="display:flex;align-items:center;gap:8px;min-height:36px;margin-bottom:4px;">';
+      html += laundryBadge(hasSent, '1');
+      if (hasSent) {
+        html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.sentAt) + '　' + escapeHtml(d.sentBy) + '</span>';
+        if (lastStep === 'sent') html += laundryCancelBtn('sent');
+      } else {
+        html += '<button onclick="doLaundryStep(\'sent\',this)" class="laundry-action-btn" style="flex:1;">クリーニングに出した</button>';
+      }
+      html += '</div>';
+
+      // ステップ2: 受取
+      html += '<div style="display:flex;align-items:center;gap:8px;min-height:36px;margin-bottom:4px;">';
+      html += laundryBadge(hasReceived, '2');
+      if (hasReceived) {
+        html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.receivedAt) + '　' + escapeHtml(d.receivedBy) + '</span>';
+        if (lastStep === 'received') html += laundryCancelBtn('received');
+      } else if (hasSent) {
+        html += '<button onclick="doLaundryStep(\'received\',this)" class="laundry-action-btn" style="flex:1;">受け取った</button>';
+      } else {
+        html += '<span style="flex:1;font-size:13px;color:#aaa;">受け取り（出した後に有効）</span>';
+      }
+      html += '</div>';
+
+      // ステップ3: 施設に戻す
+      html += '<div style="display:flex;align-items:center;gap:8px;min-height:36px;">';
+      html += laundryBadge(hasReturned, '3');
+      if (hasReturned) {
+        html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.returnedAt) + '　' + escapeHtml(d.returnedBy) + '</span>';
+        if (lastStep === 'returned') html += laundryCancelBtn('returned');
+      } else if (hasReceived) {
+        html += '<button onclick="doLaundryStep(\'returned\',this)" class="laundry-action-btn" style="flex:1;">施設に戻した</button>';
+      } else {
+        html += '<span style="flex:1;font-size:13px;color:#aaa;">施設に戻す（受取後に有効）</span>';
+      }
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    function laundryBadge(done, num) {
+      var bg = done ? '#198754' : '#adb5bd';
+      var icon = done ? '✓' : num;
+      return '<span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:' + bg + ';color:#fff;font-size:12px;font-weight:700;flex-shrink:0;">' + icon + '</span>';
+    }
+
+    function laundryCancelBtn(step) {
+      return '<button onclick="cancelLaundryStep(\'' + step + '\',this)" style="font-size:11px;padding:2px 6px;border:1px solid #ccc;border-radius:4px;background:#fff;color:#666;cursor:pointer;flex-shrink:0;">取消</button>';
+    }
+
+    function formatLaundryTime(dtStr) {
+      if (!dtStr) return '';
+      var days = ['日','月','火','水','木','金','土'];
+      var m = String(dtStr).match(/(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}:\d{2})/);
+      if (m) {
+        var dt = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+        return parseInt(m[2],10) + '/' + parseInt(m[3],10) + '(' + days[dt.getDay()] + ')' + m[4];
+      }
+      return dtStr;
+    }
+
+    function doLaundryStep(step, btn) {
+      var sName = getSelectedStaffName_() || staffName || '';
+      if (!sName) { alert('スタッフを選択してください'); return; }
+      var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
+      if (!confirm(sName + ' として「' + labels[step] + '」を記録しますか？')) return;
+      btn.disabled = true; btn.textContent = '処理中…';
+      callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
+        if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
+      }).catch(function(e) { alert('通信エラー'); btn.disabled = false; });
+    }
+
+    function cancelLaundryStep(step, btn) {
+      if (!confirm('このステップを取り消しますか？')) return;
+      btn.disabled = true; btn.textContent = '…';
+      callGAS('cancelCleaningLaundryStep', [checkoutDate, step]).then(function(res) {
+        if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; }
+      }).catch(function() { alert('通信エラー'); btn.disabled = false; });
+    }
+
+    function getSelectedStaffName_() {
+      var selects = document.querySelectorAll('[id^="staffSelect"]');
+      for (var i = 0; i < selects.length; i++) {
+        if (selects[i].value) return selects[i].value;
+      }
+      return '';
+    }
+
+    // ==========================================
+    // 清掃完了ステータス表示
+    // ==========================================
+    function checkDriveStorage() {
+      callGAS('checkDriveStorageStatus', []).then(function(res) {
+        var el = document.getElementById('storageWarning');
+        if (!el) return;
+        if (res.success && res.warning) {
+          el.innerHTML = '⚠️ <strong>Google Driveの保存容量が不足しています</strong>（残り約' + res.remainingMB + 'MB / ' + res.usedGB + 'GB使用中 / ' + res.limitGB + 'GB中）<br><span style="font-size:12px;">写真の保存に失敗する可能性があります。不要なファイルを削除してください。</span>';
+          el.style.display = 'block';
+        }
+      }).catch(function() {});
+    }
+
+    function loadCompletionStatus() {
+      callGAS('getCleaningCompletionStatus', [checkoutDate]).then(function(res) {
+        var el = document.getElementById('completionInfo');
+        if (!el) return;
+        if (res.success && res.completedAt) {
+          el.textContent = '清掃完了済み: ' + res.completedAt + (res.completedBy ? '（' + res.completedBy + '）' : '');
+          el.style.display = 'block';
+        } else {
+          el.style.display = 'none';
+        }
+      }).catch(function() {});
+    }
   </script>
 </body>
 </html>

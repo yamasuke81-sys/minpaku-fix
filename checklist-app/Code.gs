@@ -931,6 +931,35 @@ function getPhotoFolderSettings() {
 }
 
 /**
+ * Google Driveのストレージ使用状況をチェック
+ * 残りが100MB未満の場合に警告情報を返す
+ */
+function checkDriveStorageStatus() {
+  try {
+    var limit = DriveApp.getStorageLimit();
+    var used = DriveApp.getStorageUsed();
+    // limit が 0 や null の場合は無制限（Google Workspace等）
+    if (!limit || limit <= 0) return JSON.stringify({ success: true, warning: false });
+    var remaining = limit - used;
+    var remainingMB = Math.round(remaining / (1024 * 1024));
+    var usedGB = (used / (1024 * 1024 * 1024)).toFixed(1);
+    var limitGB = (limit / (1024 * 1024 * 1024)).toFixed(1);
+    var pct = Math.round((used / limit) * 100);
+    var warning = remaining < 100 * 1024 * 1024; // 100MB未満で警告
+    return JSON.stringify({
+      success: true,
+      warning: warning,
+      remainingMB: remainingMB,
+      usedGB: usedGB,
+      limitGB: limitGB,
+      pct: pct
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * メモを追加
  */
 function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
@@ -1071,6 +1100,13 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       body += '\n';
     }
 
+    // チェックリストURL
+    var checklistUrl = '';
+    try { checklistUrl = ScriptApp.getService().getUrl(); } catch (ue) {}
+    var checklistLink = checklistUrl ? checklistUrl + '?date=' + encodeURIComponent(targetDate) : '';
+    if (checklistLink) {
+      body += '▼ 清掃チェックリスト\n' + checklistLink + '\n\n';
+    }
     body += '詳細はチェックリストをご確認ください。';
 
     // HTML版メール（写真インライン表示）
@@ -1101,7 +1137,10 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       });
     }
 
-    htmlBody += '<p>詳細はチェックリストをご確認ください。</p></div>';
+    if (checklistLink) {
+      htmlBody += '<p><a href="' + checklistLink + '" style="display:inline-block;padding:10px 20px;background:#3498db;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">清掃チェックリストを開く</a></p>';
+    }
+    htmlBody += '<p style="color:#888;font-size:12px;">詳細はチェックリストをご確認ください。</p></div>';
 
     GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
 
@@ -1121,6 +1160,141 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     } catch (ne) { /* 通知追加失敗は無視 */ }
 
     return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 指定チェックアウト日の清掃完了日時を取得（通知履歴から）
+ */
+function getCleaningCompletionStatus(checkoutDate) {
+  try {
+    var dateKey = normDateStr_(checkoutDate);
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName('通知履歴');
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, completedAt: null });
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+    // 最後にマッチした行（最新の完了通知）
+    var completedAt = null;
+    var completedBy = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][1]) === '清掃完了') {
+        try {
+          var d = JSON.parse(String(rows[i][4] || '{}'));
+          if (d.type === 'cleaningComplete' && normDateStr_(d.checkoutDate || d.checkOutDate || '') === dateKey) {
+            completedAt = String(rows[i][0] || '');
+            completedBy = d.staff || '';
+          }
+        } catch (pe) {}
+      }
+    }
+    return JSON.stringify({ success: true, completedAt: completedAt, completedBy: completedBy });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+// ============================================
+// コインランドリー状況（メインappと同じスプレッドシートを参照）
+// ============================================
+var CL_SHEET_LAUNDRY = 'クリーニング連絡';
+
+function getCleaningLaundryStatus(checkoutDate) {
+  try {
+    var dateKey = normDateStr_(checkoutDate);
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_LAUNDRY);
+    if (!sheet) return JSON.stringify({ success: true, data: null });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, data: null });
+    var data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (normDateStr_(data[i][0]) === dateKey) {
+        var fmtDt_ = function(v) {
+          if (!v) return '';
+          if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+          return String(v);
+        };
+        return JSON.stringify({ success: true, data: {
+          sentBy: String(data[i][1] || ''),
+          sentAt: fmtDt_(data[i][2]),
+          receivedBy: String(data[i][3] || ''),
+          receivedAt: fmtDt_(data[i][4]),
+          returnedBy: String(data[i][5] || ''),
+          returnedAt: fmtDt_(data[i][6])
+        }});
+      }
+    }
+    return JSON.stringify({ success: true, data: null });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function recordCleaningLaundryStep(checkoutDate, step, staffName) {
+  try {
+    var dateKey = normDateStr_(checkoutDate);
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_LAUNDRY);
+    if (!sheet) {
+      sheet = ss.insertSheet(CL_SHEET_LAUNDRY);
+      sheet.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '出した人', '出した日時', '受け取った人', '受け取った日時', '施設に戻した人', '施設に戻した日時']]);
+    }
+    var lastRow = sheet.getLastRow();
+    var rowIndex = -1;
+    if (lastRow >= 2) {
+      var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < dates.length; i++) {
+        if (normDateStr_(dates[i][0]) === dateKey) { rowIndex = i + 2; break; }
+      }
+    }
+    if (rowIndex < 0) {
+      rowIndex = lastRow + 1;
+      sheet.getRange(rowIndex, 1).setValue(dateKey);
+    }
+    if (step === 'sent') {
+      sheet.getRange(rowIndex, 2).setValue(staffName);
+      sheet.getRange(rowIndex, 3).setValue(now);
+    } else if (step === 'received') {
+      sheet.getRange(rowIndex, 4).setValue(staffName);
+      sheet.getRange(rowIndex, 5).setValue(now);
+    } else if (step === 'returned') {
+      sheet.getRange(rowIndex, 6).setValue(staffName);
+      sheet.getRange(rowIndex, 7).setValue(now);
+    } else {
+      return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function cancelCleaningLaundryStep(checkoutDate, step) {
+  try {
+    var dateKey = normDateStr_(checkoutDate);
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_LAUNDRY);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '記録がありません' });
+    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < dates.length; i++) {
+      if (normDateStr_(dates[i][0]) === dateKey) {
+        var row = i + 2;
+        if (step === 'sent') {
+          sheet.getRange(row, 2, 1, 6).clearContent();
+        } else if (step === 'received') {
+          sheet.getRange(row, 4, 1, 4).clearContent();
+        } else if (step === 'returned') {
+          sheet.getRange(row, 6, 1, 2).clearContent();
+        }
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '記録がありません' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

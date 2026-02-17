@@ -1582,6 +1582,7 @@
       'use strict';
       // staffModeは文字列比較で確実に判定（GASテンプレートのboolean出力問題を回避）
       window.staffMode = ('<?= staffModeStr ?>' === 'yes');
+      window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
       // デバッグ: デプロイ確認用
@@ -4998,18 +4999,11 @@
             var inp = document.getElementById('staffDeployUrlInput');
             if (inp && r.success && r.url) {
               inp.value = r.url;
-            } else if (inp && r.success && !r.url) {
-              // バックエンドでURL取得できなかった場合、現在のページURLから生成して保存
-              var currentUrl = '';
-              try { currentUrl = window.top.location.href.split('?')[0]; } catch (e) {}
-              if (!currentUrl) {
-                try { currentUrl = window.location.href.split('?')[0]; } catch (e2) {}
-              }
-              if (currentUrl && currentUrl.indexOf('/exec') > 0) {
-                var staffUrl = currentUrl + '?staff=1';
-                inp.value = staffUrl;
-                google.script.run.setStaffDeployUrl(staffUrl);
-              }
+            } else if (inp && r.success && !r.url && window.appBaseUrl) {
+              // バックエンドでURL取得できなかった場合、doGetで渡されたbaseUrlから生成して保存
+              var staffUrl = window.appBaseUrl + (window.appBaseUrl.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
+              inp.value = staffUrl;
+              google.script.run.setStaffDeployUrl(staffUrl);
             }
           } catch (e) {}
         }).getStaffDeployUrl();

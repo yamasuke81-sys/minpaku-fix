@@ -127,7 +127,7 @@ function doGet(e) {
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
   const template = HtmlService.createTemplateFromFile('index');
-  template.baseUrl = ScriptApp.getService().getUrl();
+  template.baseUrl = ScriptApp.getService().getUrl() || '';
   var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
   template.isStaffMode = isStaff;
   // GASテンプレートでbooleanが正しく出力されない場合の対策: 明示的に文字列で渡す
@@ -708,14 +708,15 @@ function getStaffDeployUrl() {
   try {
     var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
     if (stored && String(stored).trim()) return JSON.stringify({ success: true, url: String(stored).trim(), isStored: true });
+    // 保存済みURLがない場合、ScriptApp.getService().getUrl()から自動生成
     var base = '';
-    try { base = ScriptApp.getService().getUrl(); } catch (e) {}
-    var url = base ? (base.indexOf('?') >= 0 ? base + '&staff=1' : base + '?staff=1') : '';
-    // 自動生成URLがあれば自動保存
-    if (url) {
+    try { base = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+    if (base) {
+      var url = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
       try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
+      return JSON.stringify({ success: true, url: url, isStored: true });
     }
-    return JSON.stringify({ success: true, url: url, isStored: !!url });
+    return JSON.stringify({ success: true, url: '', isStored: false });
   } catch (e) { return JSON.stringify({ success: false, url: '', isStored: false, error: e.toString() }); }
 }
 

@@ -1154,6 +1154,78 @@
     }
     .category-add-btn:active { background: #ecf0f1; color: #3498db; }
 
+    /* === 編集ロック機能 (START) === */
+    body.editing-locked .item-edit-btn,
+    body.editing-locked .item-delete-btn,
+    body.editing-locked .item-drag-handle,
+    body.editing-locked .section-cat-edit,
+    body.editing-locked .section-cat-delete,
+    body.editing-locked .cat-drag-handle,
+    body.editing-locked .section-add-btn,
+    body.editing-locked .category-add-btn,
+    body.editing-locked .inline-photo-add-btn,
+    body.editing-locked .inline-example-btn {
+      pointer-events: none;
+      opacity: 0.2;
+    }
+    .edit-lock-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      margin-bottom: 16px;
+    }
+    .edit-lock-toggle label {
+      font-size: 14px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+    .edit-lock-toggle .lock-status {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #e74c3c;
+      border-radius: 28px;
+      transition: background 0.3s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: #27ae60;
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(22px);
+    }
+    /* === 編集ロック機能 (END) === */
+
     /* ユーティリティ */
     .hidden { display: none !important; }
 
@@ -1330,6 +1402,19 @@
       <div style="padding:16px;">
         <h3 style="font-size:16px;margin-bottom:16px;color:#2c3e50;">チェックリスト設定</h3>
 
+        <!-- === 編集ロック機能 (START) === -->
+        <div class="edit-lock-toggle">
+          <div>
+            <label>項目の編集・並び替え</label>
+            <div class="lock-status" id="editLockStatus">ロック中（編集不可）</div>
+          </div>
+          <div class="toggle-switch">
+            <input type="checkbox" id="editLockToggle" onchange="toggleEditLock(this.checked)">
+            <span class="toggle-slider"></span>
+          </div>
+        </div>
+        <!-- === 編集ロック機能 (END) === -->
+
         <!-- 写真保存フォルダ設定 -->
         <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #ddd;margin-bottom:16px;">
           <h4 style="font-size:14px;margin-bottom:8px;">写真保存フォルダ（Googleドライブ）</h4>
@@ -1476,6 +1561,38 @@
       }
     }
 
+    // === 編集ロック機能 (START) ===
+    function toggleEditLock(unlocked) {
+      if (unlocked) {
+        document.body.classList.remove('editing-locked');
+        localStorage.setItem('cl_edit_locked', '0');
+        var st = document.getElementById('editLockStatus');
+        if (st) st.textContent = 'アンロック中（編集可能）';
+      } else {
+        document.body.classList.add('editing-locked');
+        localStorage.setItem('cl_edit_locked', '1');
+        var st = document.getElementById('editLockStatus');
+        if (st) st.textContent = 'ロック中（編集不可）';
+      }
+    }
+    function initEditLock() {
+      var locked = localStorage.getItem('cl_edit_locked');
+      if (locked === null) locked = '1'; // デフォルト＝ロック
+      var toggle = document.getElementById('editLockToggle');
+      if (locked === '0') {
+        document.body.classList.remove('editing-locked');
+        if (toggle) toggle.checked = true;
+        var st = document.getElementById('editLockStatus');
+        if (st) st.textContent = 'アンロック中（編集可能）';
+      } else {
+        document.body.classList.add('editing-locked');
+        if (toggle) toggle.checked = false;
+        var st = document.getElementById('editLockStatus');
+        if (st) st.textContent = 'ロック中（編集不可）';
+      }
+    }
+    // === 編集ロック機能 (END) ===
+
     // 初期化
     window.onload = function() {
       if (!checkoutDate) {
@@ -1487,6 +1604,7 @@
       document.getElementById('headerDate').textContent = dp.length === 3 ? (parseInt(dp[0]) + '/' + parseInt(dp[1]) + '/' + parseInt(dp[2])) : checkoutDate;
       loadData();
       loadStaffList();
+      initEditLock(); // 編集ロック初期化
 
       // 定期リフレッシュ（60秒ごと、2人同時利用対応）
       // 折りたたみ状態とタブ状態を保持してリフレッシュ

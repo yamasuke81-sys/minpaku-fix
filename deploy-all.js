@@ -60,18 +60,38 @@ function openBrowser(url) {
 /** ブラウザをシークレットウィンドウで開く（Windows: Brave→Edge→Chrome→通常 の順で試行） */
 function openBrowserIncognito(url) {
   if (process.platform !== 'win32') { openBrowser(url); return; }
-  try {
-    execSync('start brave --incognito "' + url + '"', { shell: true });
-    return;
-  } catch (e) {}
-  try {
-    execSync('start msedge --inprivate "' + url + '"', { shell: true });
-    return;
-  } catch (e) {}
-  try {
-    execSync('start chrome --incognito "' + url + '"', { shell: true });
-    return;
-  } catch (e) {}
+  // startコマンドは非同期で起動するため、存在しないコマンドでもエラーをスローしない
+  // そのため、ブラウザの実行ファイルが実際に存在するかチェックしてから起動する
+  var localAppData = process.env.LOCALAPPDATA || '';
+  var programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+  var programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  var browsers = [
+    { name: 'Brave', flag: '--incognito', paths: [
+      localAppData + '\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+      programFiles + '\\BraveSoftware\\Brave-Browser\\Application\\brave.exe'
+    ]},
+    { name: 'Edge', flag: '--inprivate', paths: [
+      programFilesX86 + '\\Microsoft\\Edge\\Application\\msedge.exe',
+      programFiles + '\\Microsoft\\Edge\\Application\\msedge.exe'
+    ]},
+    { name: 'Chrome', flag: '--incognito', paths: [
+      localAppData + '\\Google\\Chrome\\Application\\chrome.exe',
+      programFiles + '\\Google\\Chrome\\Application\\chrome.exe',
+      programFilesX86 + '\\Google\\Chrome\\Application\\chrome.exe'
+    ]}
+  ];
+  for (var i = 0; i < browsers.length; i++) {
+    var b = browsers[i];
+    for (var j = 0; j < b.paths.length; j++) {
+      if (fs.existsSync(b.paths[j])) {
+        try {
+          execSync('start "" "' + b.paths[j] + '" ' + b.flag + ' "' + url + '"', { shell: true });
+          return;
+        } catch (e) {}
+      }
+    }
+  }
+  // どのブラウザも見つからなかった場合、通常ウィンドウで開く
   openBrowser(url);
 }
 

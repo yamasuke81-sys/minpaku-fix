@@ -547,20 +547,7 @@
       opacity: 0.8;
       margin-left: 8px;
     }
-    .supply-item {
-      padding: 12px 14px;
-      font-size: 14px;
-      color: #333;
-      background: #fff;
-      border-bottom: 1px solid #eee;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .supply-item:last-child { border-bottom: none; }
-    .supply-item.supply-checked {
-      background: #fff3cd;
-    }
+    /* (supply-item: 単独/グループはsupply-single-item/supply-group-itemで定義) */
     .supply-item-checkbox {
       width: 22px;
       height: 22px;
@@ -593,6 +580,89 @@
     .supply-tag-1 { background: #9b59b6; }
     .supply-tag-2 { background: #1abc9c; }
     .supply-tag-3 { background: #e67e22; }
+    /* 同名アイテムグループ（折りたたみ） */
+    .supply-group {
+      border-bottom: 1px solid #eee;
+    }
+    .supply-group:last-child { border-bottom: none; }
+    .supply-group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #f8f9fa;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .supply-group-header:active {
+      background: #eef1f4;
+    }
+    .supply-group-icon {
+      font-size: 10px;
+      color: #888;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+      width: 14px;
+      text-align: center;
+    }
+    .supply-group.collapsed .supply-group-icon {
+      transform: rotate(-90deg);
+    }
+    .supply-group-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2c3e50;
+      flex: 1;
+      min-width: 0;
+    }
+    .supply-group-badge {
+      font-size: 11px;
+      color: #fff;
+      background: #e67e22;
+      padding: 1px 8px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .supply-group-badge.none {
+      background: #bbb;
+    }
+    .supply-group-body {
+      overflow: hidden;
+      transition: max-height 0.2s ease;
+    }
+    .supply-group.collapsed .supply-group-body {
+      max-height: 0 !important;
+    }
+    /* グループ内アイテム（カテゴリ別） */
+    .supply-group-item {
+      padding: 10px 14px 10px 38px;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .supply-group-item.supply-checked {
+      background: #fff8e1;
+    }
+    /* 単独アイテム（グループ不要） */
+    .supply-single-item {
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #333;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .supply-single-item:last-child { border-bottom: none; }
+    .supply-single-item.supply-checked {
+      background: #fff3cd;
+    }
     .supply-item-show-btn {
       font-size: 12px;
       color: #3498db;
@@ -2578,6 +2648,9 @@
     }
 
     // === 要補充リスト ===
+    // 折りたたみ状態を保持（再描画時に維持するため）
+    var supplyGroupCollapsed = {};
+
     function renderSupplyList() {
       var supplyNeeded = checklistData.supplyNeeded || {};
       var items = checklistData.items || [];
@@ -2604,44 +2677,108 @@
         return;
       }
 
-      // カテゴリ順→名前順でソート（チェック済みを上に）
-      supplyItems.sort(function(a, b) {
-        var aChecked = supplyNeeded[a.id] ? 0 : 1;
-        var bChecked = supplyNeeded[b.id] ? 0 : 1;
-        if (aChecked !== bChecked) return aChecked - bChecked;
-        var catA = a.category || '';
-        var catB = b.category || '';
-        var catCmp = catA.localeCompare(catB, 'ja');
-        if (catCmp !== 0) return catCmp;
-        return a.name.localeCompare(b.name, 'ja');
+      // 名前でグループ化（出現順を保持するために配列で管理）
+      var groupOrder = [];
+      var groupMap = {};
+      supplyItems.forEach(function(item) {
+        if (!groupMap[item.name]) {
+          groupMap[item.name] = [];
+          groupOrder.push(item.name);
+        }
+        groupMap[item.name].push(item);
+      });
+
+      // 名前順ソート
+      groupOrder.sort(function(a, b) { return a.localeCompare(b, 'ja'); });
+
+      // グループ内はカテゴリ順ソート
+      groupOrder.forEach(function(name) {
+        groupMap[name].sort(function(a, b) {
+          return (a.category || '').localeCompare(b.category || '', 'ja');
+        });
       });
 
       var html = '<div class="supply-list-card">';
       html += '<div class="supply-list-header">要補充チェック<span class="supply-count">' + checkedCount + ' / ' + supplyItems.length + '</span></div>';
 
-      supplyItems.forEach(function(item) {
-        var isNeeded = !!supplyNeeded[item.id];
-        var escapedId = escapeHtml(item.id).replace(/'/g, "\\'");
-        var escapedName = escapeHtml(item.name).replace(/'/g, "\\'");
-        var escapedCat = escapeHtml(item.category || '').replace(/'/g, "\\'");
-        html += '<div class="supply-item' + (isNeeded ? ' supply-checked' : '') + '">';
-        html += '<input type="checkbox" class="supply-item-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" data-item-category="' + escapeHtml(item.category || '') + '" ' + (isNeeded ? 'checked' : '') + ' onchange="toggleSupplyFromTab(this)">';
-        html += '<div class="supply-item-info">';
-        html += '<div class="supply-item-name">' + escapeHtml(item.name) + '</div>';
-        if (item.category) {
-          var parts = item.category.split('：');
-          html += '<div class="supply-item-tags">';
-          parts.forEach(function(part, idx) {
-            html += '<span class="supply-item-tag supply-tag-' + (idx % 4) + '">' + escapeHtml(part) + '</span>';
-          });
+      groupOrder.forEach(function(name) {
+        var group = groupMap[name];
+        var groupNeededCount = group.filter(function(item) { return !!supplyNeeded[item.id]; }).length;
+
+        if (group.length === 1) {
+          // 単独アイテム：折りたたみ不要
+          var item = group[0];
+          var isNeeded = !!supplyNeeded[item.id];
+          var escapedId = escapeHtml(item.id).replace(/'/g, "\\'");
+          var escapedName = escapeHtml(item.name).replace(/'/g, "\\'");
+          html += '<div class="supply-single-item' + (isNeeded ? ' supply-checked' : '') + '">';
+          html += '<input type="checkbox" class="supply-item-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" data-item-category="' + escapeHtml(item.category || '') + '" ' + (isNeeded ? 'checked' : '') + ' onchange="toggleSupplyFromTab(this)">';
+          html += '<div class="supply-item-info">';
+          html += '<div class="supply-item-name">' + escapeHtml(item.name) + '</div>';
+          if (item.category) {
+            html += '<div class="supply-item-tags">';
+            item.category.split('：').forEach(function(part, idx) {
+              html += '<span class="supply-item-tag supply-tag-' + (idx % 4) + '">' + escapeHtml(part) + '</span>';
+            });
+            html += '</div>';
+          }
           html += '</div>';
+          html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapedId + '\', \'' + escapedName + '\')">表示</button>';
+          html += '</div>';
+        } else {
+          // 同名複数：折りたたみグループ
+          var isCollapsed = supplyGroupCollapsed[name] !== false; // デフォルト折りたたみ
+          html += '<div class="supply-group' + (isCollapsed ? ' collapsed' : '') + '" data-group-name="' + escapeHtml(name) + '">';
+          html += '<div class="supply-group-header" onclick="toggleSupplyGroup(this)">';
+          html += '<span class="supply-group-icon">▼</span>';
+          html += '<span class="supply-group-name">' + escapeHtml(name) + '</span>';
+          html += '<span class="supply-group-badge' + (groupNeededCount === 0 ? ' none' : '') + '">' + groupNeededCount + '/' + group.length + '</span>';
+          html += '</div>';
+          html += '<div class="supply-group-body" style="max-height:' + (isCollapsed ? '0' : (group.length * 60)) + 'px;">';
+          group.forEach(function(item) {
+            var isNeeded = !!supplyNeeded[item.id];
+            var escapedId = escapeHtml(item.id).replace(/'/g, "\\'");
+            var escapedName = escapeHtml(item.name).replace(/'/g, "\\'");
+            html += '<div class="supply-group-item' + (isNeeded ? ' supply-checked' : '') + '">';
+            html += '<input type="checkbox" class="supply-item-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" data-item-category="' + escapeHtml(item.category || '') + '" ' + (isNeeded ? 'checked' : '') + ' onchange="toggleSupplyFromTab(this)">';
+            html += '<div class="supply-item-info">';
+            if (item.category) {
+              html += '<div class="supply-item-tags">';
+              item.category.split('：').forEach(function(part, idx) {
+                html += '<span class="supply-item-tag supply-tag-' + (idx % 4) + '">' + escapeHtml(part) + '</span>';
+              });
+              html += '</div>';
+            }
+            html += '</div>';
+            html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapedId + '\', \'' + escapedName + '\')">表示</button>';
+            html += '</div>';
+          });
+          html += '</div></div>';
         }
-        html += '</div>';
-        html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapedId + '\', \'' + escapedName + '\')">表示</button>';
-        html += '</div>';
       });
       html += '</div>';
       el.innerHTML = html;
+    }
+
+    function toggleSupplyGroup(headerEl) {
+      var group = headerEl.parentElement;
+      var name = group.getAttribute('data-group-name');
+      var body = group.querySelector('.supply-group-body');
+      var isCollapsed = group.classList.contains('collapsed');
+      if (isCollapsed) {
+        // 展開
+        group.classList.remove('collapsed');
+        body.style.maxHeight = body.scrollHeight + 'px';
+        supplyGroupCollapsed[name] = false;
+      } else {
+        // 折りたたみ
+        body.style.maxHeight = body.scrollHeight + 'px';
+        requestAnimationFrame(function() {
+          group.classList.add('collapsed');
+          body.style.maxHeight = '0';
+        });
+        supplyGroupCollapsed[name] = true;
+      }
     }
 
     // === 要補充タブからチェック切り替え（双方向同期） ===

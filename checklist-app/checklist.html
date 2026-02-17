@@ -1446,6 +1446,13 @@
     var syncInProgress = false;
     // スタッフ選択の保存中フラグ（同期による上書き防止）
     var staffSelectionSaving = false;
+    // 端末識別ID（スタッフ選択のマージ用：端末ごとに固有）
+    var deviceId = (function() {
+      var key = 'cl_device_id';
+      var id = localStorage.getItem(key);
+      if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); localStorage.setItem(key, id); }
+      return id;
+    })();
     var bookingData = null;
     var staffList = [];
     var staffRowCount = 1;
@@ -1690,11 +1697,11 @@
       return names;
     }
 
-    // スタッフ選択をバックエンドに保存（他端末との同期用）
+    // スタッフ選択をバックエンドに保存（端末ごとに保存し、全端末の和集合で同期）
     function saveStaffSelectionToServer() {
       var names = getSelectedStaffNames();
       staffSelectionSaving = true;
-      callGAS('saveStaffSelection', [checkoutDate, names]).then(function(res) {
+      callGAS('saveStaffSelection', [checkoutDate, names, deviceId]).then(function(res) {
         staffSelectionSaving = false;
       }).catch(function() {
         staffSelectionSaving = false;

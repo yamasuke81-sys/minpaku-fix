@@ -759,11 +759,13 @@ function toggleSupplyNeeded(checkoutDate, itemId, itemName, needed, staffName, c
 }
 
 /**
- * スタッフ選択を保存（複数端末間で同期用）
+ * スタッフ選択を保存（端末ごとに保存し、全端末の和集合で同期）
+ * シート列: A=日付, B=スタッフ名JSON配列, C=更新日時, D=デバイスID
  * @param {string} checkoutDate
- * @param {string[]} staffNames - 選択されたスタッフ名の配列
+ * @param {string[]} staffNames - この端末で選択されたスタッフ名の配列
+ * @param {string} dId - 端末識別ID
  */
-function saveStaffSelection(checkoutDate, staffNames) {
+function saveStaffSelection(checkoutDate, staffNames, dId) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
@@ -774,22 +776,31 @@ function saveStaffSelection(checkoutDate, staffNames) {
     var sheet = clSheet_(SHEET_CL_STAFF_SELECTION);
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
+    var deviceId = dId || 'unknown';
 
-    // 既存レコードを削除（下から削除して行ずれ防止）
+    // この端末の既存レコードを探す
+    var existingRow = -1;
     if (lastRow >= 2) {
-      var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-      for (var i = data.length - 1; i >= 0; i--) {
-        if (normDateStr_(data[i][0]) === targetDate) {
-          sheet.deleteRow(i + 2);
+      var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (normDateStr_(data[i][0]) === targetDate && data[i][3] === deviceId) {
+          existingRow = i + 2;
+          break;
         }
       }
     }
 
-    // 新規レコードを追加
     var now = new Date();
     var namesJson = JSON.stringify(staffNames || []);
-    var nextRow = sheet.getLastRow() + 1;
-    sheet.getRange(nextRow, 1, 1, 3).setValues([[checkoutDate, namesJson, now]]);
+
+    if (existingRow > 0) {
+      // この端末の既存レコードを更新
+      sheet.getRange(existingRow, 2, 1, 3).setValues([[namesJson, now, deviceId]]);
+    } else {
+      // 新規レコードを追加
+      var nextRow = sheet.getLastRow() + 1;
+      sheet.getRange(nextRow, 1, 1, 4).setValues([[checkoutDate, namesJson, now, deviceId]]);
+    }
 
     return JSON.stringify({ success: true });
   } catch (e) {
@@ -800,9 +811,10 @@ function saveStaffSelection(checkoutDate, staffNames) {
 }
 
 /**
- * スタッフ選択を取得
+ * スタッフ選択を取得（全端末の和集合を返す）
+ * 24時間以上古いレコードは無視（古い端末データの除外）
  * @param {string} checkoutDate
- * @return {string[]} 選択されたスタッフ名の配列
+ * @return {string[]} 選択されたスタッフ名の配列（重複なし）
  */
 function getStaffSelection_(checkoutDate) {
   try {
@@ -810,13 +822,24 @@ function getStaffSelection_(checkoutDate) {
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return [];
-    var data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
-    for (var i = data.length - 1; i >= 0; i--) {
-      if (normDateStr_(data[i][0]) === targetDate) {
-        try { return JSON.parse(data[i][1]); } catch (e) { return []; }
-      }
+    var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    var cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    var merged = {};
+    for (var i = 0; i < data.length; i++) {
+      if (normDateStr_(data[i][0]) !== targetDate) continue;
+      // 24時間以上古いレコードは無視
+      var ts = data[i][2];
+      if (ts instanceof Date && ts < cutoff) continue;
+      try {
+        var names = JSON.parse(data[i][1]);
+        if (Array.isArray(names)) {
+          for (var j = 0; j < names.length; j++) {
+            if (names[j]) merged[names[j]] = true;
+          }
+        }
+      } catch (e) {}
     }
-    return [];
+    return Object.keys(merged);
   } catch (e) {
     return [];
   }
@@ -845,9 +868,16 @@ function uploadChecklistPhoto(checkoutDate, spotId, timing, base64Data, staffNam
     // ファイルを閲覧可能に設定
     try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
 
-    var sheet = clSheet_(SHEET_CL_PHOTOS);
-    var nextRow = sheet.getLastRow() + 1;
-    sheet.getRange(nextRow, 1, 1, 6).setValues([[checkoutDate, spotId, file.getId(), staffName || '', new Date(), timing]]);
+    // シートへの書き込みはLockで保護（同時アップロードによる行重複防止）
+    var lock = LockService.getScriptLock();
+    try { lock.waitLock(10000); } catch (le) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
+    try {
+      var sheet = clSheet_(SHEET_CL_PHOTOS);
+      var nextRow = sheet.getLastRow() + 1;
+      sheet.getRange(nextRow, 1, 1, 6).setValues([[checkoutDate, spotId, file.getId(), staffName || '', new Date(), timing]]);
+    } finally {
+      lock.releaseLock();
+    }
 
     return JSON.stringify({ success: true, fileId: file.getId() });
   } catch (e) {
@@ -991,6 +1021,8 @@ function checkDriveStorageStatus() {
  * メモを追加
  */
 function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
     var sheet = clSheet_(SHEET_CL_MEMOS);
     var nextRow = sheet.getLastRow() + 1;
@@ -998,6 +1030,8 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1005,6 +1039,8 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
  * メモを削除
  */
 function deleteChecklistMemo(checkoutDate, memoTimestamp, memoText) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
     var sheet = clSheet_(SHEET_CL_MEMOS);
     var targetDate = normDateStr_(checkoutDate);
@@ -1029,6 +1065,8 @@ function deleteChecklistMemo(checkoutDate, memoTimestamp, memoText) {
     return JSON.stringify({ success: false, error: '削除対象が見つかりません' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1261,6 +1299,8 @@ function getCleaningLaundryStatus(checkoutDate) {
 }
 
 function recordCleaningLaundryStep(checkoutDate, step, staffName) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
     var dateKey = normDateStr_(checkoutDate);
     var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
@@ -1297,10 +1337,14 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
 function cancelCleaningLaundryStep(checkoutDate, step) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
     var dateKey = normDateStr_(checkoutDate);
     var ss = getBookingSpreadsheet_();
@@ -1325,6 +1369,8 @@ function cancelCleaningLaundryStep(checkoutDate, step) {
     return JSON.stringify({ success: false, error: '記録がありません' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2133,8 +2179,10 @@ function getCategoryOrder() {
  * @param {Array} categoryOrders - [{path: 'カテゴリパス', sortOrder: 1}, ...]
  */
 function reorderCategories(categoryOrders) {
+  if (!categoryOrders || !categoryOrders.length) return JSON.stringify({ success: true });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
-    if (!categoryOrders || !categoryOrders.length) return JSON.stringify({ success: true });
     var sheet = clSheet_(SHEET_CL_CATEGORY_ORDER);
     var lastRow = sheet.getLastRow();
 
@@ -2165,6 +2213,8 @@ function reorderCategories(categoryOrders) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2214,8 +2264,10 @@ function restoreChecklistSnapshot(snapshot) {
  * カテゴリ名を変更（マスターシートの全該当項目のカテゴリ列を更新）
  */
 function renameCategoryInMaster(oldFullPath, newName) {
+  if (!oldFullPath || !newName) return JSON.stringify({ success: false, error: 'パラメータが不足しています' });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
-    if (!oldFullPath || !newName) return JSON.stringify({ success: false, error: 'パラメータが不足しています' });
     var sheet = clSheet_(SHEET_CL_MASTER);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return JSON.stringify({ success: false, error: '項目がありません' });
@@ -2256,6 +2308,8 @@ function renameCategoryInMaster(oldFullPath, newName) {
     return JSON.stringify({ success: true, updated: updated });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2265,8 +2319,10 @@ function renameCategoryInMaster(oldFullPath, newName) {
  * deleteContents=false: 項目は親カテゴリに移動
  */
 function deleteCategoryFromMaster(fullPath, deleteContents) {
+  if (!fullPath) return JSON.stringify({ success: false, error: 'カテゴリパスが空です' });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
-    if (!fullPath) return JSON.stringify({ success: false, error: 'カテゴリパスが空です' });
     var sheet = clSheet_(SHEET_CL_MASTER);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return JSON.stringify({ success: false, error: '項目がありません' });
@@ -2305,6 +2361,8 @@ function deleteCategoryFromMaster(fullPath, deleteContents) {
     }
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2545,8 +2603,10 @@ function deleteChecklistItemPhoto(itemId) {
  * @param {string} newParentPath - 移動先の親カテゴリパス（例: "駐車場"）。空文字ならトップレベルに移動
  */
 function moveCategoryToParent(oldCategoryPath, newParentPath) {
+  if (!oldCategoryPath) return JSON.stringify({ success: false, error: 'カテゴリパスが空です' });
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
-    if (!oldCategoryPath) return JSON.stringify({ success: false, error: 'カテゴリパスが空です' });
     var parts = oldCategoryPath.split('：');
     var categoryName = parts[parts.length - 1];
     var newCategoryPath = newParentPath ? (newParentPath + '：' + categoryName) : categoryName;
@@ -2593,6 +2653,8 @@ function moveCategoryToParent(oldCategoryPath, newParentPath) {
     return JSON.stringify({ success: true, updated: updated });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 

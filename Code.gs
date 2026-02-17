@@ -92,6 +92,9 @@ const SHEET_CL_SUPPLIES = '要補充記録';
 // クリーニング連絡用シート名
 const SHEET_LAUNDRY = 'クリーニング連絡';
 
+// 請求書履歴用シート名
+const SHEET_INVOICE_HISTORY = '請求書履歴';
+
 // 日付を yyyy-MM-dd に正規化するヘルパー
 function normDateStr_(v) {
   if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
@@ -1269,6 +1272,10 @@ function ensureSheetsExist() {
 
   safeInsert(SHEET_LAUNDRY, function(s) {
     s.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '出した人', '出した日時', '受け取った人', '受け取った日時', '施設に戻した人', '施設に戻した日時']]);
+  });
+
+  safeInsert(SHEET_INVOICE_HISTORY, function(s) {
+    s.getRange(1, 1, 1, 8).setValues([['スタッフ名', '対象年月', '合計金額', '明細JSON', '送信日時', 'PDFリンク', 'PDFファイルID', 'ステータス']]);
   });
 
 }
@@ -4262,28 +4269,536 @@ function setInvoiceFolderId(folderId) {
 }
 
 /**
- * スタッフの請求書を作成してDriveに保存
+ * 請求書テンプレートDoc IDの取得・保存
  */
-function createStaffInvoice(yearMonth, staffIdentifier, folderIdFromClient) {
+function getInvoiceTemplateDocId() {
   try {
-    if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
-    var folderId = (folderIdFromClient || '').trim() || PropertiesService.getDocumentProperties().getProperty('invoiceFolderId') || '';
-    if (!folderId) return JSON.stringify({ success: false, error: 'オーナーが請求書の保存先フォルダを設定していません。オーナーに設定を依頼してください。' });
-    var scheduleRes = JSON.parse(getStaffSchedule(staffIdentifier, yearMonth));
-    if (!scheduleRes.success || !scheduleRes.list) return JSON.stringify({ success: false, error: '出勤データの取得に失敗しました' });
-    var list = scheduleRes.list || [];
-    var lines = ['請求書', yearMonth, '', 'スタッフ: ' + staffIdentifier, '清掃作業: ' + list.length + '回', ''];
-    list.forEach(function(item) {
-      lines.push(item.checkoutDisplay + ' ' + (item.partners && item.partners.length ? '(相方: ' + item.partners.join(', ') + ')' : ''));
-    });
-    var content = lines.join('\n');
-    var fileName = '請求書_' + staffIdentifier.replace(/[,、\s]/g, '_') + '_' + yearMonth + '.txt';
-    var folder = DriveApp.getFolderById(folderId);
-    var file = folder.createFile(fileName, content, MimeType.PLAIN_TEXT);
-    return JSON.stringify({ success: true, fileId: file.getId(), fileName: fileName });
+    if (!requireOwner()) return JSON.stringify({ success: false });
+    var id = PropertiesService.getDocumentProperties().getProperty('invoiceTemplateDocId') || '';
+    return JSON.stringify({ success: true, templateDocId: id });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+function setInvoiceTemplateDocId(docId) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ設定できます' });
+    var id = (docId || '').trim();
+    if (id) {
+      var match = id.match(/[a-zA-Z0-9_-]{20,}/);
+      if (match) id = match[0];
+    }
+    PropertiesService.getDocumentProperties().setProperty('invoiceTemplateDocId', id);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 請求書データ取得（スタッフ画面用）
+ * 清掃実績から自動算出 + 仕事内容マスタのプルダウン選択肢 + 送信履歴
+ */
+function getInvoiceData(yearMonth, staffIdentifier) {
+  try {
+    if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
+    var staffName = String(staffIdentifier).trim();
+    var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
+
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // スタッフ情報（住所・銀行）
+    var staffSheet = ss.getSheetByName(SHEET_STAFF);
+    var staffInfo = null;
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      var staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 9).getValues();
+      for (var si = 0; si < staffData.length; si++) {
+        if (String(staffData[si][0] || '').trim() === staffName) {
+          staffInfo = {
+            name: staffName,
+            address: String(staffData[si][1] || '').trim(),
+            email: String(staffData[si][2] || '').trim(),
+            bank: String(staffData[si][3] || '').trim(),
+            branch: String(staffData[si][4] || '').trim(),
+            acctType: String(staffData[si][5] || '').trim(),
+            acctNo: String(staffData[si][6] || '').trim(),
+            holder: String(staffData[si][7] || '').trim()
+          };
+          break;
+        }
+      }
+    }
+    if (!staffInfo) return JSON.stringify({ success: false, error: 'スタッフ情報が見つかりません' });
+
+    // 報酬マスター読み込み
+    var compSheet = ss.getSheetByName(SHEET_COMPENSATION);
+    var compMap = {}; // { "staffName-jobName": amount }
+    if (compSheet && compSheet.getLastRow() >= 2) {
+      var compData = compSheet.getRange(2, 1, compSheet.getLastRow() - 1, 3).getValues();
+      for (var ci = 0; ci < compData.length; ci++) {
+        var cStaff = String(compData[ci][0] || '').trim();
+        var cJob = String(compData[ci][1] || '').trim();
+        var cAmt = Number(compData[ci][2] || 0);
+        if (cStaff && cJob && isFinite(cAmt) && cAmt > 0) {
+          compMap[cStaff + '-' + cJob] = cAmt;
+        }
+      }
+    }
+
+    // 特別料金の読み込み
+    var specialSheet = ss.getSheetByName(SHEET_SPECIAL_RATES);
+    var specialRates = [];
+    if (specialSheet && specialSheet.getLastRow() >= 2) {
+      var spData = specialSheet.getRange(2, 1, specialSheet.getLastRow() - 1, 5).getValues();
+      for (var spi = 0; spi < spData.length; spi++) {
+        var spJob = String(spData[spi][0] || '').trim();
+        var spStart = spData[spi][1] ? parseDate(spData[spi][1]) : null;
+        var spEnd = spData[spi][2] ? parseDate(spData[spi][2]) : null;
+        var spName = String(spData[spi][3] || '').trim();
+        var spAmt = Number(spData[spi][4] || 0);
+        if (spJob && spName && isFinite(spAmt)) {
+          specialRates.push({ jobName: spJob, startDate: spStart, endDate: spEnd, itemName: spName, amount: spAmt });
+        }
+      }
+    }
+
+    // スケジュール取得（確定済みのみ）
+    var scheduleRes = JSON.parse(getStaffSchedule(staffName, ym));
+    var scheduleList = (scheduleRes.success && scheduleRes.list) ? scheduleRes.list : [];
+
+    // 清掃実績から明細を自動算出
+    var autoItems = [];
+    for (var si2 = 0; si2 < scheduleList.length; si2++) {
+      var item = scheduleList[si2];
+      if (item.confirmed === false) continue; // 未確定はスキップ
+      var staffCount = 1 + (item.partners ? item.partners.length : 0);
+      var jobName = staffCount + '名で清掃';
+      // 報酬マスターからスタッフ固有 → 共通の順で検索
+      var amount = compMap[staffName + '-' + jobName] || compMap['共通-' + jobName] || 0;
+
+      // 特別料金チェック
+      var specialItems = [];
+      var checkDate = item.checkoutDate ? parseDate(item.checkoutDate) : null;
+      if (checkDate) {
+        for (var sri = 0; sri < specialRates.length; sri++) {
+          var sr = specialRates[sri];
+          if (sr.jobName !== jobName) continue;
+          var inRange = true;
+          if (sr.startDate && checkDate < sr.startDate) inRange = false;
+          if (sr.endDate && checkDate > sr.endDate) inRange = false;
+          if (inRange) {
+            specialItems.push({ name: sr.itemName, amount: sr.amount });
+          }
+        }
+      }
+
+      autoItems.push({
+        date: item.checkoutDate || '',
+        dateDisplay: item.checkoutDisplay || '',
+        jobName: jobName,
+        amount: amount,
+        partners: item.partners || [],
+        specialItems: specialItems
+      });
+    }
+
+    // 仕事内容マスタから追加項目用の選択肢を取得
+    var jobSheet = ss.getSheetByName(SHEET_JOB_TYPES);
+    var jobOptions = [];
+    if (jobSheet && jobSheet.getLastRow() >= 2) {
+      var jobData = jobSheet.getRange(2, 1, jobSheet.getLastRow() - 1, 3).getValues();
+      for (var ji = 0; ji < jobData.length; ji++) {
+        var jName = String(jobData[ji][0] || '').trim();
+        var jActive = String(jobData[ji][2] || 'Y').trim();
+        if (!jName || jActive !== 'Y') continue;
+        // 「X名で清掃」は自動計算なので除外
+        if (/^\d+名で清掃$/.test(jName)) continue;
+        var jAmt = compMap[staffName + '-' + jName] || compMap['共通-' + jName] || 0;
+        jobOptions.push({ name: jName, defaultAmount: jAmt });
+      }
+    }
+
+    // 送信履歴
+    var history = getInvoiceHistoryInternal_(staffName, ym);
+
+    // フォルダID・テンプレートDocIDの設定状態
+    var folderId = PropertiesService.getDocumentProperties().getProperty('invoiceFolderId') || '';
+    var templateDocId = PropertiesService.getDocumentProperties().getProperty('invoiceTemplateDocId') || '';
+
+    return JSON.stringify({
+      success: true,
+      staffInfo: staffInfo,
+      autoItems: autoItems,
+      jobOptions: jobOptions,
+      history: history,
+      hasFolder: !!folderId,
+      hasTemplate: !!templateDocId
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 請求書作成・PDF化・メール送信
+ * @param {string} yearMonth - YYYY-MM
+ * @param {string} staffIdentifier - スタッフ名
+ * @param {Array} manualItems - [{date, name, amount}]
+ * @param {string} remarks - 備考
+ */
+function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) {
+  try {
+    if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
+    var staffName = String(staffIdentifier).trim();
+    var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
+
+    // 設定値の取得
+    var props = PropertiesService.getDocumentProperties();
+    var folderId = (props.getProperty('invoiceFolderId') || '').trim();
+    var templateDocId = (props.getProperty('invoiceTemplateDocId') || '').trim();
+
+    if (!folderId) return JSON.stringify({ success: false, error: '請求書の保存先フォルダが設定されていません。オーナーに設定を依頼してください。' });
+    if (!templateDocId) return JSON.stringify({ success: false, error: '請求書テンプレートが設定されていません。オーナーに設定を依頼してください。' });
+
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // スタッフ情報取得
+    var staffSheet = ss.getSheetByName(SHEET_STAFF);
+    var staffInfo = null;
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      var staffData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 9).getValues();
+      for (var si = 0; si < staffData.length; si++) {
+        if (String(staffData[si][0] || '').trim() === staffName) {
+          staffInfo = {
+            address: String(staffData[si][1] || '').trim(),
+            email: String(staffData[si][2] || '').trim(),
+            bank: String(staffData[si][3] || '').trim(),
+            branch: String(staffData[si][4] || '').trim(),
+            acctType: String(staffData[si][5] || '').trim(),
+            acctNo: String(staffData[si][6] || '').trim(),
+            holder: String(staffData[si][7] || '').trim()
+          };
+          break;
+        }
+      }
+    }
+    if (!staffInfo) return JSON.stringify({ success: false, error: 'スタッフ情報が見つかりません' });
+
+    // 報酬マスター
+    var compSheet = ss.getSheetByName(SHEET_COMPENSATION);
+    var compMap = {};
+    if (compSheet && compSheet.getLastRow() >= 2) {
+      var compData = compSheet.getRange(2, 1, compSheet.getLastRow() - 1, 3).getValues();
+      for (var ci = 0; ci < compData.length; ci++) {
+        var cStaff = String(compData[ci][0] || '').trim();
+        var cJob = String(compData[ci][1] || '').trim();
+        var cAmt = Number(compData[ci][2] || 0);
+        if (cStaff && cJob && isFinite(cAmt) && cAmt > 0) {
+          compMap[cStaff + '-' + cJob] = cAmt;
+        }
+      }
+    }
+
+    // 特別料金
+    var specialSheet = ss.getSheetByName(SHEET_SPECIAL_RATES);
+    var specialRates = [];
+    if (specialSheet && specialSheet.getLastRow() >= 2) {
+      var spData = specialSheet.getRange(2, 1, specialSheet.getLastRow() - 1, 5).getValues();
+      for (var spi = 0; spi < spData.length; spi++) {
+        var spJob = String(spData[spi][0] || '').trim();
+        var spStart = spData[spi][1] ? parseDate(spData[spi][1]) : null;
+        var spEnd = spData[spi][2] ? parseDate(spData[spi][2]) : null;
+        var spItemName = String(spData[spi][3] || '').trim();
+        var spAmt = Number(spData[spi][4] || 0);
+        if (spJob && spItemName && isFinite(spAmt)) {
+          specialRates.push({ jobName: spJob, startDate: spStart, endDate: spEnd, itemName: spItemName, amount: spAmt });
+        }
+      }
+    }
+
+    // 請求対象年月テキスト
+    var ymParts = ym.split('-');
+    var targetYear = parseInt(ymParts[0], 10);
+    var targetMonth = parseInt(ymParts[1], 10);
+    var ymText = targetYear + '年' + targetMonth + '月分';
+
+    // 対象期間・支払期限
+    var periodStart = new Date(targetYear, targetMonth - 1, 1);
+    var periodEnd = new Date(targetYear, targetMonth, 0);
+    var dueDate = new Date(targetYear, targetMonth, 5);
+    var periodText = Utilities.formatDate(periodStart, 'Asia/Tokyo', 'yyyy年M月d日') + '～' + Utilities.formatDate(periodEnd, 'Asia/Tokyo', 'M月d日');
+    var dueText = Utilities.formatDate(dueDate, 'Asia/Tokyo', 'yyyy年M月d日');
+    var issueDate = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy年MM月dd日');
+
+    // スケジュール取得
+    var scheduleRes = JSON.parse(getStaffSchedule(staffName, ym));
+    var scheduleList = (scheduleRes.success && scheduleRes.list) ? scheduleRes.list : [];
+
+    // 明細構築
+    var allItems = [];
+    var total = 0;
+
+    // 清掃実績（自動）
+    for (var si2 = 0; si2 < scheduleList.length; si2++) {
+      var sItem = scheduleList[si2];
+      if (sItem.confirmed === false) continue;
+      var staffCount = 1 + (sItem.partners ? sItem.partners.length : 0);
+      var jobName = staffCount + '名で清掃';
+      var amount = compMap[staffName + '-' + jobName] || compMap['共通-' + jobName] || 0;
+
+      if (amount > 0) {
+        var checkDate = sItem.checkoutDate ? parseDate(sItem.checkoutDate) : null;
+        var dateDisplay = sItem.checkoutDisplay || '';
+        allItems.push({ date: checkDate, dateText: dateDisplay, name: jobName, amount: amount });
+        total += amount;
+
+        // 特別料金
+        if (checkDate) {
+          for (var sri = 0; sri < specialRates.length; sri++) {
+            var sr = specialRates[sri];
+            if (sr.jobName !== jobName) continue;
+            var inRange = true;
+            if (sr.startDate && checkDate < sr.startDate) inRange = false;
+            if (sr.endDate && checkDate > sr.endDate) inRange = false;
+            if (inRange) {
+              allItems.push({ date: checkDate, dateText: dateDisplay, name: sr.itemName, amount: sr.amount });
+              total += sr.amount;
+            }
+          }
+        }
+      }
+    }
+
+    // 手動追加項目
+    if (manualItems && Array.isArray(manualItems)) {
+      for (var mi = 0; mi < manualItems.length; mi++) {
+        var mItem = manualItems[mi];
+        var mName = String(mItem.name || '').trim();
+        var mAmt = Number(mItem.amount || 0);
+        var mDate = mItem.date ? parseDate(mItem.date) : null;
+        var mDateText = mDate ? Utilities.formatDate(mDate, 'Asia/Tokyo', 'M/d') : '';
+        if (mName && isFinite(mAmt) && mAmt !== 0) {
+          allItems.push({ date: mDate, dateText: mDateText, name: mName, amount: mAmt });
+          total += mAmt;
+        }
+      }
+    }
+
+    // 日付順ソート
+    allItems.sort(function(a, b) {
+      var ta = a.date ? a.date.getTime() : Number.MAX_SAFE_INTEGER;
+      var tb = b.date ? b.date.getTime() : Number.MAX_SAFE_INTEGER;
+      return ta - tb;
+    });
+
+    // --- フォルダ管理（YYYY-MM サブフォルダ自動作成） ---
+    var monthKey = targetYear + '-' + ('0' + targetMonth).slice(-2);
+    var rootFolder = DriveApp.getFolderById(folderId);
+    var subFolderIt = rootFolder.getFoldersByName(monthKey);
+    var monthFolder = subFolderIt.hasNext() ? subFolderIt.next() : rootFolder.createFolder(monthKey);
+
+    // --- テンプレートDoc → コピー → 差し込み ---
+    var docBaseName = staffName + '_' + ymText + '_請求書';
+    var docName = getInvoiceUniqueName_(monthFolder, docBaseName);
+    var docFile = DriveApp.getFileById(templateDocId).makeCopy(docName, monthFolder);
+    var doc = DocumentApp.openById(docFile.getId());
+    var body = doc.getBody();
+
+    body.replaceText('<<請求者>>', staffName);
+    body.replaceText('<<住所>>', staffInfo.address);
+    body.replaceText('<<請求対象年月>>', ymText);
+    body.replaceText('<<対象期間>>', periodText);
+    body.replaceText('<<お支払期限>>', dueText);
+    body.replaceText('<<発行日>>', issueDate);
+    body.replaceText('<<合計金額>>', total.toLocaleString('ja-JP'));
+    body.replaceText('<<備考>>', remarks || '');
+    body.replaceText('<<金融機関名>>', staffInfo.bank);
+    body.replaceText('<<口座種類>>', staffInfo.acctType);
+    body.replaceText('<<支店名>>', staffInfo.branch);
+    body.replaceText('<<口座番号>>', staffInfo.acctNo);
+    body.replaceText('<<口座名義>>', staffInfo.holder);
+
+    // <<明細一覧>> を表で挿入
+    insertInvoiceDetailTable_(body, allItems);
+    doc.saveAndClose();
+
+    // --- PDF化 ---
+    var pdfBaseName = docBaseName + '.pdf';
+    var pdfName = getInvoiceUniqueName_(monthFolder, pdfBaseName);
+    var pdfBlob = DriveApp.getFileById(docFile.getId()).getAs(MimeType.PDF);
+    var pdfFile = monthFolder.createFile(pdfBlob).setName(pdfName);
+
+    // 中間Docを削除
+    docFile.setTrashed(true);
+
+    // --- PDF閲覧権限設定（スタッフがリンクで閲覧可能に） ---
+    try {
+      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      Logger.log('PDF共有設定エラー（続行）: ' + shareErr);
+    }
+
+    // --- メール送信（オーナーへ） ---
+    var sendResult = '（送信先なし）';
+    var ownerSheet = ss.getSheetByName(SHEET_OWNER);
+    var ownerEmail = ownerSheet ? String(ownerSheet.getRange(2, 1).getValue() || '').trim() : '';
+    if (ownerEmail && /@/.test(ownerEmail)) {
+      var subject = '【請求書】' + staffName + ' - ' + ymText;
+      var bodyText =
+        staffName + ' さんから' + ymText + 'の請求書が届きました。\n\n' +
+        '合計金額：¥' + total.toLocaleString('ja-JP') + '\n' +
+        '対象期間：' + periodText + '\n' +
+        '支払期限：' + dueText + '\n\n' +
+        'PDFを添付しておりますのでご確認ください。\n' +
+        '請求書はGoogleドライブにも保存されています。\n';
+      MailApp.sendEmail({
+        to: ownerEmail,
+        subject: subject,
+        body: bodyText,
+        attachments: [pdfBlob],
+        name: '請求書（自動送信）'
+      });
+      sendResult = '送信済み：' + ownerEmail;
+    }
+
+    // --- 履歴に記録 ---
+    var historySheet = ss.getSheetByName(SHEET_INVOICE_HISTORY);
+    if (historySheet) {
+      var itemsSummary = allItems.map(function(it) { return { d: it.dateText, n: it.name, a: it.amount }; });
+      var nextRow = historySheet.getLastRow() + 1;
+      historySheet.getRange(nextRow, 1, 1, 8).setValues([[
+        staffName,
+        ym,
+        total,
+        JSON.stringify(itemsSummary),
+        new Date(),
+        pdfFile.getUrl(),
+        pdfFile.getId(),
+        sendResult
+      ]]);
+    }
+
+    return JSON.stringify({
+      success: true,
+      pdfUrl: pdfFile.getUrl(),
+      pdfFileId: pdfFile.getId(),
+      total: total,
+      itemCount: allItems.length,
+      sendResult: sendResult
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 請求書履歴取得（内部用）
+ */
+function getInvoiceHistoryInternal_(staffName, yearMonth) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_INVOICE_HISTORY);
+    if (!sheet || sheet.getLastRow() < 2) return [];
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues();
+    var list = [];
+    for (var i = 0; i < data.length; i++) {
+      var hStaff = String(data[i][0] || '').trim();
+      var hYm = String(data[i][1] || '').trim();
+      if (hStaff !== staffName) continue;
+      if (yearMonth && hYm !== yearMonth) continue;
+      list.push({
+        staffName: hStaff,
+        yearMonth: hYm,
+        total: Number(data[i][2] || 0),
+        sentAt: data[i][4] ? Utilities.formatDate(new Date(data[i][4]), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm') : '',
+        pdfUrl: String(data[i][5] || ''),
+        pdfFileId: String(data[i][6] || ''),
+        status: String(data[i][7] || '')
+      });
+    }
+    return list;
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * 請求書履歴取得（フロント用）
+ */
+function getInvoiceHistory(staffIdentifier, yearMonth) {
+  try {
+    if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
+    var staffName = String(staffIdentifier).trim();
+    var list = getInvoiceHistoryInternal_(staffName, yearMonth || '');
+    return JSON.stringify({ success: true, list: list });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), list: [] });
+  }
+}
+
+/**
+ * 明細テーブルをDoc本文に挿入（<<明細一覧>>プレースホルダーを置換）
+ */
+function insertInvoiceDetailTable_(body, items) {
+  var range = body.findText('<<明細一覧>>');
+  if (!range) return;
+  var phPara = range.getElement().getParent().asParagraph();
+  var insertIndex = body.getChildIndex(phPara);
+  var el = range.getElement().asText();
+  el.setText(el.getText().replace('<<明細一覧>>', ''));
+
+  var cells = [['作業日', '作業内容', '単価（円）']];
+  if (items.length === 0) {
+    cells.push(['', '(該当する作業はありません)', '']);
+  } else {
+    for (var i = 0; i < items.length; i++) {
+      cells.push([items[i].dateText || '', items[i].name || '', '¥' + items[i].amount.toLocaleString('ja-JP')]);
+    }
+  }
+
+  var tmp = body.appendTable(cells);
+  var table = tmp.copy().asTable();
+  body.removeChild(tmp);
+  body.insertTable(insertIndex + 1, table);
+  body.removeChild(phPara);
+
+  // ヘッダ行を太字に
+  table.getRow(0).editAsText().setBold(true);
+
+  // 金額列を右寄せ
+  var ALIGN_RIGHT =
+    (typeof DocumentApp.ParagraphAlignment !== 'undefined' && DocumentApp.ParagraphAlignment.RIGHT) ||
+    (typeof DocumentApp.HorizontalAlignment !== 'undefined' && DocumentApp.HorizontalAlignment.RIGHT) ||
+    null;
+  for (var rr = 1; rr < table.getNumRows(); rr++) {
+    var cell = table.getCell(rr, 2);
+    if (cell.getNumChildren() === 0) cell.appendParagraph('');
+    if (ALIGN_RIGHT) {
+      for (var k = 0; k < cell.getNumChildren(); k++) {
+        var p = cell.getChild(k).asParagraph();
+        if (p) p.setAlignment(ALIGN_RIGHT);
+      }
+    }
+  }
+}
+
+/**
+ * フォルダ内で重複しないファイル名を返す
+ */
+function getInvoiceUniqueName_(folder, desiredName) {
+  var name = desiredName;
+  var dot = desiredName.lastIndexOf('.');
+  var base = dot >= 0 ? desiredName.slice(0, dot) : desiredName;
+  var ext = dot >= 0 ? desiredName.slice(dot) : '';
+  var n = 1;
+  while (folder.getFilesByName(name).hasNext()) {
+    n++;
+    name = base + ' (' + n + ')' + ext;
+  }
+  return name;
 }
 
 /**

@@ -989,12 +989,56 @@
     <div id="panelStaffSchedule" style="display:none;">
       <div class="mb-2"><label class="form-label small">表示月</label><input type="month" class="form-control form-control-sm" id="staffScheduleMonth" style="max-width:160px;"></div>
       <div id="staffScheduleList"></div>
-      <!-- TODO: 請求書機能は詳細を詰めてから実装予定 -->
-      <div class="mt-3 p-2 border rounded bg-light" style="display:none;">
-        <p class="small fw-bold mb-1">請求書</p>
-        <p class="small text-muted mb-2">月末にオーナーが設定で指定したGoogleドライブのフォルダに請求書を保存できます。オーナーに保存先フォルダの設定を依頼してください。</p>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCreateInvoice">今月の請求書を作成</button>
-        <span id="invoiceCreateResult" class="small ms-2" style="display:none;"></span>
+      <!-- 請求書セクション -->
+      <div id="invoiceSection" class="mt-4 p-3 border rounded bg-white" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-bold small">請求書作成</span>
+          <span class="badge bg-secondary" id="invoiceYmBadge"></span>
+        </div>
+        <div id="invoiceNotReady" class="small text-muted" style="display:none;">
+          <p>請求書機能はオーナーによる設定が必要です（保存先フォルダ・テンプレート）。</p>
+        </div>
+        <div id="invoiceContent" style="display:none;">
+          <!-- 清掃実績（自動算出） -->
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">清掃実績（自動算出）</label>
+            <div id="invoiceAutoItems" class="small"></div>
+          </div>
+          <!-- 追加項目 -->
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">追加項目</label>
+            <div id="invoiceManualItems"></div>
+            <div class="d-flex gap-1 align-items-center flex-wrap mt-1">
+              <input type="date" class="form-control form-control-sm" id="invoiceAddDate" style="max-width:130px;">
+              <select class="form-select form-select-sm" id="invoiceAddJobSelect" style="max-width:180px;">
+                <option value="">選択...</option>
+              </select>
+              <input type="text" class="form-control form-control-sm" id="invoiceAddCustomName" placeholder="項目名" style="max-width:120px;display:none;">
+              <input type="number" class="form-control form-control-sm" id="invoiceAddAmount" placeholder="金額" style="max-width:90px;">
+              <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnInvoiceAddItem">追加</button>
+            </div>
+          </div>
+          <!-- 備考 -->
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">備考</label>
+            <textarea class="form-control form-control-sm" id="invoiceRemarks" rows="2" placeholder="備考があれば記入"></textarea>
+          </div>
+          <!-- 合計 -->
+          <div class="border-top pt-2 mb-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold">合計請求額</span>
+            <span class="fw-bold fs-5" id="invoiceTotalDisplay">¥0</span>
+          </div>
+          <!-- 送信ボタン -->
+          <div class="mb-2">
+            <button type="button" class="btn btn-primary btn-sm w-100" id="btnSendInvoice">請求書を送信</button>
+            <div id="invoiceSendResult" class="small mt-1" style="display:none;"></div>
+          </div>
+        </div>
+        <!-- 送信履歴 -->
+        <div class="mt-3 border-top pt-2">
+          <label class="form-label small fw-bold mb-1">送信履歴</label>
+          <div id="invoiceHistoryList" class="small text-muted">履歴なし</div>
+        </div>
       </div>
     </div>
     <div id="panelNotifications" style="display:none;">
@@ -1017,15 +1061,28 @@
         </div>
       </div>
       <!-- チェックリスト写真保存フォルダはチェックアプリの設定タブに移動 -->
-      <!-- 請求書保存フォルダ（スタッフの請求書出力先） TODO: 請求書機能は詳細を詰めてから実装予定 -->
-      <div id="invoiceFolderSection" class="mb-3 p-2 border rounded bg-light" style="display:none;">
-        <label class="form-label small fw-bold">請求書保存フォルダ（スタッフ用）</label>
-        <p class="small text-muted mb-1">スタッフが「請求書を作成」したときに保存するGoogleドライブのフォルダ。フォルダを開き、URLの <code>/folders/</code> の後のIDを貼り付けてください。</p>
-        <div class="d-flex gap-2 flex-wrap align-items-center">
-          <input type="text" class="form-control form-control-sm" id="invoiceFolderIdInput" placeholder="1abc...xyz" style="max-width:300px;">
-          <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceFolder">保存</button>
+      <!-- 請求書設定 -->
+      <div id="invoiceSettingsSection" class="mb-3 p-2 border rounded bg-light">
+        <label class="form-label small fw-bold">請求書設定</label>
+        <p class="small text-muted mb-1">スタッフが請求書を作成・送信するための設定です。</p>
+        <div class="mb-2">
+          <label class="form-label small">保存先フォルダID</label>
+          <p class="small text-muted mb-1">請求書PDFの保存先フォルダ。フォルダURLの <code>/folders/</code> の後のIDを貼り付けてください。月ごとにサブフォルダ(YYYY-MM)が自動作成されます。</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" class="form-control form-control-sm" id="invoiceFolderIdInput" placeholder="1abc...xyz" style="max-width:300px;">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceFolder">保存</button>
+          </div>
+          <div id="invoiceFolderSaveResult" class="small mt-1" style="display:none;"></div>
         </div>
-        <div id="invoiceFolderSaveResult" class="small mt-1" style="display:none;"></div>
+        <div class="mb-1">
+          <label class="form-label small">テンプレートDoc ID</label>
+          <p class="small text-muted mb-1">Googleドキュメントの請求書テンプレート。URLの <code>/d/</code> と <code>/edit</code> の間のIDを貼り付けてください。</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" class="form-control form-control-sm" id="invoiceTemplateDocIdInput" placeholder="1abc...xyz" style="max-width:300px;">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceTemplate">保存</button>
+          </div>
+          <div id="invoiceTemplateSaveResult" class="small mt-1" style="display:none;"></div>
+        </div>
       </div>
       <!-- 初回セットアップ（オーナー未設定時） -->
       <div id="ownerSetupForm" class="mb-3" style="display:none;">
@@ -3832,7 +3889,7 @@
               setTimeout(function() { if (calendar) calendar.updateSize(); }, 50);
             }
             if (tab === 'recruit') loadRecruitList();
-            if (tab === 'staffSchedule') loadStaffSchedule();
+            if (tab === 'staffSchedule') { loadStaffSchedule(); loadInvoiceData(); }
             if (tab === 'notifications') loadNotificationListMain();
             if (tab === 'settings') loadSettings();
           });
@@ -4760,7 +4817,7 @@
           monthInp.dataset.init = '1';
           var d = new Date();
           monthInp.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-          monthInp.addEventListener('change', loadStaffSchedule);
+          monthInp.addEventListener('change', function() { loadStaffSchedule(); loadInvoiceData(); });
         }
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         if (!staffId) {
@@ -5019,6 +5076,13 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
+            var inp = document.getElementById('invoiceTemplateDocIdInput');
+            if (inp && r.success && r.templateDocId) inp.value = r.templateDocId || '';
+          } catch (e) {}
+        }).getInvoiceTemplateDocId();
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
             if (!r.success) return;
             var setupForm = document.getElementById('ownerSetupForm');
             var emailSection = document.getElementById('ownerEmailSection');
@@ -5082,6 +5146,7 @@
         }).withFailureHandler(function(err) { errEl.textContent = err.message || 'エラー'; errEl.style.display = 'block'; }).setInitialPassword(pw);
       });
 
+      // === 請求書設定：フォルダID保存 ===
       document.getElementById('btnSaveInvoiceFolder').addEventListener('click', function() {
         var folderId = document.getElementById('invoiceFolderIdInput').value.trim();
         var resEl = document.getElementById('invoiceFolderSaveResult');
@@ -5105,34 +5170,287 @@
           resEl.style.display = 'block';
         }).setInvoiceFolderId(folderId);
       });
-      document.getElementById('btnCreateInvoice').addEventListener('click', function() {
-        var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
-        var monthInp = document.getElementById('staffScheduleMonth');
-        var ym = monthInp && monthInp.value ? monthInp.value : (function() {
-          var d = new Date();
-          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        })();
-        var resEl = document.getElementById('invoiceCreateResult');
-        if (!staffId) { resEl.textContent = 'スタッフを選択してください'; resEl.className = 'small ms-2 text-danger'; resEl.style.display = 'inline'; return; }
-        resEl.textContent = '作成中...';
-        resEl.className = 'small ms-2 text-muted';
-        resEl.style.display = 'inline';
+      // === 請求書設定：テンプレートDoc ID保存 ===
+      document.getElementById('btnSaveInvoiceTemplate').addEventListener('click', function() {
+        var docId = document.getElementById('invoiceTemplateDocIdInput').value.trim();
+        var resEl = document.getElementById('invoiceTemplateSaveResult');
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
-              resEl.textContent = '保存しました: ' + (r.fileName || '');
-              resEl.className = 'small ms-2 text-success';
-              setTimeout(function() { resEl.style.display = 'none'; }, 4000);
+              resEl.textContent = '保存しました。';
+              resEl.className = 'small mt-1 text-success';
+              resEl.style.display = 'block';
+              setTimeout(function() { resEl.style.display = 'none'; }, 2000);
             } else {
               resEl.textContent = r.error || '失敗';
-              resEl.className = 'small ms-2 text-danger';
+              resEl.className = 'small mt-1 text-danger';
+              resEl.style.display = 'block';
             }
-          } catch (e) { resEl.textContent = 'エラー'; resEl.className = 'small ms-2 text-danger'; }
+          } catch (e) { resEl.textContent = 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
         }).withFailureHandler(function(err) {
           resEl.textContent = err.message || 'エラー';
-          resEl.className = 'small ms-2 text-danger';
-        }).createStaffInvoice(ym, staffId, null);
+          resEl.className = 'small mt-1 text-danger';
+          resEl.style.display = 'block';
+        }).setInvoiceTemplateDocId(docId);
+      });
+
+      // === 請求書機能（スタッフ画面） ===
+      var invoiceManualItemsList = []; // 手動追加項目の一時リスト
+      var invoiceJobOptions = [];      // 仕事内容マスタの選択肢キャッシュ
+
+      function getInvoiceYm() {
+        var monthInp = document.getElementById('staffScheduleMonth');
+        return monthInp && monthInp.value ? monthInp.value : (function() {
+          var d = new Date();
+          return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        })();
+      }
+
+      function loadInvoiceData() {
+        var section = document.getElementById('invoiceSection');
+        if (!section || !window.staffMode) return;
+        section.style.display = 'block';
+
+        var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
+        if (!staffId) { section.style.display = 'none'; return; }
+
+        var ym = getInvoiceYm();
+        var ymParts = ym.split('-');
+        var ymBadge = document.getElementById('invoiceYmBadge');
+        if (ymBadge) ymBadge.textContent = ymParts[0] + '年' + parseInt(ymParts[1], 10) + '月分';
+
+        var content = document.getElementById('invoiceContent');
+        var notReady = document.getElementById('invoiceNotReady');
+        var autoEl = document.getElementById('invoiceAutoItems');
+        if (autoEl) autoEl.innerHTML = '<span class="text-muted">読み込み中...</span>';
+
+        invoiceManualItemsList = [];
+        renderInvoiceManualItems();
+
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) {
+              if (autoEl) autoEl.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
+              return;
+            }
+            // 設定未完了チェック
+            if (!r.hasFolder || !r.hasTemplate) {
+              if (notReady) notReady.style.display = 'block';
+              if (content) content.style.display = 'none';
+            } else {
+              if (notReady) notReady.style.display = 'none';
+              if (content) content.style.display = 'block';
+            }
+
+            // 自動明細の表示
+            if (autoEl) {
+              if (r.autoItems && r.autoItems.length > 0) {
+                autoEl.innerHTML = r.autoItems.map(function(item) {
+                  var amtStr = item.amount > 0 ? '¥' + item.amount.toLocaleString() : '<span class="text-danger">未設定</span>';
+                  var specialHtml = '';
+                  if (item.specialItems && item.specialItems.length > 0) {
+                    specialHtml = item.specialItems.map(function(sp) {
+                      return '<div class="ms-3 text-muted"><small>+ ' + escapeHtml(sp.name) + ' ¥' + sp.amount.toLocaleString() + '</small></div>';
+                    }).join('');
+                  }
+                  return '<div class="border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center">' +
+                    '<div><strong>' + escapeHtml(item.dateDisplay) + '</strong> ' + escapeHtml(item.jobName) +
+                    (item.partners && item.partners.length ? ' <span class="text-muted">(' + item.partners.map(function(p) { return escapeHtml(p); }).join(', ') + ')</span>' : '') +
+                    '</div><div>' + amtStr + '</div></div>' + specialHtml;
+                }).join('');
+              } else {
+                autoEl.innerHTML = '<span class="text-muted">この月の清掃実績はありません。</span>';
+              }
+            }
+
+            // 仕事内容プルダウンの更新
+            invoiceJobOptions = r.jobOptions || [];
+            var sel = document.getElementById('invoiceAddJobSelect');
+            if (sel) {
+              sel.innerHTML = '<option value="">選択...</option>';
+              invoiceJobOptions.forEach(function(opt) {
+                var o = document.createElement('option');
+                o.value = opt.name;
+                o.textContent = opt.name + (opt.defaultAmount ? ' (¥' + opt.defaultAmount.toLocaleString() + ')' : '');
+                o.dataset.amount = opt.defaultAmount || 0;
+                sel.appendChild(o);
+              });
+              var customOpt = document.createElement('option');
+              customOpt.value = '__custom__';
+              customOpt.textContent = '手入力';
+              sel.appendChild(customOpt);
+            }
+
+            // 履歴の表示
+            renderInvoiceHistory(r.history || []);
+
+            // 合計更新
+            updateInvoiceTotal(r.autoItems || []);
+          } catch (e) {
+            if (autoEl) autoEl.innerHTML = '<span class="text-danger">読み込みエラー</span>';
+          }
+        }).withFailureHandler(function(err) {
+          var autoEl2 = document.getElementById('invoiceAutoItems');
+          if (autoEl2) autoEl2.innerHTML = '<span class="text-danger">通信エラー</span>';
+        }).getInvoiceData(ym, staffId);
+      }
+
+      // 手動項目の表示
+      function renderInvoiceManualItems() {
+        var el = document.getElementById('invoiceManualItems');
+        if (!el) return;
+        if (invoiceManualItemsList.length === 0) {
+          el.innerHTML = '';
+          return;
+        }
+        el.innerHTML = invoiceManualItemsList.map(function(item, idx) {
+          var dateStr = item.date || '';
+          if (dateStr) {
+            var dp = dateStr.split('-');
+            if (dp.length === 3) dateStr = parseInt(dp[1], 10) + '/' + parseInt(dp[2], 10);
+          }
+          return '<div class="border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center">' +
+            '<div>' + (dateStr ? '<strong>' + escapeHtml(dateStr) + '</strong> ' : '') + escapeHtml(item.name) + '</div>' +
+            '<div>¥' + item.amount.toLocaleString() + ' <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1 btn-remove-manual-item" data-idx="' + idx + '" style="font-size:0.7em;">×</button></div></div>';
+        }).join('');
+        el.querySelectorAll('.btn-remove-manual-item').forEach(function(btn) {
+          btn.onclick = function() {
+            var idx = parseInt(this.getAttribute('data-idx'), 10);
+            invoiceManualItemsList.splice(idx, 1);
+            renderInvoiceManualItems();
+            updateInvoiceTotal(null);
+          };
+        });
+      }
+
+      // 合計金額の計算・表示
+      function updateInvoiceTotal(autoItems) {
+        if (autoItems) window._invoiceAutoItems = autoItems;
+        var items = window._invoiceAutoItems || [];
+        var total = 0;
+        items.forEach(function(item) {
+          total += (item.amount || 0);
+          if (item.specialItems) {
+            item.specialItems.forEach(function(sp) { total += (sp.amount || 0); });
+          }
+        });
+        invoiceManualItemsList.forEach(function(item) { total += (item.amount || 0); });
+        var el = document.getElementById('invoiceTotalDisplay');
+        if (el) el.textContent = '¥' + total.toLocaleString();
+      }
+
+      // 履歴の表示
+      function renderInvoiceHistory(list) {
+        var el = document.getElementById('invoiceHistoryList');
+        if (!el) return;
+        if (!list || list.length === 0) {
+          el.innerHTML = '<span class="text-muted">この月の送信履歴はありません。</span>';
+          return;
+        }
+        el.innerHTML = list.map(function(h) {
+          var pdfLink = h.pdfUrl ? '<a href="' + escapeHtml(h.pdfUrl) + '" target="_blank" class="text-decoration-none">PDF</a>' : '';
+          return '<div class="border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center">' +
+            '<div>' + escapeHtml(h.sentAt || '') + ' ¥' + (h.total || 0).toLocaleString() + '</div>' +
+            '<div>' + pdfLink + ' <span class="text-success">送信済</span></div></div>';
+        }).join('');
+      }
+
+      // 追加項目のプルダウン変更時
+      document.getElementById('invoiceAddJobSelect').addEventListener('change', function() {
+        var customNameInp = document.getElementById('invoiceAddCustomName');
+        var amtInp = document.getElementById('invoiceAddAmount');
+        if (this.value === '__custom__') {
+          if (customNameInp) customNameInp.style.display = '';
+          if (amtInp) amtInp.value = '';
+        } else {
+          if (customNameInp) customNameInp.style.display = 'none';
+          // 選択した項目のデフォルト金額をセット
+          var opt = this.options[this.selectedIndex];
+          if (opt && opt.dataset.amount && Number(opt.dataset.amount) > 0) {
+            if (amtInp) amtInp.value = opt.dataset.amount;
+          } else {
+            if (amtInp) amtInp.value = '';
+          }
+        }
+      });
+
+      // 追加ボタン
+      document.getElementById('btnInvoiceAddItem').addEventListener('click', function() {
+        var sel = document.getElementById('invoiceAddJobSelect');
+        var customInp = document.getElementById('invoiceAddCustomName');
+        var amtInp = document.getElementById('invoiceAddAmount');
+        var dateInp = document.getElementById('invoiceAddDate');
+
+        var name = '';
+        if (sel.value === '__custom__') {
+          name = (customInp ? customInp.value.trim() : '');
+        } else {
+          name = sel.value;
+        }
+        var amt = parseInt(amtInp ? amtInp.value : 0, 10);
+        if (!name) { alert('項目名を選択または入力してください。'); return; }
+        if (!amt || !isFinite(amt)) { alert('金額を入力してください。'); return; }
+
+        invoiceManualItemsList.push({
+          date: dateInp ? dateInp.value : '',
+          name: name,
+          amount: amt
+        });
+        renderInvoiceManualItems();
+        updateInvoiceTotal(null);
+
+        // 入力リセット
+        if (sel) sel.value = '';
+        if (customInp) { customInp.value = ''; customInp.style.display = 'none'; }
+        if (amtInp) amtInp.value = '';
+        if (dateInp) dateInp.value = '';
+      });
+
+      // 送信ボタン
+      document.getElementById('btnSendInvoice').addEventListener('click', function() {
+        var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
+        var ym = getInvoiceYm();
+        var remarks = (document.getElementById('invoiceRemarks') || {}).value || '';
+        var resEl = document.getElementById('invoiceSendResult');
+        var btn = this;
+
+        if (!staffId) { alert('スタッフを選択してください。'); return; }
+        if (!confirm('請求書を作成して送信しますか？')) return;
+
+        btn.disabled = true;
+        btn.textContent = '送信中...';
+        if (resEl) { resEl.textContent = ''; resEl.style.display = 'none'; }
+
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '請求書を送信';
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              if (resEl) {
+                resEl.textContent = '送信完了（合計: ¥' + (r.total || 0).toLocaleString() + '）';
+                resEl.className = 'small mt-1 text-success';
+                resEl.style.display = 'block';
+              }
+              // 履歴を再読込
+              loadInvoiceData();
+            } else {
+              if (resEl) {
+                resEl.textContent = r.error || '送信失敗';
+                resEl.className = 'small mt-1 text-danger';
+                resEl.style.display = 'block';
+              }
+            }
+          } catch (e) {
+            if (resEl) { resEl.textContent = 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+          }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '請求書を送信';
+          if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+        }).createAndSendInvoice(ym, staffId, invoiceManualItemsList, remarks);
       });
       document.getElementById('btnOpenStaffUrl').addEventListener('click', function() {
         var url = document.getElementById('staffDeployUrlInput').value.trim();

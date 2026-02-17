@@ -1141,18 +1141,19 @@
     .category-add-btn:active { background: #ecf0f1; color: #3498db; }
 
     /* オーナー専用：編集・管理ボタンの表示制御（オーナー以外は非表示） */
-    body:not(.owner-mode) .item-drag-handle,
-    body:not(.owner-mode) .item-edit-btn,
-    body:not(.owner-mode) .item-delete-btn,
-    body:not(.owner-mode) .cat-drag-handle,
-    body:not(.owner-mode) .section-cat-edit,
-    body:not(.owner-mode) .section-cat-delete,
-    body:not(.owner-mode) .section-add-btn,
-    body:not(.owner-mode) .category-add-btn,
-    body:not(.owner-mode) .inline-spot-edit-btn,
-    body:not(.owner-mode) .inline-spot-delete-btn,
-    body:not(.owner-mode) .inline-photo-add-btn,
-    body:not(.owner-mode) .inline-example-btn {
+    /* GASのCSSサニタイザー対策: bodyではなく#contentAreaを基点にする */
+    #contentArea:not(.owner-mode) .item-drag-handle,
+    #contentArea:not(.owner-mode) .item-edit-btn,
+    #contentArea:not(.owner-mode) .item-delete-btn,
+    #contentArea:not(.owner-mode) .cat-drag-handle,
+    #contentArea:not(.owner-mode) .section-cat-edit,
+    #contentArea:not(.owner-mode) .section-cat-delete,
+    #contentArea:not(.owner-mode) .section-add-btn,
+    #contentArea:not(.owner-mode) .category-add-btn,
+    #contentArea:not(.owner-mode) .inline-spot-edit-btn,
+    #contentArea:not(.owner-mode) .inline-spot-delete-btn,
+    #contentArea:not(.owner-mode) .inline-photo-add-btn,
+    #contentArea:not(.owner-mode) .inline-example-btn {
       display: none !important;
     }
 
@@ -1600,10 +1601,13 @@
       var settingsBtn = document.querySelector('.tab-nav-btn[data-tab="clSettings"]');
       if (settingsBtn) settingsBtn.style.display = isOwner ? '' : 'none';
       // オーナーモードクラスの切替（編集・管理ボタンの表示制御）
-      if (isOwner) {
-        document.body.classList.add('owner-mode');
-      } else {
-        document.body.classList.remove('owner-mode');
+      var contentArea = document.getElementById('contentArea');
+      if (contentArea) {
+        if (isOwner) {
+          contentArea.classList.add('owner-mode');
+        } else {
+          contentArea.classList.remove('owner-mode');
+        }
       }
       // オーナーでない場合に設定タブが表示中なら切り替え
       if (!isOwner) {
@@ -1615,7 +1619,8 @@
     }
 
     function isOwnerMode() {
-      return document.body.classList.contains('owner-mode');
+      var contentArea = document.getElementById('contentArea');
+      return contentArea && contentArea.classList.contains('owner-mode');
     }
     function requireOwnerMode() {
       if (!isOwnerMode()) {

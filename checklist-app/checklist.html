@@ -461,17 +461,54 @@
     .photo-section {
       background: white;
       margin: 8px 12px;
-      padding: 16px;
+      padding: 0;
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
     }
-    .photo-section h3 {
+    .photo-cat-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      cursor: pointer;
+      user-select: none;
+      border-bottom: 2px solid #e67e22;
+      gap: 6px;
+    }
+    .photo-cat-header h3 {
       font-size: 16px;
       color: #2c3e50;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #e67e22;
+      margin: 0;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+    .photo-cat-toggle {
+      font-size: 14px;
+      color: #7f8c8d;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .photo-cat-toggle.collapsed { transform: rotate(-90deg); }
+    .photo-cat-body {
+      padding: 12px 16px 16px;
+    }
+    .photo-cat-body.collapsed { display: none; }
+    .photo-cat-bulk-btn {
+      font-size: 11px;
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .photo-cat-bulk-btn.before { background: #3498db; }
+    .photo-cat-bulk-btn.before:active { background: #2980b9; }
+    .photo-cat-bulk-btn.after { background: #e67e22; }
+    .photo-cat-bulk-btn.after:active { background: #d35400; }
     .photo-spot {
       margin-bottom: 16px;
       padding: 12px;
@@ -1610,6 +1647,7 @@
 
   <!-- 非表示のファイル入力 -->
   <input type="file" id="photoInput" accept="image/*" capture="environment">
+  <input type="file" id="bulkPhotoInput" accept="image/*" multiple>
   <input type="file" id="examplePhotoInput" accept="image/*">
   <input type="file" id="itemPhotoInput" accept="image/*">
   <input type="file" id="memoPhotoInput" accept="image/*" capture="environment">
@@ -1753,6 +1791,7 @@
 
       // イベントリスナー
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
+      document.getElementById('bulkPhotoInput').addEventListener('change', handleBulkPhotoUpload);
       document.getElementById('memoPhotoInput').addEventListener('change', handleMemoPhotoSelect);
       document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); saveStaffSelectionToServer(); });
       // スタッフ追加行のchange検知（イベント委譲）
@@ -2565,7 +2604,19 @@
       html += '<div style="height:6px;background:#ecf0f1;border-radius:3px;overflow:hidden;margin-bottom:16px;"><div style="height:100%;background:#e67e22;width:' + (totalSpots > 0 ? Math.round(doneSpots / totalSpots * 100) : 0) + '%;border-radius:3px;"></div></div></div>';
 
       catOrder.forEach(function(cat) {
-        html += '<div class="photo-section"><h3>📷 ' + escapeHtml(cat) + '</h3>';
+        var catId = 'photoCat_' + cat.replace(/[^a-zA-Z0-9\u3000-\u9fff]/g, '_');
+        var catSpots = categories[cat];
+        // カテゴリ内の撮影済み数
+        var catDone = catSpots.filter(function(s) { var p = photos[s.id] || { before: [], after: [] }; return p.before.length > 0 || p.after.length > 0; }).length;
+        html += '<div class="photo-section">';
+        html += '<div class="photo-cat-header" onclick="togglePhotoCategory(\'' + catId + '\')">';
+        html += '<span class="photo-cat-toggle" id="toggle_' + catId + '">▼</span>';
+        html += '<h3>📷 ' + escapeHtml(cat) + ' <span style="font-size:12px;font-weight:normal;color:#7f8c8d;">(' + catDone + '/' + catSpots.length + ')</span></h3>';
+        var catEsc = cat.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        html += '<button class="photo-cat-bulk-btn before" onclick="event.stopPropagation();openBulkPhotoUpload(\'' + catEsc + '\', \'ビフォー\')">前まとめて</button>';
+        html += '<button class="photo-cat-bulk-btn after" onclick="event.stopPropagation();openBulkPhotoUpload(\'' + catEsc + '\', \'アフター\')">後まとめて</button>';
+        html += '</div>';
+        html += '<div class="photo-cat-body" id="body_' + catId + '">';
         categories[cat].forEach(function(spot) {
           var spotPhotos = photos[spot.id] || { before: [], after: [] };
           var bDone = spotPhotos.before.length > 0;
@@ -2622,7 +2673,8 @@
 
           html += '</div>';
         });
-        html += '</div>';
+        html += '</div>'; // end photo-cat-body
+        html += '</div>'; // end photo-section
       });
 
       document.getElementById('photoSection').innerHTML = html;
@@ -3188,6 +3240,124 @@
         }).catch(function() { showSaveStatus('error'); });
       };
       reader.readAsDataURL(file);
+      event.target.value = '';
+    }
+
+    // === カテゴリ折りたたみ ===
+    function togglePhotoCategory(catId) {
+      var body = document.getElementById('body_' + catId);
+      var toggle = document.getElementById('toggle_' + catId);
+      if (!body) return;
+      body.classList.toggle('collapsed');
+      if (toggle) toggle.classList.toggle('collapsed');
+    }
+
+    // === まとめてアップロード ===
+    var bulkUploadCategory = null;
+    var bulkUploadTiming = null;
+
+    function openBulkPhotoUpload(category, timing) {
+      bulkUploadCategory = category;
+      bulkUploadTiming = timing;
+      var input = document.getElementById('bulkPhotoInput');
+      input.value = '';
+      input.click();
+    }
+
+    function showBulkProgress(timing, current, total) {
+      var el = document.getElementById('bulkProgressBar');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'bulkProgressBar';
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#2c3e50;color:white;padding:8px 16px;font-size:14px;text-align:center;';
+        document.body.appendChild(el);
+      }
+      el.style.display = 'block';
+      var pct = total > 0 ? Math.round(current / total * 100) : 0;
+      el.innerHTML = timing + ' アップロード中... ' + current + '/' + total + '枚 (' + pct + '%)';
+    }
+    function hideBulkProgress() {
+      var el = document.getElementById('bulkProgressBar');
+      if (el) el.style.display = 'none';
+    }
+
+    function handleBulkPhotoUpload(event) {
+      var files = Array.prototype.slice.call(event.target.files);
+      if (!files.length) return;
+      var category = bulkUploadCategory;
+      var timing = bulkUploadTiming;
+      if (!category || !timing) return;
+
+      // このカテゴリに属する撮影箇所を取得
+      var timingKey = timing === 'ビフォー' ? 'before' : 'after';
+      var spots = checklistData.spots.filter(function(s) {
+        return (s.category || 'その他') === category;
+      });
+      if (spots.length === 0) { alert('このカテゴリに撮影箇所がありません'); return; }
+
+      // まだ該当タイミングの写真がない箇所を優先、残りは最後の箇所に
+      var emptySpots = spots.filter(function(s) {
+        var p = checklistData.photos[s.id] || { before: [], after: [] };
+        return p[timingKey].length === 0;
+      });
+      var filledSpots = spots.filter(function(s) {
+        var p = checklistData.photos[s.id] || { before: [], after: [] };
+        return p[timingKey].length > 0;
+      });
+      // 割当順: 空の箇所を先に、足りなければ最後の箇所に複数枚
+      var assignTargets = emptySpots.concat(filledSpots);
+      if (assignTargets.length === 0) assignTargets = spots;
+
+      var assignments = []; // [{spotId, file}, ...]
+      for (var i = 0; i < files.length; i++) {
+        var targetIdx = Math.min(i, assignTargets.length - 1);
+        assignments.push({ spotId: assignTargets[targetIdx].id, file: files[i] });
+      }
+
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
+      var totalCount = assignments.length;
+      var doneCount = 0;
+      var failCount = 0;
+      showBulkProgress(timing, 0, totalCount);
+
+      // 順番にアップロード（並列だとGASがタイムアウトしやすい）
+      function uploadNext(idx) {
+        if (idx >= assignments.length) {
+          hideBulkProgress();
+          showSaveStatus(failCount === 0 ? 'saved' : 'error');
+          if (failCount > 0) alert(timing + ': ' + failCount + '枚の写真がアップロードに失敗しました');
+          renderPhotoSection();
+          renderChecklist();
+          return;
+        }
+        var a = assignments[idx];
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var base64 = e.target.result.split(',')[1];
+          callGAS('uploadChecklistPhoto', [checkoutDate, a.spotId, timing, base64, who]).then(function(res) {
+            if (res.success) {
+              doneCount++;
+              if (!checklistData.photos[a.spotId]) {
+                checklistData.photos[a.spotId] = { before: [], after: [] };
+              }
+              var photoData = { fileId: res.fileId, by: who, at: new Date() };
+              checklistData.photos[a.spotId][timingKey].push(photoData);
+            } else {
+              failCount++;
+            }
+            showBulkProgress(timing, doneCount + failCount, totalCount);
+            uploadNext(idx + 1);
+          }).catch(function() {
+            failCount++;
+            showBulkProgress(timing, doneCount + failCount, totalCount);
+            uploadNext(idx + 1);
+          });
+        };
+        reader.onerror = function() { failCount++; uploadNext(idx + 1); };
+        reader.readAsDataURL(a.file);
+      }
+      uploadNext(0);
       event.target.value = '';
     }
 

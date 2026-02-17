@@ -1947,7 +1947,7 @@
           if (spot.exampleFileId) {
             html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w168" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
-            html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
+            html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">＋見本</button>';
           }
           html += '<button class="inline-photo-btn' + (bDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'ビフォー\')">' + (bDone ? '✓前' : '📷前') + '</button>';
           html += '<button class="inline-photo-btn inline-photo-btn-after' + (aDone ? ' done' : '') + '" onclick="openPhotoUpload(\'' + spot.id + '\', \'アフター\')">' + (aDone ? '✓後' : '📷後') + '</button>';
@@ -2204,7 +2204,7 @@
           if (spot.exampleFileId) {
             html += '<img class="inline-example-thumb" src="https://drive.google.com/thumbnail?id=' + spot.exampleFileId + '&sz=w168" onclick="showExampleWithOptions(\'' + spot.id + '\', \'' + spot.exampleFileId + '\')" alt="見本">';
           } else {
-            html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">⊞</button>';
+            html += '<button class="inline-example-btn" onclick="uploadExamplePrompt(\'' + spot.id + '\')" title="見本写真を設定">＋見本</button>';
           }
           html += '<span style="flex:1;">' + escapeHtml(spot.name) + '</span>';
           html += '<div class="inline-spot-actions">';

@@ -437,7 +437,7 @@ function getPhotoSpotMaster() {
 /**
  * 日次チェックリストデータを取得
  */
-function getChecklistForDate(checkoutDate) {
+function getChecklistForDate(checkoutDate, deviceId) {
   try {
     var masterRes = JSON.parse(getChecklistMaster());
     var spotRes = JSON.parse(getPhotoSpotMaster());
@@ -518,8 +518,8 @@ function getChecklistForDate(checkoutDate) {
     var checkedCount = Object.keys(checkedItems).length;
     var totalItems = masterRes.items.length;
 
-    // スタッフ選択を取得
-    var selectedStaff = getStaffSelection_(checkoutDate);
+    // スタッフ選択を取得（deviceId があれば自端末分も返す）
+    var staffInfo = getStaffSelectionDetailed_(checkoutDate, deviceId || '');
 
     return JSON.stringify({
       success: true,
@@ -532,7 +532,8 @@ function getChecklistForDate(checkoutDate) {
       checkedCount: checkedCount,
       totalItems: totalItems,
       categoryOrder: catOrderRes.success ? catOrderRes.orders : [],
-      selectedStaff: selectedStaff
+      selectedStaff: staffInfo.merged,
+      myStaff: staffInfo.myStaff
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -817,17 +818,27 @@ function saveStaffSelection(checkoutDate, staffNames, dId) {
  * @return {string[]} 選択されたスタッフ名の配列（重複なし）
  */
 function getStaffSelection_(checkoutDate) {
+  return getStaffSelectionDetailed_(checkoutDate, '').merged;
+}
+
+/**
+ * スタッフ選択を詳細取得（和集合 + 自端末分）
+ * @param {string} checkoutDate
+ * @param {string} deviceId - 端末識別ID（空文字の場合 myStaff は空配列）
+ * @return {{ merged: string[], myStaff: string[] }}
+ */
+function getStaffSelectionDetailed_(checkoutDate, deviceId) {
   try {
     var sheet = clSheet_(SHEET_CL_STAFF_SELECTION);
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return [];
+    if (lastRow < 2) return { merged: [], myStaff: [] };
     var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
     var cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     var merged = {};
+    var myStaff = [];
     for (var i = 0; i < data.length; i++) {
       if (normDateStr_(data[i][0]) !== targetDate) continue;
-      // 24時間以上古いレコードは無視
       var ts = data[i][2];
       if (ts instanceof Date && ts < cutoff) continue;
       try {
@@ -836,12 +847,16 @@ function getStaffSelection_(checkoutDate) {
           for (var j = 0; j < names.length; j++) {
             if (names[j]) merged[names[j]] = true;
           }
+          // この端末のレコードなら myStaff に設定
+          if (deviceId && data[i][3] === deviceId) {
+            myStaff = names.filter(function(n) { return !!n; });
+          }
         }
       } catch (e) {}
     }
-    return Object.keys(merged);
+    return { merged: Object.keys(merged), myStaff: myStaff };
   } catch (e) {
-    return [];
+    return { merged: [], myStaff: [] };
   }
 }
 

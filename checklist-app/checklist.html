@@ -1252,11 +1252,11 @@
     <!-- チェックリストタブ -->
     <div id="tabChecklist" class="tab-content active">
       <!-- 担当スタッフ選択 -->
-      <div class="staff-selector" id="staffSelector">
-        <div class="staff-selector-label" id="staffSelectorLabel">担当スタッフ</div>
-        <div class="staff-row">
-          <select class="staff-select" id="staffSelect0"><option value="">担当スタッフを選択</option></select>
-          <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
+      <div class="staff-selector" id="staffSelector" style="background:#f0f8ff;border:2px solid #3498db;border-radius:8px;padding:10px 12px;margin:10px 12px 4px;">
+        <div class="staff-selector-label" id="staffSelectorLabel" style="font-size:12px;font-weight:bold;color:#2c3e50;margin-bottom:6px;">担当スタッフ</div>
+        <div class="staff-row" style="display:flex;align-items:center;gap:6px;">
+          <select class="staff-select" id="staffSelect0" style="padding:8px 10px;border-radius:6px;border:1px solid #bbb;background:white;color:#333;font-size:15px;font-weight:bold;flex:1;min-height:38px;"><option value="">担当スタッフを選択</option></select>
+          <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加" style="width:32px;height:32px;border-radius:50%;border:1px solid #3498db;background:white;color:#3498db;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>
         </div>
       </div>
 

@@ -1,8 +1,8 @@
 # minpaku-fix プロジェクト引き継ぎ資料
 
 > **最終更新**: 2026-02-17
-> **作業ブランチ**: `claude/update-handoff-docs-897D8`
-> **最新コミット**: `00e40bb docs: 引き継ぎルールを強化（質問→返答待ち→作業開始、ルール引き継ぎ必須化）`
+> **作業ブランチ**: `claude/review-handoff-docs-5WgKR`（EbLOg統合済み・最新デプロイ対象）
+> **最新コミット**: `0ce1231 merge: EbLOgブランチの最新コード変更を統合`
 
 ---
 
@@ -19,7 +19,7 @@
 cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <現在の作業ブランチ名> && git reset --hard origin/<現在の作業ブランチ名> && node deploy-all.js
 ```
 
-**現時点のコマンド:**
+**現時点のコマンド（これをそのままコピペ！）:**
 ```
 cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/review-handoff-docs-5WgKR && git reset --hard origin/claude/review-handoff-docs-5WgKR && node deploy-all.js
 ```
@@ -94,8 +94,8 @@ minpaku-fix/
 | ブランチ | 用途 | 状態 |
 |---------|------|------|
 | `main` | 本番 | 安定版 |
-| `claude/setup-deployment-rules-EbLOg` | 最新デプロイ対象 | **デプロイはこのブランチから** |
-| `claude/review-handoff-docs-5WgKR` | 引き継ぎ資料・編集ロック機能開発 | 開発中 |
+| `claude/review-handoff-docs-5WgKR` | **最新デプロイ対象（EbLOg統合済み）** | **デプロイはこのブランチから** |
+| `claude/setup-deployment-rules-EbLOg` | 過去の開発 | 5WgKRに統合済み |
 | `claude/update-handoff-docs-897D8` | 過去の開発・引き継ぎ | 897D8の変更はEbLOgに含む |
 | `claude/create-handoff-docs-tRAuI` | 過去の開発 | マージ不要 |
 

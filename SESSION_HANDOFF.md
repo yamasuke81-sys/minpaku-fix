@@ -1,8 +1,8 @@
 # セッション引き継ぎファイル
 
 > **最終更新**: 2026-02-17
-> **作業ブランチ**: `claude/update-handoff-docs-897D8`
-> **最新コミット**: `00e40bb docs: 引き継ぎルールを強化（質問→返答待ち→作業開始、ルール引き継ぎ必須化）`
+> **作業ブランチ**: `claude/review-handoff-docs-5WgKR`（EbLOg統合済み・最新デプロイ対象）
+> **最新コミット**: `0ce1231 merge: EbLOgブランチの最新コード変更を統合`
 
 ---
 
@@ -18,9 +18,9 @@
 cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <現在の作業ブランチ名> && git reset --hard origin/<現在の作業ブランチ名> && node deploy-all.js
 ```
 
-**現時点のコマンド:**
+**現時点のコマンド（これをそのままコピペ！）:**
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/update-handoff-docs-897D8 && git reset --hard origin/claude/update-handoff-docs-897D8 && node deploy-all.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/review-handoff-docs-5WgKR && git reset --hard origin/claude/review-handoff-docs-5WgKR && node deploy-all.js
 ```
 
 ### ルール2: 会話の圧縮が必要になったら新チャットへ移行を提案すること

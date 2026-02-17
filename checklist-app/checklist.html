@@ -1140,23 +1140,6 @@
     }
     .category-add-btn:active { background: #ecf0f1; color: #3498db; }
 
-    /* オーナー専用：編集・管理ボタンの表示制御（オーナー以外は非表示） */
-    /* GAS CSSサニタイザー対策: :not()を使わず .hide-edit クラスで制御 */
-    .hide-edit .item-drag-handle,
-    .hide-edit .item-edit-btn,
-    .hide-edit .item-delete-btn,
-    .hide-edit .cat-drag-handle,
-    .hide-edit .section-cat-edit,
-    .hide-edit .section-cat-delete,
-    .hide-edit .section-add-btn,
-    .hide-edit .category-add-btn,
-    .hide-edit .inline-spot-edit-btn,
-    .hide-edit .inline-spot-delete-btn,
-    .hide-edit .inline-photo-add-btn,
-    .hide-edit .inline-example-btn {
-      display: none !important;
-    }
-
     /* ユーティリティ */
     .hidden { display: none !important; }
 
@@ -1261,7 +1244,7 @@
 
   <div id="loadingArea" class="loading">読み込み中...</div>
 
-  <div id="contentArea" class="hidden hide-edit">
+  <div id="contentArea" class="hidden">
     <!-- 次回予約情報 -->
     <div id="bookingInfo" class="booking-info hidden"></div>
 
@@ -1600,16 +1583,6 @@
       var isOwner = firstSelect && firstSelect.value === 'オーナー';
       var settingsBtn = document.querySelector('.tab-nav-btn[data-tab="clSettings"]');
       if (settingsBtn) settingsBtn.style.display = isOwner ? '' : 'none';
-      // オーナーモードクラスの切替（編集・管理ボタンの表示制御）
-      // デフォルトで hide-edit を付与し、オーナー時のみ外す
-      var contentArea = document.getElementById('contentArea');
-      if (contentArea) {
-        if (isOwner) {
-          contentArea.classList.remove('hide-edit');
-        } else {
-          contentArea.classList.add('hide-edit');
-        }
-      }
       // オーナーでない場合に設定タブが表示中なら切り替え
       if (!isOwner) {
         var settingsTab = document.getElementById('tabClSettings');
@@ -1617,18 +1590,6 @@
           switchTab('checklist');
         }
       }
-    }
-
-    function isOwnerMode() {
-      var contentArea = document.getElementById('contentArea');
-      return contentArea && !contentArea.classList.contains('hide-edit');
-    }
-    function requireOwnerMode() {
-      if (!isOwnerMode()) {
-        alert('この操作はオーナーのみ実行できます。\nスタッフ選択で「オーナー」を選んでください。');
-        return false;
-      }
-      return true;
     }
 
     function addStaffRow() {
@@ -2487,7 +2448,7 @@
     }
 
     function renameCategoryPrompt(fullPath, currentName) {
-      if (!requireOwnerMode()) return;
+
       var newName = prompt('カテゴリ名を変更:', currentName);
       if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
       var undoSnap = captureUndoSnapshot();
@@ -2505,7 +2466,7 @@
     }
 
     function deleteCategoryPrompt(fullPath) {
-      if (!requireOwnerMode()) return;
+
       var parts = fullPath.split('：');
       var catName = parts[parts.length - 1];
       var choice = prompt('カテゴリ「' + catName + '」を削除します。\n\n1 = 中身も全て削除\n2 = 中身は親カテゴリに移動して残す\n\n番号を入力:', '');
@@ -3049,7 +3010,7 @@
 
     // === 項目編集・追加 ===
     function editItem(itemId, btn) {
-      if (!requireOwnerMode()) return;
+
       var nameEl = document.getElementById('itemName_' + itemId);
       if (!nameEl) return;
       var currentText = nameEl.textContent;
@@ -3263,7 +3224,7 @@
     });
 
     function removeItemPhoto(itemId) {
-      if (!requireOwnerMode()) return;
+
       if (!confirm('見本写真を削除しますか？')) return;
       showSaveStatus('saving');
       callGAS('deleteChecklistItemPhoto', [itemId]).then(function(res) {
@@ -3282,7 +3243,7 @@
     }
 
     function deleteItemPrompt(itemId, itemName) {
-      if (!requireOwnerMode()) return;
+
       if (!confirm('「' + itemName + '」を削除しますか？')) return;
       showSaveStatus('saving');
       callGAS('deleteChecklistItemFromMaster', [itemId]).then(function(res) {
@@ -3297,7 +3258,7 @@
     }
 
     function addItemPrompt(category) {
-      if (!requireOwnerMode()) return;
+
       var name = prompt('追加する項目名を入力してください:');
       if (!name || !name.trim()) return;
       var isSupply = confirm('この項目を「要補充対象」にしますか？\n\n要補充対象にすると、清掃時に補充が必要かチェックできます。');
@@ -3314,7 +3275,7 @@
     }
 
     function addSubCategoryPrompt(parentCategory) {
-      if (!requireOwnerMode()) return;
+
       var subName = prompt('追加するサブカテゴリ名を入力してください:');
       if (!subName || !subName.trim()) return;
       var itemName = prompt('最初の項目名を入力してください:');
@@ -3355,7 +3316,7 @@
     }
 
     function addCategoryPrompt() {
-      if (!requireOwnerMode()) return;
+
       var category = prompt('追加するカテゴリ名を入力してください:');
       if (!category || !category.trim()) return;
       var name = prompt('最初の項目名を入力してください:');
@@ -3373,7 +3334,7 @@
     }
 
     function addPhotoSpotPrompt(category) {
-      if (!requireOwnerMode()) return;
+
       var name = prompt('追加する撮影箇所名を入力してください:');
       if (!name || !name.trim()) return;
       showSaveStatus('saving');
@@ -3423,7 +3384,7 @@
     // 見本写真のアップロード
     var currentExampleSpotId = null;
     function uploadExamplePrompt(spotId) {
-      if (!requireOwnerMode()) return;
+
       currentExampleSpotId = spotId;
       document.getElementById('examplePhotoInput').click();
     }
@@ -3461,7 +3422,7 @@
 
     // 見本写真の削除
     function deleteExample(spotId) {
-      if (!requireOwnerMode()) return;
+
       if (!confirm('見本写真を削除しますか？')) return;
       showSaveStatus('saving');
       callGAS('deleteExamplePhoto', [spotId]).then(function(res) {
@@ -3481,7 +3442,7 @@
 
     // 撮影箇所の名称変更
     function editSpotName(spotId) {
-      if (!requireOwnerMode()) return;
+
       var currentName = '';
       checklistData.spots.forEach(function(s) { if (s.id === spotId) currentName = s.name; });
       var newName = prompt('新しい名称を入力してください:', currentName);
@@ -3504,7 +3465,7 @@
 
     // 撮影箇所の削除
     function deleteSpot(spotId, spotName) {
-      if (!requireOwnerMode()) return;
+
       if (!confirm('撮影箇所「' + spotName + '」を削除しますか？')) return;
       showSaveStatus('saving');
       callGAS('deletePhotoSpot', [spotId]).then(function(res) {

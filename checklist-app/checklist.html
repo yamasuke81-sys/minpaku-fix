@@ -2623,10 +2623,10 @@
         return p.before.length > 0 || p.after.length > 0;
       }).length;
 
-      var html = '<div style="padding:12px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><div style="font-size:14px;font-weight:bold;color:#2c3e50;flex:1;">撮影進捗: ' + doneSpots + ' / ' + totalSpots + ' 箇所</div>';
-      html += '<button onclick="toggleAllPhotoCategories(false)" style="font-size:12px;padding:4px 10px;border:1px solid #bdc3c7;border-radius:4px;background:#fff;cursor:pointer;">全展開</button>';
-      html += '<button onclick="toggleAllPhotoCategories(true)" style="font-size:12px;padding:4px 10px;border:1px solid #bdc3c7;border-radius:4px;background:#fff;cursor:pointer;">全折り</button></div>';
-      html += '<div style="height:6px;background:#ecf0f1;border-radius:3px;overflow:hidden;margin-bottom:16px;"><div style="height:100%;background:#e67e22;width:' + (totalSpots > 0 ? Math.round(doneSpots / totalSpots * 100) : 0) + '%;border-radius:3px;"></div></div></div>';
+      var html = '<div style="padding:12px;"><div style="font-size:14px;font-weight:bold;color:#2c3e50;margin-bottom:8px;">撮影進捗: ' + doneSpots + ' / ' + totalSpots + ' 箇所</div>';
+      html += '<div style="height:6px;background:#ecf0f1;border-radius:3px;overflow:hidden;margin-bottom:8px;"><div style="height:100%;background:#e67e22;width:' + (totalSpots > 0 ? Math.round(doneSpots / totalSpots * 100) : 0) + '%;border-radius:3px;"></div></div>';
+      html += '<div style="margin-bottom:4px;"><button id="btnPhotoExpandAll" class="action-btn" onclick="toggleAllPhotoCategories()">' + (allPhotoExpanded ? '全折り' : '全展開') + '</button></div>';
+      html += '</div>';
 
       catOrder.forEach(function(cat) {
         var catId = 'photoCat_' + cat.replace(/[^a-zA-Z0-9\u3000-\u9fff]/g, '_');
@@ -3277,18 +3277,25 @@
       if (toggle) toggle.classList.toggle('collapsed');
     }
 
-    function toggleAllPhotoCategories(collapse) {
+    var allPhotoExpanded = false;
+    function toggleAllPhotoCategories() {
+      allPhotoExpanded = !allPhotoExpanded;
+      var btn = document.getElementById('btnPhotoExpandAll');
       document.querySelectorAll('.photo-cat-body').forEach(function(body) {
         var toggleId = body.id.replace('body_', 'toggle_');
         var toggle = document.getElementById(toggleId);
-        if (collapse) {
-          body.classList.add('collapsed');
-          if (toggle) toggle.classList.add('collapsed');
-        } else {
+        if (allPhotoExpanded) {
           body.classList.remove('collapsed');
           if (toggle) toggle.classList.remove('collapsed');
+        } else {
+          body.classList.add('collapsed');
+          if (toggle) toggle.classList.add('collapsed');
         }
       });
+      if (btn) {
+        btn.textContent = allPhotoExpanded ? '全折り' : '全展開';
+        btn.title = allPhotoExpanded ? '全て折りたたみ' : '全て展開';
+      }
     }
 
     function showPhotoModal(spotId, fileId, spotName) {

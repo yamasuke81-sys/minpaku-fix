@@ -149,16 +149,12 @@ function main() {
   var today = new Date().toISOString().slice(0, 10);
   if (mainIds.length > 0) {
     mainIds.forEach(function(id, i) {
-      var label = i === 0 ? 'オーナー用' : 'スタッフ用';
-      var r = run(clasp + ' deploy --deploymentId "' + id + '" --description "' + label + ' ' + today + '"', rootDir);
-      if (r.ok) {
-        console.log('  ' + label + ': OK');
-        var baseUrl = 'https://script.google.com/macros/s/' + id + '/exec';
-        urls.push({ label: label, url: label === 'スタッフ用' ? baseUrl + '?staff=1' : baseUrl });
-      } else {
-        console.log('  ' + label + ': 失敗 - ' + r.out.slice(0, 200));
-      }
+      var r = run(clasp + ' deploy --deploymentId "' + id + '" --description "メインアプリ ' + today + '"', rootDir);
+      console.log('  デプロイID ' + (i + 1) + ': ' + (r.ok ? 'OK' : '失敗 - ' + r.out.slice(0, 200)));
     });
+    var baseUrl = 'https://script.google.com/macros/s/' + mainIds[0] + '/exec';
+    urls.push({ label: 'オーナー用', url: baseUrl });
+    urls.push({ label: 'スタッフ用', url: baseUrl + '?staff=1' });
   } else {
     console.log('  既存デプロイが見つかりません。新規作成...');
     run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);

@@ -1644,9 +1644,10 @@
       if (JSON.stringify(current) === JSON.stringify(selectedStaff)) return;
 
       var container = document.getElementById('staffSelector');
-      // 既存の追加行を削除（staffSelect0以外）
-      var extraRows = container.querySelectorAll('.staff-row:not(:first-child)');
-      extraRows.forEach(function(row) { row.remove(); });
+      // 既存の追加行を削除（staffSelect0を含む行は残す）
+      container.querySelectorAll('.staff-row').forEach(function(row) {
+        if (!row.querySelector('#staffSelect0')) row.remove();
+      });
       staffRowCount = 1;
 
       // 1人目をstaffSelect0に設定

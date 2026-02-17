@@ -57,9 +57,13 @@ function openBrowser(url) {
   }
 }
 
-/** ブラウザをシークレットウィンドウで開く（Windows: Edge→Chrome→通常 の順で試行） */
+/** ブラウザをシークレットウィンドウで開く（Windows: Brave→Edge→Chrome→通常 の順で試行） */
 function openBrowserIncognito(url) {
   if (process.platform !== 'win32') { openBrowser(url); return; }
+  try {
+    execSync('start brave --incognito "' + url + '"', { shell: true });
+    return;
+  } catch (e) {}
   try {
     execSync('start msedge --inprivate "' + url + '"', { shell: true });
     return;

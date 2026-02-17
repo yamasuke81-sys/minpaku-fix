@@ -4383,15 +4383,43 @@ function getInvoiceData(yearMonth, staffIdentifier) {
     var scheduleRes = JSON.parse(getStaffSchedule(staffName, ym));
     var scheduleList = (scheduleRes.success && scheduleRes.list) ? scheduleRes.list : [];
 
+    // 仕事内容マスタから「清掃系」の仕事名マップを構築（人数→仕事名）
+    var jobSheet = ss.getSheetByName(SHEET_JOB_TYPES);
+    var cleanJobMap = {}; // { staffCount: jobTypeName }  例: { 2: "清掃2名作業" }
+    var cleanJobNames = {}; // 清掃系仕事名のセット（jobOptionsから除外用）
+    var allJobData = [];
+    if (jobSheet && jobSheet.getLastRow() >= 2) {
+      allJobData = jobSheet.getRange(2, 1, jobSheet.getLastRow() - 1, 3).getValues();
+      for (var jmi = 0; jmi < allJobData.length; jmi++) {
+        var jmName = String(allJobData[jmi][0] || '').trim();
+        var jmActive = String(allJobData[jmi][2] || 'Y').trim();
+        if (!jmName || jmActive !== 'Y') continue;
+        // 名前に含まれる数字を抽出し、清掃系キーワードを含むかチェック
+        var numMatch = jmName.match(/(\d)/);
+        var fullWidthMatch = jmName.match(/([０-９])/);
+        var num = numMatch ? parseInt(numMatch[1], 10) : (fullWidthMatch ? (fullWidthMatch[1].charCodeAt(0) - 0xFF10) : 0);
+        if (num > 0 && /清掃|掃除|クリーニング/.test(jmName)) {
+          cleanJobMap[num] = jmName;
+          cleanJobNames[jmName] = true;
+        }
+      }
+    }
+
     // 清掃実績から明細を自動算出
     var autoItems = [];
     for (var si2 = 0; si2 < scheduleList.length; si2++) {
       var item = scheduleList[si2];
       if (item.confirmed === false) continue; // 未確定はスキップ
       var staffCount = 1 + (item.partners ? item.partners.length : 0);
-      var jobName = staffCount + '名で清掃';
+      // 仕事内容マスタの実際の名称を使用、なければ従来のパターン
+      var jobName = cleanJobMap[staffCount] || (staffCount + '名で清掃');
       // 報酬マスターからスタッフ固有 → 共通の順で検索
       var amount = lookupComp_(staffName + '-' + jobName) || lookupComp_('共通-' + jobName) || 0;
+      // 従来パターンでもフォールバック検索
+      if (amount === 0 && cleanJobMap[staffCount]) {
+        var fallbackJob = staffCount + '名で清掃';
+        amount = lookupComp_(staffName + '-' + fallbackJob) || lookupComp_('共通-' + fallbackJob) || 0;
+      }
 
       // 特別料金チェック
       var specialItems = [];
@@ -4399,7 +4427,8 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       if (checkDate) {
         for (var sri = 0; sri < specialRates.length; sri++) {
           var sr = specialRates[sri];
-          if (sr.jobName !== jobName) continue;
+          // 実際の仕事名または従来パターンどちらでもマッチ
+          if (sr.jobName !== jobName && sr.jobName !== (staffCount + '名で清掃')) continue;
           var inRange = true;
           if (sr.startDate && checkDate < sr.startDate) inRange = false;
           if (sr.endDate && checkDate > sr.endDate) inRange = false;
@@ -4419,20 +4448,16 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       });
     }
 
-    // 仕事内容マスタから追加項目用の選択肢を取得
-    var jobSheet = ss.getSheetByName(SHEET_JOB_TYPES);
+    // 仕事内容マスタから追加項目用の選択肢を取得（清掃系は自動計算なので除外）
     var jobOptions = [];
-    if (jobSheet && jobSheet.getLastRow() >= 2) {
-      var jobData = jobSheet.getRange(2, 1, jobSheet.getLastRow() - 1, 3).getValues();
-      for (var ji = 0; ji < jobData.length; ji++) {
-        var jName = String(jobData[ji][0] || '').trim();
-        var jActive = String(jobData[ji][2] || 'Y').trim();
-        if (!jName || jActive !== 'Y') continue;
-        // 「X名で清掃」は自動計算なので除外
-        if (/^\d+名で清掃$/.test(jName)) continue;
-        var jAmt = lookupComp_(staffName + '-' + jName) || lookupComp_('共通-' + jName) || 0;
-        jobOptions.push({ name: jName, defaultAmount: jAmt });
-      }
+    for (var ji = 0; ji < allJobData.length; ji++) {
+      var jName = String(allJobData[ji][0] || '').trim();
+      var jActive = String(allJobData[ji][2] || 'Y').trim();
+      if (!jName || jActive !== 'Y') continue;
+      // 清掃系（自動計算対象）は除外
+      if (cleanJobNames[jName] || /^\d+名で清掃$/.test(jName)) continue;
+      var jAmt = lookupComp_(staffName + '-' + jName) || lookupComp_('共通-' + jName) || 0;
+      jobOptions.push({ name: jName, defaultAmount: jAmt });
     }
 
     // 送信履歴
@@ -4561,6 +4586,22 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
     var scheduleRes = JSON.parse(getStaffSchedule(staffName, ym));
     var scheduleList = (scheduleRes.success && scheduleRes.list) ? scheduleRes.list : [];
 
+    // 仕事内容マスタから清掃系の仕事名マップ構築（人数→仕事名）
+    var jobSheet2 = ss.getSheetByName(SHEET_JOB_TYPES);
+    var cleanJobMap2 = {};
+    if (jobSheet2 && jobSheet2.getLastRow() >= 2) {
+      var jd2 = jobSheet2.getRange(2, 1, jobSheet2.getLastRow() - 1, 3).getValues();
+      for (var jmi2 = 0; jmi2 < jd2.length; jmi2++) {
+        var jn2 = String(jd2[jmi2][0] || '').trim();
+        var ja2 = String(jd2[jmi2][2] || 'Y').trim();
+        if (!jn2 || ja2 !== 'Y') continue;
+        var nm2 = jn2.match(/(\d)/);
+        var fw2 = jn2.match(/([０-９])/);
+        var n2 = nm2 ? parseInt(nm2[1], 10) : (fw2 ? (fw2[1].charCodeAt(0) - 0xFF10) : 0);
+        if (n2 > 0 && /清掃|掃除|クリーニング/.test(jn2)) cleanJobMap2[n2] = jn2;
+      }
+    }
+
     // 明細構築
     var allItems = [];
     var total = 0;
@@ -4570,8 +4611,13 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
       var sItem = scheduleList[si2];
       if (sItem.confirmed === false) continue;
       var staffCount = 1 + (sItem.partners ? sItem.partners.length : 0);
-      var jobName = staffCount + '名で清掃';
+      var jobName = cleanJobMap2[staffCount] || (staffCount + '名で清掃');
       var amount = lookupComp2_(staffName + '-' + jobName) || lookupComp2_('共通-' + jobName) || 0;
+      // フォールバック: 従来パターンでも検索
+      if (amount === 0 && cleanJobMap2[staffCount]) {
+        var fb2 = staffCount + '名で清掃';
+        amount = lookupComp2_(staffName + '-' + fb2) || lookupComp2_('共通-' + fb2) || 0;
+      }
 
       if (amount > 0) {
         var checkDate = sItem.checkoutDate ? parseDate(sItem.checkoutDate) : null;
@@ -4583,7 +4629,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
         if (checkDate) {
           for (var sri = 0; sri < specialRates.length; sri++) {
             var sr = specialRates[sri];
-            if (sr.jobName !== jobName) continue;
+            if (sr.jobName !== jobName && sr.jobName !== (staffCount + '名で清掃')) continue;
             var inRange = true;
             if (sr.startDate && checkDate < sr.startDate) inRange = false;
             if (sr.endDate && checkDate > sr.endDate) inRange = false;

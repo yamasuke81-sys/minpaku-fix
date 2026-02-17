@@ -2958,7 +2958,8 @@
                 if (editStaffArea) {
                   var btnEditStaff = document.createElement('button');
                   btnEditStaff.type = 'button';
-                  btnEditStaff.className = 'btn btn-sm btn-outline-secondary mt-1';
+                  btnEditStaff.className = 'btn btn-sm btn-outline-secondary';
+                  btnEditStaff.style.marginTop = '2px';
                   btnEditStaff.innerHTML = '<i class="bi bi-pencil-square"></i> 編集';
                   btnEditStaff.onclick = function() {
                     bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();

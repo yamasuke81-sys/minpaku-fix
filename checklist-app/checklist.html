@@ -2124,6 +2124,12 @@
           state[cat] = header ? header.classList.contains('collapsed') : true;
         }
       });
+      // 撮影タブの折りたたみ状態も保存
+      state._photo = {};
+      document.querySelectorAll('.photo-cat-body').forEach(function(body) {
+        var id = body.id; // body_photoCat_xxx
+        if (id) state._photo[id] = body.classList.contains('collapsed');
+      });
       return state;
     }
 
@@ -2144,6 +2150,23 @@
           }
         }
       });
+      // 撮影タブの折りたたみ状態を復元
+      if (state._photo) {
+        Object.keys(state._photo).forEach(function(bodyId) {
+          var body = document.getElementById(bodyId);
+          var toggleId = bodyId.replace('body_', 'toggle_');
+          var toggle = document.getElementById(toggleId);
+          if (body) {
+            if (state._photo[bodyId]) {
+              body.classList.add('collapsed');
+              if (toggle) toggle.classList.add('collapsed');
+            } else {
+              body.classList.remove('collapsed');
+              if (toggle) toggle.classList.remove('collapsed');
+            }
+          }
+        });
+      }
     }
 
     // === 状態を保持したまま再レンダリング ===

@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0217c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0217d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5049,6 +5049,42 @@
         new bootstrap.Modal(document.getElementById('syncFormModal')).show();
       }
 
+      // 請求書設定（フォルダID・テンプレートDocID）を読み込む
+      function loadInvoiceSettings_() {
+        var folderInp = document.getElementById('invoiceFolderIdInput');
+        var templateInp = document.getElementById('invoiceTemplateDocIdInput');
+        // まずlocalStorageキャッシュで即座に表示
+        try {
+          var cachedFolder = localStorage.getItem('invoiceFolderIdCache') || '';
+          var cachedTemplate = localStorage.getItem('invoiceTemplateDocIdCache') || '';
+          if (folderInp && cachedFolder && !folderInp.value) folderInp.value = cachedFolder;
+          if (templateInp && cachedTemplate && !templateInp.value) templateInp.value = cachedTemplate;
+        } catch (e) {}
+        // サーバーから最新値を取得
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (folderInp && r.success && r.folderId) {
+              folderInp.value = r.folderId;
+              try { localStorage.setItem('invoiceFolderIdCache', r.folderId); } catch (e) {}
+            }
+          } catch (e) {}
+        }).withFailureHandler(function(err) {
+          console.warn('getInvoiceFolderId failed:', err);
+        }).getInvoiceFolderId();
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (templateInp && r.success && r.templateDocId) {
+              templateInp.value = r.templateDocId;
+              try { localStorage.setItem('invoiceTemplateDocIdCache', r.templateDocId); } catch (e) {}
+            }
+          } catch (e) {}
+        }).withFailureHandler(function(err) {
+          console.warn('getInvoiceTemplateDocId failed:', err);
+        }).getInvoiceTemplateDocId();
+      }
+
       function loadSettings() {
         // スタッフ用URLはオーナーURLから自動生成
         var staffInp = document.getElementById('staffDeployUrlInput');
@@ -5066,20 +5102,7 @@
             } catch (e) {}
           }).getStaffDeployUrl();
         }
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
-            var inp = document.getElementById('invoiceFolderIdInput');
-            if (inp && r.success && r.folderId) inp.value = r.folderId || '';
-          } catch (e) {}
-        }).getInvoiceFolderId();
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
-            var inp = document.getElementById('invoiceTemplateDocIdInput');
-            if (inp && r.success && r.templateDocId) inp.value = r.templateDocId || '';
-          } catch (e) {}
-        }).getInvoiceTemplateDocId();
+        loadInvoiceSettings_();
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
@@ -5174,6 +5197,7 @@
             var r = JSON.parse(jsonStr);
             if (r.success) {
               document.getElementById('invoiceFolderIdInput').value = folderId;
+              try { localStorage.setItem('invoiceFolderIdCache', folderId); } catch (e2) {}
               resEl.textContent = '保存しました。';
               resEl.className = 'small mt-1 text-success';
               resEl.style.display = 'block';
@@ -5200,6 +5224,7 @@
             var r = JSON.parse(jsonStr);
             if (r.success) {
               document.getElementById('invoiceTemplateDocIdInput').value = docId;
+              try { localStorage.setItem('invoiceTemplateDocIdCache', docId); } catch (e2) {}
               resEl.textContent = '保存しました。';
               resEl.className = 'small mt-1 text-success';
               resEl.style.display = 'block';
@@ -6484,6 +6509,7 @@
           if (t === 'sync') loadSyncList();
           if (t === 'subOwners') loadSubOwnerList();
           if (t === 'notifications') loadNotificationList();
+          if (t === 'invoice') loadInvoiceSettings_();
         });
       });
 

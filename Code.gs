@@ -4339,6 +4339,9 @@ function getInvoiceData(yearMonth, staffIdentifier) {
     // 報酬マスター読み込み
     var compSheet = ss.getSheetByName(SHEET_COMPENSATION);
     var compMap = {}; // { "staffName-jobName": amount }
+    // 正規化キーマップ（全角→半角、大文字→小文字、スペース除去）
+    var compMapNorm = {};
+    function normKey_(s) { return s.replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s+/g, '').toLowerCase(); }
     if (compSheet && compSheet.getLastRow() >= 2) {
       var compData = compSheet.getRange(2, 1, compSheet.getLastRow() - 1, 3).getValues();
       for (var ci = 0; ci < compData.length; ci++) {
@@ -4347,8 +4350,16 @@ function getInvoiceData(yearMonth, staffIdentifier) {
         var cAmt = Number(compData[ci][2] || 0);
         if (cStaff && cJob && isFinite(cAmt) && cAmt > 0) {
           compMap[cStaff + '-' + cJob] = cAmt;
+          compMapNorm[normKey_(cStaff + '-' + cJob)] = cAmt;
         }
       }
+    }
+    // compMap検索ヘルパー：完全一致 → 正規化一致
+    function lookupComp_(key) {
+      if (compMap[key]) return compMap[key];
+      var nk = normKey_(key);
+      if (compMapNorm[nk]) return compMapNorm[nk];
+      return 0;
     }
 
     // 特別料金の読み込み
@@ -4380,7 +4391,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       var staffCount = 1 + (item.partners ? item.partners.length : 0);
       var jobName = staffCount + '名で清掃';
       // 報酬マスターからスタッフ固有 → 共通の順で検索
-      var amount = compMap[staffName + '-' + jobName] || compMap['共通-' + jobName] || 0;
+      var amount = lookupComp_(staffName + '-' + jobName) || lookupComp_('共通-' + jobName) || 0;
 
       // 特別料金チェック
       var specialItems = [];
@@ -4419,7 +4430,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
         if (!jName || jActive !== 'Y') continue;
         // 「X名で清掃」は自動計算なので除外
         if (/^\d+名で清掃$/.test(jName)) continue;
-        var jAmt = compMap[staffName + '-' + jName] || compMap['共通-' + jName] || 0;
+        var jAmt = lookupComp_(staffName + '-' + jName) || lookupComp_('共通-' + jName) || 0;
         jobOptions.push({ name: jName, defaultAmount: jAmt });
       }
     }
@@ -4494,6 +4505,8 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
     // 報酬マスター
     var compSheet = ss.getSheetByName(SHEET_COMPENSATION);
     var compMap = {};
+    var compMapNorm2 = {};
+    function normKey2_(s) { return s.replace(/[０-９]/g, function(c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/\s+/g, '').toLowerCase(); }
     if (compSheet && compSheet.getLastRow() >= 2) {
       var compData = compSheet.getRange(2, 1, compSheet.getLastRow() - 1, 3).getValues();
       for (var ci = 0; ci < compData.length; ci++) {
@@ -4502,8 +4515,15 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
         var cAmt = Number(compData[ci][2] || 0);
         if (cStaff && cJob && isFinite(cAmt) && cAmt > 0) {
           compMap[cStaff + '-' + cJob] = cAmt;
+          compMapNorm2[normKey2_(cStaff + '-' + cJob)] = cAmt;
         }
       }
+    }
+    function lookupComp2_(key) {
+      if (compMap[key]) return compMap[key];
+      var nk = normKey2_(key);
+      if (compMapNorm2[nk]) return compMapNorm2[nk];
+      return 0;
     }
 
     // 特別料金
@@ -4551,7 +4571,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
       if (sItem.confirmed === false) continue;
       var staffCount = 1 + (sItem.partners ? sItem.partners.length : 0);
       var jobName = staffCount + '名で清掃';
-      var amount = compMap[staffName + '-' + jobName] || compMap['共通-' + jobName] || 0;
+      var amount = lookupComp2_(staffName + '-' + jobName) || lookupComp2_('共通-' + jobName) || 0;
 
       if (amount > 0) {
         var checkDate = sItem.checkoutDate ? parseDate(sItem.checkoutDate) : null;

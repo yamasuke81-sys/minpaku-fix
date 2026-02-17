@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;" id="deployVersion">v0217a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0217b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1591,9 +1591,8 @@
         var dbgSp = '<?= debugStaffParam ?>';
         var dbgRaw = '<?= isStaffMode ?>';
         var dbgStr = '<?= staffModeStr ?>';
-        // オーナー画面のみバージョン表示
-        if (dv && dbgStr !== 'yes') dv.style.display = '';
-        else if (dv) dv.style.display = 'none';
+        // バージョン表示（オーナー・スタッフ共通）
+        if (dv) dv.style.display = '';
       } catch(e) {}
 
       let calendar;

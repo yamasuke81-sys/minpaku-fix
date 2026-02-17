@@ -76,6 +76,7 @@
       font-size: 15px;
       font-weight: bold;
       flex: 1;
+      min-height: 38px;
     }
     .staff-select option { color: #333; background: white; }
     .staff-add-btn, .staff-remove-btn {
@@ -727,7 +728,7 @@
       background: #bdc3c7;
       cursor: default;
     }
-    .memo-submit-btn:not(:disabled):active {
+    .memo-submit-btn:active {
       opacity: 0.8;
     }
     .memo-delete-btn {
@@ -1254,7 +1255,7 @@
       <div class="staff-selector" id="staffSelector">
         <div class="staff-selector-label" id="staffSelectorLabel">担当スタッフ</div>
         <div class="staff-row">
-          <select class="staff-select" id="staffSelect0"></select>
+          <select class="staff-select" id="staffSelect0"><option value="">担当スタッフを選択</option></select>
           <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加">+</button>
         </div>
       </div>

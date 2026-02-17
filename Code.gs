@@ -1216,12 +1216,14 @@ function ensureSheetsExist() {
 
   safeInsert(SHEET_JOB_TYPES, function(s) {
     s.getRange(1, 1, 1, 3).setValues([['仕事内容名', '表示順', '有効']]);
-    s.getRange(2, 1, 2, 3).setValues([['1名で清掃', 1, 'Y']]);
-    s.getRange(3, 1, 3, 3).setValues([['2名で清掃', 2, 'Y']]);
-    s.getRange(4, 1, 4, 3).setValues([['3名で清掃', 3, 'Y']]);
-    s.getRange(5, 1, 5, 3).setValues([['コインランドリー交通費', 4, 'Y']]);
-    s.getRange(6, 1, 6, 3).setValues([['コインランドリー実費', 5, 'Y']]);
-    s.getRange(7, 1, 7, 3).setValues([['直前点検', 6, 'Y']]);
+    s.getRange(2, 1, 6, 3).setValues([
+      ['1名で清掃', 1, 'Y'],
+      ['2名で清掃', 2, 'Y'],
+      ['3名で清掃', 3, 'Y'],
+      ['コインランドリー交通費', 4, 'Y'],
+      ['コインランドリー実費', 5, 'Y'],
+      ['直前点検', 6, 'Y']
+    ]);
   });
 
   safeInsert(SHEET_COMPENSATION, function(s) {
@@ -1234,10 +1236,12 @@ function ensureSheetsExist() {
 
   safeInsert(SHEET_RECRUIT_SETTINGS, function(s) {
     s.getRange(1, 1, 1, 2).setValues([['項目', '値']]);
-    s.getRange(2, 1, 2, 2).setValues([['募集開始週数', 4]]);
-    s.getRange(3, 1, 3, 2).setValues([['最少回答者数', 2]]);
-    s.getRange(4, 1, 4, 2).setValues([['リマインド間隔週', 1]]);
-    s.getRange(5, 1, 5, 2).setValues([['選定人数', 2]]);
+    s.getRange(2, 1, 4, 2).setValues([
+      ['募集開始週数', 4],
+      ['最少回答者数', 2],
+      ['リマインド間隔週', 1],
+      ['選定人数', 2]
+    ]);
   });
 
   safeInsert(SHEET_RECRUIT, function(s) {
@@ -2355,7 +2359,7 @@ function getJobTypes() {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_JOB_TYPES);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, 3).getValues() : [];
+    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 3).getValues() : [];
     const list = rows.map(function(row, i) {
       return {
         rowIndex: i + 2,
@@ -2539,7 +2543,7 @@ function getCompensation() {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_COMPENSATION);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, 4).getValues() : [];
+    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
     const list = rows.map(function(row, i) {
       return {
         rowIndex: i + 2,
@@ -2602,7 +2606,7 @@ function saveCompensationBatch(staffName, entries) {
     var lastRow = sheet.getLastRow();
     var toDelete = [];
     if (lastRow >= 2) {
-      var data = sheet.getRange(2, 1, lastRow, 1).getValues();
+      var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
       for (var i = 0; i < data.length; i++) {
         if (String(data[i][0] || '').trim() === staff) toDelete.push(i + 2);
       }
@@ -2643,7 +2647,7 @@ function saveCompensationForJob(jobName, entries) {
     var lastRow = sheet.getLastRow();
     var toDelete = [];
     if (lastRow >= 2) {
-      var data = sheet.getRange(2, 1, lastRow, 2).getValues();
+      var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
       for (var i = 0; i < data.length; i++) {
         if (String(data[i][1] || '').trim() === job) toDelete.push(i + 2);
       }
@@ -2680,7 +2684,7 @@ function deleteCompensationByStaff(staffName) {
     if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません。' });
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return JSON.stringify({ success: true });
-    var data = sheet.getRange(2, 1, lastRow, 1).getValues();
+    var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
     var toDelete = [];
     for (var i = 0; i < data.length; i++) {
       if (String(data[i][0] || '').trim() === staff) toDelete.push(i + 2);
@@ -3547,7 +3551,7 @@ function getBookingsWithoutRecruitment(sortOrder) {
       const recruitRows = recruitSheet.getRange(2, 2, numRows, 1).getValues();
       recruitRows.forEach(function(r) { existingRowNumbers.push(Number(r[0]) || 0); });
     }
-    const data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    const data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     const list = [];
     for (var i = 0; i < data.length; i++) {
       const rowNum = i + 2;
@@ -4068,7 +4072,7 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
     const headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     const colMap = buildColumnMap(headers);
     if (colMap.checkOut < 0 || colMap.cleaningStaff < 0) return JSON.stringify({ success: true, list: [] });
-    const data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    const data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     var list = [];
     var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
     var ymParts = ym.split('-');
@@ -4245,7 +4249,7 @@ function cancelStaffFromCleaning(bookingRowNumber, staffIdentifier) {
 
 function getInvoiceFolderId() {
   try {
-    if (!requireOwner()) return JSON.stringify({ success: false });
+    // 読み取りのみのため requireOwner() を外す（設定タブ自体がオーナー専用）
     var id = PropertiesService.getDocumentProperties().getProperty('invoiceFolderId') || '';
     return JSON.stringify({ success: true, folderId: id });
   } catch (e) {
@@ -4273,7 +4277,7 @@ function setInvoiceFolderId(folderId) {
  */
 function getInvoiceTemplateDocId() {
   try {
-    if (!requireOwner()) return JSON.stringify({ success: false });
+    // 読み取りのみのため requireOwner() を外す（設定タブ自体がオーナー専用）
     var id = PropertiesService.getDocumentProperties().getProperty('invoiceTemplateDocId') || '';
     return JSON.stringify({ success: true, templateDocId: id });
   } catch (e) {
@@ -4690,7 +4694,11 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
       sendResult: sendResult
     });
   } catch (e) {
-    return JSON.stringify({ success: false, error: e.toString() });
+    var errMsg = e.toString();
+    if (errMsg.indexOf('auth/documents') !== -1 || errMsg.indexOf('DocumentApp') !== -1) {
+      errMsg = 'Googleドキュメントへのアクセス権限がありません。オーナーがApps Scriptエディタで一度関数を実行し、権限を再承認してください。';
+    }
+    return JSON.stringify({ success: false, error: errMsg });
   }
 }
 
@@ -5812,7 +5820,7 @@ function checkAndCreateRecruitments() {
     if (colMap.checkOut < 0) return;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const data = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+    const data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     for (var i = 0; i < data.length; i++) {
       // キャンセル済みの予約はスキップ
       if (colMap.cancelledAt >= 0) {

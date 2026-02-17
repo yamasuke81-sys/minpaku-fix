@@ -106,7 +106,7 @@ function main() {
   var urls = [];
 
   // === メインアプリ ===
-  console.log('[1/4] メインアプリ: コードをプッシュ...');
+  console.log('[1/5] メインアプリ: コードをプッシュ...');
   var mainPush = run(clasp + ' push --force', rootDir);
   if (!mainPush.ok) {
     console.error('  エラー: メインアプリの clasp push に失敗');
@@ -115,7 +115,7 @@ function main() {
   }
   console.log('  OK');
 
-  console.log('[2/4] メインアプリ: デプロイを更新...');
+  console.log('[2/5] メインアプリ: デプロイを更新...');
   var mainDeps = run(clasp + ' deployments', rootDir);
   var mainId = mainDeps.ok ? getDeployId(mainDeps.out) : null;
   var today = new Date().toISOString().slice(0, 10);
@@ -139,7 +139,7 @@ function main() {
   }
 
   // === チェックリストアプリ ===
-  console.log('[3/4] チェックリストアプリ: コードをプッシュ...');
+  console.log('[3/5] チェックリストアプリ: コードをプッシュ...');
   var clPush = run(clasp + ' push --force', checklistDir);
   if (!clPush.ok) {
     console.error('  エラー: チェックリストアプリの clasp push に失敗');
@@ -147,14 +147,31 @@ function main() {
     process.exit(1);
   }
   console.log('  OK');
+  console.log('  push出力: ' + clPush.out.trim().split('\n').slice(0, 5).join(' / '));
 
-  console.log('[4/4] チェックリストアプリ: デプロイを更新...');
+  console.log('[4/5] チェックリストアプリ: 新バージョンを作成...');
+  var clVer = run(clasp + ' version "チェックリスト ' + today + '"', checklistDir);
+  if (!clVer.ok) {
+    console.error('  エラー: バージョン作成に失敗');
+    console.error('  ' + clVer.out.slice(0, 500));
+    process.exit(1);
+  }
+  // バージョン番号を抽出（出力例: "Created version 15."）
+  var verMatch = clVer.out.match(/(\d+)/);
+  var versionNum = verMatch ? verMatch[1] : null;
+  console.log('  OK - バージョン ' + (versionNum || '(番号取得失敗)'));
+
+  console.log('[5/5] チェックリストアプリ: デプロイを更新...');
   var clDeps = run(clasp + ' deployments', checklistDir);
+  console.log('  デプロイ一覧: ' + (clDeps.out || '').trim().split('\n').filter(function(l) { return l.trim(); }).join(' / '));
   var clId = clDeps.ok ? getDeployId(clDeps.out) : null;
   if (clId) {
-    var r = run(clasp + ' deploy --deploymentId "' + clId + '" --description "チェックリスト ' + today + '"', checklistDir);
+    var deployCmd = clasp + ' deploy --deploymentId "' + clId + '"';
+    if (versionNum) deployCmd += ' -V ' + versionNum;
+    deployCmd += ' --description "チェックリスト ' + today + '"';
+    var r = run(deployCmd, checklistDir);
     if (r.ok) {
-      console.log('  チェックリスト: OK');
+      console.log('  チェックリスト: OK (デプロイID=' + clId + ', バージョン=' + (versionNum || 'auto') + ')');
       urls.push({ label: 'チェックリスト', url: 'https://script.google.com/macros/s/' + clId + '/exec' });
     } else {
       console.log('  失敗 - ' + r.out.slice(0, 200));
@@ -163,6 +180,7 @@ function main() {
     console.log('  既存デプロイが見つかりません。新規作成...');
     var clNew = run(clasp + ' deploy --description "チェックリスト ' + today + '"', checklistDir);
     console.log('  ' + (clNew.ok ? 'OK' : '失敗'));
+    if (clNew.ok) console.log('  出力: ' + clNew.out.trim());
   }
 
   console.log('');

@@ -4992,21 +4992,19 @@
       }
 
       function loadSettings() {
-        // スタッフ用URLはオーナーURLから自動生成（常にバックエンドから最新を取得）
+        // スタッフ用URLはオーナーURLから自動生成
         var staffInp = document.getElementById('staffDeployUrlInput');
         if (staffInp) {
-          // まずローカルのappBaseUrlで即座に表示
+          // まずテンプレートのappBaseUrlで表示
           var base = window.appBaseUrl || '';
           if (base) {
             staffInp.value = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
           }
-          // バックエンドからも取得して確実に反映
+          // バックエンドから確実に取得（ScriptApp + プロパティ + デプロイID全て試行）
           google.script.run.withSuccessHandler(function(jsonStr) {
             try {
               var r = JSON.parse(jsonStr);
-              if (r.success && r.url) {
-                staffInp.value = r.url;
-              }
+              if (r.success && r.url) staffInp.value = r.url;
             } catch (e) {}
           }).getStaffDeployUrl();
         }

@@ -122,13 +122,24 @@ function doGet(e) {
     PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', u);
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
+  if (action === 'setBaseUrl' && url && typeof url === 'string') {
+    PropertiesService.getScriptProperties().setProperty('APP_BASE_URL', String(url).trim());
+    // デプロイIDも抽出して保存
+    var m = String(url).match(/\/macros\/s\/([^\/]+)\//);
+    if (m) PropertiesService.getDocumentProperties().setProperty('deploymentId', m[1]);
+    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+  }
   if (action === 'setChecklistAppUrl' && url && typeof url === 'string') {
     PropertiesService.getScriptProperties().setProperty('CHECKLIST_APP_URL', String(url).trim());
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
   const template = HtmlService.createTemplateFromFile('index');
-  var baseUrl = ScriptApp.getService().getUrl() || '';
-  // デプロイURLをプロパティに保存（getStaffDeployUrlのフォールバック用）
+  // デプロイURLを取得
+  var baseUrl = '';
+  try { baseUrl = ScriptApp.getService().getUrl() || ''; } catch(e) {}
+  if (!baseUrl) {
+    try { baseUrl = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {}
+  }
   if (baseUrl) {
     try { PropertiesService.getScriptProperties().setProperty('APP_BASE_URL', baseUrl); } catch(e) {}
   }
@@ -711,21 +722,20 @@ function getAccountSwitchUrl() {
  */
 function getStaffDeployUrl() {
   try {
-    // まずベースURLを取得（複数ソースからフォールバック）
+    // 1. 保存済みstaffDeployUrl（deploy-all.jsが保存）
+    var stored = '';
+    try { stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch(e) {}
+    if (stored) return JSON.stringify({ success: true, url: stored });
+    // 2. ベースURLから生成
     var base = '';
-    try { base = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+    try { base = ScriptApp.getService().getUrl() || ''; } catch(e) {}
     if (!base) {
-      try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
+      try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {}
     }
-    // ベースURLがあれば常に最新のスタッフURLを生成して返す
     if (base) {
       var url = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
-      try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
-      return JSON.stringify({ success: true, url: url, baseUrl: base });
+      return JSON.stringify({ success: true, url: url });
     }
-    // ベースURLが取得できない場合は保存済みURLを返す
-    var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
-    if (stored && String(stored).trim()) return JSON.stringify({ success: true, url: String(stored).trim() });
     return JSON.stringify({ success: true, url: '' });
   } catch (e) { return JSON.stringify({ success: false, url: '', error: e.toString() }); }
 }

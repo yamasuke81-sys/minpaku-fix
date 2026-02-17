@@ -130,12 +130,21 @@ function main() {
     run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);
   }
 
-  // === スタッフ用URL ===
-  // スタッフ用URLはオーナー用URL + ?staff=1 で自動生成される（GAS側 getStaffDeployUrl で自動計算）
-  var staffEntry = urls.filter(function(u) { return u.label === 'スタッフ用'; })[0];
-  if (staffEntry) {
-    console.log('');
-    console.log('  スタッフ用URLはアプリ側で自動設定されます: ' + staffEntry.url);
+  // === オーナーURL・スタッフ用URLをGASに保存 ===
+  if (mainId) {
+    var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
+    var staffUrl = baseUrl + '?staff=1';
+    console.log('  URLをGASに保存中...');
+    try {
+      // ベースURL保存
+      execSync('curl -sL "' + baseUrl + '?action=setBaseUrl&url=' + encodeURIComponent(baseUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+      // スタッフURL保存
+      execSync('curl -sL "' + baseUrl + '?action=setStaffUrl&url=' + encodeURIComponent(staffUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+      console.log('  OK - オーナー: ' + baseUrl);
+      console.log('  OK - スタッフ: ' + staffUrl);
+    } catch (e) {
+      console.log('  URL保存リクエスト失敗（次回デプロイで自動リトライされます）: ' + e.message);
+    }
   }
 
   // === チェックリストアプリ ===

@@ -926,7 +926,35 @@ function getPhotoFolderSettings() {
     var afterId = props.getProperty('CL_PHOTO_FOLDER_AFTER') || '';
     var exampleId = props.getProperty('CL_PHOTO_FOLDER_EXAMPLE') || '';
     var memoId = props.getProperty('CL_PHOTO_FOLDER_MEMO') || '';
-    return JSON.stringify({ success: true, parentId: parentId, beforeId: beforeId, afterId: afterId, exampleId: exampleId, memoId: memoId });
+    // 保管期間設定も含めて返す
+    var retention = {};
+    ['before', 'after', 'example', 'memo'].forEach(function(t) {
+      var days = props.getProperty('CL_RETENTION_DAYS_' + t.toUpperCase());
+      var noDelete = props.getProperty('CL_RETENTION_NODELETE_' + t.toUpperCase());
+      retention[t] = { days: days ? parseInt(days, 10) : (t === 'example' ? 0 : 90), noDelete: noDelete === 'true' || (t === 'example' && noDelete !== 'false') };
+    });
+    return JSON.stringify({ success: true, parentId: parentId, beforeId: beforeId, afterId: afterId, exampleId: exampleId, memoId: memoId, retention: retention });
+  } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
+}
+
+/**
+ * 写真保管期間設定を保存
+ * @param {string} type 'before' | 'after' | 'example' | 'memo'
+ * @param {number} days 保管日数（0=削除しない）
+ * @param {boolean} noDelete 削除しないフラグ
+ */
+function savePhotoRetentionSetting(type, days, noDelete) {
+  try {
+    var valid = ['before', 'after', 'example', 'memo'];
+    if (valid.indexOf(type) < 0) return JSON.stringify({ success: false, error: '無効なタイプ' });
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('CL_RETENTION_NODELETE_' + type.toUpperCase(), String(!!noDelete));
+    if (!noDelete && days > 0) {
+      props.setProperty('CL_RETENTION_DAYS_' + type.toUpperCase(), String(days));
+    } else {
+      props.setProperty('CL_RETENTION_DAYS_' + type.toUpperCase(), '0');
+    }
+    return JSON.stringify({ success: true });
   } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
 }
 

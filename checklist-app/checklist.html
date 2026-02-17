@@ -1298,17 +1298,17 @@
         <button id="memoSubmitBtn" class="memo-submit-btn" disabled onclick="addMemo()">登録</button>
       </div>
 
-      <!-- コインランドリー状況 -->
-      <div id="laundrySection" class="laundry-section" style="margin:16px 12px 8px;padding:12px;background:#f8f9fa;border-radius:10px;border:1px solid #dee2e6;">
-        <div style="font-size:14px;font-weight:700;color:#2c3e50;margin-bottom:10px;display:flex;align-items:center;gap:6px;">🧺 コインランドリー状況</div>
-        <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
-      </div>
-
       <!-- 清掃完了エリア（漏れチェック統合） -->
       <div class="complete-area">
         <div id="completeMsg" class="complete-msg"></div>
         <button id="btnComplete" class="btn-complete" onclick="completeChecklist()">清掃完了</button>
         <div id="completionInfo" style="display:none;margin-top:8px;padding:8px 10px;background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;font-size:13px;color:#155724;text-align:center;"></div>
+      </div>
+
+      <!-- コインランドリー状況（清掃完了ボタンの下） -->
+      <div id="laundrySection" class="laundry-section" style="margin:8px 12px 16px;padding:12px;background:#f8f9fa;border-radius:10px;border:1px solid #dee2e6;">
+        <div style="font-size:14px;font-weight:700;color:#2c3e50;margin-bottom:10px;display:flex;align-items:center;gap:6px;">🧺 コインランドリー状況</div>
+        <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
       </div>
     </div>
 
@@ -1334,27 +1334,60 @@
           <h4 style="font-size:14px;margin-bottom:8px;">写真保存フォルダ（Googleドライブ）</h4>
           <p style="font-size:12px;color:#666;margin-bottom:12px;">各写真の保存先フォルダURLまたはフォルダIDを指定。空欄の場合は自動作成されます。</p>
 
-          <div style="margin-bottom:10px;">
+          <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #eee;">
             <label style="font-size:12px;font-weight:bold;color:#555;">ビフォー写真フォルダ</label>
             <div style="display:flex;gap:6px;margin-top:4px;">
               <input type="text" id="folderBeforeInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
               <button onclick="saveSubFolder('before')" style="padding:6px 12px;background:#3498db;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
             </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;">
+                <input type="checkbox" id="retentionNoDeleteBefore" onchange="toggleRetentionInput('before')"> 削除しない
+              </label>
+              <div id="retentionDaysAreaBefore" style="display:flex;align-items:center;gap:4px;">
+                <span style="font-size:12px;color:#666;">保管期間:</span>
+                <input type="number" id="retentionDaysBefore" min="1" max="3650" value="90" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;">
+                <span style="font-size:12px;color:#666;">日</span>
+              </div>
+              <button onclick="saveRetention('before')" style="padding:3px 10px;background:#3498db;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">保存</button>
+            </div>
           </div>
 
-          <div style="margin-bottom:10px;">
+          <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #eee;">
             <label style="font-size:12px;font-weight:bold;color:#555;">アフター写真フォルダ</label>
             <div style="display:flex;gap:6px;margin-top:4px;">
               <input type="text" id="folderAfterInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
               <button onclick="saveSubFolder('after')" style="padding:6px 12px;background:#e67e22;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
             </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;">
+                <input type="checkbox" id="retentionNoDeleteAfter" onchange="toggleRetentionInput('after')"> 削除しない
+              </label>
+              <div id="retentionDaysAreaAfter" style="display:flex;align-items:center;gap:4px;">
+                <span style="font-size:12px;color:#666;">保管期間:</span>
+                <input type="number" id="retentionDaysAfter" min="1" max="3650" value="90" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;">
+                <span style="font-size:12px;color:#666;">日</span>
+              </div>
+              <button onclick="saveRetention('after')" style="padding:3px 10px;background:#e67e22;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">保存</button>
+            </div>
           </div>
 
-          <div style="margin-bottom:10px;">
+          <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #eee;">
             <label style="font-size:12px;font-weight:bold;color:#555;">見本写真フォルダ</label>
             <div style="display:flex;gap:6px;margin-top:4px;">
               <input type="text" id="folderExampleInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
               <button onclick="saveSubFolder('example')" style="padding:6px 12px;background:#9b59b6;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;">
+                <input type="checkbox" id="retentionNoDeleteExample" checked onchange="toggleRetentionInput('example')"> 削除しない
+              </label>
+              <div id="retentionDaysAreaExample" style="display:none;align-items:center;gap:4px;">
+                <span style="font-size:12px;color:#666;">保管期間:</span>
+                <input type="number" id="retentionDaysExample" min="1" max="3650" value="0" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;">
+                <span style="font-size:12px;color:#666;">日</span>
+              </div>
+              <button onclick="saveRetention('example')" style="padding:3px 10px;background:#9b59b6;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">保存</button>
             </div>
           </div>
 
@@ -1363,6 +1396,17 @@
             <div style="display:flex;gap:6px;margin-top:4px;">
               <input type="text" id="folderMemoInput" placeholder="フォルダURL or ID（空欄=自動）" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
               <button onclick="saveSubFolder('memo')" style="padding:6px 12px;background:#27ae60;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">保存</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;">
+                <input type="checkbox" id="retentionNoDeleteMemo" onchange="toggleRetentionInput('memo')"> 削除しない
+              </label>
+              <div id="retentionDaysAreaMemo" style="display:flex;align-items:center;gap:4px;">
+                <span style="font-size:12px;color:#666;">保管期間:</span>
+                <input type="number" id="retentionDaysMemo" min="1" max="3650" value="90" style="width:60px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:12px;text-align:center;">
+                <span style="font-size:12px;color:#666;">日</span>
+              </div>
+              <button onclick="saveRetention('memo')" style="padding:3px 10px;background:#27ae60;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;">保存</button>
             </div>
           </div>
           <div id="folderSaveResult" style="display:none;margin-top:8px;font-size:12px;"></div>
@@ -1713,8 +1757,45 @@
           if (ai && res.afterId) ai.value = 'https://drive.google.com/drive/folders/' + res.afterId;
           if (ei && res.exampleId) ei.value = 'https://drive.google.com/drive/folders/' + res.exampleId;
           if (mi && res.memoId) mi.value = 'https://drive.google.com/drive/folders/' + res.memoId;
+          // 保管期間設定を反映
+          if (res.retention) {
+            ['before', 'after', 'example', 'memo'].forEach(function(t) {
+              var r = res.retention[t];
+              if (!r) return;
+              var cb = document.getElementById('retentionNoDelete' + capitalize(t));
+              var di = document.getElementById('retentionDays' + capitalize(t));
+              if (cb) cb.checked = r.noDelete;
+              if (di && !r.noDelete && r.days > 0) di.value = r.days;
+              toggleRetentionInput(t);
+            });
+          }
         }
       });
+    }
+
+    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    function toggleRetentionInput(type) {
+      var cb = document.getElementById('retentionNoDelete' + capitalize(type));
+      var area = document.getElementById('retentionDaysArea' + capitalize(type));
+      if (cb && area) {
+        area.style.display = cb.checked ? 'none' : 'flex';
+      }
+    }
+
+    function saveRetention(type) {
+      var cb = document.getElementById('retentionNoDelete' + capitalize(type));
+      var di = document.getElementById('retentionDays' + capitalize(type));
+      var noDelete = cb ? cb.checked : false;
+      var days = di ? parseInt(di.value, 10) || 0 : 0;
+      if (!noDelete && days < 1) { alert('保管期間を1日以上で指定してください'); return; }
+      var resEl = document.getElementById('folderSaveResult');
+      resEl.textContent = '保管期間を保存中...'; resEl.style.color = '#666'; resEl.style.display = 'block';
+      callGAS('savePhotoRetentionSetting', [type, days, noDelete]).then(function(res) {
+        if (res.success) { resEl.textContent = '保管期間を保存しました'; resEl.style.color = '#27ae60'; }
+        else { resEl.textContent = res.error || '保存失敗'; resEl.style.color = '#e74c3c'; }
+        setTimeout(function() { resEl.style.display = 'none'; }, 3000);
+      }).catch(function() { resEl.textContent = 'エラー'; resEl.style.color = '#e74c3c'; setTimeout(function() { resEl.style.display = 'none'; }, 3000); });
     }
 
     // フォルダ保存

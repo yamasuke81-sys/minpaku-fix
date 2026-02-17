@@ -97,36 +97,6 @@ function openBrowserIncognito(url) {
   openBrowser(url);
 }
 
-/** URLにHTTP GETリクエストを送信（リダイレクト対応） */
-function fetchUrlSync(targetUrl) {
-  var script = [
-    "var https = require('https');",
-    "function fetch(u, depth) {",
-    "  if (depth > 5) { process.exit(1); return; }",
-    "  https.get(u, {headers:{'User-Agent':'deploy'}}, function(r) {",
-    "    if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) {",
-    "      fetch(r.headers.location, depth + 1);",
-    "    } else {",
-    "      var d = '';",
-    "      r.on('data', function(c) { d += c; });",
-    "      r.on('end', function() { process.stdout.write(d); });",
-    "    }",
-    "  }).on('error', function() { process.exit(1); });",
-    "}",
-    "fetch(process.argv[1], 0);"
-  ].join('\n');
-  var tmpFile = path.join(rootDir, '.tmp_fetch.js');
-  try {
-    fs.writeFileSync(tmpFile, script);
-    var result = run('node "' + tmpFile + '" "' + targetUrl + '"');
-    return result.ok ? result.out.trim() : '';
-  } catch (e) {
-    return '';
-  } finally {
-    try { fs.unlinkSync(tmpFile); } catch (e) {}
-  }
-}
-
 function main() {
   console.log('========================================');
   console.log('  全アプリ一括デプロイ');
@@ -160,27 +130,12 @@ function main() {
     run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);
   }
 
-  // === スタッフ用URLを設定タブに自動反映 ===
-  var ownerEntry = urls.filter(function(u) { return u.label === 'オーナー用'; })[0];
+  // === スタッフ用URL ===
+  // スタッフ用URLはオーナー用URL + ?staff=1 で自動生成される（GAS側 getStaffDeployUrl で自動計算）
   var staffEntry = urls.filter(function(u) { return u.label === 'スタッフ用'; })[0];
-  if (ownerEntry && staffEntry) {
+  if (staffEntry) {
     console.log('');
-    console.log('  スタッフ用URLを設定タブに自動反映中...');
-    var configPath = path.join(rootDir, 'deploy-config.json');
-    var urlUpdateSecret = '';
-    try {
-      var config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      urlUpdateSecret = (config.urlUpdateSecret || '').trim();
-    } catch (e) {}
-    var updateUrl = ownerEntry.url + (ownerEntry.url.indexOf('?') >= 0 ? '&' : '?') +
-      'action=setStaffUrl&url=' + encodeURIComponent(staffEntry.url) +
-      (urlUpdateSecret ? '&secret=' + encodeURIComponent(urlUpdateSecret) : '');
-    var response = fetchUrlSync(updateUrl);
-    if (response === 'OK') {
-      console.log('  スタッフ用URLを自動反映しました: ' + staffEntry.url);
-    } else {
-      console.log('  自動反映できませんでした。設定タブで手動入力してください: ' + staffEntry.url);
-    }
+    console.log('  スタッフ用URLはアプリ側で自動設定されます: ' + staffEntry.url);
   }
 
   // === チェックリストアプリ ===

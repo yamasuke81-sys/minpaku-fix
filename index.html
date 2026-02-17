@@ -1061,29 +1061,6 @@
         </div>
       </div>
       <!-- チェックリスト写真保存フォルダはチェックアプリの設定タブに移動 -->
-      <!-- 請求書設定 -->
-      <div id="invoiceSettingsSection" class="mb-3 p-2 border rounded bg-light">
-        <label class="form-label small fw-bold">請求書設定</label>
-        <p class="small text-muted mb-1">スタッフが請求書を作成・送信するための設定です。</p>
-        <div class="mb-2">
-          <label class="form-label small">保存先フォルダID</label>
-          <p class="small text-muted mb-1">請求書PDFの保存先フォルダ。フォルダURLの <code>/folders/</code> の後のIDを貼り付けてください。月ごとにサブフォルダ(YYYY-MM)が自動作成されます。</p>
-          <div class="d-flex gap-2 flex-wrap align-items-center">
-            <input type="text" class="form-control form-control-sm" id="invoiceFolderIdInput" placeholder="1abc...xyz" style="max-width:300px;">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceFolder">保存</button>
-          </div>
-          <div id="invoiceFolderSaveResult" class="small mt-1" style="display:none;"></div>
-        </div>
-        <div class="mb-1">
-          <label class="form-label small">テンプレートDoc ID</label>
-          <p class="small text-muted mb-1">Googleドキュメントの請求書テンプレート。URLの <code>/d/</code> と <code>/edit</code> の間のIDを貼り付けてください。</p>
-          <div class="d-flex gap-2 flex-wrap align-items-center">
-            <input type="text" class="form-control form-control-sm" id="invoiceTemplateDocIdInput" placeholder="1abc...xyz" style="max-width:300px;">
-            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceTemplate">保存</button>
-          </div>
-          <div id="invoiceTemplateSaveResult" class="small mt-1" style="display:none;"></div>
-        </div>
-      </div>
       <!-- 初回セットアップ（オーナー未設定時） -->
       <div id="ownerSetupForm" class="mb-3" style="display:none;">
         <div class="alert alert-info small">初回のみオーナー登録を行います。登録後はオーナーのみ設定画面にアクセスできます。</div>
@@ -1118,6 +1095,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿未入力リマインド</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoice">請求書</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsStaff">
@@ -1236,6 +1214,27 @@
       <div id="settingsNotifications" style="display:none;">
         <p class="small text-muted mb-2">回答・回答取消・予約追加・予約削除・フォーム回答などの通知履歴です。</p>
         <div id="notificationList"></div>
+      </div>
+      <div id="settingsInvoice" style="display:none;">
+        <p class="small text-muted mb-2">スタッフが請求書を作成・送信するための設定です。</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">保存先フォルダ</label>
+          <p class="small text-muted mb-1">請求書PDFの保存先GoogleドライブフォルダのURL、またはフォルダIDを入力してください。月ごとにサブフォルダ(YYYY-MM)が自動作成されます。</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" class="form-control form-control-sm" id="invoiceFolderIdInput" placeholder="URL or フォルダID" style="max-width:400px;">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceFolder">保存</button>
+          </div>
+          <div id="invoiceFolderSaveResult" class="small mt-1" style="display:none;"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">テンプレートDoc</label>
+          <p class="small text-muted mb-1">請求書テンプレートのGoogleドキュメントURL、またはDoc IDを入力してください。</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="text" class="form-control form-control-sm" id="invoiceTemplateDocIdInput" placeholder="URL or Doc ID" style="max-width:400px;">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceTemplate">保存</button>
+          </div>
+          <div id="invoiceTemplateSaveResult" class="small mt-1" style="display:none;"></div>
+        </div>
       </div>
       <div id="settingsMaintenance" style="display:none;">
         <p class="small text-muted mb-2">スプレッドシートの空白行・空白列を削除してセル数を最適化します。Google Sheetsの1000万セル上限に近づいた場合に実行してください。</p>
@@ -3769,6 +3768,7 @@
           if (saved && (saved.name || saved.email)) {
             applyStaffSelection(saved.name, saved.email);
             loadStaffSchedule();
+            loadInvoiceData();
           } else {
             showStaffSelectOverlay();
           }
@@ -5146,14 +5146,34 @@
         }).withFailureHandler(function(err) { errEl.textContent = err.message || 'エラー'; errEl.style.display = 'block'; }).setInitialPassword(pw);
       });
 
+      // === URL/IDからIDだけ抽出するヘルパー ===
+      function extractDriveId(input) {
+        var s = (input || '').trim();
+        // GoogleドライブフォルダURL: /folders/XXXXX
+        var m = s.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+        if (m) return m[1];
+        // GoogleドキュメントURL: /d/XXXXX/
+        m = s.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+        if (m) return m[1];
+        // ID部分（20文字以上の英数字ハイフンアンダーバー）
+        m = s.match(/^([a-zA-Z0-9_-]{10,})$/);
+        if (m) return m[1];
+        // URLの中にそれっぽいID
+        m = s.match(/[a-zA-Z0-9_-]{20,}/);
+        if (m) return m[0];
+        return s;
+      }
+
       // === 請求書設定：フォルダID保存 ===
       document.getElementById('btnSaveInvoiceFolder').addEventListener('click', function() {
-        var folderId = document.getElementById('invoiceFolderIdInput').value.trim();
+        var raw = document.getElementById('invoiceFolderIdInput').value.trim();
+        var folderId = extractDriveId(raw);
         var resEl = document.getElementById('invoiceFolderSaveResult');
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
+              document.getElementById('invoiceFolderIdInput').value = folderId;
               resEl.textContent = '保存しました。';
               resEl.className = 'small mt-1 text-success';
               resEl.style.display = 'block';
@@ -5172,12 +5192,14 @@
       });
       // === 請求書設定：テンプレートDoc ID保存 ===
       document.getElementById('btnSaveInvoiceTemplate').addEventListener('click', function() {
-        var docId = document.getElementById('invoiceTemplateDocIdInput').value.trim();
+        var raw = document.getElementById('invoiceTemplateDocIdInput').value.trim();
+        var docId = extractDriveId(raw);
         var resEl = document.getElementById('invoiceTemplateSaveResult');
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
+              document.getElementById('invoiceTemplateDocIdInput').value = docId;
               resEl.textContent = '保存しました。';
               resEl.className = 'small mt-1 text-success';
               resEl.style.display = 'block';
@@ -6450,6 +6472,8 @@
           document.getElementById('settingsSync').style.display = t === 'sync' ? 'block' : 'none';
           var notifEl = document.getElementById('settingsNotifications');
           if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
+          var invoiceEl = document.getElementById('settingsInvoice');
+          if (invoiceEl) invoiceEl.style.display = t === 'invoice' ? 'block' : 'none';
           var maintEl = document.getElementById('settingsMaintenance');
           if (maintEl) maintEl.style.display = t === 'maintenance' ? 'block' : 'none';
           if (t === 'staff') loadStaffList();
@@ -6607,6 +6631,7 @@
           var disp = document.getElementById('staffDisplayName');
           if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
           loadStaffSchedule();
+          loadInvoiceData();
           // ディープリンク: スタッフ選択後にペンディングのモーダルを開く
           if (window._pendingDeepLinkDate) {
             var dd = window._pendingDeepLinkDate;

@@ -4653,12 +4653,29 @@
       }).catch(function() {});
     }
 
+    function formatCompletionDate(str) {
+      if (!str) return str;
+      var days = ['日','月','火','水','木','金','土'];
+      // "yyyy-MM-dd HH:mm" 形式
+      var m = String(str).match(/(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}:\d{2})/);
+      if (m) {
+        var dt = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+        return m[1] + '/' + parseInt(m[2],10) + '/' + parseInt(m[3],10) + '(' + days[dt.getDay()] + ') ' + m[4];
+      }
+      // Date文字列のフォールバック
+      var d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + '(' + days[d.getDay()] + ') ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+      }
+      return str;
+    }
+
     function loadCompletionStatus() {
       callGAS('getCleaningCompletionStatus', [checkoutDate]).then(function(res) {
         var el = document.getElementById('completionInfo');
         if (!el) return;
         if (res.success && res.completedAt) {
-          el.textContent = '清掃完了済み: ' + res.completedAt + (res.completedBy ? '（' + res.completedBy + '）' : '');
+          el.textContent = '清掃完了済み: ' + formatCompletionDate(res.completedAt) + (res.completedBy ? '（' + res.completedBy + '）' : '');
           el.style.display = 'block';
         } else {
           el.style.display = 'none';

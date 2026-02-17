@@ -16,12 +16,24 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Get latest code
-set BRANCH=claude/minpaku-fix-ui-updates-af95w
-echo [1/3] Updating code from %BRANCH% ...
+:: Get latest code - auto-detect latest claude/* branch
+echo [1/3] Fetching latest code ...
 if exist "deploy-config.json" copy /y "deploy-config.json" "deploy-config.json.bak" >nul 2>nul
 git stash -u -q 2>nul
-git fetch origin %BRANCH%
+git fetch origin
+
+:: Find the most recently updated claude/* branch on origin
+set BRANCH=
+for /f "delims=" %%b in ('git for-each-ref --sort=-committerdate --format="%%(refname:lstrip=3)" "refs/remotes/origin/claude/*" --count=1') do set BRANCH=%%b
+
+if "%BRANCH%"=="" (
+    echo [Error] No claude/* branch found on origin.
+    echo         Try: git fetch origin
+    pause
+    exit /b 1
+)
+
+echo    Auto-detected branch: %BRANCH%
 git checkout -f %BRANCH% 2>nul
 git reset --hard origin/%BRANCH%
 if exist "deploy-config.json.bak" (

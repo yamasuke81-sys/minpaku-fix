@@ -529,53 +529,75 @@
       padding: 12px;
     }
     .supply-list-card {
-      background: #fff3cd;
-      padding: 16px;
+      background: #fff;
+      padding: 0;
       border-radius: 8px;
-      border-left: 4px solid #ffc107;
+      overflow: hidden;
     }
-    .supply-list-card h3 {
-      font-size: 16px;
-      color: #856404;
-      margin-bottom: 12px;
+    .supply-list-header {
+      background: #2c3e50;
+      color: #fff;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .supply-list-header .supply-count {
+      font-size: 13px;
+      font-weight: normal;
+      opacity: 0.8;
+      margin-left: 8px;
     }
     .supply-item {
-      padding: 8px 12px;
+      padding: 12px 14px;
       font-size: 14px;
-      color: #856404;
-      background: rgba(255,255,255,0.5);
-      border-radius: 4px;
-      margin-bottom: 6px;
+      color: #333;
+      background: #fff;
+      border-bottom: 1px solid #eee;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
-    .supply-item:before {
-      content: "\26A0\FE0F ";
+    .supply-item:last-child { border-bottom: none; }
+    .supply-item.supply-checked {
+      background: #fff3cd;
+    }
+    .supply-item-checkbox {
+      width: 22px;
+      height: 22px;
       flex-shrink: 0;
+      accent-color: #e67e22;
     }
-    .supply-item-category {
-      font-size: 10px;
-      color: #fff;
-      background: #2c3e50;
-      padding: 2px 6px;
-      border-radius: 3px;
-      flex-shrink: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 50%;
-    }
-    .supply-item-name {
+    .supply-item-info {
       flex: 1;
       min-width: 0;
     }
+    .supply-item-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+    }
+    .supply-item-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .supply-item-tag {
+      font-size: 10px;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .supply-tag-0 { background: #3498db; }
+    .supply-tag-1 { background: #9b59b6; }
+    .supply-tag-2 { background: #1abc9c; }
+    .supply-tag-3 { background: #e67e22; }
     .supply-item-show-btn {
       font-size: 12px;
-      color: #fff;
-      background: #3498db;
-      border: none;
+      color: #3498db;
+      background: none;
+      border: 1px solid #3498db;
       padding: 4px 10px;
       border-radius: 4px;
       cursor: pointer;
@@ -583,22 +605,14 @@
       white-space: nowrap;
     }
     .supply-item-show-btn:active {
-      background: #2980b9;
-    }
-    .supply-item-remove-btn {
-      font-size: 12px;
+      background: #3498db;
       color: #fff;
-      background: #e74c3c;
-      border: none;
-      padding: 4px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      flex-shrink: 0;
-      white-space: nowrap;
-      margin-left: 4px;
     }
-    .supply-item-remove-btn:active {
-      background: #c0392b;
+    .supply-empty {
+      text-align: center;
+      color: #999;
+      padding: 30px 16px;
+      font-size: 14px;
     }
     @keyframes supply-highlight {
       0% { background: #ffeaa7; }
@@ -2565,13 +2579,19 @@
 
     // === 要補充リスト ===
     function renderSupplyList() {
-      var supplyNeeded = checklistData.supplyNeeded;
-      var keys = Object.keys(supplyNeeded);
+      var supplyNeeded = checklistData.supplyNeeded || {};
+      var items = checklistData.items || [];
+
+      // supplyItem=true の全アイテムを収集
+      var supplyItems = items.filter(function(item) { return item.supplyItem; });
+
+      // 要補充チェック済みの数（バッジ用）
+      var checkedCount = supplyItems.filter(function(item) { return !!supplyNeeded[item.id]; }).length;
 
       // タブバッジ更新
       var badge = document.getElementById('supplyBadge');
-      if (keys.length > 0) {
-        badge.textContent = keys.length;
+      if (checkedCount > 0) {
+        badge.textContent = checkedCount;
         badge.classList.remove('hidden');
       } else {
         badge.classList.add('hidden');
@@ -2579,81 +2599,105 @@
 
       // タブ内コンテンツ
       var el = document.getElementById('supplyListContent');
-      if (keys.length === 0) {
-        el.innerHTML = '<div class="supply-empty">要補充のアイテムはありません</div>';
+      if (supplyItems.length === 0) {
+        el.innerHTML = '<div class="supply-empty">要補充対象の項目がありません</div>';
         return;
       }
 
-      // アイテムIDからカテゴリ・名前を検索するマップを作成
-      var itemById = {};
-      var itemsByName = {};
-      if (checklistData.items) {
-        checklistData.items.forEach(function(item) {
-          itemById[item.id] = { category: item.category || 'その他', name: item.name };
-          // 名前→カテゴリの逆引き（名前でフォールバック検索用）
-          if (!itemsByName[item.name]) {
-            itemsByName[item.name] = item.category || 'その他';
-          }
-        });
-      }
-
-      // 要補充アイテムのカテゴリを正しく解決する
-      // 保存済みカテゴリ → マスタID一致 → 名前フォールバック の優先順
-      function resolveSupplyCategory(itemId, itemName, storedCategory) {
-        // 保存済みカテゴリがあればそれを優先（記録時点のカテゴリ）
-        if (storedCategory) return storedCategory;
-        var master = itemById[itemId];
-        // IDで見つかり、名前も一致すれば確実
-        if (master && master.name === itemName) return master.category;
-        // IDが別アイテムを指す or 見つからない場合、名前で検索
-        if (itemsByName[itemName]) return itemsByName[itemName];
-        // どちらも見つからない場合
-        return master ? master.category : '';
-      }
-
-      // カテゴリ順にソートして同じカテゴリの項目をまとめる
-      keys.sort(function(a, b) {
-        var catA = resolveSupplyCategory(a, supplyNeeded[a].name, supplyNeeded[a].category);
-        var catB = resolveSupplyCategory(b, supplyNeeded[b].name, supplyNeeded[b].category);
-        return catA.localeCompare(catB, 'ja');
+      // カテゴリ順→名前順でソート（チェック済みを上に）
+      supplyItems.sort(function(a, b) {
+        var aChecked = supplyNeeded[a.id] ? 0 : 1;
+        var bChecked = supplyNeeded[b.id] ? 0 : 1;
+        if (aChecked !== bChecked) return aChecked - bChecked;
+        var catA = a.category || '';
+        var catB = b.category || '';
+        var catCmp = catA.localeCompare(catB, 'ja');
+        if (catCmp !== 0) return catCmp;
+        return a.name.localeCompare(b.name, 'ja');
       });
 
-      var html = '<div class="supply-list-card"><h3>⚠️ 要補充リスト</h3>';
-      keys.forEach(function(k) {
-        var item = supplyNeeded[k];
-        var category = resolveSupplyCategory(k, item.name, item.category);
-        html += '<div class="supply-item">';
-        if (category) {
-          html += '<span class="supply-item-category">' + escapeHtml(category).replace(/：/g, ' &gt; ') + '</span>';
+      var html = '<div class="supply-list-card">';
+      html += '<div class="supply-list-header">要補充チェック<span class="supply-count">' + checkedCount + ' / ' + supplyItems.length + '</span></div>';
+
+      supplyItems.forEach(function(item) {
+        var isNeeded = !!supplyNeeded[item.id];
+        var escapedId = escapeHtml(item.id).replace(/'/g, "\\'");
+        var escapedName = escapeHtml(item.name).replace(/'/g, "\\'");
+        var escapedCat = escapeHtml(item.category || '').replace(/'/g, "\\'");
+        html += '<div class="supply-item' + (isNeeded ? ' supply-checked' : '') + '">';
+        html += '<input type="checkbox" class="supply-item-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" data-item-category="' + escapeHtml(item.category || '') + '" ' + (isNeeded ? 'checked' : '') + ' onchange="toggleSupplyFromTab(this)">';
+        html += '<div class="supply-item-info">';
+        html += '<div class="supply-item-name">' + escapeHtml(item.name) + '</div>';
+        if (item.category) {
+          var parts = item.category.split('：');
+          html += '<div class="supply-item-tags">';
+          parts.forEach(function(part, idx) {
+            html += '<span class="supply-item-tag supply-tag-' + (idx % 4) + '">' + escapeHtml(part) + '</span>';
+          });
+          html += '</div>';
         }
-        html += '<span class="supply-item-name">' + escapeHtml(item.name) + '</span>';
-        html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\')">表示</button>';
-        html += '<button class="supply-item-remove-btn" onclick="removeSupplyItem(\'' + escapeHtml(k).replace(/'/g, "\\'") + '\', \'' + escapeHtml(item.name).replace(/'/g, "\\'") + '\', \'' + escapeHtml(category).replace(/'/g, "\\'") + '\')">解除</button>';
+        html += '</div>';
+        html += '<button class="supply-item-show-btn" onclick="scrollToSupplyItem(\'' + escapedId + '\', \'' + escapedName + '\')">表示</button>';
         html += '</div>';
       });
       html += '</div>';
       el.innerHTML = html;
     }
 
-    // === 要補充タブから直接解除 ===
-    function removeSupplyItem(itemId, itemName, category) {
+    // === 要補充タブからチェック切り替え（双方向同期） ===
+    function toggleSupplyFromTab(checkbox) {
+      var itemId = checkbox.getAttribute('data-item-id');
+      var itemName = checkbox.getAttribute('data-item-name');
+      var itemCategory = checkbox.getAttribute('data-item-category') || '';
+      var needed = checkbox.checked;
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
-      delete checklistData.supplyNeeded[itemId];
-      localSupplyRemoved[itemId] = Date.now();
+
+      // 楽観的更新
+      var prevEntry = checklistData.supplyNeeded[itemId];
+      if (needed) {
+        checklistData.supplyNeeded[itemId] = { name: itemName, category: itemCategory, by: who, at: new Date() };
+        delete localSupplyRemoved[itemId];
+      } else {
+        delete checklistData.supplyNeeded[itemId];
+        localSupplyRemoved[itemId] = Date.now();
+      }
+
+      // チェックリスト側のチェックボックスも同期
+      var clCheckbox = document.querySelector('.supply-checkbox[data-item-id="' + itemId + '"]');
+      if (clCheckbox) clCheckbox.checked = needed;
+
       renderSupplyList();
-      // チェックリスト側の供給チェックボックスも連動解除
-      var cb = document.querySelector('.supply-checkbox[data-item-id="' + itemId + '"]');
-      if (cb) cb.checked = false;
+
       showSaveStatus('saving');
-      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, false, who, category]).then(function(res) {
+      callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who, itemCategory]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
           delete localSupplyRemoved[itemId];
         } else {
           showSaveStatus('error');
+          delete localSupplyRemoved[itemId];
+          if (prevEntry) {
+            checklistData.supplyNeeded[itemId] = prevEntry;
+          } else {
+            delete checklistData.supplyNeeded[itemId];
+          }
+          checkbox.checked = !needed;
+          if (clCheckbox) clCheckbox.checked = !needed;
+          renderSupplyList();
         }
-      }).catch(function() { showSaveStatus('error'); });
+      }).catch(function() {
+        showSaveStatus('error');
+        delete localSupplyRemoved[itemId];
+        if (prevEntry) {
+          checklistData.supplyNeeded[itemId] = prevEntry;
+        } else {
+          delete checklistData.supplyNeeded[itemId];
+        }
+        checkbox.checked = !needed;
+        if (clCheckbox) clCheckbox.checked = !needed;
+        renderSupplyList();
+      });
     }
 
     // === 要補充項目へスクロール ===
@@ -2838,16 +2882,15 @@
         delete checklistData.supplyNeeded[itemId];
         localSupplyRemoved[itemId] = Date.now();
       }
+      // 補充タブを即座に再描画（双方向同期）
       renderSupplyList();
 
       showSaveStatus('saving');
       callGAS('toggleSupplyNeeded', [checkoutDate, itemId, itemName, needed, who, itemCategory]).then(function(res) {
         if (res.success) {
           showSaveStatus('saved');
-          // GAS成功: 削除が確定したのでトラッキングから外す
           delete localSupplyRemoved[itemId];
         } else {
-          // 失敗時はロールバック
           showSaveStatus('error');
           delete localSupplyRemoved[itemId];
           if (prevEntry) {
@@ -2859,7 +2902,6 @@
           renderSupplyList();
         }
       }).catch(function() {
-        // エラー時もロールバック
         showSaveStatus('error');
         delete localSupplyRemoved[itemId];
         if (prevEntry) {

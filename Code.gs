@@ -134,14 +134,26 @@ function doGet(e) {
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
   const template = HtmlService.createTemplateFromFile('index');
-  // デプロイURLを取得
+  // デプロイURLを取得（複数フォールバック）
   var baseUrl = '';
   try { baseUrl = ScriptApp.getService().getUrl() || ''; } catch(e) {}
   if (!baseUrl) {
     try { baseUrl = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {}
   }
+  if (!baseUrl) {
+    try {
+      var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || '';
+      if (depId) baseUrl = 'https://script.google.com/macros/s/' + depId + '/exec';
+    } catch(e) {}
+  }
   if (baseUrl) {
     try { PropertiesService.getScriptProperties().setProperty('APP_BASE_URL', baseUrl); } catch(e) {}
+    // スタッフURLも未保存なら自動保存
+    try {
+      if (!PropertiesService.getDocumentProperties().getProperty('staffDeployUrl')) {
+        PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', baseUrl + '?staff=1');
+      }
+    } catch(e) {}
   }
   template.baseUrl = baseUrl;
   var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
@@ -732,8 +744,17 @@ function getStaffDeployUrl() {
     if (!base) {
       try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {}
     }
+    // 3. デプロイIDから構築
+    if (!base) {
+      try {
+        var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || '';
+        if (depId) base = 'https://script.google.com/macros/s/' + depId + '/exec';
+      } catch(e) {}
+    }
     if (base) {
       var url = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
+      // 次回以降のために保存
+      try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch(e) {}
       return JSON.stringify({ success: true, url: url });
     }
     return JSON.stringify({ success: true, url: '' });

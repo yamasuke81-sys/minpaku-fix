@@ -3711,6 +3711,7 @@
           try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
           if (saved && (saved.name || saved.email)) {
             applyStaffSelection(saved.name, saved.email);
+            loadStaffSchedule();
           } else {
             showStaffSelectOverlay();
           }
@@ -6287,6 +6288,7 @@
           hideStaffSelectOverlay();
           var disp = document.getElementById('staffDisplayName');
           if (disp) disp.textContent = window.currentUserName || window.currentUserEmail || '--';
+          loadStaffSchedule();
           // ディープリンク: スタッフ選択後にペンディングのモーダルを開く
           if (window._pendingDeepLinkDate) {
             var dd = window._pendingDeepLinkDate;

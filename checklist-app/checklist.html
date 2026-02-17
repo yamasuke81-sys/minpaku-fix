@@ -1164,9 +1164,14 @@
     body.editing-locked .section-add-btn,
     body.editing-locked .category-add-btn,
     body.editing-locked .inline-photo-add-btn,
-    body.editing-locked .inline-example-btn {
+    body.editing-locked .inline-example-btn,
+    body.editing-locked .inline-spot-edit-btn,
+    body.editing-locked .inline-spot-delete-btn {
       pointer-events: none;
       opacity: 0.2;
+    }
+    body.editing-locked .inline-example-thumb {
+      pointer-events: none;
     }
     .edit-lock-toggle {
       display: flex;
@@ -3639,12 +3644,15 @@
       overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
       var modal = document.createElement('div');
       modal.className = 'photo-modal';
-      modal.innerHTML = '<h3>📌 撮影見本</h3>' +
-        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;border:2px solid #e67e22;" onerror="this.src=\'\';this.alt=\'画像を読み込めません\';"></div>' +
+      var locked = document.body.classList.contains('editing-locked');
+      var editBtns = locked ? '' :
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
         '<button class="photo-modal-close" style="flex:1;background:#e67e22;color:white;border-color:#e67e22;" onclick="this.closest(\'.photo-modal-overlay\').remove();uploadExamplePrompt(\'' + spotId + '\')">変更</button>' +
         '<button class="photo-modal-close" style="flex:1;background:#e74c3c;color:white;border-color:#e74c3c;" onclick="this.closest(\'.photo-modal-overlay\').remove();deleteExample(\'' + spotId + '\')">削除</button>' +
-        '</div>' +
+        '</div>';
+      modal.innerHTML = '<h3>📌 撮影見本</h3>' +
+        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;border:2px solid #e67e22;" onerror="this.src=\'\';this.alt=\'画像を読み込めません\';"></div>' +
+        editBtns +
         '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
       overlay.appendChild(modal);
       document.body.appendChild(overlay);

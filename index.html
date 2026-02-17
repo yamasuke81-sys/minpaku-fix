@@ -974,7 +974,7 @@
         </div>
         <div class="d-flex flex-wrap gap-3 align-items-center">
           <span style="background:#ffc107;color:#212529;padding:1px 8px;border-radius:4px;font-weight:bold;">清掃</span>
-          <span><span class="d-inline-block me-1" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="width:8px;height:8px;border-radius:50%;background:#dc3545;display:block;"></span></span>募集中</span>
+          <span><span class="d-inline-block me-1" style="position:relative;width:14px;height:14px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#dc3545;display:block;"></span></span>募集中</span>
           <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
         </div>
       </div>
@@ -1591,8 +1591,9 @@
         var dbgSp = '<?= debugStaffParam ?>';
         var dbgRaw = '<?= isStaffMode ?>';
         var dbgStr = '<?= staffModeStr ?>';
-        // デバッグ表示を非表示にする
-        if (dv) dv.style.display = 'none';
+        // オーナー画面のみバージョン表示
+        if (dv && dbgStr !== 'yes') dv.style.display = '';
+        else if (dv) dv.style.display = 'none';
       } catch(e) {}
 
       let calendar;
@@ -1975,12 +1976,7 @@
         else if (sd === 'cleaning-decided') dotColor = '#198754';
         else if (sd === 'cleaning-recruiting') dotColor = '#dc3545';
         else if (sd === 'cleaning-not-recruiting') dotColor = '';
-        var dotHtml = '';
-        if (sd === 'cleaning-recruiting') {
-          dotHtml = '<span class="d-inline-block me-1" style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="width:7px;height:7px;border-radius:50%;background:#dc3545;display:block;"></span></span>';
-        } else if (dotColor) {
-          dotHtml = '<span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:' + dotColor + ';vertical-align:middle;"></span>';
-        }
+        var dotHtml = dotColor ? '<span class="d-inline-block rounded-circle me-1" style="width:8px;height:8px;background:' + dotColor + ';vertical-align:middle;"></span>' : '';
         var headerEl = document.getElementById('eventModalHeader');
         document.getElementById('eventModalTitle').innerHTML = titleIcon + dotHtml + escapeHtml(title);
         headerEl.className = 'modal-header ' + (type === 'cleaning' ? 'modal-header-cleaning' : 'modal-header-booking');
@@ -3766,12 +3762,7 @@
             if (dotColor) {
               var dot = document.createElement('span');
               dot.className = 'fc-event-status-dot';
-              if (sd === 'cleaning-recruiting') {
-                dot.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:11px;height:11px;background:#ffff00;border:1px solid #ccc;margin-right:4px;flex-shrink:0;';
-                dot.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#dc3545;display:block;"></span>';
-              } else {
-                dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
-              }
+              dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
               var titleEl = arg.el.querySelector('.fc-event-title') || arg.el.querySelector('.fc-event-main');
               if (titleEl) {
                 if (titleEl.firstChild) titleEl.insertBefore(dot, titleEl.firstChild);

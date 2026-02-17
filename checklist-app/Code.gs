@@ -556,7 +556,8 @@ function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
     var found = false;
 
     if (lastRow >= 2) {
-      var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+      var cols = sheet.getLastColumn();
+      var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
       for (var i = 0; i < data.length; i++) {
         if (normDateStr_(data[i][0]) === targetDate && String(data[i][1]) === String(itemId)) {
           if (checked) {
@@ -564,7 +565,15 @@ function toggleChecklistItem(checkoutDate, itemId, checked, staffName) {
             sheet.getRange(i + 2, 4).setValue(staffName || '');
             sheet.getRange(i + 2, 5).setValue(new Date());
           } else {
-            sheet.deleteRow(i + 2);
+            // 1行削除もバッチ方式で（deleteRow回避）
+            var remaining = [];
+            for (var j = 0; j < data.length; j++) {
+              if (j !== i) remaining.push(data[j]);
+            }
+            sheet.getRange(2, 1, lastRow - 1, cols).clearContent();
+            if (remaining.length > 0) {
+              sheet.getRange(2, 1, remaining.length, cols).setValues(remaining);
+            }
           }
           found = true;
           break;
@@ -648,12 +657,16 @@ function uncheckAllItems(checkoutDate) {
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) { lock.releaseLock(); return JSON.stringify({ success: true }); }
-    var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    // 下から削除（行番号ずれ防止）
-    for (var i = data.length - 1; i >= 0; i--) {
-      if (normDateStr_(data[i][0]) === targetDate) {
-        sheet.deleteRow(i + 2);
-      }
+    var cols = sheet.getLastColumn();
+    var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
+    // 対象日以外の行だけ残す
+    var remaining = data.filter(function(row) {
+      return normDateStr_(row[0]) !== targetDate;
+    });
+    // 全データをクリアして残りを書き戻し（1回のAPI呼び出しで完了）
+    sheet.getRange(2, 1, lastRow - 1, cols).clearContent();
+    if (remaining.length > 0) {
+      sheet.getRange(2, 1, remaining.length, cols).setValues(remaining);
     }
     return JSON.stringify({ success: true });
   } catch (e) {
@@ -682,11 +695,16 @@ function uncheckItems(checkoutDate, itemIds) {
     if (lastRow < 2) { lock.releaseLock(); return JSON.stringify({ success: true }); }
     var idSet = {};
     itemIds.forEach(function(id) { idSet[String(id)] = true; });
-    var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
-    for (var i = data.length - 1; i >= 0; i--) {
-      if (normDateStr_(data[i][0]) === targetDate && idSet[String(data[i][1])]) {
-        sheet.deleteRow(i + 2);
-      }
+    var cols = sheet.getLastColumn();
+    var data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
+    // 対象日＋対象IDの行を除外して残す
+    var remaining = data.filter(function(row) {
+      return !(normDateStr_(row[0]) === targetDate && idSet[String(row[1])]);
+    });
+    // 全データをクリアして残りを書き戻し（1回のAPI呼び出しで完了）
+    sheet.getRange(2, 1, lastRow - 1, cols).clearContent();
+    if (remaining.length > 0) {
+      sheet.getRange(2, 1, remaining.length, cols).setValues(remaining);
     }
     return JSON.stringify({ success: true });
   } catch (e) {

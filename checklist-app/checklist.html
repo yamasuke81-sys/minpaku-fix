@@ -2191,6 +2191,16 @@
         if (!categories[cat]) { categories[cat] = []; catOrder.push(cat); }
         categories[cat].push(spot);
       });
+      // チェックリストタブと同じカテゴリ順序を適用
+      if (checklistData.categoryOrder && checklistData.categoryOrder.length > 0) {
+        var orderMap = {};
+        checklistData.categoryOrder.forEach(function(o) { orderMap[o.path] = o.sortOrder; });
+        catOrder.sort(function(a, b) {
+          var orderA = orderMap[a] !== undefined ? orderMap[a] : 99999;
+          var orderB = orderMap[b] !== undefined ? orderMap[b] : 99999;
+          return orderA - orderB;
+        });
+      }
 
       // 撮影済み/未撮影のカウント
       var totalSpots = spots.length;

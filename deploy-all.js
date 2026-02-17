@@ -2,9 +2,11 @@
  * 全アプリ一括デプロイ＆ブラウザ自動オープン
  * 使い方: node deploy-all.js
  *
- * 1. メインアプリ: clasp push → clasp deploy（オーナー用・スタッフ用）
+ * 1. メインアプリ: clasp push → clasp deploy
  * 2. チェックリストアプリ: clasp push → clasp deploy
- * 3. ブラウザでメインアプリを自動オープン
+ * 3. ブラウザでメインアプリを自動オープン（オーナー用=通常、スタッフ用=シークレット）
+ *
+ * ※ スタッフ用URLはオーナー用URLに ?staff=1 を付けたもの（デプロイIDは1つ）
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -31,15 +33,15 @@ function run(cmd, cwd) {
   }
 }
 
-/** clasp deployments からデプロイIDを取得（@HEAD除外） */
-function getDeployIds(text) {
-  var ids = [];
-  text.split('\n').forEach(function(line) {
-    if (line.includes('@HEAD')) return;
-    var m = line.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
-    if (m && ids.indexOf(m[1]) < 0) ids.push(m[1]);
-  });
-  return ids;
+/** clasp deployments からデプロイIDを1つ取得（@HEAD除外） */
+function getDeployId(text) {
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].includes('@HEAD')) continue;
+    var m = lines[i].match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (m) return m[1];
+  }
+  return null;
 }
 
 /** ブラウザを通常ウィンドウで開く */
@@ -145,14 +147,12 @@ function main() {
 
   console.log('[2/4] メインアプリ: デプロイを更新...');
   var mainDeps = run(clasp + ' deployments', rootDir);
-  var mainIds = mainDeps.ok ? getDeployIds(mainDeps.out) : [];
+  var mainId = mainDeps.ok ? getDeployId(mainDeps.out) : null;
   var today = new Date().toISOString().slice(0, 10);
-  if (mainIds.length > 0) {
-    mainIds.forEach(function(id, i) {
-      var r = run(clasp + ' deploy --deploymentId "' + id + '" --description "メインアプリ ' + today + '"', rootDir);
-      console.log('  デプロイID ' + (i + 1) + ': ' + (r.ok ? 'OK' : '失敗 - ' + r.out.slice(0, 200)));
-    });
-    var baseUrl = 'https://script.google.com/macros/s/' + mainIds[0] + '/exec';
+  if (mainId) {
+    var r = run(clasp + ' deploy --deploymentId "' + mainId + '" --description "メインアプリ ' + today + '"', rootDir);
+    console.log('  デプロイ: ' + (r.ok ? 'OK' : '失敗 - ' + r.out.slice(0, 200)));
+    var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
     urls.push({ label: 'オーナー用', url: baseUrl });
     urls.push({ label: 'スタッフ用', url: baseUrl + '?staff=1' });
   } else {
@@ -195,9 +195,8 @@ function main() {
 
   console.log('[4/4] チェックリストアプリ: デプロイを更新...');
   var clDeps = run(clasp + ' deployments', checklistDir);
-  var clIds = clDeps.ok ? getDeployIds(clDeps.out) : [];
-  if (clIds.length > 0) {
-    var clId = clIds[0];
+  var clId = clDeps.ok ? getDeployId(clDeps.out) : null;
+  if (clId) {
     var r = run(clasp + ' deploy --deploymentId "' + clId + '" --description "チェックリスト ' + today + '"', checklistDir);
     if (r.ok) {
       console.log('  チェックリスト: OK');

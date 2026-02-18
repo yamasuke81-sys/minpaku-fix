@@ -4612,19 +4612,19 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       }
     }
 
-    // 除外リスト（チェックアウト日のセット）- google.script.run経由の配列正規化
+    // 除外リスト（JSON文字列で受け取る）
     var excludedSet = {};
-    if (excludedAutoItems && typeof excludedAutoItems === 'object') {
-      var exArr = [];
+    var exArr = [];
+    if (typeof excludedAutoItems === 'string') {
+      try { exArr = JSON.parse(excludedAutoItems); } catch (ep2) { exArr = []; }
+    } else if (excludedAutoItems && typeof excludedAutoItems === 'object') {
       if (typeof excludedAutoItems.length === 'number') {
         for (var el2 = 0; el2 < excludedAutoItems.length; el2++) { if (excludedAutoItems[el2]) exArr.push(excludedAutoItems[el2]); }
-      } else {
-        var ekeys = Object.keys(excludedAutoItems);
-        for (var ek = 0; ek < ekeys.length; ek++) { if (excludedAutoItems[ekeys[ek]]) exArr.push(excludedAutoItems[ekeys[ek]]); }
       }
-      for (var ei = 0; ei < exArr.length; ei++) {
-        excludedSet[String(exArr[ei])] = true;
-      }
+    }
+    if (!Array.isArray(exArr)) exArr = [];
+    for (var ei = 0; ei < exArr.length; ei++) {
+      excludedSet[String(exArr[ei])] = true;
     }
 
     // 明細構築
@@ -4668,16 +4668,16 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       }
     }
 
-    // 手動追加項目（google.script.run経由の配列正規化）
+    // 手動追加項目（JSON文字列で受け取る）
     var manualList = [];
-    if (manualItems && typeof manualItems === 'object') {
+    if (typeof manualItems === 'string') {
+      try { manualList = JSON.parse(manualItems); } catch (ep3) { manualList = []; }
+    } else if (manualItems && typeof manualItems === 'object') {
       if (typeof manualItems.length === 'number') {
         for (var ml = 0; ml < manualItems.length; ml++) { if (manualItems[ml]) manualList.push(manualItems[ml]); }
-      } else {
-        var mkeys = Object.keys(manualItems).filter(function(k) { return !isNaN(k); }).sort(function(a, b) { return Number(a) - Number(b); });
-        for (var mk = 0; mk < mkeys.length; mk++) { if (manualItems[mkeys[mk]]) manualList.push(manualItems[mkeys[mk]]); }
       }
     }
+    if (!Array.isArray(manualList)) manualList = [];
     if (manualList.length > 0) {
       for (var mi = 0; mi < manualList.length; mi++) {
         var mItem = manualList[mi];
@@ -4709,26 +4709,31 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     var docBaseName = staffName + '_' + ymText + '_請求書';
     var docName = getInvoiceUniqueName_(monthFolder, docBaseName);
     var docFile = DriveApp.getFileById(templateDocId).makeCopy(docName, monthFolder);
-    var doc = DocumentApp.openById(docFile.getId());
-    var body = doc.getBody();
+    var docId = docFile.getId();
 
-    body.replaceText('<<請求者>>', staffName);
-    body.replaceText('<<住所>>', staffInfo.address);
-    body.replaceText('<<請求対象年月>>', ymText);
-    body.replaceText('<<対象期間>>', periodText);
-    body.replaceText('<<お支払期限>>', dueText);
-    body.replaceText('<<発行日>>', issueDate);
-    body.replaceText('<<合計金額>>', total.toLocaleString('ja-JP'));
-    body.replaceText('<<備考>>', remarks || '');
-    body.replaceText('<<金融機関名>>', staffInfo.bank);
-    body.replaceText('<<口座種類>>', staffInfo.acctType);
-    body.replaceText('<<支店名>>', staffInfo.branch);
-    body.replaceText('<<口座番号>>', staffInfo.acctNo);
-    body.replaceText('<<口座名義>>', staffInfo.holder);
+    // Google Docs REST APIでテキスト置換（DocumentAppスコープ不要）
+    var token = ScriptApp.getOAuthToken();
+    var docsApiBase = 'https://docs.googleapis.com/v1/documents/' + docId;
+    var headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
-    // <<明細一覧>> を表で挿入
-    insertInvoiceDetailTable_(body, allItems);
-    doc.saveAndClose();
+    var replacements = [
+      { from: '<<請求者>>', to: staffName },
+      { from: '<<住所>>', to: staffInfo.address },
+      { from: '<<請求対象年月>>', to: ymText },
+      { from: '<<対象期間>>', to: periodText },
+      { from: '<<お支払期限>>', to: dueText },
+      { from: '<<発行日>>', to: issueDate },
+      { from: '<<合計金額>>', to: total.toLocaleString('ja-JP') },
+      { from: '<<備考>>', to: remarks || '' },
+      { from: '<<金融機関名>>', to: staffInfo.bank },
+      { from: '<<口座種類>>', to: staffInfo.acctType },
+      { from: '<<支店名>>', to: staffInfo.branch },
+      { from: '<<口座番号>>', to: staffInfo.acctNo },
+      { from: '<<口座名義>>', to: staffInfo.holder }
+    ];
+
+    // <<明細一覧>> を表で置換 + テキスト置換を一括実行
+    insertInvoiceDetailTableApi_(docId, token, allItems, replacements);
 
     // --- PDF化 ---
     var pdfBaseName = docBaseName + '.pdf';
@@ -4939,43 +4944,31 @@ function createInvoiceZipDownload(pdfFileIds) {
 }
 
 /**
- * DocumentApp権限承認用ヘルパー（オーナーがスクリプトエディタで実行して権限を付与）
+ * 権限承認用ヘルパー（後方互換用・現在はDocs REST APIを使用するため不要）
  */
 function authorizeDocumentApp() {
-  // この関数を実行するとDocumentAppのスコープが承認される
-  DocumentApp.create('_temp_auth_check');
-  var files = DriveApp.getFilesByName('_temp_auth_check');
-  while (files.hasNext()) files.next().setTrashed(true);
-  return '権限が承認されました。';
+  return '請求書機能はGoogle Docs REST APIを使用するため、追加の権限承認は不要です。';
 }
 
 /**
  * 請求書追加項目を保存（シートに永続化）
  */
-function saveInvoiceExtraItems(yearMonth, staffIdentifier, items) {
+function saveInvoiceExtraItems(yearMonth, staffIdentifier, itemsParam) {
   try {
     if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
     var staffName = String(staffIdentifier).trim();
     var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
 
-    // google.script.run経由の配列を正規化（Array.isArrayがfalseになる場合がある）
+    // JSON文字列で受け取る（google.script.runの配列シリアライズ問題を回避）
     var itemList = [];
-    if (items) {
-      // 配列風オブジェクトを配列に変換
-      if (typeof items === 'object' && items !== null) {
-        if (typeof items.length === 'number') {
-          for (var k = 0; k < items.length; k++) {
-            if (items[k]) itemList.push(items[k]);
-          }
-        } else {
-          // オブジェクトのキーを数値順に取得
-          var keys = Object.keys(items).filter(function(k) { return !isNaN(k); }).sort(function(a, b) { return Number(a) - Number(b); });
-          for (var ki = 0; ki < keys.length; ki++) {
-            if (items[keys[ki]]) itemList.push(items[keys[ki]]);
-          }
-        }
+    if (typeof itemsParam === 'string') {
+      try { itemList = JSON.parse(itemsParam); } catch (ep) { itemList = []; }
+    } else if (itemsParam && typeof itemsParam === 'object') {
+      if (typeof itemsParam.length === 'number') {
+        for (var k = 0; k < itemsParam.length; k++) { if (itemsParam[k]) itemList.push(itemsParam[k]); }
       }
     }
+    if (!Array.isArray(itemList)) itemList = [];
 
     ensureSheetsExist();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5046,48 +5039,188 @@ function getInvoiceExtraItems(yearMonth, staffIdentifier) {
 }
 
 /**
- * 明細テーブルをDoc本文に挿入（<<明細一覧>>プレースホルダーを置換）
+ * Google Docs REST APIで明細テーブル挿入＋テキスト置換（DocumentApp不要）
  */
-function insertInvoiceDetailTable_(body, items) {
-  var range = body.findText('<<明細一覧>>');
-  if (!range) return;
-  var phPara = range.getElement().getParent().asParagraph();
-  var insertIndex = body.getChildIndex(phPara);
-  var el = range.getElement().asText();
-  el.setText(el.getText().replace('<<明細一覧>>', ''));
+function insertInvoiceDetailTableApi_(docId, token, items, replacements) {
+  var docsApiBase = 'https://docs.googleapis.com/v1/documents/' + docId;
+  var headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 
-  var cells = [['作業日', '作業内容', '単価（円）']];
-  if (items.length === 0) {
-    cells.push(['', '(該当する作業はありません)', '']);
-  } else {
-    for (var i = 0; i < items.length; i++) {
-      cells.push([items[i].dateText || '', items[i].name || '', '¥' + items[i].amount.toLocaleString('ja-JP')]);
+  // 1) まずテキスト置換のリクエストを構築
+  var requests = [];
+  for (var ri = 0; ri < replacements.length; ri++) {
+    requests.push({
+      replaceAllText: {
+        containsText: { text: replacements[ri].from, matchCase: true },
+        replaceText: replacements[ri].to
+      }
+    });
+  }
+
+  // 2) テキスト置換を実行
+  if (requests.length > 0) {
+    var replResp = UrlFetchApp.fetch(docsApiBase + ':batchUpdate', {
+      method: 'post',
+      headers: headers,
+      payload: JSON.stringify({ requests: requests }),
+      muteHttpExceptions: true
+    });
+    if (replResp.getResponseCode() !== 200) {
+      throw new Error('Docs APIテキスト置換エラー: ' + replResp.getContentText().substring(0, 200));
     }
   }
 
-  var tmp = body.appendTable(cells);
-  var table = tmp.copy().asTable();
-  body.removeChild(tmp);
-  body.insertTable(insertIndex + 1, table);
-  body.removeChild(phPara);
+  // 3) ドキュメントを再読み込みして <<明細一覧>> の位置を取得
+  var docResp = UrlFetchApp.fetch(docsApiBase, { method: 'get', headers: headers, muteHttpExceptions: true });
+  if (docResp.getResponseCode() !== 200) {
+    throw new Error('Docs APIドキュメント読み込みエラー: ' + docResp.getContentText().substring(0, 200));
+  }
+  var docData = JSON.parse(docResp.getContentText());
+  var bodyContent = docData.body ? docData.body.content : [];
 
-  // ヘッダ行を太字に
-  table.getRow(0).editAsText().setBold(true);
-
-  // 金額列を右寄せ
-  var ALIGN_RIGHT =
-    (typeof DocumentApp.ParagraphAlignment !== 'undefined' && DocumentApp.ParagraphAlignment.RIGHT) ||
-    (typeof DocumentApp.HorizontalAlignment !== 'undefined' && DocumentApp.HorizontalAlignment.RIGHT) ||
-    null;
-  for (var rr = 1; rr < table.getNumRows(); rr++) {
-    var cell = table.getCell(rr, 2);
-    if (cell.getNumChildren() === 0) cell.appendParagraph('');
-    if (ALIGN_RIGHT) {
-      for (var k = 0; k < cell.getNumChildren(); k++) {
-        var p = cell.getChild(k).asParagraph();
-        if (p) p.setAlignment(ALIGN_RIGHT);
+  // <<明細一覧>> プレースホルダーの位置を探す
+  var phStartIndex = -1;
+  var phEndIndex = -1;
+  for (var bc = 0; bc < bodyContent.length; bc++) {
+    var elem = bodyContent[bc];
+    if (elem.paragraph && elem.paragraph.elements) {
+      for (var pe = 0; pe < elem.paragraph.elements.length; pe++) {
+        var tr = elem.paragraph.elements[pe].textRun;
+        if (tr && tr.content && tr.content.indexOf('<<明細一覧>>') !== -1) {
+          // このパラグラフ全体を置換対象にする
+          phStartIndex = elem.startIndex;
+          phEndIndex = elem.endIndex;
+          break;
+        }
       }
     }
+    if (phStartIndex !== -1) break;
+  }
+
+  if (phStartIndex === -1) return; // プレースホルダーなし
+
+  // 4) <<明細一覧>>パラグラフを削除してテーブルを挿入
+  var tableRequests = [];
+
+  // パラグラフ削除
+  tableRequests.push({
+    deleteContentRange: {
+      range: { startIndex: phStartIndex, endIndex: phEndIndex }
+    }
+  });
+
+  // テーブル挿入（削除後のインデックスで挿入）
+  var rows = [];
+  var headerRow = { tableCells: [
+    { content: [{ paragraph: { elements: [{ textRun: { content: '作業日\n', textStyle: { bold: true } } }] } }] },
+    { content: [{ paragraph: { elements: [{ textRun: { content: '作業内容\n', textStyle: { bold: true } } }] } }] },
+    { content: [{ paragraph: { elements: [{ textRun: { content: '単価（円）\n', textStyle: { bold: true } } }] } }] }
+  ] };
+  rows.push(headerRow);
+
+  if (items.length === 0) {
+    rows.push({ tableCells: [
+      { content: [{ paragraph: { elements: [{ textRun: { content: '\n' } }] } }] },
+      { content: [{ paragraph: { elements: [{ textRun: { content: '(該当する作業はありません)\n' } }] } }] },
+      { content: [{ paragraph: { elements: [{ textRun: { content: '\n' } }] } }] }
+    ] });
+  } else {
+    for (var ti = 0; ti < items.length; ti++) {
+      rows.push({ tableCells: [
+        { content: [{ paragraph: { elements: [{ textRun: { content: (items[ti].dateText || '') + '\n' } }] } }] },
+        { content: [{ paragraph: { elements: [{ textRun: { content: (items[ti].name || '') + '\n' } }] } }] },
+        { content: [{ paragraph: { elements: [{ textRun: { content: '¥' + items[ti].amount.toLocaleString('ja-JP') + '\n' } }] } }] }
+      ] });
+    }
+  }
+
+  tableRequests.push({
+    insertTable: {
+      rows: rows.length,
+      columns: 3,
+      location: { index: phStartIndex }
+    }
+  });
+
+  // テーブル構造の挿入を実行
+  var tableResp = UrlFetchApp.fetch(docsApiBase + ':batchUpdate', {
+    method: 'post',
+    headers: headers,
+    payload: JSON.stringify({ requests: tableRequests }),
+    muteHttpExceptions: true
+  });
+  if (tableResp.getResponseCode() !== 200) {
+    throw new Error('Docs APIテーブル挿入エラー: ' + tableResp.getContentText().substring(0, 200));
+  }
+
+  // 5) テーブルのセルにテキストを埋める
+  // テーブル挿入後、ドキュメントを再取得してテーブルのインデックスを取得
+  var docResp2 = UrlFetchApp.fetch(docsApiBase, { method: 'get', headers: headers, muteHttpExceptions: true });
+  var docData2 = JSON.parse(docResp2.getContentText());
+  var bodyContent2 = docData2.body ? docData2.body.content : [];
+
+  // 挿入されたテーブルを見つける
+  var table = null;
+  for (var bc2 = 0; bc2 < bodyContent2.length; bc2++) {
+    if (bodyContent2[bc2].table && bodyContent2[bc2].startIndex >= phStartIndex) {
+      table = bodyContent2[bc2].table;
+      break;
+    }
+  }
+
+  if (!table) return;
+
+  // テーブルのセルにテキストを挿入（逆順で処理）
+  var cellRequests = [];
+  var allRowData = [['作業日', '作業内容', '単価（円）']];
+  if (items.length === 0) {
+    allRowData.push(['', '(該当する作業はありません)', '']);
+  } else {
+    for (var di = 0; di < items.length; di++) {
+      allRowData.push([items[di].dateText || '', items[di].name || '', '¥' + items[di].amount.toLocaleString('ja-JP')]);
+    }
+  }
+
+  // テーブルの各セルを逆順に処理（インデックスが変わらないように）
+  for (var rowIdx = table.rows - 1; rowIdx >= 0; rowIdx--) {
+    var tableRow = table.tableRows[rowIdx];
+    for (var colIdx = 2; colIdx >= 0; colIdx--) {
+      var cell = tableRow.tableCells[colIdx];
+      if (!cell || !cell.content || !cell.content[0] || !cell.content[0].paragraph) continue;
+      var paraElem = cell.content[0].paragraph;
+      var cellStartIdx = paraElem.elements[0].startIndex;
+      var cellEndIdx = paraElem.elements[0].endIndex;
+      var cellText = allRowData[rowIdx] ? (allRowData[rowIdx][colIdx] || '') : '';
+
+      // 既存の空テキスト（\n）を置換
+      if (cellText) {
+        cellRequests.push({
+          insertText: {
+            location: { index: cellStartIdx },
+            text: cellText
+          }
+        });
+      }
+
+      // ヘッダ行は太字に
+      if (rowIdx === 0 && cellText) {
+        cellRequests.push({
+          updateTextStyle: {
+            range: { startIndex: cellStartIdx, endIndex: cellStartIdx + cellText.length },
+            textStyle: { bold: true },
+            fields: 'bold'
+          }
+        });
+      }
+    }
+  }
+
+  if (cellRequests.length > 0) {
+    UrlFetchApp.fetch(docsApiBase + ':batchUpdate', {
+      method: 'post',
+      headers: headers,
+      payload: JSON.stringify({ requests: cellRequests }),
+      muteHttpExceptions: true
+    });
   }
 }
 

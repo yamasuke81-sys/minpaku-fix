@@ -1237,17 +1237,7 @@
           </div>
           <div id="invoiceTemplateSaveResult" class="small mt-1" style="display:none;"></div>
         </div>
-        <!-- 権限承認の手順 -->
-        <div class="mb-3 p-2 border rounded bg-warning bg-opacity-10">
-          <label class="form-label small fw-bold">請求書送信で権限エラーが出る場合（初回のみ）</label>
-          <ol class="small mb-1" style="padding-left:1.2rem;">
-            <li>下のボタンでApps Scriptエディタを開く</li>
-            <li>上部の関数選択プルダウンで <code>authorizeDocumentApp</code> を選択</li>
-            <li><strong>▶ 実行</strong>ボタンを押す</li>
-            <li>「権限を確認」→「許可」を押す</li>
-          </ol>
-          <button type="button" class="btn btn-sm btn-outline-primary" id="btnOpenScriptEditor">Apps Scriptエディタを開く</button>
-        </div>
+        <!-- 権限承認不要（Docs REST API使用） -->
         <hr>
         <!-- オーナー用：請求書一覧 -->
         <div class="mb-2">
@@ -5436,10 +5426,6 @@
       });
 
       // === オーナー請求書一覧：イベントハンドラ ===
-      document.getElementById('btnOpenScriptEditor').addEventListener('click', function() {
-        window.open('https://script.google.com/home/projects/1cFH0kD81gR6DC1RPBFyMJNXLI52nGYSOl6w461bkz_Byx1nE-4C0yD4w/edit', '_blank');
-      });
-
       document.getElementById('btnOwnerInvSearch').addEventListener('click', function() {
         searchOwnerInvoices_();
       });
@@ -5677,10 +5663,11 @@
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         var ym = getInvoiceYm();
         if (!staffId || !ym) return;
-        // items を純粋な配列に変換（GAS間の受け渡し対策）
+        // JSON文字列化して渡す（google.script.runの配列シリアライズ問題を回避）
         var itemsToSave = invoiceManualItemsList.map(function(it) {
           return { date: String(it.date || ''), name: String(it.name || ''), amount: Number(it.amount || 0) };
         });
+        var itemsJson = JSON.stringify(itemsToSave);
         var saveStatusEl = document.getElementById('invoiceSaveStatus');
         if (saveStatusEl) { saveStatusEl.textContent = '保存中...'; saveStatusEl.className = 'small text-muted'; saveStatusEl.style.display = 'inline'; }
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -5697,7 +5684,7 @@
           setTimeout(function() { if (saveStatusEl) saveStatusEl.style.display = 'none'; }, 3000);
         }).withFailureHandler(function(err) {
           if (saveStatusEl) { saveStatusEl.textContent = '通信エラー: ' + (err.message || err); saveStatusEl.className = 'small text-danger'; saveStatusEl.style.display = 'inline'; }
-        }).saveInvoiceExtraItems(ym, staffId, itemsToSave);
+        }).saveInvoiceExtraItems(ym, staffId, itemsJson);
       }
 
       // 合計金額の計算・表示
@@ -5823,7 +5810,7 @@
           btn.disabled = false;
           btn.textContent = '請求書を送信';
           if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
-        }).createAndSendInvoice(ym, staffId, invoiceManualItemsList.map(function(it) { return { date: String(it.date || ''), name: String(it.name || ''), amount: Number(it.amount || 0) }; }), remarks, invoiceExcludedAuto.slice());
+        }).createAndSendInvoice(ym, staffId, JSON.stringify(invoiceManualItemsList.map(function(it) { return { date: String(it.date || ''), name: String(it.name || ''), amount: Number(it.amount || 0) }; })), remarks, JSON.stringify(invoiceExcludedAuto.slice()));
       });
       document.getElementById('btnOpenStaffUrl').addEventListener('click', function() {
         var url = document.getElementById('staffDeployUrlInput').value.trim();

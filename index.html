@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5558,6 +5558,13 @@
               sel.appendChild(customOpt);
             }
 
+            // 追加項目（getInvoiceDataレスポンスに含まれる）
+            invoiceManualItemsList = r.extraItems || [];
+            renderInvoiceManualItems();
+
+            // 履歴
+            renderInvoiceHistory(r.history || []);
+
             updateInvoiceTotal();
           } catch (e) {
             if (autoEl) autoEl.innerHTML = '<span class="text-danger">読み込みエラー</span>';
@@ -5565,30 +5572,6 @@
         }).withFailureHandler(function(err) {
           if (autoEl) autoEl.innerHTML = '<span class="text-danger">通信エラー</span>';
         }).getInvoiceData(ym, staffId);
-
-        // 追加項目を独立して読み込み（getInvoiceDataの成否に依存しない）
-        google.script.run.withSuccessHandler(function(extraJson) {
-          try {
-            var er = JSON.parse(extraJson);
-            invoiceManualItemsList = (er.success && er.items) ? er.items : [];
-          } catch (e2) { invoiceManualItemsList = []; }
-          renderInvoiceManualItems();
-          updateInvoiceTotal();
-        }).withFailureHandler(function() {
-          invoiceManualItemsList = [];
-          renderInvoiceManualItems();
-          updateInvoiceTotal();
-        }).getInvoiceExtraItems(ym, staffId);
-
-        // 履歴を独立して読み込み（getInvoiceDataの成否に依存しない）
-        google.script.run.withSuccessHandler(function(histJson) {
-          try {
-            var hr = JSON.parse(histJson);
-            renderInvoiceHistory(hr.success ? hr.list : []);
-          } catch (e3) {}
-        }).withFailureHandler(function() {
-          renderInvoiceHistory([]);
-        }).getInvoiceHistory(staffId, ym);
       }
 
       // 自動明細の表示（除外ボタン付き）

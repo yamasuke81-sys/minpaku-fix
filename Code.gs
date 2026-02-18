@@ -4472,6 +4472,24 @@ function getInvoiceData(yearMonth, staffIdentifier) {
     // 送信履歴
     var history = getInvoiceHistoryInternal_(staffName, ym);
 
+    // 追加項目（シートから読み込み）
+    var extraItems = [];
+    try {
+      var extraSheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+      if (extraSheet && extraSheet.getLastRow() >= 2) {
+        var extraData = extraSheet.getRange(2, 1, extraSheet.getLastRow() - 1, 5).getValues();
+        for (var exi = 0; exi < extraData.length; exi++) {
+          if (String(extraData[exi][0] || '').trim() === staffName && String(extraData[exi][1] || '').trim() === ym) {
+            extraItems.push({
+              date: String(extraData[exi][2] || ''),
+              name: String(extraData[exi][3] || ''),
+              amount: Number(extraData[exi][4] || 0)
+            });
+          }
+        }
+      }
+    } catch (exErr) {}
+
     // フォルダID・テンプレートDocIDの設定状態
     var folderId = PropertiesService.getDocumentProperties().getProperty('invoiceFolderId') || '';
     var templateDocId = PropertiesService.getDocumentProperties().getProperty('invoiceTemplateDocId') || '';
@@ -4483,6 +4501,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       jobOptions: jobOptions,
       allJobOptions: allJobOptions,
       history: history,
+      extraItems: extraItems,
       hasFolder: !!folderId,
       hasTemplate: !!templateDocId
     });

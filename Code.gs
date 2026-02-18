@@ -4131,7 +4131,7 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
       list.push({
         rowNumber: i + 2,
         checkoutDate: coKey,
-        checkoutDisplay: Utilities.formatDate(checkOut, 'Asia/Tokyo', 'M/d'),
+        checkoutDisplay: Utilities.formatDate(checkOut, 'Asia/Tokyo', 'yyyy/M/d'),
         partners: partners,
         recruitRowIndex: rri,
         cancelPending: cancelPending
@@ -4156,7 +4156,7 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         if (rCoDate) {
           recruitInfoMap[rid] = {
             checkoutDate: toDateKeySafe_(rCoDate),
-            checkoutDisplay: Utilities.formatDate(rCoDate, 'Asia/Tokyo', 'M/d'),
+            checkoutDisplay: Utilities.formatDate(rCoDate, 'Asia/Tokyo', 'yyyy/M/d'),
             status: rStatus,
             bookingRowNumber: rBookingRow,
             recruitRowIndex: ri2 + 2
@@ -4684,7 +4684,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         var mName = String(mItem.name || '').trim();
         var mAmt = Number(mItem.amount || 0);
         var mDate = mItem.date ? parseDate(mItem.date) : null;
-        var mDateText = mDate ? Utilities.formatDate(mDate, 'Asia/Tokyo', 'M/d') : '';
+        var mDateText = mDate ? Utilities.formatDate(mDate, 'Asia/Tokyo', 'yyyy/M/d') : '';
         if (mName && isFinite(mAmt) && mAmt !== 0) {
           allItems.push({ date: mDate, dateText: mDateText, name: mName, amount: mAmt });
           total += mAmt;
@@ -4796,6 +4796,11 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       for (var hci = 0; hci < headerRow.getNumCells(); hci++) {
         headerRow.getCell(hci).setBackgroundColor('#f0f0f0');
         headerRow.getCell(hci).editAsText().setBold(true);
+      }
+      // 金額列（3列目）を右寄せ
+      for (var tri = 0; tri < table.getNumRows(); tri++) {
+        var amtCell = table.getRow(tri).getCell(2);
+        amtCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
       }
     }
 

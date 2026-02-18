@@ -4740,14 +4740,13 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       ['対象期間', periodText],
       ['お支払期限', dueText],
       ['発行日', issueDate],
-      ['合計金額', '¥' + total.toLocaleString('ja-JP')],
+      ['合計金額', total.toLocaleString('ja-JP')],
       ['備考', remarks || ''],
       ['金融機関名', staffInfo.bank],
       ['口座種類', staffInfo.acctType],
       ['支店名', staffInfo.branch],
       ['口座番号', staffInfo.acctNo],
-      ['口座名義', staffInfo.holder],
-      ['明細一覧', meisaiText]
+      ['口座名義', staffInfo.holder]
     ];
     for (var ri2 = 0; ri2 < replacements.length; ri2++) {
       var fieldName = replacements[ri2][0];
@@ -4759,6 +4758,47 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       // 全角山括弧 <<...>>（＜＜...＞＞）
       body.replaceText('＜＜' + fieldName + '＞＞', fieldValue);
     }
+
+    // 明細一覧プレースホルダーをテーブルに置換（罫線付き）
+    var meisaiPlaceholders = ['<<明細一覧>>', '≪明細一覧≫', '＜＜明細一覧＞＞'];
+    var numChildren = body.getNumChildren();
+    var meisaiParaIndex = -1;
+    for (var pi = 0; pi < numChildren; pi++) {
+      var child = body.getChild(pi);
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH) {
+        var pText = child.asParagraph().getText();
+        for (var mpi = 0; mpi < meisaiPlaceholders.length; mpi++) {
+          if (pText.indexOf(meisaiPlaceholders[mpi]) !== -1) {
+            meisaiParaIndex = pi;
+            break;
+          }
+        }
+        if (meisaiParaIndex !== -1) break;
+      }
+    }
+    if (meisaiParaIndex !== -1) {
+      body.removeChild(body.getChild(meisaiParaIndex));
+      var tableData = [['日付', '作業内容', '金額']];
+      if (allItems.length === 0) {
+        tableData.push(['', '（該当する作業はありません）', '']);
+      } else {
+        for (var ti3 = 0; ti3 < allItems.length; ti3++) {
+          tableData.push([
+            allItems[ti3].dateText || '',
+            allItems[ti3].name || '',
+            '¥' + allItems[ti3].amount.toLocaleString('ja-JP')
+          ]);
+        }
+      }
+      var table = body.insertTable(meisaiParaIndex, tableData);
+      table.setBorderWidth(1);
+      var headerRow = table.getRow(0);
+      for (var hci = 0; hci < headerRow.getNumCells(); hci++) {
+        headerRow.getCell(hci).setBackgroundColor('#f0f0f0');
+        headerRow.getCell(hci).editAsText().setBold(true);
+      }
+    }
+
     doc.saveAndClose();
 
     var docFile = DriveApp.getFileById(newDocId);

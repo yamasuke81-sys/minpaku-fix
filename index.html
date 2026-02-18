@@ -1039,12 +1039,18 @@
       </div>
       <!-- 送信履歴（サーバーから都度取得） -->
       <div class="mt-3 border-top pt-2">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <label class="form-label small fw-bold mb-0">送信履歴</label>
-          <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnRefreshStaffHistory" style="font-size:0.75rem;">更新</button>
+        <label class="form-label small fw-bold mb-1">送信履歴</label>
+        <div class="d-flex gap-2 align-items-end mb-1 flex-wrap">
+          <div>
+            <label class="form-label small mb-0">対象月</label>
+            <select class="form-select form-select-sm" id="staffHistoryFilterYm" style="max-width:140px;">
+              <option value="">全期間</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnRefreshStaffHistory" style="font-size:0.75rem;">検索</button>
         </div>
         <div id="invoiceHistoryList" class="small">
-          <span class="text-muted">読み込み中...</span>
+          <span class="text-muted">検索ボタンを押してください。</span>
         </div>
       </div>
     </div>
@@ -5784,8 +5790,9 @@
       // 送信履歴をサーバーから独立取得（オーナー請求書一覧と同じ関数を使用）
       function loadStaffInvoiceHistory_() {
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
-        var ym = getInvoiceYm();
-        console.log('[履歴] getAllInvoiceHistory呼出 staffId=[' + staffId + '] ym=[' + ym + ']');
+        var ymSel = document.getElementById('staffHistoryFilterYm');
+        var filterYm = ymSel ? ymSel.value : '';
+        console.log('[履歴] getAllInvoiceHistory呼出 staffId=[' + staffId + '] filterYm=[' + filterYm + ']');
         if (!staffId) { console.warn('[履歴] staffIdが空のためスキップ'); return; }
         var el = document.getElementById('invoiceHistoryList');
         if (el) el.innerHTML = '<span class="text-muted">読み込み中...</span>';
@@ -5797,6 +5804,19 @@
               if (el) el.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
               return;
             }
+            // 対象月プルダウンを更新（サーバーから返る全期間リスト）
+            if (r.yearMonths && ymSel) {
+              var curVal = ymSel.value;
+              ymSel.innerHTML = '<option value="">全期間</option>';
+              r.yearMonths.forEach(function(ym) {
+                var o = document.createElement('option');
+                o.value = ym;
+                var p = ym.split('-');
+                o.textContent = p[0] + '年' + parseInt(p[1], 10) + '月';
+                if (ym === curVal) o.selected = true;
+                ymSel.appendChild(o);
+              });
+            }
             console.log('[履歴] 件数:', (r.list || []).length);
             renderStaffInvoiceHistory_(r.list || []);
           } catch (e) {
@@ -5806,7 +5826,7 @@
         }).withFailureHandler(function(err) {
           console.error('[履歴] 通信エラー:', err);
           if (el) el.innerHTML = '<span class="text-danger">通信エラー: ' + escapeHtml(err.message || String(err)) + '</span>';
-        }).getAllInvoiceHistory(staffId, ym);
+        }).getAllInvoiceHistory(staffId, filterYm);
       }
 
       // 送信履歴テーブル表示（オーナー請求書一覧と同じパターン）

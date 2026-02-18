@@ -4833,6 +4833,107 @@ function getInvoiceHistory(staffIdentifier, yearMonth) {
 }
 
 /**
+ * 全スタッフの請求書履歴取得（オーナー用）
+ */
+function getAllInvoiceHistory(filterStaff, filterYm) {
+  try {
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_INVOICE_HISTORY);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [], staffNames: [], yearMonths: [] });
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues();
+    var list = [];
+    var staffSet = {};
+    var ymSet = {};
+    for (var i = 0; i < data.length; i++) {
+      var hStaff = String(data[i][0] || '').trim();
+      var hYm = String(data[i][1] || '').trim();
+      if (!hStaff) continue;
+      staffSet[hStaff] = true;
+      if (hYm) ymSet[hYm] = true;
+      if (filterStaff && hStaff !== filterStaff) continue;
+      if (filterYm && hYm !== filterYm) continue;
+      list.push({
+        rowIndex: i + 2,
+        staffName: hStaff,
+        yearMonth: hYm,
+        total: Number(data[i][2] || 0),
+        itemsJson: String(data[i][3] || ''),
+        sentAt: data[i][4] ? Utilities.formatDate(new Date(data[i][4]), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm') : '',
+        pdfUrl: String(data[i][5] || ''),
+        pdfFileId: String(data[i][6] || ''),
+        status: String(data[i][7] || '')
+      });
+    }
+    var staffNames = Object.keys(staffSet).sort();
+    var yearMonths = Object.keys(ymSet).sort().reverse();
+    return JSON.stringify({ success: true, list: list, staffNames: staffNames, yearMonths: yearMonths });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), list: [] });
+  }
+}
+
+/**
+ * 選択したPDFをZIPにまとめてダウンロードURLを返す
+ */
+function createInvoiceZipDownload(pdfFileIds) {
+  try {
+    if (!pdfFileIds || !Array.isArray(pdfFileIds) || pdfFileIds.length === 0) {
+      return JSON.stringify({ success: false, error: 'PDFが選択されていません' });
+    }
+    var blobs = [];
+    for (var i = 0; i < pdfFileIds.length; i++) {
+      var fid = String(pdfFileIds[i]).trim();
+      if (!fid) continue;
+      try {
+        var file = DriveApp.getFileById(fid);
+        blobs.push(file.getBlob().setName(file.getName()));
+      } catch (fe) {
+        // ファイルが見つからない場合はスキップ
+      }
+    }
+    if (blobs.length === 0) return JSON.stringify({ success: false, error: 'ダウンロード可能なPDFが見つかりません' });
+
+    // 1件だけの場合はそのままPDFのURLを返す
+    if (blobs.length === 1) {
+      var singleFile = DriveApp.getFileById(String(pdfFileIds[0]).trim());
+      return JSON.stringify({ success: true, url: singleFile.getUrl(), count: 1 });
+    }
+
+    // 複数の場合はZIPを作成
+    var zipBlob = Utilities.zip(blobs, '請求書一括_' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd_HHmm') + '.zip');
+
+    // 請求書フォルダに一時保存
+    var props = PropertiesService.getDocumentProperties();
+    var folderId = (props.getProperty('invoiceFolderId') || '').trim();
+    var folder;
+    if (folderId) {
+      try { folder = DriveApp.getFolderById(folderId); } catch (e) {}
+    }
+    if (!folder) folder = DriveApp.getRootFolder();
+
+    var zipFile = folder.createFile(zipBlob);
+    // 共有設定（リンクを知っている人が閲覧可能）
+    try { zipFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+
+    return JSON.stringify({ success: true, url: zipFile.getUrl(), count: blobs.length });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * DocumentApp権限承認用ヘルパー（オーナーがスクリプトエディタで実行して権限を付与）
+ */
+function authorizeDocumentApp() {
+  // この関数を実行するとDocumentAppのスコープが承認される
+  DocumentApp.create('_temp_auth_check');
+  var files = DriveApp.getFilesByName('_temp_auth_check');
+  while (files.hasNext()) files.next().setTrashed(true);
+  return '権限が承認されました。';
+}
+
+/**
  * 請求書追加項目を保存（シートに永続化）
  */
 function saveInvoiceExtraItems(yearMonth, staffIdentifier, items) {

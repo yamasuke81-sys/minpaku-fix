@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1236,6 +1236,42 @@
             <button type="button" class="btn btn-sm btn-outline-primary" id="btnSaveInvoiceTemplate">保存</button>
           </div>
           <div id="invoiceTemplateSaveResult" class="small mt-1" style="display:none;"></div>
+        </div>
+        <!-- 権限承認ボタン -->
+        <div class="mb-3 p-2 border rounded bg-light">
+          <label class="form-label small fw-bold">DocumentApp権限の承認</label>
+          <p class="small text-muted mb-1">請求書送信で権限エラーが出る場合、下のボタンで承認してください（初回のみ）。</p>
+          <button type="button" class="btn btn-sm btn-outline-warning" id="btnAuthorizeDocApp">権限を承認する</button>
+          <span id="authorizeDocAppResult" class="small ms-2" style="display:none;"></span>
+        </div>
+        <hr>
+        <!-- オーナー用：請求書一覧 -->
+        <div class="mb-2">
+          <label class="form-label small fw-bold">請求書一覧（全スタッフ）</label>
+          <div class="d-flex gap-2 flex-wrap align-items-end mb-2">
+            <div>
+              <label class="form-label small mb-0">スタッフ</label>
+              <select class="form-select form-select-sm" id="ownerInvFilterStaff" style="max-width:160px;">
+                <option value="">全員</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small mb-0">対象月</label>
+              <select class="form-select form-select-sm" id="ownerInvFilterYm" style="max-width:140px;">
+                <option value="">全期間</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnOwnerInvSearch">検索</button>
+            <button type="button" class="btn btn-sm btn-outline-success" id="btnOwnerInvDownload" disabled>選択したPDFをダウンロード</button>
+          </div>
+          <div class="mb-1 d-flex gap-2 align-items-center">
+            <label class="form-check-label small"><input type="checkbox" class="form-check-input" id="ownerInvCheckAll"> 全選択</label>
+            <span class="small text-muted" id="ownerInvSelectedCount"></span>
+          </div>
+          <div id="ownerInvList" class="small">
+            <span class="text-muted">検索ボタンを押してください。</span>
+          </div>
+          <div id="ownerInvDownloadResult" class="small mt-1" style="display:none;"></div>
         </div>
       </div>
       <div id="settingsMaintenance" style="display:none;">
@@ -5061,6 +5097,9 @@
       }
 
       // 請求書設定（フォルダID・テンプレートDocID）を読み込む
+      // === オーナー請求書管理 ===
+      var _ownerInvData = []; // 現在表示中の請求書一覧
+
       function loadInvoiceSettings_() {
         var folderInp = document.getElementById('invoiceFolderIdInput');
         var templateInp = document.getElementById('invoiceTemplateDocIdInput');
@@ -5094,6 +5133,145 @@
         }).withFailureHandler(function(err) {
           console.warn('getInvoiceTemplateDocId failed:', err);
         }).getInvoiceTemplateDocId();
+        // フィルタ用のスタッフ名・年月を取得
+        loadOwnerInvoiceFilters_();
+      }
+
+      function loadOwnerInvoiceFilters_() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) return;
+            var staffSel = document.getElementById('ownerInvFilterStaff');
+            var ymSel = document.getElementById('ownerInvFilterYm');
+            if (staffSel) {
+              var curVal = staffSel.value;
+              staffSel.innerHTML = '<option value="">全員</option>';
+              (r.staffNames || []).forEach(function(n) {
+                var o = document.createElement('option');
+                o.value = n; o.textContent = n;
+                if (n === curVal) o.selected = true;
+                staffSel.appendChild(o);
+              });
+            }
+            if (ymSel) {
+              var curYm = ymSel.value;
+              ymSel.innerHTML = '<option value="">全期間</option>';
+              (r.yearMonths || []).forEach(function(ym) {
+                var o = document.createElement('option');
+                o.value = ym;
+                var p = ym.split('-');
+                o.textContent = p[0] + '年' + parseInt(p[1], 10) + '月';
+                if (ym === curYm) o.selected = true;
+                ymSel.appendChild(o);
+              });
+            }
+          } catch (e) {}
+        }).getAllInvoiceHistory('', '');
+      }
+
+      function searchOwnerInvoices_() {
+        var staffVal = (document.getElementById('ownerInvFilterStaff') || {}).value || '';
+        var ymVal = (document.getElementById('ownerInvFilterYm') || {}).value || '';
+        var listEl = document.getElementById('ownerInvList');
+        if (listEl) listEl.innerHTML = '<span class="text-muted">読み込み中...</span>';
+        var checkAll = document.getElementById('ownerInvCheckAll');
+        if (checkAll) checkAll.checked = false;
+        updateOwnerInvSelection_();
+
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) {
+              if (listEl) listEl.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
+              return;
+            }
+            _ownerInvData = r.list || [];
+            renderOwnerInvoiceList_();
+          } catch (e) {
+            if (listEl) listEl.innerHTML = '<span class="text-danger">読み込みエラー</span>';
+          }
+        }).withFailureHandler(function(err) {
+          if (listEl) listEl.innerHTML = '<span class="text-danger">通信エラー</span>';
+        }).getAllInvoiceHistory(staffVal, ymVal);
+      }
+
+      function renderOwnerInvoiceList_() {
+        var listEl = document.getElementById('ownerInvList');
+        if (!listEl) return;
+        if (_ownerInvData.length === 0) {
+          listEl.innerHTML = '<span class="text-muted">該当する請求書がありません。</span>';
+          return;
+        }
+        var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">' +
+          '<thead class="table-light"><tr>' +
+          '<th style="width:30px;"><input type="checkbox" class="form-check-input" id="ownerInvCheckAllInner"></th>' +
+          '<th>スタッフ</th><th>対象月</th><th>合計</th><th>送信日時</th><th>明細</th><th>PDF</th>' +
+          '</tr></thead><tbody>';
+        _ownerInvData.forEach(function(inv, idx) {
+          var ymParts = (inv.yearMonth || '').split('-');
+          var ymDisplay = ymParts.length === 2 ? ymParts[0] + '年' + parseInt(ymParts[1], 10) + '月' : inv.yearMonth;
+          var detailHtml = '';
+          try {
+            var items = JSON.parse(inv.itemsJson || '[]');
+            if (items.length > 0) {
+              detailHtml = '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 btn-inv-detail" data-idx="' + idx + '" style="font-size:0.75rem;">明細</button>';
+            }
+          } catch (e) {}
+          var pdfHtml = inv.pdfUrl ? '<a href="' + escapeHtml(inv.pdfUrl) + '" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.75rem;">PDF</a>' : '-';
+          var hasPdf = !!(inv.pdfFileId && inv.pdfUrl);
+          html += '<tr>' +
+            '<td class="text-center"><input type="checkbox" class="form-check-input ownerInvCheck" data-idx="' + idx + '" data-fileid="' + escapeHtml(inv.pdfFileId || '') + '"' + (hasPdf ? '' : ' disabled') + '></td>' +
+            '<td>' + escapeHtml(inv.staffName) + '</td>' +
+            '<td>' + escapeHtml(ymDisplay) + '</td>' +
+            '<td class="text-end">¥' + (inv.total || 0).toLocaleString() + '</td>' +
+            '<td>' + escapeHtml(inv.sentAt || '') + '</td>' +
+            '<td class="text-center">' + detailHtml + '</td>' +
+            '<td class="text-center">' + pdfHtml + '</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+
+        // チェックボックスイベント
+        listEl.querySelectorAll('.ownerInvCheck').forEach(function(cb) {
+          cb.addEventListener('change', updateOwnerInvSelection_);
+        });
+        var innerAll = document.getElementById('ownerInvCheckAllInner');
+        if (innerAll) {
+          innerAll.addEventListener('change', function() {
+            var checked = this.checked;
+            listEl.querySelectorAll('.ownerInvCheck:not(:disabled)').forEach(function(cb) { cb.checked = checked; });
+            var outerAll = document.getElementById('ownerInvCheckAll');
+            if (outerAll) outerAll.checked = checked;
+            updateOwnerInvSelection_();
+          });
+        }
+
+        // 明細ボタン
+        listEl.querySelectorAll('.btn-inv-detail').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var idx = parseInt(this.getAttribute('data-idx'), 10);
+            var inv = _ownerInvData[idx];
+            if (!inv) return;
+            try {
+              var items = JSON.parse(inv.itemsJson || '[]');
+              var text = items.map(function(it) {
+                return (it.d || '') + ' ' + (it.n || '') + ' ¥' + (it.a || 0).toLocaleString();
+              }).join('\n');
+              alert('【' + inv.staffName + ' ' + inv.yearMonth + '】\n\n' + (text || '明細なし'));
+            } catch (e) { alert('明細の読み込みに失敗しました'); }
+          });
+        });
+      }
+
+      function updateOwnerInvSelection_() {
+        var checks = document.querySelectorAll('.ownerInvCheck:checked');
+        var countEl = document.getElementById('ownerInvSelectedCount');
+        var dlBtn = document.getElementById('btnOwnerInvDownload');
+        var cnt = checks.length;
+        if (countEl) countEl.textContent = cnt > 0 ? cnt + '件選択中' : '';
+        if (dlBtn) dlBtn.disabled = cnt === 0;
       }
 
       function loadSettings() {
@@ -5251,6 +5429,75 @@
           resEl.className = 'small mt-1 text-danger';
           resEl.style.display = 'block';
         }).setInvoiceTemplateDocId(docId);
+      });
+
+      // === オーナー請求書一覧：イベントハンドラ ===
+      document.getElementById('btnAuthorizeDocApp').addEventListener('click', function() {
+        var btn = this;
+        var resEl = document.getElementById('authorizeDocAppResult');
+        btn.disabled = true;
+        btn.textContent = '承認中...';
+        google.script.run.withSuccessHandler(function(msg) {
+          btn.disabled = false;
+          btn.textContent = '権限を承認する';
+          if (resEl) { resEl.textContent = msg || '完了'; resEl.className = 'small ms-2 text-success'; resEl.style.display = ''; }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '権限を承認する';
+          if (resEl) { resEl.textContent = err.message || 'エラー（スクリプトエディタから直接実行してください）'; resEl.className = 'small ms-2 text-danger'; resEl.style.display = ''; }
+        }).authorizeDocumentApp();
+      });
+
+      document.getElementById('btnOwnerInvSearch').addEventListener('click', function() {
+        searchOwnerInvoices_();
+      });
+
+      document.getElementById('ownerInvCheckAll').addEventListener('change', function() {
+        var checked = this.checked;
+        document.querySelectorAll('.ownerInvCheck:not(:disabled)').forEach(function(cb) { cb.checked = checked; });
+        var innerAll = document.getElementById('ownerInvCheckAllInner');
+        if (innerAll) innerAll.checked = checked;
+        updateOwnerInvSelection_();
+      });
+
+      document.getElementById('btnOwnerInvDownload').addEventListener('click', function() {
+        var btn = this;
+        var checks = document.querySelectorAll('.ownerInvCheck:checked');
+        var fileIds = [];
+        checks.forEach(function(cb) {
+          var fid = cb.getAttribute('data-fileid');
+          if (fid) fileIds.push(fid);
+        });
+        if (fileIds.length === 0) { alert('PDFを選択してください。'); return; }
+        var resEl = document.getElementById('ownerInvDownloadResult');
+        btn.disabled = true;
+        btn.textContent = fileIds.length + '件のPDFを準備中...';
+        if (resEl) { resEl.style.display = 'none'; }
+
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '選択したPDFをダウンロード';
+          updateOwnerInvSelection_();
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.url) {
+              if (resEl) {
+                resEl.innerHTML = '<a href="' + escapeHtml(r.url) + '" target="_blank" class="text-success">' + r.count + '件の' + (r.count > 1 ? 'ZIP' : 'PDF') + 'を開く</a>';
+                resEl.style.display = 'block';
+              }
+              window.open(r.url, '_blank');
+            } else {
+              if (resEl) { resEl.textContent = r.error || '失敗'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+            }
+          } catch (e) {
+            if (resEl) { resEl.textContent = 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+          }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '選択したPDFをダウンロード';
+          updateOwnerInvSelection_();
+          if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+        }).createInvoiceZipDownload(fileIds);
       });
 
       // === 請求書機能（スタッフ画面・独立タブ） ===
@@ -5436,12 +5683,20 @@
       // 追加項目をシートに保存
       function saveInvoiceExtraItemsToSheet() {
         if (_invoiceSaving) return;
-        _invoiceSaving = true;
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         var ym = getInvoiceYm();
-        google.script.run.withSuccessHandler(function() { _invoiceSaving = false; })
-          .withFailureHandler(function() { _invoiceSaving = false; })
-          .saveInvoiceExtraItems(ym, staffId, invoiceManualItemsList);
+        if (!staffId || !ym) { console.warn('saveInvoiceExtra: staffId or ym empty', staffId, ym); return; }
+        _invoiceSaving = true;
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          _invoiceSaving = false;
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) console.warn('saveInvoiceExtra error:', r.error);
+          } catch (e) {}
+        }).withFailureHandler(function(err) {
+          _invoiceSaving = false;
+          console.warn('saveInvoiceExtra failed:', err);
+        }).saveInvoiceExtraItems(ym, staffId, invoiceManualItemsList);
       }
 
       // 合計金額の計算・表示

@@ -4705,10 +4705,9 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     var subFolderIt = rootFolder.getFoldersByName(monthKey);
     var monthFolder = subFolderIt.hasNext() ? subFolderIt.next() : rootFolder.createFolder(monthKey);
 
-    // --- テンプレートDoc → Docs API replaceAllText → PDF変換 ---
+    // --- テンプレートDoc → DocumentApp replaceText → PDF変換 ---
     var docBaseName = staffName + '_' + ymText + '_請求書';
     var docName = getInvoiceUniqueName_(monthFolder, docBaseName);
-    var token = ScriptApp.getOAuthToken();
 
     // テンプレートをコピー
     var templateFile = DriveApp.getFileById(templateDocId);
@@ -4723,53 +4722,44 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       var meisaiLines = [];
       for (var ti = 0; ti < allItems.length; ti++) {
         meisaiLines.push(
-          (allItems[ti].dateText || '') + '\t' +
-          (allItems[ti].name || '') + '\t¥' +
+          (allItems[ti].dateText || '') + '  ' +
+          (allItems[ti].name || '') + '  ¥' +
           allItems[ti].amount.toLocaleString('ja-JP')
         );
       }
       meisaiText = meisaiLines.join('\n');
     }
 
-    // Docs API batchUpdate で全プレースホルダーを置換
+    // DocumentApp で全プレースホルダーを置換（半角・全角両方対応）
+    var doc = DocumentApp.openById(newDocId);
+    var body = doc.getBody();
     var replacements = [
-      ['<<請求者>>', staffName],
-      ['<<住所>>', staffInfo.address],
-      ['<<請求対象年月>>', ymText],
-      ['<<対象期間>>', periodText],
-      ['<<お支払期限>>', dueText],
-      ['<<発行日>>', issueDate],
-      ['<<合計金額>>', '¥' + total.toLocaleString('ja-JP')],
-      ['<<備考>>', remarks || ''],
-      ['<<金融機関名>>', staffInfo.bank],
-      ['<<口座種類>>', staffInfo.acctType],
-      ['<<支店名>>', staffInfo.branch],
-      ['<<口座番号>>', staffInfo.acctNo],
-      ['<<口座名義>>', staffInfo.holder],
-      ['<<明細一覧>>', meisaiText]
+      ['請求者', staffName],
+      ['住所', staffInfo.address],
+      ['請求対象年月', ymText],
+      ['対象期間', periodText],
+      ['お支払期限', dueText],
+      ['発行日', issueDate],
+      ['合計金額', '¥' + total.toLocaleString('ja-JP')],
+      ['備考', remarks || ''],
+      ['金融機関名', staffInfo.bank],
+      ['口座種類', staffInfo.acctType],
+      ['支店名', staffInfo.branch],
+      ['口座番号', staffInfo.acctNo],
+      ['口座名義', staffInfo.holder],
+      ['明細一覧', meisaiText]
     ];
-    var batchRequests = [];
     for (var ri2 = 0; ri2 < replacements.length; ri2++) {
-      batchRequests.push({
-        replaceAllText: {
-          containsText: { text: replacements[ri2][0], matchCase: true },
-          replaceText: replacements[ri2][1] || ''
-        }
-      });
+      var fieldName = replacements[ri2][0];
+      var fieldValue = replacements[ri2][1] || '';
+      // 半角 <<...>>
+      body.replaceText('<<' + fieldName + '>>', fieldValue);
+      // 全角 ≪...≫
+      body.replaceText('≪' + fieldName + '≫', fieldValue);
+      // 全角山括弧 <<...>>（＜＜...＞＞）
+      body.replaceText('＜＜' + fieldName + '＞＞', fieldValue);
     }
-    var docsResp = UrlFetchApp.fetch(
-      'https://docs.googleapis.com/v1/documents/' + newDocId + ':batchUpdate',
-      {
-        method: 'post',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        payload: JSON.stringify({ requests: batchRequests }),
-        muteHttpExceptions: true
-      }
-    );
-    if (docsResp.getResponseCode() !== 200) {
-      Logger.log('Docs API replaceAllText エラー: ' + docsResp.getContentText().substring(0, 300));
-      throw new Error('請求書のテキスト置換に失敗しました: ' + docsResp.getContentText().substring(0, 200));
-    }
+    doc.saveAndClose();
 
     var docFile = DriveApp.getFileById(newDocId);
 

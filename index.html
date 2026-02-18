@@ -5241,6 +5241,10 @@
           listEl.innerHTML = '<span class="text-muted">該当する請求書がありません。</span>';
           return;
         }
+        // 新しい順にソート（送信日時の降順）
+        _ownerInvData.sort(function(a, b) {
+          return (b.sentAt || '').localeCompare(a.sentAt || '');
+        });
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">' +
           '<thead class="table-light"><tr>' +
           '<th style="width:30px;"><input type="checkbox" class="form-check-input" id="ownerInvCheckAllInner"></th>' +

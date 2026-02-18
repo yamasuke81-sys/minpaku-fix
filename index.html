@@ -5781,16 +5781,16 @@
         if (el) el.textContent = '¥' + total.toLocaleString();
       }
 
-      // 送信履歴をサーバーから独立取得（オーナー請求書一覧と同じ方式）
+      // 送信履歴をサーバーから独立取得（オーナー請求書一覧と同じ関数を使用）
       function loadStaffInvoiceHistory_() {
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         var ym = getInvoiceYm();
-        console.log('[履歴] staffId=[' + staffId + '] ym=[' + ym + ']');
+        console.log('[履歴] getAllInvoiceHistory呼出 staffId=[' + staffId + '] ym=[' + ym + ']');
         if (!staffId) { console.warn('[履歴] staffIdが空のためスキップ'); return; }
         var el = document.getElementById('invoiceHistoryList');
         if (el) el.innerHTML = '<span class="text-muted">読み込み中...</span>';
         google.script.run.withSuccessHandler(function(jsonStr) {
-          console.log('[履歴] サーバー応答:', jsonStr ? jsonStr.substring(0, 200) : '(empty)');
+          console.log('[履歴] サーバー応答:', jsonStr ? jsonStr.substring(0, 300) : '(empty)');
           try {
             var r = JSON.parse(jsonStr);
             if (!r.success) {
@@ -5806,7 +5806,7 @@
         }).withFailureHandler(function(err) {
           console.error('[履歴] 通信エラー:', err);
           if (el) el.innerHTML = '<span class="text-danger">通信エラー: ' + escapeHtml(err.message || String(err)) + '</span>';
-        }).getInvoiceHistory(staffId, ym);
+        }).getAllInvoiceHistory(staffId, ym);
       }
 
       // 送信履歴テーブル表示（オーナー請求書一覧と同じパターン）

@@ -4705,23 +4705,33 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     var subFolderIt = rootFolder.getFoldersByName(monthKey);
     var monthFolder = subFolderIt.hasNext() ? subFolderIt.next() : rootFolder.createFolder(monthKey);
 
-    // --- テンプレートDoc → HTML差し込み → PDF変換（Drive API使用・Docs API不要） ---
+    // --- テンプレートDoc → Docs API replaceAllText → PDF変換 ---
     var docBaseName = staffName + '_' + ymText + '_請求書';
     var docName = getInvoiceUniqueName_(monthFolder, docBaseName);
     var token = ScriptApp.getOAuthToken();
 
-    // テンプレートをHTML形式でエクスポート（Drive API export）
-    var exportUrl = 'https://www.googleapis.com/drive/v3/files/' + templateDocId + '/export?mimeType=text%2Fhtml';
-    var htmlResp = UrlFetchApp.fetch(exportUrl, {
-      headers: { 'Authorization': 'Bearer ' + token },
-      muteHttpExceptions: true
-    });
-    if (htmlResp.getResponseCode() !== 200) {
-      throw new Error('テンプレート読み込みエラー: ' + htmlResp.getContentText().substring(0, 300));
-    }
-    var html = htmlResp.getContentText();
+    // テンプレートをコピー
+    var templateFile = DriveApp.getFileById(templateDocId);
+    var docCopy = templateFile.makeCopy(docName, monthFolder);
+    var newDocId = docCopy.getId();
 
-    // テキスト置換（HTML内エスケープ版 &lt;&lt;...&gt;&gt; も対応）
+    // 明細テキストを構築（改行区切り）
+    var meisaiText = '';
+    if (allItems.length === 0) {
+      meisaiText = '（該当する作業はありません）';
+    } else {
+      var meisaiLines = [];
+      for (var ti = 0; ti < allItems.length; ti++) {
+        meisaiLines.push(
+          (allItems[ti].dateText || '') + '\t' +
+          (allItems[ti].name || '') + '\t¥' +
+          allItems[ti].amount.toLocaleString('ja-JP')
+        );
+      }
+      meisaiText = meisaiLines.join('\n');
+    }
+
+    // Docs API batchUpdate で全プレースホルダーを置換
     var replacements = [
       ['<<請求者>>', staffName],
       ['<<住所>>', staffInfo.address],
@@ -4729,66 +4739,38 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       ['<<対象期間>>', periodText],
       ['<<お支払期限>>', dueText],
       ['<<発行日>>', issueDate],
-      ['<<合計金額>>', total.toLocaleString('ja-JP')],
+      ['<<合計金額>>', '¥' + total.toLocaleString('ja-JP')],
       ['<<備考>>', remarks || ''],
       ['<<金融機関名>>', staffInfo.bank],
       ['<<口座種類>>', staffInfo.acctType],
       ['<<支店名>>', staffInfo.branch],
       ['<<口座番号>>', staffInfo.acctNo],
-      ['<<口座名義>>', staffInfo.holder]
+      ['<<口座名義>>', staffInfo.holder],
+      ['<<明細一覧>>', meisaiText]
     ];
+    var batchRequests = [];
     for (var ri2 = 0; ri2 < replacements.length; ri2++) {
-      var fromText = replacements[ri2][0];
-      var toText = replacements[ri2][1] || '';
-      html = html.split(fromText).join(toText);
-      var fromEsc = fromText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      if (fromEsc !== fromText) html = html.split(fromEsc).join(toText);
+      batchRequests.push({
+        replaceAllText: {
+          containsText: { text: replacements[ri2][0], matchCase: true },
+          replaceText: replacements[ri2][1] || ''
+        }
+      });
     }
-
-    // 明細テーブルHTMLを構築
-    var tableHtml = '<table style="border-collapse:collapse;width:100%;font-size:10pt;">';
-    tableHtml += '<tr style="background:#f0f0f0;font-weight:bold;"><td style="border:1px solid #999;padding:4px;">作業日</td><td style="border:1px solid #999;padding:4px;">作業内容</td><td style="border:1px solid #999;padding:4px;text-align:right;">単価（円）</td></tr>';
-    if (allItems.length === 0) {
-      tableHtml += '<tr><td style="border:1px solid #999;padding:4px;"></td><td style="border:1px solid #999;padding:4px;">(該当する作業はありません)</td><td style="border:1px solid #999;padding:4px;"></td></tr>';
-    } else {
-      for (var ti = 0; ti < allItems.length; ti++) {
-        tableHtml += '<tr><td style="border:1px solid #999;padding:4px;">' + (allItems[ti].dateText || '') + '</td>';
-        tableHtml += '<td style="border:1px solid #999;padding:4px;">' + (allItems[ti].name || '') + '</td>';
-        tableHtml += '<td style="border:1px solid #999;padding:4px;text-align:right;">¥' + allItems[ti].amount.toLocaleString('ja-JP') + '</td></tr>';
+    var docsResp = UrlFetchApp.fetch(
+      'https://docs.googleapis.com/v1/documents/' + newDocId + ':batchUpdate',
+      {
+        method: 'post',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        payload: JSON.stringify({ requests: batchRequests }),
+        muteHttpExceptions: true
       }
+    );
+    if (docsResp.getResponseCode() !== 200) {
+      Logger.log('Docs API replaceAllText エラー: ' + docsResp.getContentText().substring(0, 300));
+      throw new Error('請求書のテキスト置換に失敗しました: ' + docsResp.getContentText().substring(0, 200));
     }
-    tableHtml += '</table>';
-    html = html.split('<<明細一覧>>').join(tableHtml);
-    html = html.split('&lt;&lt;明細一覧&gt;&gt;').join(tableHtml);
 
-    // 修正HTMLをGoogle Docとしてアップロード（Drive API multipart upload + 変換）
-    var boundary = '-----InvoiceBoundary' + new Date().getTime();
-    var metaJson = JSON.stringify({
-      name: docName,
-      mimeType: 'application/vnd.google-apps.document',
-      parents: [monthFolder.getId()]
-    });
-    var payloadStr = '--' + boundary + '\r\n' +
-      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-      metaJson + '\r\n' +
-      '--' + boundary + '\r\n' +
-      'Content-Type: text/html; charset=UTF-8\r\n\r\n' +
-      html + '\r\n' +
-      '--' + boundary + '--';
-
-    var uploadResp = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'post',
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'multipart/related; boundary=' + boundary
-      },
-      payload: Utilities.newBlob(payloadStr).getBytes(),
-      muteHttpExceptions: true
-    });
-    if (uploadResp.getResponseCode() !== 200) {
-      throw new Error('請求書作成エラー: ' + uploadResp.getContentText().substring(0, 300));
-    }
-    var newDocId = JSON.parse(uploadResp.getContentText()).id;
     var docFile = DriveApp.getFileById(newDocId);
 
     // --- PDF化 ---

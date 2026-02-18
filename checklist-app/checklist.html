@@ -1441,7 +1441,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218b</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218c</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -2632,13 +2632,13 @@
         var catDone = catSpots.filter(function(s) { var p = photos[s.id] || { before: [], after: [] }; return p.before.length > 0 || p.after.length > 0; }).length;
         html += '<div class="photo-section">';
         html += '<div class="photo-cat-header" onclick="togglePhotoCategory(\'' + catId + '\')">';
-        html += '<span class="photo-cat-toggle" id="toggle_' + catId + '">▼</span>';
+        html += '<span class="photo-cat-toggle' + (allPhotoExpanded ? '' : ' collapsed') + '" id="toggle_' + catId + '">▼</span>';
         html += '<h3>📷 ' + escapeHtml(cat) + ' <span style="font-size:12px;font-weight:normal;color:#7f8c8d;">(' + catDone + '/' + catSpots.length + ')</span></h3>';
         var catEsc = cat.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         html += '<button class="photo-cat-bulk-btn before" onclick="event.stopPropagation();openBulkPhotoUpload(\'' + catEsc + '\', \'ビフォー\')">前まとめて</button>';
         html += '<button class="photo-cat-bulk-btn after" onclick="event.stopPropagation();openBulkPhotoUpload(\'' + catEsc + '\', \'アフター\')">後まとめて</button>';
         html += '</div>';
-        html += '<div class="photo-cat-body" id="body_' + catId + '">';
+        html += '<div class="photo-cat-body' + (allPhotoExpanded ? '' : ' collapsed') + '" id="body_' + catId + '">';
         categories[cat].forEach(function(spot) {
           var spotPhotos = photos[spot.id] || { before: [], after: [] };
           var bDone = spotPhotos.before.length > 0;
@@ -3274,7 +3274,7 @@
       if (toggle) toggle.classList.toggle('collapsed');
     }
 
-    var allPhotoExpanded = true;
+    var allPhotoExpanded = false;
     function toggleAllPhotoCategories() {
       allPhotoExpanded = !allPhotoExpanded;
       var btn = document.getElementById('btnPhotoExpandAll');

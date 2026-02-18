@@ -4612,11 +4612,18 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       }
     }
 
-    // 除外リスト（チェックアウト日のセット）
+    // 除外リスト（チェックアウト日のセット）- google.script.run経由の配列正規化
     var excludedSet = {};
-    if (excludedAutoItems && Array.isArray(excludedAutoItems)) {
-      for (var ei = 0; ei < excludedAutoItems.length; ei++) {
-        excludedSet[String(excludedAutoItems[ei])] = true;
+    if (excludedAutoItems && typeof excludedAutoItems === 'object') {
+      var exArr = [];
+      if (typeof excludedAutoItems.length === 'number') {
+        for (var el2 = 0; el2 < excludedAutoItems.length; el2++) { if (excludedAutoItems[el2]) exArr.push(excludedAutoItems[el2]); }
+      } else {
+        var ekeys = Object.keys(excludedAutoItems);
+        for (var ek = 0; ek < ekeys.length; ek++) { if (excludedAutoItems[ekeys[ek]]) exArr.push(excludedAutoItems[ekeys[ek]]); }
+      }
+      for (var ei = 0; ei < exArr.length; ei++) {
+        excludedSet[String(exArr[ei])] = true;
       }
     }
 
@@ -4661,10 +4668,19 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       }
     }
 
-    // 手動追加項目
-    if (manualItems && Array.isArray(manualItems)) {
-      for (var mi = 0; mi < manualItems.length; mi++) {
-        var mItem = manualItems[mi];
+    // 手動追加項目（google.script.run経由の配列正規化）
+    var manualList = [];
+    if (manualItems && typeof manualItems === 'object') {
+      if (typeof manualItems.length === 'number') {
+        for (var ml = 0; ml < manualItems.length; ml++) { if (manualItems[ml]) manualList.push(manualItems[ml]); }
+      } else {
+        var mkeys = Object.keys(manualItems).filter(function(k) { return !isNaN(k); }).sort(function(a, b) { return Number(a) - Number(b); });
+        for (var mk = 0; mk < mkeys.length; mk++) { if (manualItems[mkeys[mk]]) manualList.push(manualItems[mkeys[mk]]); }
+      }
+    }
+    if (manualList.length > 0) {
+      for (var mi = 0; mi < manualList.length; mi++) {
+        var mItem = manualList[mi];
         var mName = String(mItem.name || '').trim();
         var mAmt = Number(mItem.amount || 0);
         var mDate = mItem.date ? parseDate(mItem.date) : null;
@@ -4941,6 +4957,26 @@ function saveInvoiceExtraItems(yearMonth, staffIdentifier, items) {
     if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
     var staffName = String(staffIdentifier).trim();
     var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
+
+    // google.script.run経由の配列を正規化（Array.isArrayがfalseになる場合がある）
+    var itemList = [];
+    if (items) {
+      // 配列風オブジェクトを配列に変換
+      if (typeof items === 'object' && items !== null) {
+        if (typeof items.length === 'number') {
+          for (var k = 0; k < items.length; k++) {
+            if (items[k]) itemList.push(items[k]);
+          }
+        } else {
+          // オブジェクトのキーを数値順に取得
+          var keys = Object.keys(items).filter(function(k) { return !isNaN(k); }).sort(function(a, b) { return Number(a) - Number(b); });
+          for (var ki = 0; ki < keys.length; ki++) {
+            if (items[keys[ki]]) itemList.push(items[keys[ki]]);
+          }
+        }
+      }
+    }
+
     ensureSheetsExist();
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
@@ -4957,14 +4993,23 @@ function saveInvoiceExtraItems(yearMonth, staffIdentifier, items) {
     }
 
     // 新しいデータを書き込み
-    if (items && Array.isArray(items) && items.length > 0) {
-      var rows = items.map(function(it) {
-        return [staffName, ym, String(it.date || ''), String(it.name || ''), Number(it.amount || 0)];
-      });
-      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
+    if (itemList.length > 0) {
+      var rows = [];
+      for (var ri = 0; ri < itemList.length; ri++) {
+        var it = itemList[ri];
+        var itName = String(it.name || it['name'] || '').trim();
+        var itDate = String(it.date || it['date'] || '');
+        var itAmt = Number(it.amount || it['amount'] || 0);
+        if (itName) {
+          rows.push([staffName, ym, itDate, itName, itAmt]);
+        }
+      }
+      if (rows.length > 0) {
+        sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
+      }
     }
 
-    return JSON.stringify({ success: true });
+    return JSON.stringify({ success: true, savedCount: itemList.length });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218d</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1008,7 +1008,7 @@
         </div>
         <!-- 追加項目 -->
         <div class="mb-3">
-          <label class="form-label small fw-bold mb-1">追加項目</label>
+          <label class="form-label small fw-bold mb-1">追加項目 <span id="invoiceSaveStatus" class="small" style="display:none;"></span></label>
           <p class="text-muted mb-1" style="font-size:0.7rem;">追加した項目は自動保存されます</p>
           <div id="invoiceManualItems"></div>
           <div class="d-flex gap-1 align-items-center flex-wrap mt-1">
@@ -5674,21 +5674,30 @@
 
       // 追加項目をシートに保存
       function saveInvoiceExtraItemsToSheet() {
-        if (_invoiceSaving) return;
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         var ym = getInvoiceYm();
-        if (!staffId || !ym) { console.warn('saveInvoiceExtra: staffId or ym empty', staffId, ym); return; }
-        _invoiceSaving = true;
+        if (!staffId || !ym) return;
+        // items を純粋な配列に変換（GAS間の受け渡し対策）
+        var itemsToSave = invoiceManualItemsList.map(function(it) {
+          return { date: String(it.date || ''), name: String(it.name || ''), amount: Number(it.amount || 0) };
+        });
+        var saveStatusEl = document.getElementById('invoiceSaveStatus');
+        if (saveStatusEl) { saveStatusEl.textContent = '保存中...'; saveStatusEl.className = 'small text-muted'; saveStatusEl.style.display = 'inline'; }
         google.script.run.withSuccessHandler(function(jsonStr) {
-          _invoiceSaving = false;
           try {
             var r = JSON.parse(jsonStr);
-            if (!r.success) console.warn('saveInvoiceExtra error:', r.error);
-          } catch (e) {}
+            if (r.success) {
+              if (saveStatusEl) { saveStatusEl.textContent = '保存済み'; saveStatusEl.className = 'small text-success'; saveStatusEl.style.display = 'inline'; }
+            } else {
+              if (saveStatusEl) { saveStatusEl.textContent = '保存失敗: ' + (r.error || ''); saveStatusEl.className = 'small text-danger'; saveStatusEl.style.display = 'inline'; }
+            }
+          } catch (e) {
+            if (saveStatusEl) { saveStatusEl.textContent = '保存エラー'; saveStatusEl.className = 'small text-danger'; saveStatusEl.style.display = 'inline'; }
+          }
+          setTimeout(function() { if (saveStatusEl) saveStatusEl.style.display = 'none'; }, 3000);
         }).withFailureHandler(function(err) {
-          _invoiceSaving = false;
-          console.warn('saveInvoiceExtra failed:', err);
-        }).saveInvoiceExtraItems(ym, staffId, invoiceManualItemsList);
+          if (saveStatusEl) { saveStatusEl.textContent = '通信エラー: ' + (err.message || err); saveStatusEl.className = 'small text-danger'; saveStatusEl.style.display = 'inline'; }
+        }).saveInvoiceExtraItems(ym, staffId, itemsToSave);
       }
 
       // 合計金額の計算・表示
@@ -5814,7 +5823,7 @@
           btn.disabled = false;
           btn.textContent = '請求書を送信';
           if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
-        }).createAndSendInvoice(ym, staffId, invoiceManualItemsList, remarks, invoiceExcludedAuto);
+        }).createAndSendInvoice(ym, staffId, invoiceManualItemsList.map(function(it) { return { date: String(it.date || ''), name: String(it.name || ''), amount: Number(it.amount || 0) }; }), remarks, invoiceExcludedAuto.slice());
       });
       document.getElementById('btnOpenStaffUrl').addEventListener('click', function() {
         var url = document.getElementById('staffDeployUrlInput').value.trim();

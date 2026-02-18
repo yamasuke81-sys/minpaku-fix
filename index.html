@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218z</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218aa</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2299,11 +2299,8 @@
 
             // 清掃募集状況カード: 募集状況→清掃担当→ボタン/アクション→回答状況
             html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
-            // 1. 募集状況（flex行: ステータスバッジ + 編集ボタン）
-            html += '<div style="display:flex;align-items:center;justify-content:space-between;">';
-            html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted" style="background:#e9ecef;">読み込み中…</span>';
-            html += '<span id="eventModalEditStaffBtnArea"></span>';
-            html += '</div>';
+            // 1. 募集状況（バッジ内に編集ボタンエリアを含む）
+            html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted" style="background:#e9ecef;position:relative;">読み込み中…<span id="eventModalEditStaffBtnArea" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);"></span></span>';
             // 1b. ステータス見出し直下のボタンエリア
             html += '<div id="eventModalStatusBtnArea" class="mt-1"></div>';
             // 2. 清掃担当
@@ -2930,26 +2927,30 @@
                   ownerStaffLabel.classList.add(ownerResolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              // 編集ボタンをカード右上（ステータスバッジの右）に配置
+              var ownerEffectiveStatus = r.status;
+              var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済');
+              // ステータス更新（editBtnAreaを含めてinnerHTMLで再構築）
+              if (statusEl && r.success) {
+                var editBtnHtml = '<span id="eventModalEditStaffBtnArea" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);"></span>';
+                statusEl.innerHTML = (isOwnerConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中') + editBtnHtml;
+                statusEl.className = 'recruit-status-badge ' + (isOwnerConfirmed ? 'status-decided' : 'status-recruiting');
+                statusEl.style.position = 'relative';
+              }
+              // 編集ボタンをステータスバッジ内右側に配置（確定済み＋担当者ありの場合のみ）
               var editBtnArea = document.getElementById('eventModalEditStaffBtnArea');
-              if (editBtnArea && (d.cleaningStaff || '').trim()) {
+              if (editBtnArea && isOwnerConfirmed && (d.cleaningStaff || '').trim()) {
                 var btnEditStaff = document.createElement('button');
                 btnEditStaff.type = 'button';
-                btnEditStaff.className = 'btn btn-sm btn-outline-secondary';
-                btnEditStaff.style.cssText = 'font-size:0.7rem;padding:0.15rem 0.5rem;';
+                btnEditStaff.className = 'btn btn-sm';
+                btnEditStaff.style.cssText = 'font-size:0.7rem;padding:0.15rem 0.5rem;background:rgba(255,255,255,0.25);color:#fff;border:1px solid rgba(255,255,255,0.6);';
                 btnEditStaff.innerHTML = '<i class="bi bi-pencil-square"></i> 編集';
+                btnEditStaff.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.45)'; };
+                btnEditStaff.onmouseleave = function() { this.style.background = 'rgba(255,255,255,0.25)'; };
                 btnEditStaff.onclick = function() {
                   bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                   openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim(), r.volunteers || []);
                 };
                 editBtnArea.appendChild(btnEditStaff);
-              }
-              var ownerEffectiveStatus = r.status;
-              var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済');
-              if (statusEl && r.success) {
-                statusEl.textContent = isOwnerConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
-                statusEl.className = 'recruit-status-badge ' + (isOwnerConfirmed ? 'status-decided' : 'status-recruiting');
-                statusEl.removeAttribute('style');
               }
               if (volArea && volList) {
                 if (r.success) {

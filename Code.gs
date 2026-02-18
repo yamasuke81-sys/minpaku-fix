@@ -95,6 +95,7 @@ const SHEET_LAUNDRY = 'クリーニング連絡';
 // 請求書履歴用シート名
 const SHEET_INVOICE_HISTORY = '請求書履歴';
 const SHEET_INVOICE_EXTRA = '請求書追加項目';
+const SHEET_INVOICE_EXCLUDED = '請求書除外項目';
 
 // 日付を yyyy-MM-dd に正規化するヘルパー
 function normDateStr_(v) {
@@ -1285,6 +1286,10 @@ function ensureSheetsExist() {
 
   safeInsert(SHEET_INVOICE_EXTRA, function(s) {
     s.getRange(1, 1, 1, 5).setValues([['スタッフ名', '対象年月', '日付', '項目名', '金額']]);
+  });
+
+  safeInsert(SHEET_INVOICE_EXCLUDED, function(s) {
+    s.getRange(1, 1, 1, 3).setValues([['スタッフ名', '対象年月', '除外日付JSON']]);
   });
 
 }
@@ -4469,8 +4474,8 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       }
     }
 
-    // 送信履歴
-    var history = getInvoiceHistoryInternal_(staffName, ym);
+    // 送信履歴（全月分を返す）
+    var history = getInvoiceHistoryInternal_(staffName, '');
 
     // 追加項目（シートから読み込み）
     var extraItems = [];
@@ -4490,6 +4495,21 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       }
     } catch (exErr) {}
 
+    // 除外項目（シートから読み込み）
+    var excludedAuto = [];
+    try {
+      var exclSheet = ss.getSheetByName(SHEET_INVOICE_EXCLUDED);
+      if (exclSheet && exclSheet.getLastRow() >= 2) {
+        var exclData = exclSheet.getRange(2, 1, exclSheet.getLastRow() - 1, 3).getValues();
+        for (var exi2 = 0; exi2 < exclData.length; exi2++) {
+          if (String(exclData[exi2][0] || '').trim() === staffName && String(exclData[exi2][1] || '').trim() === ym) {
+            try { excludedAuto = JSON.parse(String(exclData[exi2][2] || '[]')); } catch (pe) { excludedAuto = []; }
+            break;
+          }
+        }
+      }
+    } catch (exclErr) {}
+
     // フォルダID・テンプレートDocIDの設定状態
     var folderId = PropertiesService.getDocumentProperties().getProperty('invoiceFolderId') || '';
     var templateDocId = PropertiesService.getDocumentProperties().getProperty('invoiceTemplateDocId') || '';
@@ -4502,6 +4522,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       allJobOptions: allJobOptions,
       history: history,
       extraItems: extraItems,
+      excludedAuto: excludedAuto,
       hasFolder: !!folderId,
       hasTemplate: !!templateDocId
     });
@@ -4910,7 +4931,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     // 履歴を読み込んでレスポンスに含める（別途取得する必要をなくす）
     var updatedHistory = [];
     try {
-      updatedHistory = getInvoiceHistoryInternal_(staffName, ym);
+      updatedHistory = getInvoiceHistoryInternal_(staffName, '');
     } catch (hErr) {
       Logger.log('履歴再読込エラー: ' + hErr);
     }
@@ -5143,6 +5164,46 @@ function saveInvoiceExtraItems(yearMonth, staffIdentifier, itemsParam) {
     }
 
     return JSON.stringify({ success: true, savedCount: itemList.length });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 請求書除外項目を保存（シートに永続化）
+ */
+function saveInvoiceExcludedAuto(yearMonth, staffIdentifier, excludedJson) {
+  try {
+    if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
+    var staffName = String(staffIdentifier).trim();
+    var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
+    var excludedList = [];
+    if (typeof excludedJson === 'string') {
+      try { excludedList = JSON.parse(excludedJson); } catch (ep) { excludedList = []; }
+    }
+    if (!Array.isArray(excludedList)) excludedList = [];
+
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_INVOICE_EXCLUDED);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+
+    // 既存の該当スタッフ・月のデータを削除
+    if (sheet.getLastRow() >= 2) {
+      var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+      for (var i = data.length - 1; i >= 0; i--) {
+        if (String(data[i][0] || '').trim() === staffName && String(data[i][1] || '').trim() === ym) {
+          sheet.deleteRow(i + 2);
+        }
+      }
+    }
+
+    // 除外項目がある場合のみ書き込み
+    if (excludedList.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, 1, 3).setValues([[staffName, ym, JSON.stringify(excludedList)]]);
+    }
+
+    return JSON.stringify({ success: true, savedCount: excludedList.length });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218o</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218p</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5613,7 +5613,14 @@
             // サーバーが空でもsessionStorageに残っていればそのまま維持
             renderInvoiceManualItems();
 
-            // 履歴
+            // 除外項目（サーバーから読み込み、再デプロイでも維持される）
+            if (r.excludedAuto && r.excludedAuto.length > 0) {
+              invoiceExcludedAuto = r.excludedAuto;
+              _invoiceSaveCache('excluded', ym, invoiceExcludedAuto);
+            }
+            renderInvoiceAutoItems();
+
+            // 履歴（全月分）
             renderInvoiceHistory(r.history || []);
 
             updateInvoiceTotal();
@@ -5659,6 +5666,7 @@
             var dt = this.getAttribute('data-date');
             if (invoiceExcludedAuto.indexOf(dt) === -1) invoiceExcludedAuto.push(dt);
             _invoiceSaveCache('excluded', getInvoiceYm(), invoiceExcludedAuto);
+            _saveExcludedToServer();
             renderInvoiceAutoItems();
             updateInvoiceTotal();
           };
@@ -5668,6 +5676,7 @@
             var dt = this.getAttribute('data-date');
             invoiceExcludedAuto = invoiceExcludedAuto.filter(function(d) { return d !== dt; });
             _invoiceSaveCache('excluded', getInvoiceYm(), invoiceExcludedAuto);
+            _saveExcludedToServer();
             renderInvoiceAutoItems();
             updateInvoiceTotal();
           };
@@ -5733,6 +5742,14 @@
         }).saveInvoiceExtraItems(ym, staffId, itemsJson);
       }
 
+      // 除外項目をサーバーに保存
+      function _saveExcludedToServer() {
+        var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
+        var ym = getInvoiceYm();
+        if (!staffId || !ym) return;
+        google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).saveInvoiceExcludedAuto(ym, staffId, JSON.stringify(invoiceExcludedAuto));
+      }
+
       // 合計金額の計算・表示
       function updateInvoiceTotal() {
         var items = window._invoiceAutoItems || [];
@@ -5749,18 +5766,23 @@
         if (el) el.textContent = '¥' + total.toLocaleString();
       }
 
-      // 履歴の表示
+      // 履歴の表示（全月分、新しい順）
       function renderInvoiceHistory(list) {
         var el = document.getElementById('invoiceHistoryList');
         if (!el) return;
         if (!list || list.length === 0) {
-          el.innerHTML = '<span class="text-muted">この月の送信履歴はありません。</span>';
+          el.innerHTML = '<span class="text-muted">送信履歴はありません。</span>';
           return;
         }
-        el.innerHTML = list.map(function(h) {
+        // 新しい順にソート（sentAtの降順）
+        var sorted = list.slice().sort(function(a, b) {
+          return (b.sentAt || '').localeCompare(a.sentAt || '');
+        });
+        el.innerHTML = sorted.map(function(h) {
+          var ymLabel = h.yearMonth ? h.yearMonth.replace('-', '/') : '';
           var pdfLink = h.pdfUrl ? '<a href="' + escapeHtml(h.pdfUrl) + '" target="_blank" class="text-decoration-none">PDF</a>' : '';
           return '<div class="border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center">' +
-            '<div>' + escapeHtml(h.sentAt || '') + ' ¥' + (h.total || 0).toLocaleString() + '</div>' +
+            '<div><span class="badge bg-secondary me-1" style="font-size:0.7em;">' + escapeHtml(ymLabel) + '</span>' + escapeHtml(h.sentAt || '') + ' ¥' + (h.total || 0).toLocaleString() + '</div>' +
             '<div>' + pdfLink + ' <span class="text-success">送信済</span></div></div>';
         }).join('');
       }

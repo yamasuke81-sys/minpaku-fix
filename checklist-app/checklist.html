@@ -1684,6 +1684,18 @@
       return _origConfirm.call(window, msg);
     };
 
+    // --- iOS Safari 対策: prompt() をオーバーライド ---
+    // iOS SafariのGASフレーム内ではprompt()もブロックされる（nullが返る）
+    // prompt()は同期関数のため完全な代替が困難→メッセージ表示でガイド
+    var _origPrompt = window.prompt;
+    window.prompt = function(msg, defaultVal) {
+      if (_isIOSGAS) {
+        _showToast('この操作はiOS Safariでは利用できません。PCからお試しください。', 'warning');
+        return null;
+      }
+      return _origPrompt.call(window, msg, defaultVal);
+    };
+
     // グローバル変数
     var checkoutDate = '<?= checkoutDate ?>' || '';
     var staffName = '<?= staffName ?>' || '';

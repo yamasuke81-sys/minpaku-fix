@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218w</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218x</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2306,7 +2306,7 @@
             // 2. 清掃担当
             html += '<div class="modal-staff-label mt-1 ' + (staffUndecided ? 'staff-unset' : 'staff-set') + '" style="display:flex; align-items:flex-start;">';
             html += '<div style="flex-shrink:0;"><span style="white-space:nowrap;"><i class="bi bi-person-badge"></i> 清掃担当:&nbsp;</span><div id="eventModalEditStaffArea"></div></div>';
-            html += '<span id="eventModalStaffDisplay">' + formatStaffDisplayHtml(staffVal, null) + '</span></div>';
+            html += '<span id="eventModalStaffDisplay">' + formatStaffDisplayHtml(staffVal, null) + '</span><span id="eventModalCancelBtnArea" style="margin-left:auto;flex-shrink:0;display:flex;align-items:center;"></span></div>';
             // 3. ボタン/アクションエリア（メール送信・対応可ボタンなど、JSで動的に追加）
             html += '<div id="eventModalVolunteerBodyArea" class="mt-2"><div class="text-muted small" id="volBodyLoading"><span class="spinner-border spinner-border-sm text-secondary me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div>';
             // 4. 回答状況（折りたたみ式、デフォルト閉じ）
@@ -2662,8 +2662,9 @@
                   volList.innerHTML = '';
                 }
               }
-              // 取り消し申請: cleaningStaffが設定済みかつ自分が担当の場合に表示
-              if (r.success && r.recruitRowIndex && resolvedStaff && volBodyArea) {
+              // 取り消し申請: cleaningStaffが設定済みかつ自分が担当の場合に清掃担当者名の右側に表示
+              var cancelBtnArea = document.getElementById('eventModalCancelBtnArea');
+              if (r.success && r.recruitRowIndex && resolvedStaff && cancelBtnArea) {
                 var assignedStaff = resolvedStaff;
                 var curName2 = (window.currentUserName || '').trim();
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
@@ -2684,20 +2685,23 @@
                   if (wasRejected) {
                     // 否認通知 + 確認ボタン → 確認後にキャンセル申請ボタン復活
                     var rejWrap = document.createElement('div');
-                    rejWrap.className = 'mb-1';
+                    rejWrap.className = 'mb-0';
                     var rejBadge = document.createElement('div');
-                    rejBadge.className = 'alert alert-danger py-1 px-2 small mb-1';
-                    rejBadge.innerHTML = '<i class="bi bi-x-circle"></i> 取り消し申請が否認されました';
+                    rejBadge.className = 'alert alert-danger py-0 px-2 small mb-0';
+                    rejBadge.style.fontSize = '0.7rem';
+                    rejBadge.style.lineHeight = '1.5';
+                    rejBadge.innerHTML = '<i class="bi bi-x-circle"></i> 否認';
                     rejWrap.appendChild(rejBadge);
                     var rejConfirmBtn = document.createElement('button');
                     rejConfirmBtn.type = 'button';
-                    rejConfirmBtn.className = 'btn btn-sm btn-outline-secondary';
+                    rejConfirmBtn.className = 'btn btn-sm btn-outline-secondary ms-1';
+                    rejConfirmBtn.style.fontSize = '0.7rem';
+                    rejConfirmBtn.style.padding = '0.1rem 0.4rem';
                     rejConfirmBtn.textContent = '確認';
                     rejConfirmBtn.onclick = function() {
                       rejConfirmBtn.disabled = true;
                       rejConfirmBtn.textContent = '処理中...';
                       google.script.run.withSuccessHandler(function(j) {
-                        // モーダルを再読み込み
                         bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                         loadAndRender();
                         if (window.staffMode) loadStaffSchedule();
@@ -2707,34 +2711,38 @@
                       }).clearCancelRejection(r.recruitRowIndex, window.currentUserName || '', window.currentUserEmail || '');
                     };
                     rejWrap.appendChild(rejConfirmBtn);
-                    volBodyArea.appendChild(rejWrap);
+                    cancelBtnArea.appendChild(rejWrap);
                   } else if (alreadyRequested) {
-                    var pendingBadge = document.createElement('div');
-                    pendingBadge.className = 'alert alert-warning py-1 px-2 small mb-0';
-                    pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> 取り消し申請中（オーナーの承認待ち）';
-                    volBodyArea.appendChild(pendingBadge);
+                    var pendingBadge = document.createElement('span');
+                    pendingBadge.className = 'badge bg-warning text-dark';
+                    pendingBadge.style.fontSize = '0.7rem';
+                    pendingBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> 取消申請中';
+                    cancelBtnArea.appendChild(pendingBadge);
                   } else {
                     var cancelReqBtn = document.createElement('button');
                     cancelReqBtn.type = 'button';
-                    cancelReqBtn.className = 'btn btn-sm btn-danger w-100';
+                    cancelReqBtn.className = 'btn btn-sm btn-danger';
+                    cancelReqBtn.style.fontSize = '0.7rem';
+                    cancelReqBtn.style.padding = '0.15rem 0.5rem';
+                    cancelReqBtn.style.whiteSpace = 'nowrap';
                     cancelReqBtn.textContent = '取消申請';
                     cancelReqBtn.onclick = function() {
                       customConfirm('出勤の取り消し申請を提出します。\nオーナーの承認後に取り消しが反映されます。\n\nよろしいですか？').then(function(ok) {
                         if (!ok) return;
                         cancelReqBtn.disabled = true;
                         cancelReqBtn.textContent = '申請中...';
-                        cancelReqBtn.className = 'btn btn-sm btn-secondary w-100';
+                        cancelReqBtn.className = 'btn btn-sm btn-secondary';
                         google.script.run.withSuccessHandler(function(j) {
                           var res = JSON.parse(j);
                           if (res.success) {
                             bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                             loadAndRender();
                             if (window.staffMode) loadStaffSchedule();
-                          } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }
-                        }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger w-100'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, checkoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                          } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger'; }
+                        }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, checkoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                       });
                     };
-                    volBodyArea.appendChild(cancelReqBtn);
+                    cancelBtnArea.appendChild(cancelReqBtn);
                   }
                 }
               }

@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218t</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218u</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5856,14 +5856,25 @@
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">' +
           '<thead class="table-light"><tr>' +
           '<th style="width:28px;"><input type="checkbox" class="form-check-input" id="staffHistoryCheckAllInner"></th>' +
-          '<th>送信日時</th><th>合計</th><th>PDF</th></tr></thead><tbody>';
+          '<th>対象月</th><th>合計</th><th>送信日時</th><th>明細</th><th>PDF</th></tr></thead><tbody>';
         sorted.forEach(function(h, idx) {
           var hasPdf = !!(h.pdfFileId && h.pdfUrl);
           var pdfHtml = h.pdfUrl ? '<a href="' + escapeHtml(h.pdfUrl) + '" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.75rem;">PDF</a>' : '-';
+          var ymParts = (h.yearMonth || '').split('-');
+          var ymDisplay = ymParts.length === 2 ? ymParts[0] + '年' + parseInt(ymParts[1], 10) + '月' : h.yearMonth || '';
+          var detailHtml = '';
+          try {
+            var items = JSON.parse(h.itemsJson || '[]');
+            if (items.length > 0) {
+              detailHtml = '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 btn-staff-hist-detail" data-idx="' + idx + '" style="font-size:0.75rem;">明細</button>';
+            }
+          } catch (e) {}
           html += '<tr>' +
             '<td class="text-center"><input type="checkbox" class="form-check-input staffHistoryCheck" data-fileid="' + escapeHtml(h.pdfFileId || '') + '"' + (hasPdf ? '' : ' disabled') + '></td>' +
-            '<td>' + escapeHtml(h.sentAt || '') + '</td>' +
+            '<td>' + escapeHtml(ymDisplay) + '</td>' +
             '<td class="text-end">¥' + (h.total || 0).toLocaleString() + '</td>' +
+            '<td>' + escapeHtml(h.sentAt || '') + '</td>' +
+            '<td class="text-center">' + detailHtml + '</td>' +
             '<td class="text-center">' + pdfHtml + '</td>' +
             '</tr>';
         });
@@ -5882,6 +5893,21 @@
             updateStaffHistorySelection_();
           });
         }
+        // 明細ボタン
+        el.querySelectorAll('.btn-staff-hist-detail').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var idx = parseInt(this.getAttribute('data-idx'), 10);
+            var h = sorted[idx];
+            if (!h) return;
+            try {
+              var items = JSON.parse(h.itemsJson || '[]');
+              var text = items.map(function(it) {
+                return (it.d || '') + ' ' + (it.n || '') + ' ¥' + (it.a || 0).toLocaleString();
+              }).join('\n');
+              alert('【' + (h.yearMonth || '') + '】\n\n' + (text || '明細なし'));
+            } catch (e) { alert('明細の読み込みに失敗しました'); }
+          });
+        });
       }
 
       // スタッフ履歴の選択件数・DLボタン更新

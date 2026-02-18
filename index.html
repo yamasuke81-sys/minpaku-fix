@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1237,12 +1237,16 @@
           </div>
           <div id="invoiceTemplateSaveResult" class="small mt-1" style="display:none;"></div>
         </div>
-        <!-- 権限承認ボタン -->
-        <div class="mb-3 p-2 border rounded bg-light">
-          <label class="form-label small fw-bold">DocumentApp権限の承認</label>
-          <p class="small text-muted mb-1">請求書送信で権限エラーが出る場合、下のボタンで承認してください（初回のみ）。</p>
-          <button type="button" class="btn btn-sm btn-outline-warning" id="btnAuthorizeDocApp">権限を承認する</button>
-          <span id="authorizeDocAppResult" class="small ms-2" style="display:none;"></span>
+        <!-- 権限承認の手順 -->
+        <div class="mb-3 p-2 border rounded bg-warning bg-opacity-10">
+          <label class="form-label small fw-bold">請求書送信で権限エラーが出る場合（初回のみ）</label>
+          <ol class="small mb-1" style="padding-left:1.2rem;">
+            <li>下のボタンでApps Scriptエディタを開く</li>
+            <li>上部の関数選択プルダウンで <code>authorizeDocumentApp</code> を選択</li>
+            <li><strong>▶ 実行</strong>ボタンを押す</li>
+            <li>「権限を確認」→「許可」を押す</li>
+          </ol>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btnOpenScriptEditor">Apps Scriptエディタを開く</button>
         </div>
         <hr>
         <!-- オーナー用：請求書一覧 -->
@@ -5432,20 +5436,8 @@
       });
 
       // === オーナー請求書一覧：イベントハンドラ ===
-      document.getElementById('btnAuthorizeDocApp').addEventListener('click', function() {
-        var btn = this;
-        var resEl = document.getElementById('authorizeDocAppResult');
-        btn.disabled = true;
-        btn.textContent = '承認中...';
-        google.script.run.withSuccessHandler(function(msg) {
-          btn.disabled = false;
-          btn.textContent = '権限を承認する';
-          if (resEl) { resEl.textContent = msg || '完了'; resEl.className = 'small ms-2 text-success'; resEl.style.display = ''; }
-        }).withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.textContent = '権限を承認する';
-          if (resEl) { resEl.textContent = err.message || 'エラー（スクリプトエディタから直接実行してください）'; resEl.className = 'small ms-2 text-danger'; resEl.style.display = ''; }
-        }).authorizeDocumentApp();
+      document.getElementById('btnOpenScriptEditor').addEventListener('click', function() {
+        window.open('https://script.google.com/home/projects/1cFH0kD81gR6DC1RPBFyMJNXLI52nGYSOl6w461bkz_Byx1nE-4C0yD4w/edit', '_blank');
       });
 
       document.getElementById('btnOwnerInvSearch').addEventListener('click', function() {

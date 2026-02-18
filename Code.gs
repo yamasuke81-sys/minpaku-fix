@@ -4908,7 +4908,24 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     }
 
     // 履歴を読み込んでレスポンスに含める（別途取得する必要をなくす）
-    var updatedHistory = getInvoiceHistoryInternal_(staffName, ym);
+    var updatedHistory = [];
+    try {
+      updatedHistory = getInvoiceHistoryInternal_(staffName, ym);
+    } catch (hErr) {
+      Logger.log('履歴再読込エラー: ' + hErr);
+    }
+    // 再読込が空でも書き込み成功なら、書き込んだデータを直接構築して返す
+    if (updatedHistory.length === 0 && historyWriteOk) {
+      updatedHistory = [{
+        staffName: staffName,
+        yearMonth: ym,
+        total: total,
+        sentAt: Utilities.formatDate(sentAt, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm'),
+        pdfUrl: pdfFile.getUrl(),
+        pdfFileId: pdfFile.getId(),
+        status: sendResult
+      }];
+    }
 
     return JSON.stringify({
       success: true,
@@ -4936,8 +4953,10 @@ function getInvoiceHistoryInternal_(staffName, yearMonth) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_INVOICE_HISTORY);
-    if (!sheet || sheet.getLastRow() < 2) return [];
+    if (!sheet) { Logger.log('履歴シートが見つかりません: ' + SHEET_INVOICE_HISTORY); return []; }
+    if (sheet.getLastRow() < 2) { Logger.log('履歴シートにデータ行なし: lastRow=' + sheet.getLastRow()); return []; }
     var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues();
+    Logger.log('履歴読込: ' + data.length + '行, staffName=[' + staffName + '], ym=[' + yearMonth + ']');
     var list = [];
     for (var i = 0; i < data.length; i++) {
       var hStaff = String(data[i][0] || '').trim();

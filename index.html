@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1667,6 +1667,39 @@
   <script>
     (function() {
       'use strict';
+
+      // --- iOS Safari 対策: alert() をトースト通知に置き換え ---
+      function _showToast(msg, type) {
+        type = type || 'info';
+        var colorMap = { info: '#0d6efd', success: '#198754', warning: '#ffc107', danger: '#dc3545' };
+        var textColor = type === 'warning' ? '#000' : '#fff';
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;' +
+          'background:' + (colorMap[type] || colorMap.info) + ';color:' + textColor + ';padding:10px 20px;' +
+          'border-radius:8px;font-size:14px;max-width:90vw;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);' +
+          'opacity:0;transition:opacity 0.3s;word-break:break-word;';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        requestAnimationFrame(function() { toast.style.opacity = '1'; });
+        setTimeout(function() {
+          toast.style.opacity = '0';
+          setTimeout(function() { toast.remove(); }, 400);
+        }, 3500);
+      }
+      window._showToast = _showToast;
+      // GASのiframe内ではalert()がブロックされるため、グローバルにオーバーライド
+      window.alert = function(msg) { _showToast(String(msg), 'info'); };
+      // iOS SafariのGASフレーム内ではconfirm()がブロックされfalseが返る
+      var _origConfirm = window.confirm;
+      var _isIOSGAS = /iPad|iPhone|iPod/.test(navigator.userAgent) && window !== window.top;
+      window.confirm = function(msg) {
+        if (_isIOSGAS) {
+          _showToast(String(msg), 'warning');
+          return true;
+        }
+        return _origConfirm.call(window, msg);
+      };
+
       // staffModeは文字列比較で確実に判定（GASテンプレートのboolean出力問題を回避）
       window.staffMode = ('<?= staffModeStr ?>' === 'yes');
       window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
@@ -5792,7 +5825,24 @@
         var btn = this;
 
         if (!staffId) { alert('スタッフを選択してください。'); return; }
-        if (!confirm('請求書を作成して送信しますか？')) return;
+        // confirm()はiOS Safariでブロックされるため2タップ方式
+        if (!btn._confirmReady) {
+          btn._confirmReady = true;
+          btn._origText = btn.textContent;
+          btn.textContent = '本当に送信？もう一度タップ';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-danger');
+          setTimeout(function() {
+            if (btn._confirmReady) {
+              btn._confirmReady = false;
+              btn.textContent = btn._origText;
+              btn.classList.remove('btn-danger');
+              btn.classList.add('btn-primary');
+            }
+          }, 5000);
+          return;
+        }
+        btn._confirmReady = false;
 
         btn.disabled = true;
         btn.textContent = '送信中...';
@@ -7175,15 +7225,18 @@
         if (!btn._confirmReady) {
           btn._confirmReady = true;
           btn._origText = btn.innerHTML;
+          btn._origColor = btn.style.color;
           btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + staffName + 'として記録？もう一度タップ';
           btn.classList.remove('btn-warning');
           btn.classList.add('btn-danger');
+          btn.style.color = '#fff';
           setTimeout(function() {
             if (btn._confirmReady) {
               btn._confirmReady = false;
               btn.innerHTML = btn._origText;
               btn.classList.remove('btn-danger');
               btn.classList.add('btn-warning');
+              btn.style.color = btn._origColor || '#000';
             }
           }, 5000);
           return;

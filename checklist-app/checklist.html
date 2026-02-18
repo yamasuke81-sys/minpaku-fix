@@ -1650,6 +1650,40 @@
   <input type="file" id="memoPhotoInput" accept="image/*" capture="environment">
 
   <script>
+    // --- iOS Safari 対策: alert() をトースト通知に置き換え ---
+    function _showToast(msg, type) {
+      type = type || 'info';
+      var colorMap = { info: '#0d6efd', success: '#198754', warning: '#ffc107', danger: '#dc3545' };
+      var textColor = type === 'warning' ? '#000' : '#fff';
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:99999;' +
+        'background:' + (colorMap[type] || colorMap.info) + ';color:' + textColor + ';padding:10px 20px;' +
+        'border-radius:8px;font-size:14px;max-width:90vw;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.3);' +
+        'opacity:0;transition:opacity 0.3s;word-break:break-word;';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      requestAnimationFrame(function() { toast.style.opacity = '1'; });
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        setTimeout(function() { toast.remove(); }, 400);
+      }, 3500);
+    }
+    window._showToast = _showToast;
+    window.alert = function(msg) { _showToast(String(msg), 'info'); };
+
+    // --- iOS Safari 対策: confirm() をオーバーライド ---
+    // iOS SafariのGASフレーム内ではconfirm()がブロックされfalseが返る
+    // iOS検出時はトースト表示+true返却で動作を維持
+    var _origConfirm = window.confirm;
+    var _isIOSGAS = /iPad|iPhone|iPod/.test(navigator.userAgent) && window !== window.top;
+    window.confirm = function(msg) {
+      if (_isIOSGAS) {
+        _showToast(String(msg), 'warning');
+        return true;
+      }
+      return _origConfirm.call(window, msg);
+    };
+
     // グローバル変数
     var checkoutDate = '<?= checkoutDate ?>' || '';
     var staffName = '<?= staffName ?>' || '';
@@ -5187,7 +5221,26 @@
       var sName = getSelectedStaffName_() || staffName || '';
       if (!sName) { alert('スタッフを選択してください'); return; }
       var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
-      if (!confirm(sName + ' として「' + labels[step] + '」を記録しますか？')) return;
+      // confirm()はiOS Safariでブロックされるため2タップ方式
+      if (!btn._confirmReady) {
+        btn._confirmReady = true;
+        btn._origText = btn.textContent;
+        btn._origBg = btn.style.background || '';
+        btn._origColor = btn.style.color || '';
+        btn.textContent = sName + 'として記録？もう一度タップ';
+        btn.style.background = '#dc3545';
+        btn.style.color = '#fff';
+        setTimeout(function() {
+          if (btn._confirmReady) {
+            btn._confirmReady = false;
+            btn.textContent = btn._origText;
+            btn.style.background = btn._origBg;
+            btn.style.color = btn._origColor;
+          }
+        }, 5000);
+        return;
+      }
+      btn._confirmReady = false;
       btn.disabled = true; btn.textContent = '処理中…';
       callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
         if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
@@ -5195,7 +5248,26 @@
     }
 
     function cancelLaundryStep(step, btn) {
-      if (!confirm('このステップを取り消しますか？')) return;
+      // confirm()はiOS Safariでブロックされるため2タップ方式
+      if (!btn._confirmReady) {
+        btn._confirmReady = true;
+        btn._origText = btn.textContent;
+        btn._origBg = btn.style.background || '';
+        btn._origColor = btn.style.color || '';
+        btn.textContent = '取消？もう一度タップ';
+        btn.style.background = '#dc3545';
+        btn.style.color = '#fff';
+        setTimeout(function() {
+          if (btn._confirmReady) {
+            btn._confirmReady = false;
+            btn.textContent = btn._origText;
+            btn.style.background = btn._origBg;
+            btn.style.color = btn._origColor;
+          }
+        }, 5000);
+        return;
+      }
+      btn._confirmReady = false;
       btn.disabled = true; btn.textContent = '…';
       callGAS('cancelCleaningLaundryStep', [checkoutDate, step]).then(function(res) {
         if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; }

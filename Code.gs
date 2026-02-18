@@ -4815,6 +4815,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       for (var hci = 0; hci < headerRow.getNumCells(); hci++) {
         headerRow.getCell(hci).setBackgroundColor('#f0f0f0');
         headerRow.getCell(hci).editAsText().setBold(true);
+        headerRow.getCell(hci).getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
       }
       // 金額列（3列目）を右寄せ
       for (var tri = 0; tri < table.getNumRows(); tri++) {

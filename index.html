@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5503,6 +5503,15 @@
         }
       })();
 
+      // sessionStorage キャッシュヘルパー
+      function _invoiceCacheKey(type, ym) { return 'inv_' + type + '_' + (window.currentUserName || '') + '_' + ym; }
+      function _invoiceSaveCache(type, ym, data) {
+        try { sessionStorage.setItem(_invoiceCacheKey(type, ym), JSON.stringify(data)); } catch(e) {}
+      }
+      function _invoiceLoadCache(type, ym) {
+        try { return JSON.parse(sessionStorage.getItem(_invoiceCacheKey(type, ym)) || '[]'); } catch(e) { return []; }
+      }
+
       function loadInvoiceData() {
         if (!window.staffMode) return;
 
@@ -5519,7 +5528,11 @@
         var autoEl = document.getElementById('invoiceAutoItems');
         if (autoEl) autoEl.innerHTML = '<span class="text-muted">読み込み中...</span>';
 
-        invoiceExcludedAuto = [];
+        // sessionStorage から除外・追加項目を復元（サーバー応答前に即時表示）
+        invoiceExcludedAuto = _invoiceLoadCache('excluded', ym);
+        invoiceManualItemsList = _invoiceLoadCache('extra', ym);
+        renderInvoiceManualItems();
+        updateInvoiceTotal();
 
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -5558,8 +5571,13 @@
               sel.appendChild(customOpt);
             }
 
-            // 追加項目（getInvoiceDataレスポンスに含まれる）
-            invoiceManualItemsList = r.extraItems || [];
+            // 追加項目（サーバーが返せばそちらを優先、なければsessionStorageを維持）
+            var serverExtra = r.extraItems || [];
+            if (serverExtra.length > 0) {
+              invoiceManualItemsList = serverExtra;
+              _invoiceSaveCache('extra', ym, serverExtra);
+            }
+            // サーバーが空でもsessionStorageに残っていればそのまま維持
             renderInvoiceManualItems();
 
             // 履歴
@@ -5607,6 +5625,7 @@
           btn.onclick = function() {
             var dt = this.getAttribute('data-date');
             if (invoiceExcludedAuto.indexOf(dt) === -1) invoiceExcludedAuto.push(dt);
+            _invoiceSaveCache('excluded', getInvoiceYm(), invoiceExcludedAuto);
             renderInvoiceAutoItems();
             updateInvoiceTotal();
           };
@@ -5615,6 +5634,7 @@
           btn.onclick = function() {
             var dt = this.getAttribute('data-date');
             invoiceExcludedAuto = invoiceExcludedAuto.filter(function(d) { return d !== dt; });
+            _invoiceSaveCache('excluded', getInvoiceYm(), invoiceExcludedAuto);
             renderInvoiceAutoItems();
             updateInvoiceTotal();
           };
@@ -5643,6 +5663,7 @@
           btn.onclick = function() {
             var idx = parseInt(this.getAttribute('data-idx'), 10);
             invoiceManualItemsList.splice(idx, 1);
+            _invoiceSaveCache('extra', getInvoiceYm(), invoiceManualItemsList);
             renderInvoiceManualItems();
             updateInvoiceTotal();
             saveInvoiceExtraItemsToSheet();
@@ -5751,6 +5772,7 @@
           name: name,
           amount: amt
         });
+        _invoiceSaveCache('extra', getInvoiceYm(), invoiceManualItemsList);
         renderInvoiceManualItems();
         updateInvoiceTotal();
         saveInvoiceExtraItemsToSheet();
@@ -5787,13 +5809,8 @@
                 resEl.className = 'small mt-1 text-success';
                 resEl.style.display = 'block';
               }
-              // 履歴だけ更新（追加項目はそのまま保持）
-              google.script.run.withSuccessHandler(function(histJson) {
-                try {
-                  var hr = JSON.parse(histJson);
-                  renderInvoiceHistory(hr.success ? hr.list : []);
-                } catch(e3) {}
-              }).getInvoiceHistory(staffId, ym);
+              // 少し待ってから全データ再読込（履歴書き込み反映のため）
+              setTimeout(function() { loadInvoiceData(); }, 1000);
             } else {
               if (resEl) {
                 resEl.textContent = r.error || '送信失敗';

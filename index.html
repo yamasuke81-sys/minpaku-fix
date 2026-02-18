@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218x</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218y</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2921,6 +2921,23 @@
               var ownerStaffDisplayEl = document.getElementById('eventModalStaffDisplay');
               if (ownerStaffDisplayEl && r.success) {
                 ownerStaffDisplayEl.innerHTML = formatStaffDisplayHtml(ownerResolvedStaff, r.volunteers);
+                // 各スタッフ名カードの右側に編集ボタンを追加
+                if (ownerResolvedStaff) {
+                  ownerStaffDisplayEl.querySelectorAll('.staff-card-item').forEach(function(cardEl) {
+                    var editIcon = document.createElement('button');
+                    editIcon.type = 'button';
+                    editIcon.className = 'btn btn-sm p-0 ms-1';
+                    editIcon.style.cssText = 'font-size:0.75rem;line-height:1;color:#6c757d;border:none;background:none;vertical-align:middle;';
+                    editIcon.innerHTML = '<i class="bi bi-pencil-square"></i>';
+                    editIcon.title = '清掃担当を編集';
+                    editIcon.onclick = function(e) {
+                      e.stopPropagation();
+                      bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                      openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim(), r.volunteers || []);
+                    };
+                    cardEl.appendChild(editIcon);
+                  });
+                }
                 var ownerStaffLabel = ownerStaffDisplayEl.closest('.modal-staff-label');
                 if (ownerStaffLabel) {
                   ownerStaffLabel.classList.remove('staff-set', 'staff-unset');
@@ -3121,20 +3138,7 @@
                   statusBtnArea.appendChild(btnRow);
                 }
               }
-              if ((d.cleaningStaff || '').trim()) {
-                var editStaffArea = document.getElementById('eventModalEditStaffArea');
-                if (editStaffArea) {
-                  var btnEditStaff = document.createElement('button');
-                  btnEditStaff.type = 'button';
-                  btnEditStaff.className = 'btn btn-sm btn-outline-secondary mt-1';
-                  btnEditStaff.innerHTML = '<i class="bi bi-pencil-square"></i> 編集';
-                  btnEditStaff.onclick = function() {
-                    bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                    openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim(), r.volunteers || []);
-                  };
-                  editStaffArea.appendChild(btnEditStaff);
-                }
-              }
+              // 編集ボタンは各スタッフ名カード横に移動済み（上記 ownerStaffDisplayEl 内）
               // 取り消し申請がある場合、承認ボタンを表示
               if (r.cancelRequested && r.cancelRequested.length && r.recruitRowIndex && ownerCenterArea) {
                 r.cancelRequested.forEach(function(cr) {

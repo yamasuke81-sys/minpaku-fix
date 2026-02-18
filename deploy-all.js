@@ -20,14 +20,18 @@ const claspCmd = process.platform === 'win32'
   : path.join(binDir, 'clasp');
 const clasp = fs.existsSync(claspCmd) ? '"' + claspCmd + '"' : 'npx clasp';
 
-function run(cmd, cwd) {
+function run(cmd, cwd, timeoutMs) {
   var sep = process.platform === 'win32' ? ';' : ':';
   var envPath = binDir + sep + (process.env.PATH || '');
+  var opts = { encoding: 'utf8', shell: true, cwd: cwd, env: Object.assign({}, process.env, { PATH: envPath }) };
+  if (timeoutMs) opts.timeout = timeoutMs;
   try {
-    var out = execSync(cmd, { encoding: 'utf8', shell: true, cwd: cwd, env: Object.assign({}, process.env, { PATH: envPath }) });
+    var out = execSync(cmd, opts);
     return { ok: true, out: out || '' };
   } catch (e) {
-    return { ok: false, out: (e.stdout || '').toString() + (e.stderr || '').toString() };
+    var msg = (e.stdout || '').toString() + (e.stderr || '').toString();
+    if (e.killed) msg += '\n(タイムアウトで強制終了)';
+    return { ok: false, out: msg };
   }
 }
 
@@ -147,10 +151,21 @@ function main() {
 
   // === チェックリストアプリ（deploy-checklist.js に委譲） ===
   console.log('[3/3] チェックリストアプリ: deploy-checklist.js を実行...');
+  console.log('');
   var clDeployScript = path.join(checklistDir, 'deploy-checklist.js');
   if (fs.existsSync(clDeployScript)) {
-    var clResult = run('node "' + clDeployScript + '"', checklistDir);
-    if (clResult.ok) {
+    try {
+      // stdio: 'inherit' で子プロセスの出力をリアルタイム表示
+      var sep = process.platform === 'win32' ? ';' : ':';
+      var envPath = binDir + sep + (process.env.PATH || '');
+      execSync('node "' + clDeployScript + '"', {
+        shell: true,
+        cwd: checklistDir,
+        stdio: 'inherit',
+        timeout: 120000,
+        env: Object.assign({}, process.env, { PATH: envPath })
+      });
+      console.log('');
       console.log('  チェックリストアプリ: デプロイ完了');
       // deploy-config.json からチェックリストURLを取得
       try {
@@ -162,9 +177,14 @@ function main() {
           }
         }
       } catch (cfgErr) {}
-    } else {
-      console.error('  チェックリストアプリのデプロイに失敗:');
-      console.error('  ' + clResult.out.slice(0, 500));
+    } catch (clErr) {
+      console.log('');
+      if (clErr.killed) {
+        console.error('  チェックリストアプリ: タイムアウト（120秒）で強制終了');
+        console.error('  デプロイ自体は成功している可能性があります。');
+      } else {
+        console.error('  チェックリストアプリのデプロイに失敗');
+      }
     }
   } else {
     console.error('  エラー: ' + clDeployScript + ' が見つかりません');

@@ -80,13 +80,13 @@ function validateCode() {
   console.log('   バリデーション OK');
 }
 
-/** URLを取得（リダイレクト対応） */
+/** URLを取得（リダイレクト対応、15秒タイムアウト） */
 function fetchUrl(url, redirectCount) {
   if (redirectCount === undefined) redirectCount = 0;
   if (redirectCount >= 5) return Promise.reject(new Error('Too many redirects'));
   return new Promise(function(resolve, reject) {
     var lib = url.startsWith('https') ? https : http;
-    lib.get(url, { headers: { 'User-Agent': 'deploy-checklist/1.0' } }, function(res) {
+    var req = lib.get(url, { headers: { 'User-Agent': 'deploy-checklist/1.0' }, timeout: 15000 }, function(res) {
       if (res.statusCode >= 301 && res.statusCode <= 303 && res.headers.location) {
         var next = res.headers.location.startsWith('http') ? res.headers.location : new URL(res.headers.location, url).href;
         return fetchUrl(next, redirectCount + 1).then(resolve, reject);
@@ -94,7 +94,9 @@ function fetchUrl(url, redirectCount) {
       var data = '';
       res.on('data', function(chunk) { data += chunk; });
       res.on('end', function() { resolve(data); });
-    }).on('error', reject);
+    });
+    req.on('timeout', function() { req.destroy(); reject(new Error('タイムアウト (15秒)')); });
+    req.on('error', reject);
   });
 }
 

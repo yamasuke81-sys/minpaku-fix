@@ -4817,8 +4817,8 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         headerRow.getCell(hci).editAsText().setBold(true);
         headerRow.getCell(hci).getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
       }
-      // 金額列（3列目）を右寄せ
-      for (var tri = 0; tri < table.getNumRows(); tri++) {
+      // 金額列（3列目）を右寄せ（ヘッダー行はスキップ）
+      for (var tri = 1; tri < table.getNumRows(); tri++) {
         var amtCell = table.getRow(tri).getCell(2);
         amtCell.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
       }
@@ -4875,20 +4875,40 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
 
     // --- 履歴に記録 ---
     var historySheet = ss.getSheetByName(SHEET_INVOICE_HISTORY);
-    if (historySheet) {
-      var itemsSummary = allItems.map(function(it) { return { d: it.dateText, n: it.name, a: it.amount }; });
-      var nextRow = historySheet.getLastRow() + 1;
-      historySheet.getRange(nextRow, 1, 1, 8).setValues([[
-        staffName,
-        ym,
-        total,
-        JSON.stringify(itemsSummary),
-        new Date(),
-        pdfFile.getUrl(),
-        pdfFile.getId(),
-        sendResult
-      ]]);
+    if (!historySheet) {
+      // シートが存在しない場合、再作成を試みる
+      try {
+        historySheet = ss.insertSheet(SHEET_INVOICE_HISTORY);
+        historySheet.getRange(1, 1, 1, 8).setValues([['スタッフ名', '対象年月', '合計金額', '明細JSON', '送信日時', 'PDFリンク', 'PDFファイルID', 'ステータス']]);
+      } catch (sheetErr) {
+        Logger.log('履歴シート作成失敗: ' + sheetErr);
+      }
     }
+    var historyWriteOk = false;
+    if (historySheet) {
+      try {
+        var itemsSummary = allItems.map(function(it) { return { d: it.dateText, n: it.name, a: it.amount }; });
+        var nextRow = historySheet.getLastRow() + 1;
+        var sentAt = new Date();
+        historySheet.getRange(nextRow, 1, 1, 8).setValues([[
+          staffName,
+          ym,
+          total,
+          JSON.stringify(itemsSummary),
+          sentAt,
+          pdfFile.getUrl(),
+          pdfFile.getId(),
+          sendResult
+        ]]);
+        SpreadsheetApp.flush(); // 書き込みを即座に反映
+        historyWriteOk = true;
+      } catch (histErr) {
+        Logger.log('履歴書き込みエラー: ' + histErr);
+      }
+    }
+
+    // 履歴を読み込んでレスポンスに含める（別途取得する必要をなくす）
+    var updatedHistory = getInvoiceHistoryInternal_(staffName, ym);
 
     return JSON.stringify({
       success: true,
@@ -4896,7 +4916,9 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       pdfFileId: pdfFile.getId(),
       total: total,
       itemCount: allItems.length,
-      sendResult: sendResult
+      sendResult: sendResult,
+      history: updatedHistory,
+      historyWriteOk: historyWriteOk
     });
   } catch (e) {
     var errMsg = e.toString();

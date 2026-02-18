@@ -1048,10 +1048,16 @@
             </select>
           </div>
           <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnRefreshStaffHistory" style="font-size:0.75rem;">検索</button>
+          <button type="button" class="btn btn-sm btn-outline-success py-0" id="btnStaffHistoryDownload" style="font-size:0.75rem;" disabled>選択PDFをダウンロード</button>
+        </div>
+        <div class="mb-1 d-flex gap-2 align-items-center">
+          <label class="form-check-label small"><input type="checkbox" class="form-check-input" id="staffHistoryCheckAll"> 全選択</label>
+          <span class="small text-muted" id="staffHistorySelectedCount"></span>
         </div>
         <div id="invoiceHistoryList" class="small">
           <span class="text-muted">検索ボタンを押してください。</span>
         </div>
+        <div id="staffHistoryDownloadResult" class="small mt-1" style="display:none;"></div>
       </div>
     </div>
     <div id="panelNotifications" style="display:none;">
@@ -5833,22 +5839,29 @@
         }).getAllInvoiceHistory(staffId, filterYm);
       }
 
-      // 送信履歴テーブル表示（オーナー請求書一覧と同じパターン）
+      // 送信履歴テーブル表示（チェックボックス+PDF DL対応）
       function renderStaffInvoiceHistory_(list) {
         var el = document.getElementById('invoiceHistoryList');
         if (!el) return;
+        var checkAll = document.getElementById('staffHistoryCheckAll');
+        if (checkAll) checkAll.checked = false;
+        updateStaffHistorySelection_();
         if (!list || list.length === 0) {
-          el.innerHTML = '<span class="text-muted">この月の送信履歴はありません。</span>';
+          el.innerHTML = '<span class="text-muted">送信履歴はありません。</span>';
           return;
         }
         var sorted = list.slice().sort(function(a, b) {
           return (b.sentAt || '').localeCompare(a.sentAt || '');
         });
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">' +
-          '<thead class="table-light"><tr><th>送信日時</th><th>合計</th><th>PDF</th><th>状態</th></tr></thead><tbody>';
-        sorted.forEach(function(h) {
+          '<thead class="table-light"><tr>' +
+          '<th style="width:28px;"><input type="checkbox" class="form-check-input" id="staffHistoryCheckAllInner"></th>' +
+          '<th>送信日時</th><th>合計</th><th>PDF</th><th>状態</th></tr></thead><tbody>';
+        sorted.forEach(function(h, idx) {
+          var hasPdf = !!(h.pdfFileId && h.pdfUrl);
           var pdfHtml = h.pdfUrl ? '<a href="' + escapeHtml(h.pdfUrl) + '" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.75rem;">PDF</a>' : '-';
           html += '<tr>' +
+            '<td class="text-center"><input type="checkbox" class="form-check-input staffHistoryCheck" data-fileid="' + escapeHtml(h.pdfFileId || '') + '"' + (hasPdf ? '' : ' disabled') + '></td>' +
             '<td>' + escapeHtml(h.sentAt || '') + '</td>' +
             '<td class="text-end">¥' + (h.total || 0).toLocaleString() + '</td>' +
             '<td class="text-center">' + pdfHtml + '</td>' +
@@ -5857,6 +5870,29 @@
         });
         html += '</tbody></table>';
         el.innerHTML = html;
+        // チェックボックスイベント
+        el.querySelectorAll('.staffHistoryCheck').forEach(function(cb) {
+          cb.addEventListener('change', updateStaffHistorySelection_);
+        });
+        var innerAll = document.getElementById('staffHistoryCheckAllInner');
+        if (innerAll) {
+          innerAll.addEventListener('change', function() {
+            var checked = this.checked;
+            el.querySelectorAll('.staffHistoryCheck:not(:disabled)').forEach(function(cb) { cb.checked = checked; });
+            if (checkAll) checkAll.checked = checked;
+            updateStaffHistorySelection_();
+          });
+        }
+      }
+
+      // スタッフ履歴の選択件数・DLボタン更新
+      function updateStaffHistorySelection_() {
+        var checks = document.querySelectorAll('.staffHistoryCheck:checked');
+        var countEl = document.getElementById('staffHistorySelectedCount');
+        var dlBtn = document.getElementById('btnStaffHistoryDownload');
+        var cnt = checks.length;
+        if (countEl) countEl.textContent = cnt > 0 ? cnt + '件選択中' : '';
+        if (dlBtn) dlBtn.disabled = cnt === 0;
       }
 
       // 追加項目のプルダウン変更時
@@ -5910,9 +5946,60 @@
         if (dateInp) dateInp.value = '';
       });
 
-      // 送信履歴の更新ボタン
+      // 送信履歴の検索ボタン
       document.getElementById('btnRefreshStaffHistory').addEventListener('click', function() {
         loadStaffInvoiceHistory_();
+      });
+
+      // 送信履歴の全選択チェックボックス
+      document.getElementById('staffHistoryCheckAll').addEventListener('change', function() {
+        var checked = this.checked;
+        document.querySelectorAll('.staffHistoryCheck:not(:disabled)').forEach(function(cb) { cb.checked = checked; });
+        var innerAll = document.getElementById('staffHistoryCheckAllInner');
+        if (innerAll) innerAll.checked = checked;
+        updateStaffHistorySelection_();
+      });
+
+      // 送信履歴のPDFダウンロードボタン
+      document.getElementById('btnStaffHistoryDownload').addEventListener('click', function() {
+        var btn = this;
+        var checks = document.querySelectorAll('.staffHistoryCheck:checked');
+        var fileIds = [];
+        checks.forEach(function(cb) {
+          var fid = cb.getAttribute('data-fileid');
+          if (fid) fileIds.push(fid);
+        });
+        if (fileIds.length === 0) { alert('PDFを選択してください。'); return; }
+        var resEl = document.getElementById('staffHistoryDownloadResult');
+        btn.disabled = true;
+        btn.textContent = fileIds.length + '件のPDFを準備中...';
+        if (resEl) { resEl.style.display = 'none'; }
+
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '選択PDFをダウンロード';
+          updateStaffHistorySelection_();
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.url) {
+              if (resEl) {
+                resEl.innerHTML = '<a href="' + escapeHtml(r.url) + '" target="_blank" class="text-success">' + r.count + '件の' + (r.count > 1 ? 'ZIP' : 'PDF') + 'を開く</a>';
+                resEl.className = 'small mt-1';
+                resEl.style.display = 'block';
+              }
+              window.open(r.url, '_blank');
+            } else {
+              if (resEl) { resEl.textContent = r.error || '失敗'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+            }
+          } catch (e) {
+            if (resEl) { resEl.textContent = 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+          }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '選択PDFをダウンロード';
+          updateStaffHistorySelection_();
+          if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
+        }).createInvoiceZipDownload(fileIds);
       });
 
       // 送信ボタン

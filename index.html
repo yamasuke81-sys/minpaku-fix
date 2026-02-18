@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0217f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -962,6 +962,7 @@
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
       <li class="nav-item" id="navRecruit" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
       <li class="nav-item" id="navStaffSchedule" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
+      <li class="nav-item" id="navInvoice" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="invoice">請求書</a></li>
       <li class="nav-item" id="navNotifications" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
       <li class="nav-item" id="navSettings" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
     </ul>
@@ -989,56 +990,57 @@
     <div id="panelStaffSchedule" style="display:none;">
       <div class="mb-2"><label class="form-label small">表示月</label><input type="month" class="form-control form-control-sm" id="staffScheduleMonth" style="max-width:160px;"></div>
       <div id="staffScheduleList"></div>
-      <!-- 請求書セクション -->
-      <div id="invoiceSection" class="mt-4 p-3 border rounded bg-white" style="display:none;">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="fw-bold small">請求書作成</span>
-          <span class="badge bg-secondary" id="invoiceYmBadge"></span>
+    </div>
+    <div id="panelInvoice" style="display:none;">
+      <div class="mb-2 d-flex gap-2 align-items-end">
+        <div><label class="form-label small mb-0">対象月</label><input type="month" class="form-control form-control-sm" id="invoiceMonth" style="max-width:160px;"></div>
+        <span class="badge bg-secondary align-self-end" id="invoiceYmBadge"></span>
+      </div>
+      <div id="invoiceNotReady" class="small text-muted mb-2" style="display:none;">
+        <p>請求書機能はオーナーによる設定が必要です（保存先フォルダ・テンプレート）。</p>
+      </div>
+      <div id="invoiceContent" style="display:none;">
+        <!-- 清掃実績（自動算出） -->
+        <div class="mb-3">
+          <label class="form-label small fw-bold mb-1">清掃実績（自動算出）</label>
+          <p class="text-muted mb-1" style="font-size:0.7rem;">不要な項目は×で除外できます（カレンダーには影響しません）</p>
+          <div id="invoiceAutoItems" class="small"></div>
         </div>
-        <div id="invoiceNotReady" class="small text-muted" style="display:none;">
-          <p>請求書機能はオーナーによる設定が必要です（保存先フォルダ・テンプレート）。</p>
-        </div>
-        <div id="invoiceContent" style="display:none;">
-          <!-- 清掃実績（自動算出） -->
-          <div class="mb-2">
-            <label class="form-label small fw-bold mb-1">清掃実績（自動算出）</label>
-            <div id="invoiceAutoItems" class="small"></div>
-          </div>
-          <!-- 追加項目 -->
-          <div class="mb-2">
-            <label class="form-label small fw-bold mb-1">追加項目</label>
-            <div id="invoiceManualItems"></div>
-            <div class="d-flex gap-1 align-items-center flex-wrap mt-1">
-              <input type="date" class="form-control form-control-sm" id="invoiceAddDate" style="max-width:130px;">
-              <select class="form-select form-select-sm" id="invoiceAddJobSelect" style="max-width:180px;">
-                <option value="">選択...</option>
-              </select>
-              <input type="text" class="form-control form-control-sm" id="invoiceAddCustomName" placeholder="項目名" style="max-width:120px;display:none;">
-              <input type="number" class="form-control form-control-sm" id="invoiceAddAmount" placeholder="金額" style="max-width:90px;">
-              <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnInvoiceAddItem">追加</button>
-            </div>
-          </div>
-          <!-- 備考 -->
-          <div class="mb-2">
-            <label class="form-label small fw-bold mb-1">備考</label>
-            <textarea class="form-control form-control-sm" id="invoiceRemarks" rows="2" placeholder="備考があれば記入"></textarea>
-          </div>
-          <!-- 合計 -->
-          <div class="border-top pt-2 mb-2 d-flex justify-content-between align-items-center">
-            <span class="fw-bold">合計請求額</span>
-            <span class="fw-bold fs-5" id="invoiceTotalDisplay">¥0</span>
-          </div>
-          <!-- 送信ボタン -->
-          <div class="mb-2">
-            <button type="button" class="btn btn-primary btn-sm w-100" id="btnSendInvoice">請求書を送信</button>
-            <div id="invoiceSendResult" class="small mt-1" style="display:none;"></div>
+        <!-- 追加項目 -->
+        <div class="mb-3">
+          <label class="form-label small fw-bold mb-1">追加項目</label>
+          <p class="text-muted mb-1" style="font-size:0.7rem;">追加した項目は自動保存されます</p>
+          <div id="invoiceManualItems"></div>
+          <div class="d-flex gap-1 align-items-center flex-wrap mt-1">
+            <input type="date" class="form-control form-control-sm" id="invoiceAddDate" style="max-width:130px;">
+            <select class="form-select form-select-sm" id="invoiceAddJobSelect" style="max-width:180px;">
+              <option value="">選択...</option>
+            </select>
+            <input type="text" class="form-control form-control-sm" id="invoiceAddCustomName" placeholder="項目名" style="max-width:120px;display:none;">
+            <input type="number" class="form-control form-control-sm" id="invoiceAddAmount" placeholder="金額" style="max-width:90px;">
+            <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnInvoiceAddItem">追加</button>
           </div>
         </div>
-        <!-- 送信履歴 -->
-        <div class="mt-3 border-top pt-2">
-          <label class="form-label small fw-bold mb-1">送信履歴</label>
-          <div id="invoiceHistoryList" class="small text-muted">履歴なし</div>
+        <!-- 備考 -->
+        <div class="mb-2">
+          <label class="form-label small fw-bold mb-1">備考</label>
+          <textarea class="form-control form-control-sm" id="invoiceRemarks" rows="2" placeholder="備考があれば記入"></textarea>
         </div>
+        <!-- 合計 -->
+        <div class="border-top pt-2 mb-2 d-flex justify-content-between align-items-center">
+          <span class="fw-bold">合計請求額</span>
+          <span class="fw-bold fs-5" id="invoiceTotalDisplay">¥0</span>
+        </div>
+        <!-- 送信ボタン -->
+        <div class="mb-2">
+          <button type="button" class="btn btn-primary btn-sm w-100" id="btnSendInvoice">請求書を送信</button>
+          <div id="invoiceSendResult" class="small mt-1" style="display:none;"></div>
+        </div>
+      </div>
+      <!-- 送信履歴 -->
+      <div class="mt-3 border-top pt-2">
+        <label class="form-label small fw-bold mb-1">送信履歴</label>
+        <div id="invoiceHistoryList" class="small text-muted">履歴なし</div>
       </div>
     </div>
     <div id="panelNotifications" style="display:none;">
@@ -3736,6 +3738,8 @@
           if (nst) nst.style.display = '';
           var nss = document.getElementById('navStaffSchedule');
           if (nss) nss.style.display = 'none';
+          var ninv = document.getElementById('navInvoice');
+          if (ninv) ninv.style.display = 'none';
           var nr = document.getElementById('navRecruit');
           if (nr) nr.style.display = '';
         } else {
@@ -3749,6 +3753,8 @@
           if (nst2) nst2.style.display = 'none';
           var nss2 = document.getElementById('navStaffSchedule');
           if (nss2) nss2.style.display = '';
+          var ninv2 = document.getElementById('navInvoice');
+          if (ninv2) ninv2.style.display = '';
           var nr2 = document.getElementById('navRecruit');
           if (nr2) nr2.style.display = 'none';
         }
@@ -3882,6 +3888,7 @@
             document.getElementById('panelCalendar').style.display = tab === 'calendar' ? 'block' : 'none';
             document.getElementById('panelRecruit').style.display = tab === 'recruit' ? 'block' : 'none';
             document.getElementById('panelStaffSchedule').style.display = tab === 'staffSchedule' ? 'block' : 'none';
+            document.getElementById('panelInvoice').style.display = tab === 'invoice' ? 'block' : 'none';
             document.getElementById('panelNotifications').style.display = tab === 'notifications' ? 'block' : 'none';
             document.getElementById('panelSettings').style.display = tab === 'settings' ? 'block' : 'none';
             document.getElementById('panelStaffTest').style.display = tab === 'staffTest' ? 'block' : 'none';
@@ -3889,7 +3896,8 @@
               setTimeout(function() { if (calendar) calendar.updateSize(); }, 50);
             }
             if (tab === 'recruit') loadRecruitList();
-            if (tab === 'staffSchedule') { loadStaffSchedule(); loadInvoiceData(); }
+            if (tab === 'staffSchedule') loadStaffSchedule();
+            if (tab === 'invoice') loadInvoiceData();
             if (tab === 'notifications') loadNotificationListMain();
             if (tab === 'settings') loadSettings();
           });
@@ -3921,6 +3929,8 @@
               if (navStaffTest) navStaffTest.style.display = showOwnerTabs ? '' : 'none';
               var navStaffSched = document.getElementById('navStaffSchedule');
               if (navStaffSched) navStaffSched.style.display = (window.staffMode || staffBarVisible) ? '' : 'none';
+              var navInvoiceTab = document.getElementById('navInvoice');
+              if (navInvoiceTab) navInvoiceTab.style.display = (window.staffMode || staffBarVisible) ? '' : 'none';
               var navRecruit = document.getElementById('navRecruit');
               if (navRecruit) navRecruit.style.display = (window.staffMode || staffBarVisible) ? 'none' : '';
               var btnSwitch = document.getElementById('btnAccountSwitch');
@@ -3953,6 +3963,7 @@
             document.getElementById('panelCalendar').style.display = 'none';
             document.getElementById('panelRecruit').style.display = 'none';
             if (document.getElementById('panelStaffSchedule')) document.getElementById('panelStaffSchedule').style.display = 'none';
+            document.getElementById('panelInvoice').style.display = 'none';
             document.getElementById('panelNotifications').style.display = 'block';
             document.getElementById('panelSettings').style.display = 'none';
             document.getElementById('panelStaffTest').style.display = 'none';
@@ -4817,7 +4828,7 @@
           monthInp.dataset.init = '1';
           var d = new Date();
           monthInp.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-          monthInp.addEventListener('change', function() { loadStaffSchedule(); loadInvoiceData(); });
+          monthInp.addEventListener('change', function() { loadStaffSchedule(); });
         }
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         if (!staffId) {
@@ -5242,25 +5253,36 @@
         }).setInvoiceTemplateDocId(docId);
       });
 
-      // === 請求書機能（スタッフ画面） ===
-      var invoiceManualItemsList = []; // 手動追加項目の一時リスト
+      // === 請求書機能（スタッフ画面・独立タブ） ===
+      var invoiceManualItemsList = []; // 手動追加項目リスト（シートに永続化）
+      var invoiceExcludedAuto = [];    // 除外した清掃実績のcheckoutDate配列（UI上のみ）
       var invoiceJobOptions = [];      // 仕事内容マスタの選択肢キャッシュ
+      var _invoiceSaving = false;      // 保存中フラグ
 
       function getInvoiceYm() {
-        var monthInp = document.getElementById('staffScheduleMonth');
+        var monthInp = document.getElementById('invoiceMonth');
         return monthInp && monthInp.value ? monthInp.value : (function() {
           var d = new Date();
           return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
         })();
       }
 
+      // 月セレクタ初期化
+      (function() {
+        var monthInp = document.getElementById('invoiceMonth');
+        if (monthInp && !monthInp.dataset.init) {
+          monthInp.dataset.init = '1';
+          var d = new Date();
+          monthInp.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          monthInp.addEventListener('change', function() { loadInvoiceData(); });
+        }
+      })();
+
       function loadInvoiceData() {
-        var section = document.getElementById('invoiceSection');
-        if (!section || !window.staffMode) return;
-        section.style.display = 'block';
+        if (!window.staffMode) return;
 
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
-        if (!staffId) { section.style.display = 'none'; return; }
+        if (!staffId) return;
 
         var ym = getInvoiceYm();
         var ymParts = ym.split('-');
@@ -5272,8 +5294,7 @@
         var autoEl = document.getElementById('invoiceAutoItems');
         if (autoEl) autoEl.innerHTML = '<span class="text-muted">読み込み中...</span>';
 
-        invoiceManualItemsList = [];
-        renderInvoiceManualItems();
+        invoiceExcludedAuto = [];
 
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -5282,7 +5303,6 @@
               if (autoEl) autoEl.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
               return;
             }
-            // 設定未完了チェック
             if (!r.hasFolder || !r.hasTemplate) {
               if (notReady) notReady.style.display = 'block';
               if (content) content.style.display = 'none';
@@ -5291,29 +5311,12 @@
               if (content) content.style.display = 'block';
             }
 
-            // 自動明細の表示
-            if (autoEl) {
-              if (r.autoItems && r.autoItems.length > 0) {
-                autoEl.innerHTML = r.autoItems.map(function(item) {
-                  var amtStr = item.amount > 0 ? '¥' + item.amount.toLocaleString() : '<span class="text-danger">未設定</span>';
-                  var specialHtml = '';
-                  if (item.specialItems && item.specialItems.length > 0) {
-                    specialHtml = item.specialItems.map(function(sp) {
-                      return '<div class="ms-3 text-muted"><small>+ ' + escapeHtml(sp.name) + ' ¥' + sp.amount.toLocaleString() + '</small></div>';
-                    }).join('');
-                  }
-                  return '<div class="border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center">' +
-                    '<div><strong>' + escapeHtml(item.dateDisplay) + '</strong> ' + escapeHtml(item.jobName) +
-                    (item.partners && item.partners.length ? ' <span class="text-muted">(' + item.partners.map(function(p) { return escapeHtml(p); }).join(', ') + ')</span>' : '') +
-                    '</div><div>' + amtStr + '</div></div>' + specialHtml;
-                }).join('');
-              } else {
-                autoEl.innerHTML = '<span class="text-muted">この月の清掃実績はありません。</span>';
-              }
-            }
+            // 自動明細の表示（削除ボタン付き）
+            window._invoiceAutoItems = r.autoItems || [];
+            renderInvoiceAutoItems();
 
-            // 仕事内容プルダウンの更新
-            invoiceJobOptions = r.jobOptions || [];
+            // 仕事内容プルダウン（清掃系含む全項目）
+            invoiceJobOptions = r.allJobOptions || r.jobOptions || [];
             var sel = document.getElementById('invoiceAddJobSelect');
             if (sel) {
               sel.innerHTML = '<option value="">選択...</option>';
@@ -5330,18 +5333,75 @@
               sel.appendChild(customOpt);
             }
 
-            // 履歴の表示
+            // 履歴
             renderInvoiceHistory(r.history || []);
 
-            // 合計更新
-            updateInvoiceTotal(r.autoItems || []);
+            // 保存済み追加項目を読み込み
+            google.script.run.withSuccessHandler(function(extraJson) {
+              try {
+                var er = JSON.parse(extraJson);
+                invoiceManualItemsList = (er.success && er.items) ? er.items : [];
+              } catch (e2) { invoiceManualItemsList = []; }
+              renderInvoiceManualItems();
+              updateInvoiceTotal();
+            }).withFailureHandler(function() {
+              invoiceManualItemsList = [];
+              renderInvoiceManualItems();
+              updateInvoiceTotal();
+            }).getInvoiceExtraItems(ym, staffId);
           } catch (e) {
             if (autoEl) autoEl.innerHTML = '<span class="text-danger">読み込みエラー</span>';
           }
         }).withFailureHandler(function(err) {
-          var autoEl2 = document.getElementById('invoiceAutoItems');
-          if (autoEl2) autoEl2.innerHTML = '<span class="text-danger">通信エラー</span>';
+          if (autoEl) autoEl.innerHTML = '<span class="text-danger">通信エラー</span>';
         }).getInvoiceData(ym, staffId);
+      }
+
+      // 自動明細の表示（除外ボタン付き）
+      function renderInvoiceAutoItems() {
+        var autoEl = document.getElementById('invoiceAutoItems');
+        if (!autoEl) return;
+        var items = window._invoiceAutoItems || [];
+        if (items.length === 0) {
+          autoEl.innerHTML = '<span class="text-muted">この月の清掃実績はありません。</span>';
+          return;
+        }
+        autoEl.innerHTML = items.map(function(item, idx) {
+          var excluded = invoiceExcludedAuto.indexOf(item.date) !== -1;
+          var amtStr = item.amount > 0 ? '¥' + item.amount.toLocaleString() : '<span class="text-danger">未設定</span>';
+          var specialHtml = '';
+          if (!excluded && item.specialItems && item.specialItems.length > 0) {
+            specialHtml = item.specialItems.map(function(sp) {
+              return '<div class="ms-3 text-muted"><small>+ ' + escapeHtml(sp.name) + ' ¥' + sp.amount.toLocaleString() + '</small></div>';
+            }).join('');
+          }
+          var rowClass = excluded ? 'border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center bg-light text-decoration-line-through text-muted' :
+                                    'border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center';
+          var btnHtml = excluded
+            ? '<button type="button" class="btn btn-sm btn-outline-success py-0 px-1 ms-1 btn-restore-auto" data-date="' + escapeHtml(item.date) + '" style="font-size:0.7em;">戻す</button>'
+            : '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1 btn-exclude-auto" data-date="' + escapeHtml(item.date) + '" style="font-size:0.7em;">×</button>';
+          return '<div class="' + rowClass + '">' +
+            '<div><strong>' + escapeHtml(item.dateDisplay) + '</strong> ' + escapeHtml(item.jobName) +
+            (item.partners && item.partners.length ? ' <span class="text-muted">(' + item.partners.map(function(p) { return escapeHtml(p); }).join(', ') + ')</span>' : '') +
+            '</div><div>' + (excluded ? '<s>' + amtStr + '</s>' : amtStr) + ' ' + btnHtml + '</div></div>' + specialHtml;
+        }).join('');
+
+        autoEl.querySelectorAll('.btn-exclude-auto').forEach(function(btn) {
+          btn.onclick = function() {
+            var dt = this.getAttribute('data-date');
+            if (invoiceExcludedAuto.indexOf(dt) === -1) invoiceExcludedAuto.push(dt);
+            renderInvoiceAutoItems();
+            updateInvoiceTotal();
+          };
+        });
+        autoEl.querySelectorAll('.btn-restore-auto').forEach(function(btn) {
+          btn.onclick = function() {
+            var dt = this.getAttribute('data-date');
+            invoiceExcludedAuto = invoiceExcludedAuto.filter(function(d) { return d !== dt; });
+            renderInvoiceAutoItems();
+            updateInvoiceTotal();
+          };
+        });
       }
 
       // 手動項目の表示
@@ -5367,17 +5427,29 @@
             var idx = parseInt(this.getAttribute('data-idx'), 10);
             invoiceManualItemsList.splice(idx, 1);
             renderInvoiceManualItems();
-            updateInvoiceTotal(null);
+            updateInvoiceTotal();
+            saveInvoiceExtraItemsToSheet();
           };
         });
       }
 
+      // 追加項目をシートに保存
+      function saveInvoiceExtraItemsToSheet() {
+        if (_invoiceSaving) return;
+        _invoiceSaving = true;
+        var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
+        var ym = getInvoiceYm();
+        google.script.run.withSuccessHandler(function() { _invoiceSaving = false; })
+          .withFailureHandler(function() { _invoiceSaving = false; })
+          .saveInvoiceExtraItems(ym, staffId, invoiceManualItemsList);
+      }
+
       // 合計金額の計算・表示
-      function updateInvoiceTotal(autoItems) {
-        if (autoItems) window._invoiceAutoItems = autoItems;
+      function updateInvoiceTotal() {
         var items = window._invoiceAutoItems || [];
         var total = 0;
         items.forEach(function(item) {
+          if (invoiceExcludedAuto.indexOf(item.date) !== -1) return;
           total += (item.amount || 0);
           if (item.specialItems) {
             item.specialItems.forEach(function(sp) { total += (sp.amount || 0); });
@@ -5413,7 +5485,6 @@
           if (amtInp) amtInp.value = '';
         } else {
           if (customNameInp) customNameInp.style.display = 'none';
-          // 選択した項目のデフォルト金額をセット
           var opt = this.options[this.selectedIndex];
           if (opt && opt.dataset.amount && Number(opt.dataset.amount) > 0) {
             if (amtInp) amtInp.value = opt.dataset.amount;
@@ -5446,9 +5517,9 @@
           amount: amt
         });
         renderInvoiceManualItems();
-        updateInvoiceTotal(null);
+        updateInvoiceTotal();
+        saveInvoiceExtraItemsToSheet();
 
-        // 入力リセット
         if (sel) sel.value = '';
         if (customInp) { customInp.value = ''; customInp.style.display = 'none'; }
         if (amtInp) amtInp.value = '';
@@ -5481,7 +5552,6 @@
                 resEl.className = 'small mt-1 text-success';
                 resEl.style.display = 'block';
               }
-              // 履歴を再読込
               loadInvoiceData();
             } else {
               if (resEl) {
@@ -5497,7 +5567,7 @@
           btn.disabled = false;
           btn.textContent = '請求書を送信';
           if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
-        }).createAndSendInvoice(ym, staffId, invoiceManualItemsList, remarks);
+        }).createAndSendInvoice(ym, staffId, invoiceManualItemsList, remarks, invoiceExcludedAuto);
       });
       document.getElementById('btnOpenStaffUrl').addEventListener('click', function() {
         var url = document.getElementById('staffDeployUrlInput').value.trim();

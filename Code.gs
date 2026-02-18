@@ -94,6 +94,7 @@ const SHEET_LAUNDRY = 'クリーニング連絡';
 
 // 請求書履歴用シート名
 const SHEET_INVOICE_HISTORY = '請求書履歴';
+const SHEET_INVOICE_EXTRA = '請求書追加項目';
 
 // 日付を yyyy-MM-dd に正規化するヘルパー
 function normDateStr_(v) {
@@ -1280,6 +1281,10 @@ function ensureSheetsExist() {
 
   safeInsert(SHEET_INVOICE_HISTORY, function(s) {
     s.getRange(1, 1, 1, 8).setValues([['スタッフ名', '対象年月', '合計金額', '明細JSON', '送信日時', 'PDFリンク', 'PDFファイルID', 'ステータス']]);
+  });
+
+  safeInsert(SHEET_INVOICE_EXTRA, function(s) {
+    s.getRange(1, 1, 1, 5).setValues([['スタッフ名', '対象年月', '日付', '項目名', '金額']]);
   });
 
 }
@@ -4450,14 +4455,18 @@ function getInvoiceData(yearMonth, staffIdentifier) {
 
     // 仕事内容マスタから追加項目用の選択肢を取得（清掃系は自動計算なので除外）
     var jobOptions = [];
+    // 全ての仕事内容（清掃系含む）の選択肢も返す
+    var allJobOptions = [];
     for (var ji = 0; ji < allJobData.length; ji++) {
       var jName = String(allJobData[ji][0] || '').trim();
       var jActive = String(allJobData[ji][2] || 'Y').trim();
       if (!jName || jActive !== 'Y') continue;
-      // 清掃系（自動計算対象）は除外
-      if (cleanJobNames[jName] || /^\d+名で清掃$/.test(jName)) continue;
       var jAmt = lookupComp_(staffName + '-' + jName) || lookupComp_('共通-' + jName) || 0;
-      jobOptions.push({ name: jName, defaultAmount: jAmt });
+      allJobOptions.push({ name: jName, defaultAmount: jAmt, isCleaning: !!(cleanJobNames[jName] || /^\d+名で清掃$/.test(jName)) });
+      // 非清掃系のみ従来のjobOptionsに
+      if (!cleanJobNames[jName] && !/^\d+名で清掃$/.test(jName)) {
+        jobOptions.push({ name: jName, defaultAmount: jAmt });
+      }
     }
 
     // 送信履歴
@@ -4472,6 +4481,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       staffInfo: staffInfo,
       autoItems: autoItems,
       jobOptions: jobOptions,
+      allJobOptions: allJobOptions,
       history: history,
       hasFolder: !!folderId,
       hasTemplate: !!templateDocId
@@ -4488,7 +4498,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
  * @param {Array} manualItems - [{date, name, amount}]
  * @param {string} remarks - 備考
  */
-function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) {
+function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, excludedAutoItems) {
   try {
     if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
     var staffName = String(staffIdentifier).trim();
@@ -4602,6 +4612,14 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
       }
     }
 
+    // 除外リスト（チェックアウト日のセット）
+    var excludedSet = {};
+    if (excludedAutoItems && Array.isArray(excludedAutoItems)) {
+      for (var ei = 0; ei < excludedAutoItems.length; ei++) {
+        excludedSet[String(excludedAutoItems[ei])] = true;
+      }
+    }
+
     // 明細構築
     var allItems = [];
     var total = 0;
@@ -4610,6 +4628,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
     for (var si2 = 0; si2 < scheduleList.length; si2++) {
       var sItem = scheduleList[si2];
       if (sItem.confirmed === false) continue;
+      if (excludedSet[sItem.checkoutDate]) continue;
       var staffCount = 1 + (sItem.partners ? sItem.partners.length : 0);
       var jobName = cleanJobMap2[staffCount] || (staffCount + '名で清掃');
       var amount = lookupComp2_(staffName + '-' + jobName) || lookupComp2_('共通-' + jobName) || 0;
@@ -4810,6 +4829,73 @@ function getInvoiceHistory(staffIdentifier, yearMonth) {
     return JSON.stringify({ success: true, list: list });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), list: [] });
+  }
+}
+
+/**
+ * 請求書追加項目を保存（シートに永続化）
+ */
+function saveInvoiceExtraItems(yearMonth, staffIdentifier, items) {
+  try {
+    if (!staffIdentifier) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
+    var staffName = String(staffIdentifier).trim();
+    var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+
+    // 既存の該当スタッフ・月のデータを削除（上書き保存）
+    if (sheet.getLastRow() >= 2) {
+      var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+      for (var i = data.length - 1; i >= 0; i--) {
+        if (String(data[i][0] || '').trim() === staffName && String(data[i][1] || '').trim() === ym) {
+          sheet.deleteRow(i + 2);
+        }
+      }
+    }
+
+    // 新しいデータを書き込み
+    if (items && Array.isArray(items) && items.length > 0) {
+      var rows = items.map(function(it) {
+        return [staffName, ym, String(it.date || ''), String(it.name || ''), Number(it.amount || 0)];
+      });
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 請求書追加項目を読み込み
+ */
+function getInvoiceExtraItems(yearMonth, staffIdentifier) {
+  try {
+    if (!staffIdentifier) return JSON.stringify({ success: false, items: [] });
+    var staffName = String(staffIdentifier).trim();
+    var ym = yearMonth || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM');
+    ensureSheetsExist();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, items: [] });
+
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+    var items = [];
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0] || '').trim() === staffName && String(data[i][1] || '').trim() === ym) {
+        items.push({
+          date: String(data[i][2] || ''),
+          name: String(data[i][3] || ''),
+          amount: Number(data[i][4] || 0)
+        });
+      }
+    }
+    return JSON.stringify({ success: true, items: items });
+  } catch (e) {
+    return JSON.stringify({ success: false, items: [], error: e.toString() });
   }
 }
 

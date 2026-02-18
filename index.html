@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218s</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218t</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5856,7 +5856,7 @@
         var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">' +
           '<thead class="table-light"><tr>' +
           '<th style="width:28px;"><input type="checkbox" class="form-check-input" id="staffHistoryCheckAllInner"></th>' +
-          '<th>送信日時</th><th>合計</th><th>PDF</th><th>状態</th></tr></thead><tbody>';
+          '<th>送信日時</th><th>合計</th><th>PDF</th></tr></thead><tbody>';
         sorted.forEach(function(h, idx) {
           var hasPdf = !!(h.pdfFileId && h.pdfUrl);
           var pdfHtml = h.pdfUrl ? '<a href="' + escapeHtml(h.pdfUrl) + '" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:0.75rem;">PDF</a>' : '-';
@@ -5865,7 +5865,6 @@
             '<td>' + escapeHtml(h.sentAt || '') + '</td>' +
             '<td class="text-end">¥' + (h.total || 0).toLocaleString() + '</td>' +
             '<td class="text-center">' + pdfHtml + '</td>' +
-            '<td class="text-center"><span class="text-success">送信済</span></td>' +
             '</tr>';
         });
         html += '</tbody></table>';

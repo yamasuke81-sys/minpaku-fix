@@ -2851,13 +2851,15 @@ function checkRosterReminder() {
     var sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) return;
 
-    // ヘッダーからチェックイン列と氏名列を特定
+    // ヘッダーからチェックイン列・氏名列（複数対応）・キャンセル列を特定
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var checkInCol = -1, guestNameCol = -1;
+    var checkInCol = -1, guestNameCols = [], cancelledAtCol = -1;
     for (var h = 0; h < headers.length; h++) {
       var hdr = String(headers[h]).trim();
       if (hdr === HEADERS.CHECK_IN) checkInCol = h;
-      if (hdr === HEADERS.GUEST_NAME) guestNameCol = h;
+      // 氏名列は部分一致で全て収集（buildColumnMapと同じ基準）
+      if (hdr.indexOf('氏名') > -1 || hdr.indexOf('名前') > -1 || hdr.toLowerCase() === 'full name') guestNameCols.push(h);
+      if ((hdr === HEADERS.CANCELLED_AT || hdr === 'キャンセル日時') && cancelledAtCol < 0) cancelledAtCol = h;
     }
     if (checkInCol < 0) return;
 
@@ -2880,9 +2882,14 @@ function checkRosterReminder() {
       if (!checkInDate) continue;
       checkInDate.setHours(0, 0, 0, 0);
       if (checkInDate < today || checkInDate > targetDate) continue;
-      // 氏名が空 = 名簿未記入とみなす
-      var guestName = guestNameCol >= 0 ? String(rows[i][guestNameCol] || '').trim() : '';
-      if (!guestName) {
+      // キャンセル済み予約はスキップ
+      if (cancelledAtCol >= 0 && String(rows[i][cancelledAtCol] || '').trim()) continue;
+      // いずれかの氏名列に値があれば名簿記入済みとみなす
+      var hasGuestName = false;
+      for (var g = 0; g < guestNameCols.length; g++) {
+        if (String(rows[i][guestNameCols[g]] || '').trim()) { hasGuestName = true; break; }
+      }
+      if (!hasGuestName) {
         missing.push({
           checkIn: Utilities.formatDate(checkInDate, 'Asia/Tokyo', 'yyyy-MM-dd'),
           rowNumber: i + 2

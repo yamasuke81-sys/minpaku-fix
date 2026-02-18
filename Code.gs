@@ -4761,8 +4761,8 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks) 
     });
   } catch (e) {
     var errMsg = e.toString();
-    if (errMsg.indexOf('auth/documents') !== -1 || errMsg.indexOf('DocumentApp') !== -1) {
-      errMsg = 'Googleドキュメントへのアクセス権限がありません。オーナーがApps Scriptエディタで一度関数を実行し、権限を再承認してください。';
+    if (errMsg.indexOf('auth') !== -1 && errMsg.indexOf('denied') !== -1) {
+      errMsg = 'Googleドキュメントへのアクセス権限がありません。オーナーがApps Scriptエディタで一度関数を実行し、権限を再承認してください。（詳細: ' + e.toString() + '）';
     }
     return JSON.stringify({ success: false, error: errMsg });
   }

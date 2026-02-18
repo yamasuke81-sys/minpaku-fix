@@ -4981,7 +4981,8 @@ function getInvoiceHistoryInternal_(staffName, yearMonth) {
     var list = [];
     for (var i = 0; i < data.length; i++) {
       var hStaff = String(data[i][0] || '').trim();
-      var hYm = String(data[i][1] || '').trim();
+      var hYmRaw = data[i][1];
+      var hYm = (hYmRaw instanceof Date) ? Utilities.formatDate(hYmRaw, 'Asia/Tokyo', 'yyyy-MM') : String(hYmRaw || '').trim();
       if (hStaff !== staffName) continue;
       if (yearMonth && hYm !== yearMonth) continue;
       list.push({
@@ -5029,7 +5030,8 @@ function getAllInvoiceHistory(filterStaff, filterYm) {
     var ymSet = {};
     for (var i = 0; i < data.length; i++) {
       var hStaff = String(data[i][0] || '').trim();
-      var hYm = String(data[i][1] || '').trim();
+      var hYmRaw = data[i][1];
+      var hYm = (hYmRaw instanceof Date) ? Utilities.formatDate(hYmRaw, 'Asia/Tokyo', 'yyyy-MM') : String(hYmRaw || '').trim();
       if (!hStaff) continue;
       staffSet[hStaff] = true;
       if (hYm) ymSet[hYm] = true;

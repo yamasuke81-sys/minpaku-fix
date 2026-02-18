@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218q</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218r</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1002,7 +1002,7 @@
       <div id="invoiceContent" style="display:none;">
         <!-- 清掃実績（自動算出） -->
         <div class="mb-3">
-          <label class="form-label small fw-bold mb-1">清掃実績（自動算出）</label>
+          <label class="form-label small fw-bold mb-1">清掃実績（自動算出） <span id="invoiceExclSaveStatus" class="small" style="display:none;"></span></label>
           <p class="text-muted mb-1" style="font-size:0.7rem;">不要な項目は×で除外できます（カレンダーには影響しません）</p>
           <div id="invoiceAutoItems" class="small"></div>
         </div>
@@ -5604,20 +5604,14 @@
               sel.appendChild(customOpt);
             }
 
-            // 追加項目（サーバーが返せばそちらを優先、なければsessionStorageを維持）
-            var serverExtra = r.extraItems || [];
-            if (serverExtra.length > 0) {
-              invoiceManualItemsList = serverExtra;
-              _invoiceSaveCache('extra', ym, serverExtra);
-            }
-            // サーバーが空でもsessionStorageに残っていればそのまま維持
+            // 追加項目（サーバーを正とする：再デプロイ後もサーバーから復元）
+            invoiceManualItemsList = r.extraItems || [];
+            _invoiceSaveCache('extra', ym, invoiceManualItemsList);
             renderInvoiceManualItems();
 
-            // 除外項目（サーバーから読み込み、再デプロイでも維持される）
-            if (r.excludedAuto && r.excludedAuto.length > 0) {
-              invoiceExcludedAuto = r.excludedAuto;
-              _invoiceSaveCache('excluded', ym, invoiceExcludedAuto);
-            }
+            // 除外項目（サーバーを正とする：再デプロイ後もサーバーから復元）
+            invoiceExcludedAuto = r.excludedAuto || [];
+            _invoiceSaveCache('excluded', ym, invoiceExcludedAuto);
             renderInvoiceAutoItems();
 
             // 履歴（全月分）
@@ -5742,12 +5736,28 @@
         }).saveInvoiceExtraItems(ym, staffId, itemsJson);
       }
 
-      // 除外項目をサーバーに保存
+      // 除外項目をサーバーに保存（保存結果フィードバック付き）
       function _saveExcludedToServer() {
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         var ym = getInvoiceYm();
         if (!staffId || !ym) return;
-        google.script.run.withSuccessHandler(function() {}).withFailureHandler(function() {}).saveInvoiceExcludedAuto(ym, staffId, JSON.stringify(invoiceExcludedAuto));
+        var exclStatusEl = document.getElementById('invoiceExclSaveStatus');
+        if (exclStatusEl) { exclStatusEl.textContent = '保存中...'; exclStatusEl.className = 'small text-muted'; exclStatusEl.style.display = 'inline'; }
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              if (exclStatusEl) { exclStatusEl.textContent = '保存済み'; exclStatusEl.className = 'small text-success'; exclStatusEl.style.display = 'inline'; }
+            } else {
+              if (exclStatusEl) { exclStatusEl.textContent = '保存失敗'; exclStatusEl.className = 'small text-danger'; exclStatusEl.style.display = 'inline'; }
+            }
+          } catch (e) {
+            if (exclStatusEl) { exclStatusEl.textContent = '保存エラー'; exclStatusEl.className = 'small text-danger'; exclStatusEl.style.display = 'inline'; }
+          }
+          setTimeout(function() { if (exclStatusEl) exclStatusEl.style.display = 'none'; }, 3000);
+        }).withFailureHandler(function(err) {
+          if (exclStatusEl) { exclStatusEl.textContent = '通信エラー'; exclStatusEl.className = 'small text-danger'; exclStatusEl.style.display = 'inline'; }
+        }).saveInvoiceExcludedAuto(ym, staffId, JSON.stringify(invoiceExcludedAuto));
       }
 
       // 合計金額の計算・表示

@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218p</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0218q</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5766,12 +5766,12 @@
         if (el) el.textContent = '¥' + total.toLocaleString();
       }
 
-      // 履歴の表示（全月分、新しい順）
+      // 履歴の表示（対象月分、新しい順）
       function renderInvoiceHistory(list) {
         var el = document.getElementById('invoiceHistoryList');
         if (!el) return;
         if (!list || list.length === 0) {
-          el.innerHTML = '<span class="text-muted">送信履歴はありません。</span>';
+          el.innerHTML = '<span class="text-muted">この月の送信履歴はありません。</span>';
           return;
         }
         // 新しい順にソート（sentAtの降順）
@@ -5779,10 +5779,9 @@
           return (b.sentAt || '').localeCompare(a.sentAt || '');
         });
         el.innerHTML = sorted.map(function(h) {
-          var ymLabel = h.yearMonth ? h.yearMonth.replace('-', '/') : '';
           var pdfLink = h.pdfUrl ? '<a href="' + escapeHtml(h.pdfUrl) + '" target="_blank" class="text-decoration-none">PDF</a>' : '';
           return '<div class="border rounded p-1 px-2 mb-1 d-flex justify-content-between align-items-center">' +
-            '<div><span class="badge bg-secondary me-1" style="font-size:0.7em;">' + escapeHtml(ymLabel) + '</span>' + escapeHtml(h.sentAt || '') + ' ¥' + (h.total || 0).toLocaleString() + '</div>' +
+            '<div>' + escapeHtml(h.sentAt || '') + ' ¥' + (h.total || 0).toLocaleString() + '</div>' +
             '<div>' + pdfLink + ' <span class="text-success">送信済</span></div></div>';
         }).join('');
       }

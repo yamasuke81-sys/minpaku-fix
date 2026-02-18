@@ -4474,8 +4474,8 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       }
     }
 
-    // 送信履歴（全月分を返す）
-    var history = getInvoiceHistoryInternal_(staffName, '');
+    // 送信履歴（対象月分のみ）
+    var history = getInvoiceHistoryInternal_(staffName, ym);
 
     // 追加項目（シートから読み込み）
     var extraItems = [];
@@ -4931,7 +4931,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     // 履歴を読み込んでレスポンスに含める（別途取得する必要をなくす）
     var updatedHistory = [];
     try {
-      updatedHistory = getInvoiceHistoryInternal_(staffName, '');
+      updatedHistory = getInvoiceHistoryInternal_(staffName, ym);
     } catch (hErr) {
       Logger.log('履歴再読込エラー: ' + hErr);
     }

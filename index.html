@@ -7157,9 +7157,38 @@
 
       window.confirmLaundryStep = function(checkoutDate, step, btn) {
         var staffName = window.currentUserName || '';
-        if (!staffName) { alert('スタッフ名が取得できません。画面を再読み込みしてください。'); return; }
+        if (!staffName) {
+          // alert()もiOS Safariでブロックされる可能性があるためUI表示に変更
+          var area = document.getElementById('laundryCardArea');
+          if (area) {
+            var msg = document.createElement('div');
+            msg.className = 'alert alert-warning small py-1 mt-1';
+            msg.textContent = 'スタッフ名が取得できません。画面を再読み込みしてください。';
+            area.appendChild(msg);
+            setTimeout(function() { msg.remove(); }, 4000);
+          }
+          return;
+        }
         var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
-        if (!confirm(staffName + ' さんとして「' + labels[step] + '」を記録しますか？')) return;
+        // confirm()はiOS SafariのGASフレーム内でブロックされることがあるため
+        // 1回目タップで確認表示、2回目で実行する方式に変更
+        if (!btn._confirmReady) {
+          btn._confirmReady = true;
+          btn._origText = btn.innerHTML;
+          btn.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + staffName + 'として記録？もう一度タップ';
+          btn.classList.remove('btn-warning');
+          btn.classList.add('btn-danger');
+          setTimeout(function() {
+            if (btn._confirmReady) {
+              btn._confirmReady = false;
+              btn.innerHTML = btn._origText;
+              btn.classList.remove('btn-danger');
+              btn.classList.add('btn-warning');
+            }
+          }, 5000);
+          return;
+        }
+        btn._confirmReady = false;
         setButtonLoading(btn, true);
         google.script.run
           .withSuccessHandler(function(resStr) {
@@ -7169,17 +7198,34 @@
                 var area = document.getElementById('laundryCardArea');
                 if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
               } else {
-                alert('エラー: ' + (res.error || '不明なエラー'));
+                btn.textContent = 'エラー: ' + (res.error || '不明なエラー');
+                btn.classList.add('btn-danger');
                 setButtonLoading(btn, false);
               }
-            } catch (e) { alert('エラーが発生しました'); setButtonLoading(btn, false); }
+            } catch (e) { btn.textContent = 'エラーが発生しました'; setButtonLoading(btn, false); }
           })
-          .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
+          .withFailureHandler(function(e) { btn.textContent = '通信エラー'; setButtonLoading(btn, false); })
           .recordCleaningLaundryStep(checkoutDate, step, staffName);
       };
 
       window.resetLaundry = function(checkoutDate, btn) {
-        if (!confirm('クリーニング連絡をリセットしますか？（全ステップが消去されます）')) return;
+        if (!btn._confirmReady) {
+          btn._confirmReady = true;
+          btn._origText = btn.innerHTML;
+          btn.innerHTML = '本当にリセット？もう一度タップ';
+          btn.classList.remove('btn-outline-secondary');
+          btn.classList.add('btn-danger');
+          setTimeout(function() {
+            if (btn._confirmReady) {
+              btn._confirmReady = false;
+              btn.innerHTML = btn._origText;
+              btn.classList.remove('btn-danger');
+              btn.classList.add('btn-outline-secondary');
+            }
+          }, 5000);
+          return;
+        }
+        btn._confirmReady = false;
         setButtonLoading(btn, true);
         google.script.run
           .withSuccessHandler(function(resStr) {
@@ -7189,18 +7235,34 @@
                 var area = document.getElementById('laundryCardArea');
                 if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
               } else {
-                alert('エラー: ' + (res.error || ''));
+                btn.textContent = 'エラー: ' + (res.error || '');
                 setButtonLoading(btn, false);
               }
-            } catch (e) { alert('エラーが発生しました'); setButtonLoading(btn, false); }
+            } catch (e) { btn.textContent = 'エラーが発生しました'; setButtonLoading(btn, false); }
           })
-          .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
+          .withFailureHandler(function(e) { btn.textContent = '通信エラー'; setButtonLoading(btn, false); })
           .resetCleaningLaundry(checkoutDate);
       };
 
       window.cancelLaundryStep = function(checkoutDate, step, btn) {
         var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
-        if (!confirm('「' + labels[step] + '」を取り消しますか？')) return;
+        if (!btn._confirmReady) {
+          btn._confirmReady = true;
+          btn._origText = btn.innerHTML;
+          btn.textContent = '「' + labels[step] + '」を取消？もう一度タップ';
+          btn.classList.remove('btn-outline-secondary');
+          btn.classList.add('btn-danger');
+          setTimeout(function() {
+            if (btn._confirmReady) {
+              btn._confirmReady = false;
+              btn.innerHTML = btn._origText;
+              btn.classList.remove('btn-danger');
+              btn.classList.add('btn-outline-secondary');
+            }
+          }, 5000);
+          return;
+        }
+        btn._confirmReady = false;
         setButtonLoading(btn, true);
         google.script.run
           .withSuccessHandler(function(resStr) {
@@ -7210,12 +7272,12 @@
                 var area = document.getElementById('laundryCardArea');
                 if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
               } else {
-                alert('エラー: ' + (res.error || '不明なエラー'));
+                btn.textContent = 'エラー: ' + (res.error || '不明なエラー');
                 setButtonLoading(btn, false);
               }
-            } catch (e) { alert('エラーが発生しました'); setButtonLoading(btn, false); }
+            } catch (e) { btn.textContent = 'エラーが発生しました'; setButtonLoading(btn, false); }
           })
-          .withFailureHandler(function(e) { alert('通信エラー: ' + e.message); setButtonLoading(btn, false); })
+          .withFailureHandler(function(e) { btn.textContent = '通信エラー'; setButtonLoading(btn, false); })
           .cancelCleaningLaundryStep(checkoutDate, step);
       };
 

@@ -4819,15 +4819,21 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         '対象期間：' + periodText + '\n' +
         '支払期限：' + dueText + '\n\n' +
         'PDFを添付しておりますのでご確認ください。\n' +
-        '請求書はGoogleドライブにも保存されています。\n';
-      MailApp.sendEmail({
-        to: ownerEmail,
-        subject: subject,
-        body: bodyText,
-        attachments: [pdfBlob],
-        name: '請求書（自動送信）'
-      });
-      sendResult = '送信済み：' + ownerEmail;
+        '請求書はGoogleドライブにも保存されています。\n' +
+        'PDF: ' + pdfFile.getUrl() + '\n';
+      try {
+        MailApp.sendEmail({
+          to: ownerEmail,
+          subject: subject,
+          body: bodyText,
+          attachments: [pdfBlob],
+          name: '請求書（自動送信）'
+        });
+        sendResult = '送信済み：' + ownerEmail;
+      } catch (mailErr) {
+        sendResult = 'メール送信スキップ（PDF作成は成功）';
+        Logger.log('メール送信エラー（PDF作成は成功、続行）: ' + mailErr);
+      }
     }
 
     // --- 履歴に記録 ---

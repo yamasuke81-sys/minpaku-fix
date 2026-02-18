@@ -5572,6 +5572,9 @@
         renderInvoiceManualItems();
         updateInvoiceTotal();
 
+        // 送信履歴を独立してサーバーから取得（getInvoiceDataの成否に依存しない）
+        loadStaffInvoiceHistory_();
+
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
@@ -5618,9 +5621,6 @@
             invoiceExcludedAuto = r.excludedAuto || [];
             _invoiceSaveCache('excluded', ym, invoiceExcludedAuto);
             renderInvoiceAutoItems();
-
-            // 履歴（サーバーから独立取得）
-            loadStaffInvoiceHistory_();
 
             updateInvoiceTotal();
           } catch (e) {
@@ -5785,22 +5785,27 @@
       function loadStaffInvoiceHistory_() {
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         var ym = getInvoiceYm();
-        if (!staffId) return;
+        console.log('[履歴] staffId=[' + staffId + '] ym=[' + ym + ']');
+        if (!staffId) { console.warn('[履歴] staffIdが空のためスキップ'); return; }
         var el = document.getElementById('invoiceHistoryList');
         if (el) el.innerHTML = '<span class="text-muted">読み込み中...</span>';
         google.script.run.withSuccessHandler(function(jsonStr) {
+          console.log('[履歴] サーバー応答:', jsonStr ? jsonStr.substring(0, 200) : '(empty)');
           try {
             var r = JSON.parse(jsonStr);
             if (!r.success) {
               if (el) el.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
               return;
             }
+            console.log('[履歴] 件数:', (r.list || []).length);
             renderStaffInvoiceHistory_(r.list || []);
           } catch (e) {
+            console.error('[履歴] パースエラー:', e);
             if (el) el.innerHTML = '<span class="text-danger">読み込みエラー</span>';
           }
         }).withFailureHandler(function(err) {
-          if (el) el.innerHTML = '<span class="text-danger">通信エラー</span>';
+          console.error('[履歴] 通信エラー:', err);
+          if (el) el.innerHTML = '<span class="text-danger">通信エラー: ' + escapeHtml(err.message || String(err)) + '</span>';
         }).getInvoiceHistory(staffId, ym);
       }
 

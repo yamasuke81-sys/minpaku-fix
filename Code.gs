@@ -2463,7 +2463,8 @@ function getNotifications(unreadOnly) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
     var lastCol = Math.max(sheet.getLastColumn(), 5);
-    const data = sheet.getRange(2, 1, sheet.getLastRow(), lastCol).getValues();
+    var numRows = sheet.getLastRow() - 1;
+    const data = sheet.getRange(2, 1, numRows, lastCol).getValues();
     var list = data.map(function(r, i) {
       var readVal = lastCol >= 4 ? String(r[3] || '').trim() : '';
       var atVal = r[0];

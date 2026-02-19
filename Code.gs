@@ -8311,6 +8311,18 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     var sheet = ss.getSheetByName(SHEET_LAUNDRY);
     if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
 
+    // その日の担当スタッフを取得（通知data用）
+    var assignedStaff = '';
+    try {
+      var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+      if (recruitSheet && recruitSheet.getLastRow() >= 2) {
+        var rData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 5).getValues();
+        for (var ri = 0; ri < rData.length; ri++) {
+          if (normDateStr_(rData[ri][0]) === dateKey) { assignedStaff = String(rData[ri][4] || '').trim(); break; }
+        }
+      }
+    } catch (e2) {}
+
     // 既存行を検索
     var lastRow = sheet.getLastRow();
     var rowIndex = -1;
@@ -8331,15 +8343,15 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     if (step === 'sent') {
       sheet.getRange(rowIndex, 2).setValue(staffName);
       sheet.getRange(rowIndex, 3).setValue(now);
-      addNotification_('クリーニング出し', staffName + ' がクリーニングに出しました（' + dateKey + '）', { checkoutDate: dateKey });
+      addNotification_('クリーニング出し', staffName + ' がクリーニングに出しました（' + dateKey + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else if (step === 'received') {
       sheet.getRange(rowIndex, 4).setValue(staffName);
       sheet.getRange(rowIndex, 5).setValue(now);
-      addNotification_('クリーニング受取', staffName + ' がクリーニングを受け取りました（' + dateKey + '）', { checkoutDate: dateKey });
+      addNotification_('クリーニング受取', staffName + ' がクリーニングを受け取りました（' + dateKey + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else if (step === 'returned') {
       sheet.getRange(rowIndex, 6).setValue(staffName);
       sheet.getRange(rowIndex, 7).setValue(now);
-      addNotification_('クリーニング戻し', staffName + ' がクリーニングを施設に戻しました（' + dateKey + '）', { checkoutDate: dateKey });
+      addNotification_('クリーニング戻し', staffName + ' がクリーニングを施設に戻しました（' + dateKey + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }

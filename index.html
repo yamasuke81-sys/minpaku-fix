@@ -946,7 +946,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5216,13 +5216,26 @@
                 var myName = (window.currentUserName || '').trim();
                 var myEmail = (window.currentUserEmail || '').trim().toLowerCase();
                 var bannerSelfKinds = ['回答', '回答取消', '出勤キャンセル要望', '保留', '回答変更要請'];
+                var cleaningKinds = ['クリーニング出し', 'クリーニング受取', 'クリーニング戻し'];
                 filtered = filtered.filter(function(n) {
                   var msg = (n.message || '');
                   var kind = (n.kind || '');
+                  var data = n.data || {};
                   // 自分が行ったアクションは除外
                   if (myName && bannerSelfKinds.indexOf(kind) >= 0 && msg.indexOf(myName + ' が') === 0) return false;
                   // 清掃募集開始は全スタッフに表示
                   if (kind === '清掃募集開始') return true;
+                  // スタッフ確定: 自分の名前が含まれていれば表示
+                  if (kind === 'スタッフ確定' && myName && msg.indexOf(myName) >= 0) return true;
+                  // キャンセル承認/却下: 自分の名前が含まれていれば表示
+                  if ((kind === 'キャンセル承認' || kind === 'キャンセル却下') && myName && msg.indexOf(myName) >= 0) return true;
+                  // クリーニング出し/受取/戻し: 担当スタッフかつ自分が操作していない場合のみ表示
+                  if (cleaningKinds.indexOf(kind) >= 0 && myName) {
+                    var assigned = (data.assignedStaff || '');
+                    var actionBy = (data.actionBy || '');
+                    if (assigned.indexOf(myName) >= 0 && actionBy !== myName) return true;
+                    return false;
+                  }
                   // 清掃変更は自分の名前が含まれる場合のみ表示
                   if (kind === '清掃変更' && myName && msg.indexOf(myName) >= 0) return true;
                   // 自分の名前が含まれる通知を表示

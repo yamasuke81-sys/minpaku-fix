@@ -3035,6 +3035,7 @@ function getRecruitmentSettings() {
     return JSON.stringify({
       success: true,
       settings: {
+        recruitReminderEnabled: map['募集リマインド有効'] === true || map['募集リマインド有効'] === 'true',
         recruitStartWeeks: parseInt(map['募集開始週数'], 10) || 4,
         minRespondents: parseInt(map['最少回答者数'], 10) || 2,
         selectCount: parseInt(map['選定人数'], 10) || 2,
@@ -3063,6 +3064,7 @@ function setRecruitmentSettings(settings) {
       if (key) rowMap[key] = i + 2;
     }
     var entries = [
+      ['募集リマインド有効', settings.recruitReminderEnabled ? 'true' : 'false'],
       ['最少回答者数', settings.minRespondents != null ? settings.minRespondents : 2],
       ['選定人数', settings.selectCount != null ? settings.selectCount : 2],
       ['募集リマインドスケジュール', JSON.stringify(settings.schedules || [])],

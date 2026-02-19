@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219i</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1133,6 +1133,10 @@
       </div>
       <div id="settingsRecruitSettings" style="display:none;">
         <p class="small text-muted mb-2">募集に対する回答が少ない場合にスタッフへリマインドメールを送信します。最大5件設定できます。</p>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="recruitReminderEnabled">
+          <label class="form-check-label" for="recruitReminderEnabled">募集リマインドを有効にする</label>
+        </div>
         <div class="mb-2"><label class="form-label small">最少回答者数（これ未満でリマインド）</label><input type="number" class="form-control form-control-sm" id="minRespondents" min="1" value="2" style="max-width:100px;"></div>
         <div class="mb-2"><label class="form-label small">選定人数（基本何人選ぶか）</label><input type="number" class="form-control form-control-sm" id="selectCount" min="1" value="2" style="max-width:100px;"></div>
         <hr class="my-3">
@@ -6763,6 +6767,7 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
+              document.getElementById('recruitReminderEnabled').checked = !!r.settings.recruitReminderEnabled;
               document.getElementById('minRespondents').value = r.settings.minRespondents || 2;
               document.getElementById('selectCount').value = r.settings.selectCount || 2;
               // スケジュールエントリ
@@ -6798,6 +6803,7 @@
           });
         });
         var settings = {
+          recruitReminderEnabled: document.getElementById('recruitReminderEnabled').checked,
           minRespondents: parseInt(document.getElementById('minRespondents').value, 10) || 2,
           selectCount: parseInt(document.getElementById('selectCount').value, 10) || 2,
           schedules: schedules,

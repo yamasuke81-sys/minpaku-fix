@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219p</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219q</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1734,6 +1734,22 @@
         </div>
         <div class="modal-footer justify-content-center border-0 pt-0">
           <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- カスタム入力モーダル（prompt()代替・iOS Safari対応） -->
+  <div class="modal fade" id="customPromptModal" tabindex="-1" data-bs-backdrop="static" style="z-index:1070;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-body py-4 text-center">
+          <p id="customPromptMessage" class="mb-0" style="white-space:pre-wrap;"></p>
+          <input type="text" id="customPromptInput" class="form-control mt-2">
+        </div>
+        <div class="modal-footer justify-content-center border-0 pt-0">
+          <button type="button" class="btn btn-primary px-4" id="customPromptOk">OK</button>
+          <button type="button" class="btn btn-outline-secondary px-3" id="customPromptCancel">キャンセル</button>
         </div>
       </div>
     </div>
@@ -3499,6 +3515,36 @@
         }
       }
       window.alert = function(msg) { customAlert(String(msg || '')); };
+
+      /** カスタム入力モーダル（prompt()代替・iOS Safari対応）- Promise版 */
+      function customPrompt(msg, defaultVal, inputType) {
+        return new Promise(function(resolve) {
+          var modal = document.getElementById('customPromptModal');
+          var msgEl = document.getElementById('customPromptMessage');
+          var input = document.getElementById('customPromptInput');
+          var okBtn = document.getElementById('customPromptOk');
+          var cancelBtn = document.getElementById('customPromptCancel');
+          msgEl.textContent = msg;
+          input.value = defaultVal || '';
+          input.type = inputType || 'text';
+          var bsModal = bootstrap.Modal.getInstance(modal);
+          if (bsModal) bsModal.dispose();
+          bsModal = new bootstrap.Modal(modal);
+          var resolved = false;
+          function cleanup() { okBtn.onclick = null; cancelBtn.onclick = null; input.onkeydown = null; modal.removeEventListener('hidden.bs.modal', onHidden); }
+          function onOk() { if (resolved) return; resolved = true; var v = input.value; cleanup(); bsModal.hide(); resolve(v); }
+          function onCancel() { if (resolved) return; resolved = true; cleanup(); bsModal.hide(); resolve(null); }
+          function onHidden() { if (!resolved) { resolved = true; cleanup(); resolve(null); } }
+          okBtn.onclick = onOk;
+          cancelBtn.onclick = onCancel;
+          input.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); onOk(); } };
+          modal.addEventListener('hidden.bs.modal', onHidden);
+          _fixDialogBackdrop(modal);
+          bsModal.show();
+          _fixDialogBackdrop(modal);
+          setTimeout(function() { input.focus(); }, 300);
+        });
+      }
 
       function escapeHtml(s) {
         if (s == null) return '';
@@ -7646,16 +7692,26 @@
           if (!v[0]) { alert('まず名前を選択してください'); return; }
           var opt = sel.options[sel.selectedIndex];
           var hasPw = opt && opt.dataset.hasPw === '1';
-          var oldPw = hasPw ? prompt('現在のパスワードを入力してください') : '';
-          if (hasPw && oldPw === null) return;
-          var newPw = prompt('新しいパスワードを入力してください（4文字以上）');
-          if (!newPw) return;
-          if (newPw.length < 4) { alert('パスワードは4文字以上で設定してください'); return; }
-          google.script.run.withSuccessHandler(function(j) {
-            var res = JSON.parse(j);
-            if (res.success) { alert('パスワードを変更しました'); if (opt) opt.dataset.hasPw = '1'; }
-            else alert(res.error || '失敗');
-          }).withFailureHandler(function(e) { alert(e.message); }).setStaffPassword(v[0] || '', v[1] || '', oldPw || '', newPw);
+          var vCopy = [v[0] || '', v[1] || ''];
+          function doSetPassword(oldPw) {
+            customPrompt('新しいパスワードを入力してください（4文字以上）', '', 'password').then(function(newPw) {
+              if (!newPw) return;
+              if (newPw.length < 4) { alert('パスワードは4文字以上で設定してください'); return; }
+              google.script.run.withSuccessHandler(function(j) {
+                var res = JSON.parse(j);
+                if (res.success) { alert('パスワードを変更しました'); if (opt) opt.dataset.hasPw = '1'; }
+                else alert(res.error || '失敗');
+              }).withFailureHandler(function(e) { alert(e.message); }).setStaffPassword(vCopy[0], vCopy[1], oldPw || '', newPw);
+            });
+          }
+          if (hasPw) {
+            customPrompt('現在のパスワードを入力してください', '', 'password').then(function(oldPw) {
+              if (oldPw === null) return;
+              doSetPassword(oldPw);
+            });
+          } else {
+            doSetPassword('');
+          }
         });
       }
       google.script.run.withSuccessHandler(function(jsonStr) {

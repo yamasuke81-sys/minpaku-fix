@@ -1442,7 +1442,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0219c</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0219d</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1673,30 +1673,44 @@
     window._showToast = _showToast;
     window.alert = function(msg) { _showToast(String(msg), 'info'); };
 
-    // --- iOS Safari 対策: confirm() をオーバーライド ---
-    // iOS SafariのGASフレーム内ではconfirm()がブロックされfalseが返る
-    // iOS検出時はトースト表示+true返却で動作を維持
-    var _origConfirm = window.confirm;
-    var _isIOSGAS = /iPad|iPhone|iPod/.test(navigator.userAgent) && window !== window.top;
-    window.confirm = function(msg) {
-      if (_isIOSGAS) {
-        _showToast(String(msg), 'warning');
-        return true;
-      }
-      return _origConfirm.call(window, msg);
-    };
+    // --- iOS Safari 完全対策: カスタムモーダルで confirm/prompt を置き換え ---
+    // GAS iframe内ではiOS Safariで confirm()/prompt() がブロックされるため
+    // DOMベースのモーダルで完全に代替する（全プラットフォーム共通）
 
-    // --- iOS Safari 対策: prompt() をオーバーライド ---
-    // iOS SafariのGASフレーム内ではprompt()もブロックされる（nullが返る）
-    // prompt()は同期関数のため完全な代替が困難→メッセージ表示でガイド
-    var _origPrompt = window.prompt;
-    window.prompt = function(msg, defaultVal) {
-      if (_isIOSGAS) {
-        _showToast('この操作はiOS Safariでは利用できません。PCからお試しください。', 'warning');
-        return null;
-      }
-      return _origPrompt.call(window, msg, defaultVal);
-    };
+    /** カスタム確認モーダル（confirm()代替）- Promise版 */
+    function customConfirm(msg) {
+      return new Promise(function(resolve) {
+        var ov = document.getElementById('customConfirmOverlay');
+        var msgEl = document.getElementById('customConfirmMsg');
+        var okBtn = document.getElementById('customConfirmOk');
+        var cancelBtn = document.getElementById('customConfirmCancel');
+        msgEl.textContent = msg;
+        ov.style.display = 'flex';
+        function cleanup() { ov.style.display = 'none'; okBtn.onclick = null; cancelBtn.onclick = null; }
+        okBtn.onclick = function() { cleanup(); resolve(true); };
+        cancelBtn.onclick = function() { cleanup(); resolve(false); };
+      });
+    }
+
+    /** カスタム入力モーダル（prompt()代替）- Promise版 */
+    function customPrompt(msg, defaultVal) {
+      return new Promise(function(resolve) {
+        var ov = document.getElementById('customPromptOverlay');
+        var msgEl = document.getElementById('customPromptMsg');
+        var input = document.getElementById('customPromptInput');
+        var okBtn = document.getElementById('customPromptOk');
+        var cancelBtn = document.getElementById('customPromptCancel');
+        msgEl.textContent = msg;
+        input.value = defaultVal || '';
+        input.type = 'text';
+        ov.style.display = 'flex';
+        setTimeout(function() { input.focus(); }, 100);
+        function cleanup() { ov.style.display = 'none'; okBtn.onclick = null; cancelBtn.onclick = null; input.onkeydown = null; }
+        okBtn.onclick = function() { var v = input.value; cleanup(); resolve(v); };
+        cancelBtn.onclick = function() { cleanup(); resolve(null); };
+        input.onkeydown = function(e) { if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); } };
+      });
+    }
 
     // グローバル変数
     var checkoutDate = '<?= checkoutDate ?>' || '';
@@ -1868,8 +1882,9 @@
         }
       });
       document.getElementById('btnReimportCL').addEventListener('click', function() {
-        if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\n既存のマスターデータが上書きされます。\n\nよろしいですか？')) return;
         var btn = this;
+        customConfirm('チェックリスト項目と撮影箇所を初期状態に戻します。\n既存のマスターデータが上書きされます。\n\nよろしいですか？').then(function(ok) {
+        if (!ok) return;
         var resEl = document.getElementById('reimportResult');
         btn.disabled = true;
         btn.textContent = 'インポート中...';
@@ -1903,6 +1918,7 @@
           btn.disabled = false;
           btn.textContent = '初期データを再インポート';
         });
+        }); // customConfirm
       });
     };
 
@@ -2523,17 +2539,20 @@
               restoreBtns.forEach(function(rb) {
                 rb.addEventListener('click', function() {
                   var restoreId = this.getAttribute('data-id');
-                  if (!confirm('このスプレッドシート(ID: ' + restoreId + ')に切り替えますか？')) return;
-                  this.disabled = true;
-                  this.textContent = '復旧中…';
-                  callGAS('restoreChecklistSpreadsheetId', [restoreId]).then(function(rr) {
-                    if (rr.success) {
-                      alert(rr.message);
-                      location.reload();
-                    } else {
-                      alert('復旧失敗: ' + (rr.error || '不明'));
-                    }
-                  }).catch(function(e) { alert('通信エラー: ' + (e.message || e)); });
+                  var rbBtn = this;
+                  customConfirm('このスプレッドシート(ID: ' + restoreId + ')に切り替えますか？').then(function(ok) {
+                    if (!ok) return;
+                    rbBtn.disabled = true;
+                    rbBtn.textContent = '復旧中…';
+                    callGAS('restoreChecklistSpreadsheetId', [restoreId]).then(function(rr) {
+                      if (rr.success) {
+                        alert(rr.message);
+                        location.reload();
+                      } else {
+                        alert('復旧失敗: ' + (rr.error || '不明'));
+                      }
+                    }).catch(function(e) { alert('通信エラー: ' + (e.message || e)); });
+                  });
                 });
               });
             }).catch(function(e) {
@@ -3075,46 +3094,48 @@
     }
 
     function renameCategoryPrompt(fullPath, currentName) {
-
-      var newName = prompt('カテゴリ名を変更:', currentName);
-      if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
-      var undoSnap = captureUndoSnapshot();
-      showSaveStatus('saving');
-      callGAS('renameCategoryInMaster', [fullPath, newName.trim()]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          setUndo(undoSnap);
-          reloadChecklist();
-        } else {
-          showSaveStatus('error');
-          alert(res.error || '名称変更に失敗しました');
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('カテゴリ名を変更:', currentName).then(function(newName) {
+        if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+        var undoSnap = captureUndoSnapshot();
+        showSaveStatus('saving');
+        callGAS('renameCategoryInMaster', [fullPath, newName.trim()]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            setUndo(undoSnap);
+            reloadChecklist();
+          } else {
+            showSaveStatus('error');
+            alert(res.error || '名称変更に失敗しました');
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     function deleteCategoryPrompt(fullPath) {
-
       var parts = fullPath.split('：');
       var catName = parts[parts.length - 1];
-      var choice = prompt('カテゴリ「' + catName + '」を削除します。\n\n1 = 中身も全て削除\n2 = 中身は親カテゴリに移動して残す\n\n番号を入力:', '');
-      if (!choice) return;
-      choice = choice.trim();
-      if (choice !== '1' && choice !== '2') { alert('1 または 2 を入力してください'); return; }
-      var deleteContents = (choice === '1');
-      var confirmMsg = deleteContents
-        ? 'カテゴリ「' + catName + '」と中身の全項目を削除します。よろしいですか？'
-        : 'カテゴリ「' + catName + '」を削除し、中身は親カテゴリに移動します。よろしいですか？';
-      if (!confirm(confirmMsg)) return;
-      showSaveStatus('saving');
-      callGAS('deleteCategoryFromMaster', [fullPath, deleteContents]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          reloadChecklist();
-        } else {
-          showSaveStatus('error');
-          alert(res.error || 'カテゴリ削除に失敗しました');
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('カテゴリ「' + catName + '」を削除します。\n\n1 = 中身も全て削除\n2 = 中身は親カテゴリに移動して残す\n\n番号を入力:', '').then(function(choice) {
+        if (!choice) return;
+        choice = choice.trim();
+        if (choice !== '1' && choice !== '2') { alert('1 または 2 を入力してください'); return; }
+        var deleteContents = (choice === '1');
+        var confirmMsg = deleteContents
+          ? 'カテゴリ「' + catName + '」と中身の全項目を削除します。よろしいですか？'
+          : 'カテゴリ「' + catName + '」を削除し、中身は親カテゴリに移動します。よろしいですか？';
+        customConfirm(confirmMsg).then(function(ok) {
+          if (!ok) return;
+          showSaveStatus('saving');
+          callGAS('deleteCategoryFromMaster', [fullPath, deleteContents]).then(function(res) {
+            if (res.success) {
+              showSaveStatus('saved');
+              reloadChecklist();
+            } else {
+              showSaveStatus('error');
+              alert(res.error || 'カテゴリ削除に失敗しました');
+            }
+          }).catch(function() { showSaveStatus('error'); });
+        });
+      });
     }
 
     function reloadAndRender() {
@@ -3881,16 +3902,18 @@
     }
 
     function deleteMemo(index) {
-      if (!confirm('このメモを削除しますか？')) return;
-      var memo = checklistData.memos[index];
-      if (!memo) return;
-      callGAS('deleteChecklistMemo', [checkoutDate, String(memo.at), memo.text]).then(function(res) {
-        if (res.success) {
-          checklistData.memos.splice(index, 1);
-          renderMemos();
-        } else {
-          alert('削除に失敗しました: ' + (res.error || ''));
-        }
+      customConfirm('このメモを削除しますか？').then(function(ok) {
+        if (!ok) return;
+        var memo = checklistData.memos[index];
+        if (!memo) return;
+        callGAS('deleteChecklistMemo', [checkoutDate, String(memo.at), memo.text]).then(function(res) {
+          if (res.success) {
+            checklistData.memos.splice(index, 1);
+            renderMemos();
+          } else {
+            alert('削除に失敗しました: ' + (res.error || ''));
+          }
+        });
       });
     }
 
@@ -3982,47 +4005,51 @@
     function checkAllItems() {
       var btn = document.getElementById('btnCheckAll');
       if (!allChecked) {
-        // 全チェック
         var unchecked = document.querySelectorAll('.item-checkbox:not(:checked)');
         if (unchecked.length === 0) {
-          // 既に全チェック済み → トグルでアンチェック
-          if (!confirm('全てのチェックを外しますか？')) return;
-          uncheckAllItems();
+          customConfirm('全てのチェックを外しますか？').then(function(ok) {
+            if (!ok) return;
+            uncheckAllItems();
+            updateProgress();
+            updateSectionCounts();
+          });
           return;
         }
-        if (!confirm('全項目（' + unchecked.length + '件）にチェックを入れますか？')) return;
-        var names = getSelectedStaffNames();
-        var who = names.length > 0 ? names.join(', ') : staffName;
-        // 全項目IDを収集
-        var allItemIds = checklistData.items.map(function(item) { return item.id; });
-        // UIを即時更新
-        unchecked.forEach(function(cb) { cb.checked = true; });
-        allItemIds.forEach(function(id) {
-          checklistData.checked[id] = { checked: true, by: who, at: new Date() };
-        });
-        allChecked = true;
-        btn.textContent = '全✓解除';
-        btn.title = '全チェック解除';
-        btn.classList.add('is-all-checked');
-        // インフライト追跡: 全項目をチェック中としてマーク
-        allItemIds.forEach(function(id) {
-          pendingToggles[id] = { checked: true, by: who, at: new Date() };
-        });
-        // バックエンドに一括保存（1回のGAS呼び出し）
-        showSaveStatus('saving');
-        callGAS('checkAllItems', [checkoutDate, allItemIds, who]).then(function(res) {
-          allItemIds.forEach(function(id) { delete pendingToggles[id]; });
-          showSaveStatus(res.success ? 'saved' : 'error');
-        }).catch(function() {
-          allItemIds.forEach(function(id) { delete pendingToggles[id]; });
-          showSaveStatus('error');
+        customConfirm('全項目（' + unchecked.length + '件）にチェックを入れますか？').then(function(ok) {
+          if (!ok) return;
+          var names = getSelectedStaffNames();
+          var who = names.length > 0 ? names.join(', ') : staffName;
+          var allItemIds = checklistData.items.map(function(item) { return item.id; });
+          unchecked.forEach(function(cb) { cb.checked = true; });
+          allItemIds.forEach(function(id) {
+            checklistData.checked[id] = { checked: true, by: who, at: new Date() };
+          });
+          allChecked = true;
+          btn.textContent = '全✓解除';
+          btn.title = '全チェック解除';
+          btn.classList.add('is-all-checked');
+          allItemIds.forEach(function(id) {
+            pendingToggles[id] = { checked: true, by: who, at: new Date() };
+          });
+          showSaveStatus('saving');
+          callGAS('checkAllItems', [checkoutDate, allItemIds, who]).then(function(res) {
+            allItemIds.forEach(function(id) { delete pendingToggles[id]; });
+            showSaveStatus(res.success ? 'saved' : 'error');
+          }).catch(function() {
+            allItemIds.forEach(function(id) { delete pendingToggles[id]; });
+            showSaveStatus('error');
+          });
+          updateProgress();
+          updateSectionCounts();
         });
       } else {
-        if (!confirm('全てのチェックを外しますか？')) return;
-        uncheckAllItems();
+        customConfirm('全てのチェックを外しますか？').then(function(ok) {
+          if (!ok) return;
+          uncheckAllItems();
+          updateProgress();
+          updateSectionCounts();
+        });
       }
-      updateProgress();
-      updateSectionCounts();
     }
 
     function uncheckAllItems() {
@@ -4339,129 +4366,136 @@
     });
 
     function removeItemPhoto(itemId) {
-
-      if (!confirm('見本写真を削除しますか？')) return;
-      showSaveStatus('saving');
-      callGAS('deleteChecklistItemPhoto', [itemId]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          checklistData.items.forEach(function(item) {
-            if (item.id === itemId) item.exampleFileId = '';
-          });
-          cancelItemEdit(itemId);
-          reRenderWithState();
-        } else {
-          showSaveStatus('error');
-          alert('削除に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customConfirm('見本写真を削除しますか？').then(function(ok) {
+        if (!ok) return;
+        showSaveStatus('saving');
+        callGAS('deleteChecklistItemPhoto', [itemId]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            checklistData.items.forEach(function(item) {
+              if (item.id === itemId) item.exampleFileId = '';
+            });
+            cancelItemEdit(itemId);
+            reRenderWithState();
+          } else {
+            showSaveStatus('error');
+            alert('削除に失敗しました: ' + (res.error || ''));
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     function deleteItemPrompt(itemId, itemName) {
-
-      if (!confirm('「' + itemName + '」を削除しますか？')) return;
-      showSaveStatus('saving');
-      callGAS('deleteChecklistItemFromMaster', [itemId]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          reloadAndRender();
-        } else {
-          showSaveStatus('error');
-          alert('削除に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customConfirm('「' + itemName + '」を削除しますか？').then(function(ok) {
+        if (!ok) return;
+        showSaveStatus('saving');
+        callGAS('deleteChecklistItemFromMaster', [itemId]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            reloadAndRender();
+          } else {
+            showSaveStatus('error');
+            alert('削除に失敗しました: ' + (res.error || ''));
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     function addItemPrompt(category) {
-
-      var name = prompt('追加する項目名を入力してください:');
-      if (!name || !name.trim()) return;
-      var isSupply = confirm('この項目を「要補充対象」にしますか？\n\n要補充対象にすると、清掃時に補充が必要かチェックできます。');
-      showSaveStatus('saving');
-      callGAS('addChecklistItemToMaster', [category, name.trim(), isSupply]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          reloadAndRender();
-        } else {
-          showSaveStatus('error');
-          alert('追加に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('追加する項目名を入力してください:').then(function(name) {
+        if (!name || !name.trim()) return;
+        customConfirm('この項目を「要補充対象」にしますか？\n\n要補充対象にすると、清掃時に補充が必要かチェックできます。').then(function(isSupply) {
+          showSaveStatus('saving');
+          callGAS('addChecklistItemToMaster', [category, name.trim(), isSupply]).then(function(res) {
+            if (res.success) {
+              showSaveStatus('saved');
+              reloadAndRender();
+            } else {
+              showSaveStatus('error');
+              alert('追加に失敗しました: ' + (res.error || ''));
+            }
+          }).catch(function() { showSaveStatus('error'); });
+        });
+      });
     }
 
     function addSubCategoryPrompt(parentCategory) {
-
-      var subName = prompt('追加するサブカテゴリ名を入力してください:');
-      if (!subName || !subName.trim()) return;
-      var itemName = prompt('最初の項目名を入力してください:');
-      if (!itemName || !itemName.trim()) return;
-      var fullCategory = parentCategory + '\uff1a' + subName.trim();
-      showSaveStatus('saving');
-      callGAS('addChecklistItemToMaster', [fullCategory, itemName.trim(), false]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          reloadAndRender();
-        } else {
-          showSaveStatus('error');
-          alert('追加に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('追加するサブカテゴリ名を入力してください:').then(function(subName) {
+        if (!subName || !subName.trim()) return;
+        customPrompt('最初の項目名を入力してください:').then(function(itemName) {
+          if (!itemName || !itemName.trim()) return;
+          var fullCategory = parentCategory + '\uff1a' + subName.trim();
+          showSaveStatus('saving');
+          callGAS('addChecklistItemToMaster', [fullCategory, itemName.trim(), false]).then(function(res) {
+            if (res.success) {
+              showSaveStatus('saved');
+              reloadAndRender();
+            } else {
+              showSaveStatus('error');
+              alert('追加に失敗しました: ' + (res.error || ''));
+            }
+          }).catch(function() { showSaveStatus('error'); });
+        });
+      });
     }
 
     function reimportFromChecklist() {
-      if (!confirm('チェックリスト項目と撮影箇所を初期状態に戻します。\nよろしいですか？')) return;
-      callGAS('importDefaultChecklist', []).then(function(res) {
-        if (res.success) {
-          callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
-            if (clRes.success) {
-              checklistData = clRes;
-              renderChecklist();
-              renderPhotoSection();
-              renderSupplyList();
-              updateProgress();
-              updateCheckAllButton();
-            }
-          });
-        } else {
-          alert('インポートに失敗しました: ' + (res.error || '不明'));
-        }
-      }).catch(function(e) {
-        alert('インポートに失敗しました: ' + (e.message || '通信失敗'));
+      customConfirm('チェックリスト項目と撮影箇所を初期状態に戻します。\nよろしいですか？').then(function(ok) {
+        if (!ok) return;
+        callGAS('importDefaultChecklist', []).then(function(res) {
+          if (res.success) {
+            callGAS('getChecklistForDate', [checkoutDate]).then(function(clRes) {
+              if (clRes.success) {
+                checklistData = clRes;
+                renderChecklist();
+                renderPhotoSection();
+                renderSupplyList();
+                updateProgress();
+                updateCheckAllButton();
+              }
+            });
+          } else {
+            alert('インポートに失敗しました: ' + (res.error || '不明'));
+          }
+        }).catch(function(e) {
+          alert('インポートに失敗しました: ' + (e.message || '通信失敗'));
+        });
       });
     }
 
     function addCategoryPrompt() {
-
-      var category = prompt('追加するカテゴリ名を入力してください:');
-      if (!category || !category.trim()) return;
-      var name = prompt('最初の項目名を入力してください:');
-      if (!name || !name.trim()) return;
-      showSaveStatus('saving');
-      callGAS('addChecklistItemToMaster', [category.trim(), name.trim(), false]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          reloadAndRender();
-        } else {
-          showSaveStatus('error');
-          alert('追加に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('追加するカテゴリ名を入力してください:').then(function(category) {
+        if (!category || !category.trim()) return;
+        customPrompt('最初の項目名を入力してください:').then(function(name) {
+          if (!name || !name.trim()) return;
+          showSaveStatus('saving');
+          callGAS('addChecklistItemToMaster', [category.trim(), name.trim(), false]).then(function(res) {
+            if (res.success) {
+              showSaveStatus('saved');
+              reloadAndRender();
+            } else {
+              showSaveStatus('error');
+              alert('追加に失敗しました: ' + (res.error || ''));
+            }
+          }).catch(function() { showSaveStatus('error'); });
+        });
+      });
     }
 
     function addPhotoSpotPrompt(category) {
-
-      var name = prompt('追加する撮影箇所名を入力してください:');
-      if (!name || !name.trim()) return;
-      showSaveStatus('saving');
-      callGAS('addPhotoSpotToMaster', [name.trim(), 'ビフォー/アフター', category]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          reloadAndRender();
-        } else {
-          showSaveStatus('error');
-          alert('追加に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('追加する撮影箇所名を入力してください:').then(function(name) {
+        if (!name || !name.trim()) return;
+        showSaveStatus('saving');
+        callGAS('addPhotoSpotToMaster', [name.trim(), 'ビフォー/アフター', category]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            reloadAndRender();
+          } else {
+            showSaveStatus('error');
+            alert('追加に失敗しました: ' + (res.error || ''));
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     // 撮影例の表示
@@ -4540,91 +4574,94 @@
 
     // 見本写真の削除
     function deleteExample(spotId) {
-
-      if (!confirm('見本写真を削除しますか？')) return;
-      showSaveStatus('saving');
-      callGAS('deleteExamplePhoto', [spotId]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          checklistData.spots.forEach(function(s) {
-            if (s.id === spotId) s.exampleFileId = '';
-          });
-          renderChecklist();
-          renderPhotoSection();
-        } else {
-          showSaveStatus('error');
-          alert('削除に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customConfirm('見本写真を削除しますか？').then(function(ok) {
+        if (!ok) return;
+        showSaveStatus('saving');
+        callGAS('deleteExamplePhoto', [spotId]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            checklistData.spots.forEach(function(s) {
+              if (s.id === spotId) s.exampleFileId = '';
+            });
+            renderChecklist();
+            renderPhotoSection();
+          } else {
+            showSaveStatus('error');
+            alert('削除に失敗しました: ' + (res.error || ''));
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     // 撮影箇所の名称変更
     function editSpotName(spotId) {
-
       var currentName = '';
       checklistData.spots.forEach(function(s) { if (s.id === spotId) currentName = s.name; });
-      var newName = prompt('新しい名称を入力してください:', currentName);
-      if (!newName || !newName.trim() || newName.trim() === currentName) return;
-      showSaveStatus('saving');
-      callGAS('updatePhotoSpotName', [spotId, newName.trim()]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          checklistData.spots.forEach(function(s) {
-            if (s.id === spotId) s.name = newName.trim();
-          });
-          renderChecklist();
-          renderPhotoSection();
-        } else {
-          showSaveStatus('error');
-          alert('変更に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customPrompt('新しい名称を入力してください:', currentName).then(function(newName) {
+        if (!newName || !newName.trim() || newName.trim() === currentName) return;
+        showSaveStatus('saving');
+        callGAS('updatePhotoSpotName', [spotId, newName.trim()]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            checklistData.spots.forEach(function(s) {
+              if (s.id === spotId) s.name = newName.trim();
+            });
+            renderChecklist();
+            renderPhotoSection();
+          } else {
+            showSaveStatus('error');
+            alert('変更に失敗しました: ' + (res.error || ''));
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     // 撮影箇所の削除
     function deleteSpot(spotId, spotName) {
-
-      if (!confirm('撮影箇所「' + spotName + '」を削除しますか？')) return;
-      showSaveStatus('saving');
-      callGAS('deletePhotoSpot', [spotId]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          checklistData.spots = checklistData.spots.filter(function(s) { return s.id !== spotId; });
-          renderChecklist();
-          renderPhotoSection();
-        } else {
-          showSaveStatus('error');
-          alert('削除に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+      customConfirm('撮影箇所「' + spotName + '」を削除しますか？').then(function(ok) {
+        if (!ok) return;
+        showSaveStatus('saving');
+        callGAS('deletePhotoSpot', [spotId]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            checklistData.spots = checklistData.spots.filter(function(s) { return s.id !== spotId; });
+            renderChecklist();
+            renderPhotoSection();
+          } else {
+            showSaveStatus('error');
+            alert('削除に失敗しました: ' + (res.error || ''));
+          }
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     // 撮影写真の削除
     function deletePhoto(spotId, fileId) {
-      if (!confirm('この写真を削除しますか？')) return;
-      showSaveStatus('saving');
-      callGAS('deleteChecklistPhoto', [checkoutDate, spotId, fileId]).then(function(res) {
-        if (res.success) {
-          showSaveStatus('saved');
-          var sp = checklistData.photos[spotId];
-          if (sp) {
-            sp.before = sp.before.filter(function(p) { return p.fileId !== fileId; });
-            sp.after = sp.after.filter(function(p) { return p.fileId !== fileId; });
+      customConfirm('この写真を削除しますか？').then(function(ok) {
+        if (!ok) return;
+        showSaveStatus('saving');
+        callGAS('deleteChecklistPhoto', [checkoutDate, spotId, fileId]).then(function(res) {
+          if (res.success) {
+            showSaveStatus('saved');
+            var sp = checklistData.photos[spotId];
+            if (sp) {
+              sp.before = sp.before.filter(function(p) { return p.fileId !== fileId; });
+              sp.after = sp.after.filter(function(p) { return p.fileId !== fileId; });
+            }
+            renderChecklist();
+            renderPhotoSection();
+          } else {
+            showSaveStatus('error');
+            alert('削除に失敗しました: ' + (res.error || ''));
           }
-          renderChecklist();
-          renderPhotoSection();
-        } else {
-          showSaveStatus('error');
-          alert('削除に失敗しました: ' + (res.error || ''));
-        }
-      }).catch(function() { showSaveStatus('error'); });
+        }).catch(function() { showSaveStatus('error'); });
+      });
     }
 
     function completeChecklist() {
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
 
-      // 漏れチェック実行
       var uncheckedItems = document.querySelectorAll('.item-checkbox:not(:checked)');
       var photos = checklistData ? checklistData.photos || {} : {};
       var spots = checklistData ? checklistData.spots || [] : [];
@@ -4634,31 +4671,32 @@
       });
 
       var msgEl = document.getElementById('completeMsg');
+      var confirmMsg;
 
       if (uncheckedItems.length > 0 || missingPhotos.length > 0) {
-        // 未完了項目あり → ハイライト表示
         highlightMissing();
         var msgs = [];
         if (uncheckedItems.length > 0) msgs.push('未チェック項目: ' + uncheckedItems.length + '件');
         if (missingPhotos.length > 0) msgs.push('未撮影箇所: ' + missingPhotos.length + '件');
         msgEl.textContent = msgs.join('、');
         msgEl.style.display = 'block';
-
-        // 未完了でも確認して送信可能
-        if (!confirm('未完了項目があります。\n' + msgs.join('\n') + '\n\nそれでも清掃完了を通知しますか？')) return;
+        confirmMsg = '未完了項目があります。\n' + msgs.join('\n') + '\n\nそれでも清掃完了を通知しますか？';
       } else {
         msgEl.style.display = 'none';
         clearMissingHighlight();
-        if (!confirm('清掃を完了してオーナーに通知しますか？')) return;
+        confirmMsg = '清掃を完了してオーナーに通知しますか？';
       }
 
-      callGAS('notifyCleaningComplete', [checkoutDate, who]).then(function(res) {
-        if (res.success) {
-          alert('清掃完了通知を送信しました！お疲れ様でした！');
-          loadCompletionStatus();
-        } else {
-          alert('通知の送信に失敗しました: ' + res.error);
-        }
+      customConfirm(confirmMsg).then(function(ok) {
+        if (!ok) return;
+        callGAS('notifyCleaningComplete', [checkoutDate, who]).then(function(res) {
+          if (res.success) {
+            alert('清掃完了通知を送信しました！お疲れ様でした！');
+            loadCompletionStatus();
+          } else {
+            alert('通知の送信に失敗しました: ' + res.error);
+          }
+        });
       });
     }
 
@@ -5719,5 +5757,28 @@
       }).catch(function() {});
     }
   </script>
+
+  <!-- カスタム確認モーダル（confirm()代替・iOS Safari対応） -->
+  <div id="customConfirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:20px;max-width:85vw;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+      <div id="customConfirmMsg" style="font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:16px;color:#333;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="customConfirmCancel" style="padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>
+        <button id="customConfirmOk" style="padding:8px 16px;border:none;border-radius:6px;background:#0d6efd;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- カスタム入力モーダル（prompt()代替・iOS Safari対応） -->
+  <div id="customPromptOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:20px;max-width:85vw;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+      <div id="customPromptMsg" style="font-size:14px;line-height:1.6;white-space:pre-wrap;margin-bottom:12px;color:#333;"></div>
+      <input id="customPromptInput" type="text" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-bottom:16px;box-sizing:border-box;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="customPromptCancel" style="padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>
+        <button id="customPromptOk" style="padding:8px 16px;border:none;border-radius:6px;background:#0d6efd;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">OK</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

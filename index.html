@@ -273,7 +273,7 @@
         color: #e0e0e0 !important;
       }
       #staffSelectOverlay h6 { color: #fff !important; }
-      .recruit-status-badge { font-size: 0.9rem; font-weight: 700; display: block; text-align: center; padding: 0.4rem 0.75rem; letter-spacing: 0.05em; margin: -0.75rem -0.75rem 0.5rem -0.75rem; border-radius: 10px 10px 0 0; }
+      .recruit-status-badge { font-size: 0.9rem; font-weight: 700; display: block; text-align: center; padding: 0.4rem 0.75rem; letter-spacing: 0.05em; margin: -0.75rem -0.75rem 0.5rem -0.75rem; border-radius: 10px 10px 0 0; border-bottom: 1px solid rgba(255,255,255,0.15); }
       .recruit-status-badge.status-undecided { background: transparent; color: #f8d7da; }
       .recruit-status-badge.status-recruiting { background: transparent; color: #fff3cd; }
       .recruit-status-badge.status-decided { background: transparent; color: #d1e7dd; }
@@ -443,6 +443,7 @@
       /* 清掃セクション回答状況 */
       .cleaning-section-volunteers {
         color: #adb5bd !important;
+        border-top-color: rgba(255,255,255,0.15) !important;
       }
       .cleaning-section-volunteers strong {
         color: #e0e0e0 !important;
@@ -485,6 +486,7 @@
       letter-spacing: 0.05em;
       margin: -0.75rem -0.75rem 0.5rem -0.75rem;
       border-radius: 10px 10px 0 0;
+      border-bottom: 1px solid rgba(0,0,0,0.12);
     }
     .recruit-status-badge.status-undecided { background: transparent; color: #842029; }
     .recruit-status-badge.status-recruiting { background: transparent; color: #664d03; }
@@ -499,6 +501,9 @@
       font-size: 0.85rem;
       color: #555;
       padding: 0.15rem 0;
+      border-top: 1px solid rgba(0,0,0,0.12);
+      padding-top: 0.5rem;
+      margin-top: 0.5rem;
     }
     .cleaning-section-volunteers strong {
       color: #333;
@@ -956,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3079,10 +3084,10 @@
                 var btnEditStaff = document.createElement('button');
                 btnEditStaff.type = 'button';
                 btnEditStaff.className = 'btn btn-sm';
-                btnEditStaff.style.cssText = 'font-size:0.7rem;padding:0.15rem 0.5rem;background:rgba(255,255,255,0.25);color:#fff;border:1px solid rgba(255,255,255,0.6);';
+                btnEditStaff.style.cssText = 'font-size:0.7rem;padding:0.15rem 0.5rem;background:#fff;color:#0f5132;border:1px solid #0f5132;border-radius:4px;font-weight:600;';
                 btnEditStaff.innerHTML = '<i class="bi bi-pencil-square"></i> 編集';
-                btnEditStaff.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.45)'; };
-                btnEditStaff.onmouseleave = function() { this.style.background = 'rgba(255,255,255,0.25)'; };
+                btnEditStaff.onmouseenter = function() { this.style.background = '#0f5132'; this.style.color = '#fff'; };
+                btnEditStaff.onmouseleave = function() { this.style.background = '#fff'; this.style.color = '#0f5132'; };
                 btnEditStaff.onclick = function() {
                   bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                   openStaffEditModal(props.rowNumber, (d.cleaningStaff || '').trim(), r.volunteers || []);

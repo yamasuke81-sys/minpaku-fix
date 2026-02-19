@@ -1361,6 +1361,29 @@ function addNotification_(kind, message, data) {
 }
 
 /**
+ * 通知メッセージ内の古い日付を新しい日付に置換
+ * 予約日付が変更された場合に既存通知のメッセージを修正する
+ */
+function fixNotificationDates_(oldDateStr, newDateStr) {
+  try {
+    if (!oldDateStr || !newDateStr || oldDateStr === newDateStr) return;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NOTIFICATIONS);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    var numRows = sheet.getLastRow() - 1;
+    var data = sheet.getRange(2, 2, numRows, 2).getValues(); // col2=kind, col3=message
+    for (var i = 0; i < numRows; i++) {
+      var kind = String(data[i][0] || '').trim();
+      if (kind !== '回答' && kind !== '回答取消') continue;
+      var msg = String(data[i][1] || '');
+      if (msg.indexOf(oldDateStr) >= 0) {
+        sheet.getRange(i + 2, 3).setValue(msg.replace(oldDateStr, newDateStr));
+      }
+    }
+  } catch (e) {}
+}
+
+/**
  * 予約を削除（オーナーのみ）キャンセルや誤登録の削除用
  */
 function deleteBooking(rowNumber) {
@@ -4650,7 +4673,12 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
             var fCoVal = data[rBookingRow - 2][colMap.checkOut];
             var fCo = parseDate(fCoVal);
             if (fCo) {
-              coKey = toDateKeySafe_(fCo);
+              var newCoKey = toDateKeySafe_(fCo);
+              if (newCoKey && newCoKey !== coKey) {
+                // 募集シートの日付を同期
+                try { recruitSheet.getRange(ri2 + 2, 1).setValue(newCoKey); } catch (e) {}
+              }
+              coKey = newCoKey || coKey;
               coDisp = Utilities.formatDate(fCo, 'Asia/Tokyo', 'yyyy/M/d');
             }
           }
@@ -5835,7 +5863,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
         volSheet.getRange(i + 2, 5).setValue(staffMemo);
         volSheet.getRange(i + 2, 6).setValue(response);
         var checkoutStr = getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss);
-        addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
+        addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr || recruitId) + '）', { recruitRowIndex: recruitRowIndex });
         return JSON.stringify({ success: true, updated: true });
       }
     }
@@ -5845,7 +5873,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
     volSheet.getRange(nextRow, 5).setValue(staffMemo);
     volSheet.getRange(nextRow, 6).setValue(response);
     var checkoutStr2 = getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss);
-    addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr2 || recruitId) + '）');
+    addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr2 || recruitId) + '）', { recruitRowIndex: recruitRowIndex });
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6284,6 +6312,23 @@ function getRecruitmentStatusMap() {
       var rawDate = rows[i][0];
       var checkoutDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(rawDate)) : '';
       var normCo = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
+
+      // 募集シートの日付が古い場合、フォームシートから実際のチェックアウト日を取得して補正
+      if (staleRowNum >= 2 && formData && staleRowNum - 2 < formData.length && formColMap && formColMap.checkOut >= 0) {
+        var directCo = parseDate(formData[staleRowNum - 2][formColMap.checkOut]);
+        if (directCo) {
+          var directCoStr = toDateKeySafe_(directCo);
+          if (directCoStr && directCoStr !== normCo) {
+            // 予約日付が変更された → 募集シートの日付を同期 + 通知メッセージも修正
+            var oldNormCo = normCo;
+            normCo = directCoStr;
+            checkoutDate = directCoStr;
+            try { recruitSheet.getRange(i + 2, 1).setValue(directCoStr); } catch (e) {}
+            try { fixNotificationDates_(oldNormCo, directCoStr); } catch (e) {}
+          }
+        }
+      }
+
       // 現在のフォーム行番号に変換（ソート対策）、見つからなければ元の行番号を使用
       var currentRowNum = (normCo && coToCurrentRow[normCo]) ? coToCurrentRow[normCo] : staleRowNum;
 

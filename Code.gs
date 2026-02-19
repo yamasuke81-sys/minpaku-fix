@@ -4457,12 +4457,13 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) return;
-    const emails = [];
+    var emailSet = {};
     const data = staffSheet.getRange(2, 3, staffSheet.getLastRow(), 3).getValues();
     data.forEach(function(row) {
-      const e = String(row[0] || '').trim();
-      if (e) emails.push(e);
+      const e = String(row[0] || '').trim().toLowerCase();
+      if (e) emailSet[e] = 1;
     });
+    const emails = Object.keys(emailSet);
     if (emails.length === 0) return;
     // 次回予約情報を取得してメール本文に含める
     var nextRes = null;
@@ -4931,13 +4932,19 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
           var coKey = toDateKeySafe_(rCoDate);
           var coDisp = Utilities.formatDate(rCoDate, 'Asia/Tokyo', 'yyyy/M/d');
           // チェックアウト日→現在の行番号のマップで正しい行を特定
+          var matchedByDate = !!coToCurrentFormRow[coKey];
           var correctedRow = coToCurrentFormRow[coKey] || rBookingRow;
           if (correctedRow >= 2 && correctedRow <= data.length + 1) {
             var fCoVal = data[correctedRow - 2][colMap.checkOut];
             var fCo = parseDate(fCoVal);
             if (fCo) {
-              coKey = toDateKeySafe_(fCo) || coKey;
-              coDisp = Utilities.formatDate(fCo, 'Asia/Tokyo', 'yyyy/M/d');
+              var fCoKey = toDateKeySafe_(fCo);
+              // 日付マップで一致した場合のみフォームの値を採用。
+              // rBookingRowフォールバックの場合は、フォームの日付が募集の日付と一致する場合のみ採用（行番号ずれ防止）
+              if (matchedByDate || fCoKey === coKey) {
+                coKey = fCoKey || coKey;
+                coDisp = Utilities.formatDate(fCo, 'Asia/Tokyo', 'yyyy/M/d');
+              }
             }
           }
           recruitInfoMap[rid] = {
@@ -7025,9 +7032,10 @@ function notifyStaffConfirmation(recruitRowIndex) {
     // スタッフ全員のメールアドレスを取得
     var staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフが登録されていません' });
-    var emails = [];
+    var emailSet = {};
     var data = staffSheet.getRange(2, 3, staffSheet.getLastRow() - 1, 1).getValues();
-    data.forEach(function(r) { var e = String(r[0] || '').trim(); if (e) emails.push(e); });
+    data.forEach(function(r) { var e = String(r[0] || '').trim().toLowerCase(); if (e) emailSet[e] = 1; });
+    var emails = Object.keys(emailSet);
     if (emails.length === 0) return JSON.stringify({ success: false, error: 'メールアドレスが登録されていません' });
 
     var volunteers = [];
@@ -7123,6 +7131,8 @@ function checkAndSendReminders() {
   try {
     const res = JSON.parse(getRecruitmentSettings());
     if (!res.success || !res.settings) return;
+    // 募集リマインドが無効ならスキップ
+    if (!res.settings.recruitReminderEnabled) return;
     ensureRecruitNotifyMethodColumn_();
     const minResp = res.settings.minRespondents || 2;
     const intervalWeeks = res.settings.reminderIntervalWeeks || 1;
@@ -7156,20 +7166,21 @@ function checkAndSendReminders() {
         if (today >= nextRemind) shouldRemind = true;
       }
       if (shouldRemind) {
-        // 同日重複送信を防止
+        // 同日重複送信を防止（フラグを送信前にセットして競合を排除）
         var propKey = 'staffRemind_' + rowIndex + '_' + todayStr;
         if (props.getProperty(propKey)) continue;
+        props.setProperty(propKey, '1');
         const staffSheet = ss.getSheetByName(SHEET_STAFF);
         if (staffSheet && staffSheet.getLastRow() >= 2) {
           const emails = staffSheet.getRange(2, 3, staffSheet.getLastRow(), 3).getValues();
-          const to = [];
-          emails.forEach(function(r) { if (r[0]) to.push(r[0]); });
+          var toSet = {};
+          emails.forEach(function(r) { var e = String(r[0] || '').trim().toLowerCase(); if (e) toSet[e] = 1; });
+          var to = Object.keys(toSet);
           if (to.length) {
             GmailApp.sendEmail(to.join(','), '【民泊】清掃スタッフ募集のリマインド: ' + rows[i][0], 'まだ回答が少ないため、再度ご案内します。チェックアウト日: ' + rows[i][0]);
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
-        props.setProperty(propKey, '1');
       }
     }
   } catch (e) {
@@ -7492,6 +7503,7 @@ function checkAndSendReminderEmails() {
             // PropertiesService による重複送信防止
             var propKey = 'ownerRemind_' + checkoutDateStr + '_' + remIdx;
             if (props.getProperty(propKey)) continue;
+            props.setProperty(propKey, Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
             var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
             var detailLink = buildCleaningDetailUrl_(checkoutDateStr);
             var tmplVars = { 'チェックイン': checkinDateStr, 'チェックアウト': checkoutDateStr, '残り日数': daysLeft, '清掃詳細リンク': detailLink };
@@ -7509,7 +7521,6 @@ function checkAndSendReminderEmails() {
                   + '早めに清掃スタッフの手配をお願いします。';
               GmailApp.sendEmail(ownerEmail, subject, body);
               newSent.push(remIdx);
-              props.setProperty(propKey, Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
             } catch (mailErr) {
               Logger.log('reminderEmail error: ' + mailErr.toString());
             }
@@ -7550,6 +7561,7 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
     var immPropKey = 'immRemind_' + checkInStr + '_' + checkOutStr + '_' + todayStr;
     var immProps = PropertiesService.getScriptProperties();
     if (immProps.getProperty(immPropKey)) return;
+    immProps.setProperty(immPropKey, '1');
 
     // チェックイン日が1週間以内かチェック
     var checkinDate = parseDate(checkInStr);
@@ -7590,7 +7602,6 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
         + '清掃詳細: ' + detailLink + '\n\n'
         + '早急に清掃スタッフの手配をお願いします。';
     GmailApp.sendEmail(ownerEmail, subject, body);
-    immProps.setProperty(immPropKey, '1');
     addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
   } catch (e) {
     Logger.log('sendImmediateReminderIfNeeded_: ' + e.toString());
@@ -8027,6 +8038,7 @@ function notifyCleaningComplete(checkoutDate) {
     var ccPropKey = 'cleanComplete_' + dateKey + '_' + ccTodayStr;
     var ccProps = PropertiesService.getScriptProperties();
     if (ccProps.getProperty(ccPropKey)) return JSON.stringify({ success: true, message: '既に清掃完了通知を送信済みです。' });
+    ccProps.setProperty(ccPropKey, '1');
 
     var clRes = JSON.parse(getChecklistForDate(dateKey));
     if (!clRes.success) return JSON.stringify({ success: false, error: clRes.error });
@@ -8054,7 +8066,6 @@ function notifyCleaningComplete(checkoutDate) {
         GmailApp.sendEmail(ownerEmail, subject, body);
       }
     }
-    ccProps.setProperty(ccPropKey, '1');
     return JSON.stringify({ success: true, message: '清掃完了通知を送信しました。' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

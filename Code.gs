@@ -1413,13 +1413,11 @@ function fixNotificationDates_(oldDateStr, newDateStr) {
     var sheet = ss.getSheetByName(SHEET_NOTIFICATIONS);
     if (!sheet || sheet.getLastRow() < 2) return;
     var numRows = sheet.getLastRow() - 1;
-    var data = sheet.getRange(2, 2, numRows, 2).getValues(); // col2=kind, col3=message
+    var msgs = sheet.getRange(2, 3, numRows, 1).getValues(); // col3=message
     for (var i = 0; i < numRows; i++) {
-      var kind = String(data[i][0] || '').trim();
-      if (kind !== '回答' && kind !== '回答取消') continue;
-      var msg = String(data[i][1] || '');
+      var msg = String(msgs[i][0] || '');
       if (msg.indexOf(oldDateStr) >= 0) {
-        sheet.getRange(i + 2, 3).setValue(msg.replace(oldDateStr, newDateStr));
+        sheet.getRange(i + 2, 3).setValue(msg.split(oldDateStr).join(newDateStr));
       }
     }
   } catch (e) {}

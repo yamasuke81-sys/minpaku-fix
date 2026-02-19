@@ -4960,7 +4960,7 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
           };
         }
       }
-      var _dbg = { staff: staff, targetYear: targetYear, targetMonth: targetMonth, volCount: volData.length, recruitCount: rAllData.length, myEntries: [], aprilRecruits: [], myRecruitDetail: {} };
+      var _dbg = { staff: staff, targetYear: targetYear, targetMonth: targetMonth, volCount: volData.length, recruitCount: rAllData.length, myEntries: [], aprilRecruits: [], myRecruitDetail: {}, r12Volunteers: [] };
       // 4月の募集エントリを全て表示
       var _rKeys = Object.keys(recruitInfoMap);
       for (var _rki = 0; _rki < _rKeys.length; _rki++) {
@@ -4969,6 +4969,15 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         var _rd = parseDate(_ri.checkoutDate);
         if (_rd && new Date(_rd).getMonth() + 1 === targetMonth) {
           _dbg.aprilRecruits.push({ rid: _rk, date: _ri.checkoutDate, status: _ri.status, bookingRow: _ri.bookingRowNumber });
+        }
+      }
+      // 4月募集の全ボランティアエントリを表示
+      for (var _r12i = 0; _r12i < volData.length; _r12i++) {
+        var _r12rid = String(volData[_r12i][0] || '').trim();
+        for (var _ai = 0; _ai < _dbg.aprilRecruits.length; _ai++) {
+          if (_r12rid === _dbg.aprilRecruits[_ai].rid) {
+            _dbg.r12Volunteers.push({ rid: _r12rid, name: String(volData[_r12i][1] || ''), email: String(volData[_r12i][2] || ''), status: String(volData[_r12i][5] || ''), col0to6: String(volData[_r12i][0]) + '|' + String(volData[_r12i][1]) + '|' + String(volData[_r12i][2]) + '|' + String(volData[_r12i][3]) + '|' + String(volData[_r12i][4]) + '|' + String(volData[_r12i][5]) + '|' + String(volData[_r12i][6] || '') });
+          }
         }
       }
       // ユーザーの回答に関連する募集エントリの詳細（元の募集シート日付とrBookingRowの情報）

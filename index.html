@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1292,12 +1292,6 @@
         <div id="syncList"></div>
         <div id="syncResult" class="small mt-2" style="display:none;"></div>
         <hr class="my-3">
-        <div class="mb-2">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="autoSyncEnabled">
-            <label class="form-check-label small fw-bold" for="autoSyncEnabled">自動同期を有効にする</label>
-          </div>
-        </div>
         <div class="mb-2">
           <label class="form-label small">同期間隔</label>
           <select class="form-select form-select-sm" id="autoSyncInterval" style="max-width:160px;">
@@ -7327,7 +7321,6 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
-              document.getElementById('autoSyncEnabled').checked = !!r.enabled;
               document.getElementById('autoSyncInterval').value = String(r.intervalHours || 1);
             }
           } catch (e) {}
@@ -7337,7 +7330,6 @@
       document.getElementById('btnSaveAutoSync').addEventListener('click', function() {
         var btn = this;
         var resEl = document.getElementById('autoSyncSaveResult');
-        var enabled = document.getElementById('autoSyncEnabled').checked;
         var interval = parseInt(document.getElementById('autoSyncInterval').value, 10) || 1;
         btn.disabled = true;
         resEl.style.display = 'none';
@@ -7345,7 +7337,7 @@
           var r = JSON.parse(jsonStr);
           resEl.style.display = 'block';
           resEl.className = 'small mt-1 ' + (r.success ? 'text-success' : 'text-danger');
-          resEl.textContent = r.success ? (enabled ? interval + '時間ごとの自動同期を設定しました' : '自動同期を無効にしました') : (r.error || '保存に失敗しました');
+          resEl.textContent = r.success ? (interval + '時間ごとの同期間隔を保存しました') : (r.error || '保存に失敗しました');
           btn.disabled = false;
           setTimeout(function() { resEl.style.display = 'none'; }, 3000);
         }).withFailureHandler(function(err) {
@@ -7353,7 +7345,7 @@
           resEl.className = 'small mt-1 text-danger';
           resEl.textContent = err.message || '保存に失敗しました';
           btn.disabled = false;
-        }).saveAutoSyncSettings(enabled, interval);
+        }).saveAutoSyncSettings(interval);
       });
 
       function doReloadData() {

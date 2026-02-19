@@ -1424,6 +1424,63 @@ function fixNotificationDates_(oldDateStr, newDateStr) {
 }
 
 /**
+ * 通知メッセージ内の遠未来日付（120日以上先）を直接修復する一発修復関数。
+ * 募集エントリの予約行番号から正しいチェックアウト日を取得して置換する。
+ * ScriptPropertiesで実行済みフラグを管理し、修復完了後は再実行しない。
+ */
+function fixFarFutureNotificationDates_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('FIX_FARFUTURE_NOTIF') === 'done') return;
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var notifSheet = ss.getSheetByName(SHEET_NOTIFICATIONS);
+    if (!notifSheet || notifSheet.getLastRow() < 2) return;
+
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!recruitSheet) return;
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var farFuture = new Date(today);
+    farFuture.setDate(farFuture.getDate() + 120);
+    var farFutureStr = Utilities.formatDate(farFuture, 'Asia/Tokyo', 'yyyy-MM-dd');
+
+    var numRows = notifSheet.getLastRow() - 1;
+    var lastCol = Math.max(notifSheet.getLastColumn(), 5);
+    var rows = notifSheet.getRange(2, 1, numRows, lastCol).getValues();
+
+    var targetKinds = { '回答': 1, '回答取消': 1, '保留': 1, '回答変更要請': 1 };
+
+    for (var i = 0; i < numRows; i++) {
+      var kind = String(rows[i][1] || '').trim();
+      if (!targetKinds[kind]) continue;
+
+      var msg = String(rows[i][2] || '');
+      var dateMatch = msg.match(/(\d{4}-\d{2}-\d{2})/);
+      if (!dateMatch) continue;
+      var dateInMsg = dateMatch[1];
+
+      // 120日以上先の日付のみ対象
+      if (dateInMsg <= farFutureStr) continue;
+
+      // データ列から募集行番号を取得
+      var nData = null;
+      try { var raw = String(rows[i][lastCol >= 5 ? 4 : 3] || '').trim(); if (raw) nData = JSON.parse(raw); } catch (e) {}
+
+      if (nData && nData.recruitRowIndex) {
+        var correctDate = getCheckoutForRecruit_(recruitSheet, nData.recruitRowIndex, ss);
+        if (correctDate && correctDate !== dateInMsg) {
+          notifSheet.getRange(i + 2, 3).setValue(msg.split(dateInMsg).join(correctDate));
+        }
+      }
+    }
+
+    props.setProperty('FIX_FARFUTURE_NOTIF', 'done');
+  } catch (e) {}
+}
+
+/**
  * 破損した募集エントリを自動修復する
  * 日付書き換えバグにより、遠い未来の日付に回答データが紐付いてしまったケースを修復。
  * 検出: 120日以上先の日付なのにアクティブな回答がある → 破損の疑い
@@ -1870,13 +1927,24 @@ function setSyncSetting(rowIndex, platformName, icalUrl, active) {
     const s = ss.getSheetByName(SHEET_SYNC_SETTINGS);
     if (!s) return JSON.stringify({ success: false, error: '連携設定シートが見つかりません。' });
     var lastRow = s.getLastRow();
+    var resultRow;
     if (rowIndex && rowIndex >= 2 && rowIndex <= lastRow) {
       s.getRange(rowIndex, 1, 1, 3).setValues([[platformName || '', icalUrl || '', active !== 'N' ? 'Y' : 'N']]);
-      return JSON.stringify({ success: true, rowIndex: rowIndex });
+      resultRow = rowIndex;
+    } else {
+      var nextRow = lastRow + 1;
+      s.getRange(nextRow, 1, 1, 3).setValues([[platformName || '', icalUrl || '', active !== 'N' ? 'Y' : 'N']]);
+      resultRow = nextRow;
     }
-    var nextRow = lastRow + 1;
-    s.getRange(nextRow, 1, 1, 3).setValues([[platformName || '', icalUrl || '', active !== 'N' ? 'Y' : 'N']]);
-    return JSON.stringify({ success: true, rowIndex: nextRow });
+    // ソースの有効状態が変わった場合、トリガーを自動管理
+    try {
+      var props = PropertiesService.getScriptProperties();
+      var intervalHours = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_HOURS'), 10) || 1;
+      var hasActive = hasAnyActiveSyncSource_();
+      props.setProperty('AUTO_SYNC_ENABLED', hasActive ? 'true' : 'false');
+      setupAutoSyncTrigger_(hasActive, intervalHours);
+    } catch (te) {}
+    return JSON.stringify({ success: true, rowIndex: resultRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -2444,18 +2512,48 @@ function getAutoSyncSettings() {
 
 /**
  * 自動同期設定の保存＋トリガー設定
+ * enabledは廃止。ソースごとの有効/無効状態から自動判定する。
+ * 後方互換のため引数2つでも1つでも受け付ける。
  */
-function saveAutoSyncSettings(enabled, intervalHours) {
+function saveAutoSyncSettings(enabledOrInterval, intervalHoursOpt) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
+    // 後方互換: saveAutoSyncSettings(interval) or saveAutoSyncSettings(enabled, interval)
+    var intervalHours;
+    if (intervalHoursOpt !== undefined) {
+      intervalHours = parseInt(intervalHoursOpt, 10) || 1;
+    } else {
+      intervalHours = parseInt(enabledOrInterval, 10) || 1;
+    }
     var props = PropertiesService.getScriptProperties();
-    props.setProperty('AUTO_SYNC_ENABLED', enabled ? 'true' : 'false');
-    props.setProperty('AUTO_SYNC_INTERVAL_HOURS', String(intervalHours || 1));
-    setupAutoSyncTrigger_(enabled, intervalHours);
+    props.setProperty('AUTO_SYNC_INTERVAL_HOURS', String(intervalHours));
+    // ソースの有効状態からトリガー要否を自動判定
+    var hasActive = hasAnyActiveSyncSource_();
+    props.setProperty('AUTO_SYNC_ENABLED', hasActive ? 'true' : 'false');
+    setupAutoSyncTrigger_(hasActive, intervalHours);
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/**
+ * いずれかのiCalソースが自動同期有効かどうかを判定
+ */
+function hasAnyActiveSyncSource_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var syncSheet = ss.getSheetByName(SHEET_SYNC_SETTINGS);
+    if (!syncSheet || syncSheet.getLastRow() < 2) return false;
+    var rows = syncSheet.getRange(2, 1, syncSheet.getLastRow() - 1, 3).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var name = String(rows[i][0] || '').trim();
+      var url = String(rows[i][1] || '').trim();
+      var active = String(rows[i][2] || 'Y').trim();
+      if (name && url && active !== 'N') return true;
+    }
+    return false;
+  } catch (e) { return false; }
 }
 
 function setupAutoSyncTrigger_(enabled, intervalHours) {
@@ -2647,6 +2745,7 @@ function addBookingManually(checkIn, checkOut, guestName, bookingSite, guestCoun
 function getNotifications(unreadOnly) {
   try {
     ensureSheetsExist();
+    try { fixFarFutureNotificationDates_(); } catch (e) {}
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
     var lastCol = Math.max(sheet.getLastColumn(), 5);

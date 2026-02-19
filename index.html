@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -6215,13 +6215,21 @@
             var res = JSON.parse(jsonStr);
             var html = '';
             if (res.success && res.list && res.list.length) {
-              res.list.forEach(function(s) {
-                html += '<div class="border rounded p-2 mb-2"><strong>' + escapeHtml(s.name) + '</strong> ' + escapeHtml(s.email);
+              var staffCount = res.list.length;
+              res.list.forEach(function(s, idx) {
+                html += '<div class="border rounded p-2 mb-2 d-flex align-items-center gap-2">';
+                html += '<div class="d-flex flex-column" style="min-width:28px;">';
+                if (idx > 0) html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 btnStaffUp" data-row="' + s.rowIndex + '" title="上へ" style="font-size:0.7rem;line-height:1;">&#9650;</button>';
+                if (idx < staffCount - 1) html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 btnStaffDown" data-row="' + s.rowIndex + '" title="下へ" style="font-size:0.7rem;line-height:1;">&#9660;</button>';
+                html += '</div>';
+                html += '<div class="flex-grow-1"><strong>' + escapeHtml(s.name) + '</strong> ' + escapeHtml(s.email);
                 html += ' <button type="button" class="btn btn-sm btn-outline-secondary btnEditStaff" data-row="' + s.rowIndex + '" data-name="' + escapeHtml(s.name) + '" data-address="' + escapeHtml(s.address) + '" data-email="' + escapeHtml(s.email) + '" data-bank="' + escapeHtml(s.bankName) + '" data-branch="' + escapeHtml(s.bankBranch) + '" data-atype="' + escapeHtml(s.accountType) + '" data-anum="' + escapeHtml(s.accountNumber) + '" data-holder="' + escapeHtml(s.accountHolder) + '">編集</button>';
                 html += ' <button type="button" class="btn btn-sm btn-outline-danger btnDelStaff" data-row="' + s.rowIndex + '">削除</button>';
                 if (s.hasPassword) html += ' <button type="button" class="btn btn-sm btn-outline-warning btnResetPw" data-name="' + escapeHtml(s.name) + '">PW\u30EA\u30BB\u30C3\u30C8</button>';
-                html += '</div>';
+                html += '</div></div>';
               });
+              // 全スタッフのrowIndex順を保持
+              window._staffRowOrder = res.list.map(function(s) { return s.rowIndex; });
             }
             document.getElementById('staffList').innerHTML = html || '<p class="text-muted">スタッフがいません。</p>';
             document.querySelectorAll('.btnEditStaff').forEach(function(btn) {
@@ -6262,6 +6270,25 @@
                   }).resetStaffPassword(staffName);
                 });
               });
+            });
+            // 上下ボタンのイベント
+            function swapStaffOrder(clickedRow, direction) {
+              var order = window._staffRowOrder || [];
+              var idx = order.indexOf(clickedRow);
+              if (idx < 0) return;
+              var swapIdx = idx + direction;
+              if (swapIdx < 0 || swapIdx >= order.length) return;
+              var tmp = order[idx]; order[idx] = order[swapIdx]; order[swapIdx] = tmp;
+              google.script.run.withSuccessHandler(function(j) {
+                var r = JSON.parse(j);
+                if (r.success) loadStaffList();
+              }).updateStaffOrder(order);
+            }
+            document.querySelectorAll('.btnStaffUp').forEach(function(btn) {
+              btn.addEventListener('click', function(e) { e.stopPropagation(); swapStaffOrder(parseInt(this.getAttribute('data-row'), 10), -1); });
+            });
+            document.querySelectorAll('.btnStaffDown').forEach(function(btn) {
+              btn.addEventListener('click', function(e) { e.stopPropagation(); swapStaffOrder(parseInt(this.getAttribute('data-row'), 10), 1); });
             });
           } catch (e) {}
         }).getStaffList();

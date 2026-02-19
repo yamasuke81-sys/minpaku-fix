@@ -1213,7 +1213,7 @@ function ensureSheetsExist() {
   });
 
   safeInsert(SHEET_STAFF, function(s) {
-    s.getRange(1, 1, 1, 9).setValues([['名前', '住所', 'メール', '金融機関名', '支店名', '口座種類', '口座番号', '口座名義', '有効']]);
+    s.getRange(1, 1, 1, 11).setValues([['名前', '住所', 'メール', '金融機関名', '支店名', '口座種類', '口座番号', '口座名義', '有効', 'パスワード', '表示順']]);
   });
 
   safeInsert(SHEET_JOB_TYPES, function(s) {
@@ -2533,11 +2533,11 @@ function getStaffList() {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。', list: [] });
     ensureSheetsExist();
+    ensureStaffOrderColumn_();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const lastCol = Math.max(sheet.getLastColumn(), 10);
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, lastCol).getValues() : [];
+    const lastCol = Math.max(sheet.getLastColumn(), 11);
+    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
     const list = rows.map(function(row, i) {
       return {
         rowIndex: i + 2,
@@ -2550,12 +2550,61 @@ function getStaffList() {
         accountNumber: String(row[6] || '').trim(),
         accountHolder: String(row[7] || '').trim(),
         active: String(row[8] || 'Y').trim(),
-        hasPassword: lastCol >= 10 ? !!String(row[9] || '').trim() : false
+        hasPassword: lastCol >= 10 ? !!String(row[9] || '').trim() : false,
+        displayOrder: parseInt(row[10], 10) || 9999
       };
     }).filter(function(item) { return item.name || item.email; });
+    list.sort(function(a, b) { return a.displayOrder - b.displayOrder; });
     return JSON.stringify({ success: true, list: list });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), list: [] });
+  }
+}
+
+/** スタッフシートに表示順列を保証 */
+function ensureStaffOrderColumn_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === '表示順') return;
+    }
+    var nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue('表示順');
+    // 既存スタッフに連番を振る
+    if (sheet.getLastRow() >= 2) {
+      for (var r = 2; r <= sheet.getLastRow(); r++) {
+        sheet.getRange(r, nextCol).setValue(r - 1);
+      }
+    }
+  } catch (e) {}
+}
+
+/** スタッフの表示順を一括保存 */
+function updateStaffOrder(orderedRowIndices) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet) return JSON.stringify({ success: false, error: 'スタッフシートが見つかりません。' });
+    ensureStaffOrderColumn_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var orderCol = -1;
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === '表示順') { orderCol = i + 1; break; }
+    }
+    if (orderCol < 0) return JSON.stringify({ success: false, error: '表示順列が見つかりません。' });
+    for (var j = 0; j < orderedRowIndices.length; j++) {
+      var rowIdx = orderedRowIndices[j];
+      if (rowIdx >= 2 && rowIdx <= sheet.getLastRow()) {
+        sheet.getRange(rowIdx, orderCol).setValue(j + 1);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
   }
 }
 
@@ -5758,15 +5807,16 @@ function normalizeVolStatus_(rawStatus) {
 function getAllActiveStaff_(ss) {
   var staffSheet = ss.getSheetByName(SHEET_STAFF);
   if (!staffSheet || staffSheet.getLastRow() < 2) return [];
-  var lastCol = Math.max(staffSheet.getLastColumn(), 9);
+  var lastCol = Math.max(staffSheet.getLastColumn(), 11);
   var rows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
   return rows.map(function(row) {
     var name = String(row[0] || '').trim();
     var email = String(row[2] || '').trim();
     var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
     if (active === 'N' || (!name && !email)) return null;
-    return { staffName: name || email, email: email };
-  }).filter(Boolean);
+    var order = parseInt(row[10], 10) || 9999;
+    return { staffName: name || email, email: email, displayOrder: order };
+  }).filter(Boolean).sort(function(a, b) { return a.displayOrder - b.displayOrder; });
 }
 
 function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmailFromClient) {

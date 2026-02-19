@@ -1464,7 +1464,11 @@ function repairOrphanedRecruitEntries_(recruitSheet, rows, coToCurrentRow, formD
       if (vRid && vStatus && vStatus !== '未回答' && vStatus !== '×') {
         if (!volByRid[vRid]) volByRid[vRid] = { count: 0, latestResponse: '' };
         volByRid[vRid].count++;
-        var respTime = String(volData[vi][3] || '').trim();
+        // Date型の場合はformatDateで安全にyyyy-MM-dd HH:mm形式に変換
+        var respRaw = volData[vi][3];
+        var respTime = respRaw instanceof Date
+          ? Utilities.formatDate(respRaw, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm')
+          : String(respRaw || '').trim();
         if (respTime > volByRid[vRid].latestResponse) volByRid[vRid].latestResponse = respTime;
       }
     }

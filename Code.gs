@@ -43,6 +43,48 @@ function sortFormResponses_() {
   sheet
     .getRange(2, 1, lastRow - 1, lastCol)
     .sort({ column: sortCol, ascending: false });
+
+  // ソート後に募集シートの行番号を同期（行番号ずれ防止）
+  try { syncRecruitBookingRowsAfterSort_(ss, sheet, colMap); } catch (e) {}
+}
+
+/**
+ * ソート後に募集シートのbookingRowNumber（列2）を
+ * フォームシートの最新行番号に更新する
+ */
+function syncRecruitBookingRowsAfterSort_(ss, formSheet, colMap) {
+  var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+  if (!recruitSheet || recruitSheet.getLastRow() < 2) return;
+  if (!colMap || colMap.checkOut < 0) return;
+  var formLastRow = formSheet.getLastRow();
+  if (formLastRow < 2) return;
+  // フォームシートからチェックアウト日→行番号マップを構築
+  var formData = formSheet.getRange(2, colMap.checkOut + 1, formLastRow - 1, 1).getValues();
+  var coToRow = {};
+  for (var f = 0; f < formData.length; f++) {
+    var co = parseDate(formData[f][0]);
+    if (!co) continue;
+    var coStr = toDateKeySafe_(co);
+    if (coStr && !coToRow[coStr]) coToRow[coStr] = f + 2;
+  }
+  // 募集シートの各行を確認・更新
+  var recruitLastRow = recruitSheet.getLastRow();
+  var recruitData = recruitSheet.getRange(2, 1, recruitLastRow - 1, 2).getValues();
+  var updates = [];
+  for (var ri = 0; ri < recruitData.length; ri++) {
+    var recruitCo = parseDate(recruitData[ri][0]);
+    if (!recruitCo) continue;
+    var recruitCoStr = toDateKeySafe_(recruitCo);
+    var oldRow = recruitData[ri][1] ? Number(recruitData[ri][1]) : 0;
+    var newRow = coToRow[recruitCoStr];
+    if (newRow && newRow !== oldRow) {
+      updates.push({ row: ri + 2, newVal: newRow });
+    }
+  }
+  // バッチ更新
+  for (var u = 0; u < updates.length; u++) {
+    recruitSheet.getRange(updates[u].row, 2).setValue(updates[u].newVal);
+  }
 }
 
 /**********************************************
@@ -4658,6 +4700,15 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
       var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
       var rLastCol = Math.max(recruitSheet.getLastColumn(), 5);
       var rAllData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, rLastCol).getValues();
+      // チェックアウト日→現在のフォーム行番号マップ（ソート対策）
+      var coToCurrentFormRow = {};
+      for (var fi2 = 0; fi2 < data.length; fi2++) {
+        var fi2Co = parseDate(data[fi2][colMap.checkOut]);
+        if (fi2Co) {
+          var fi2Str = toDateKeySafe_(fi2Co);
+          if (fi2Str && !coToCurrentFormRow[fi2Str]) coToCurrentFormRow[fi2Str] = fi2 + 2;
+        }
+      }
       // 募集ID → {checkoutDate, status, bookingRowNumber} マップ
       var recruitInfoMap = {};
       for (var ri2 = 0; ri2 < rAllData.length; ri2++) {
@@ -4668,17 +4719,13 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         if (rCoDate) {
           var coKey = toDateKeySafe_(rCoDate);
           var coDisp = Utilities.formatDate(rCoDate, 'Asia/Tokyo', 'yyyy/M/d');
-          // フォームシートの最新チェックアウト日を優先（予約日付変更・ソート対策）
-          if (rBookingRow >= 2 && rBookingRow <= data.length + 1) {
-            var fCoVal = data[rBookingRow - 2][colMap.checkOut];
+          // チェックアウト日→現在の行番号のマップで正しい行を特定
+          var correctedRow = coToCurrentFormRow[coKey] || rBookingRow;
+          if (correctedRow >= 2 && correctedRow <= data.length + 1) {
+            var fCoVal = data[correctedRow - 2][colMap.checkOut];
             var fCo = parseDate(fCoVal);
             if (fCo) {
-              var newCoKey = toDateKeySafe_(fCo);
-              if (newCoKey && newCoKey !== coKey) {
-                // 募集シートの日付を同期
-                try { recruitSheet.getRange(ri2 + 2, 1).setValue(newCoKey); } catch (e) {}
-              }
-              coKey = newCoKey || coKey;
+              coKey = toDateKeySafe_(fCo) || coKey;
               coDisp = Utilities.formatDate(fCo, 'Asia/Tokyo', 'yyyy/M/d');
             }
           }
@@ -6313,24 +6360,28 @@ function getRecruitmentStatusMap() {
       var checkoutDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(rawDate)) : '';
       var normCo = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
 
-      // 募集シートの日付が古い場合、フォームシートから実際のチェックアウト日を取得して補正
-      if (staleRowNum >= 2 && formData && staleRowNum - 2 < formData.length && formColMap && formColMap.checkOut >= 0) {
-        var directCo = parseDate(formData[staleRowNum - 2][formColMap.checkOut]);
-        if (directCo) {
-          var directCoStr = toDateKeySafe_(directCo);
-          if (directCoStr && directCoStr !== normCo) {
+      // 現在のフォーム行番号に変換（ソート対策）、見つからなければ元の行番号を使用
+      var currentRowNum = (normCo && coToCurrentRow[normCo]) ? coToCurrentRow[normCo] : staleRowNum;
+
+      // coToCurrentRow で正しい行番号が見つかった場合、募集シートの行番号を同期
+      if (currentRowNum && currentRowNum !== staleRowNum && staleRowNum) {
+        try { recruitSheet.getRange(i + 2, 2).setValue(currentRowNum); } catch (e) {}
+      }
+
+      // 正しい行番号からフォームシートの最新チェックアウト日を取得
+      if (currentRowNum >= 2 && formData && currentRowNum - 2 < formData.length && formColMap && formColMap.checkOut >= 0) {
+        var actualCo = parseDate(formData[currentRowNum - 2][formColMap.checkOut]);
+        if (actualCo) {
+          var actualCoStr = toDateKeySafe_(actualCo);
+          if (actualCoStr && actualCoStr !== normCo) {
             // 予約日付が変更された → 募集シートの日付を同期 + 通知メッセージも修正
-            var oldNormCo = normCo;
-            normCo = directCoStr;
-            checkoutDate = directCoStr;
-            try { recruitSheet.getRange(i + 2, 1).setValue(directCoStr); } catch (e) {}
-            try { fixNotificationDates_(oldNormCo, directCoStr); } catch (e) {}
+            try { recruitSheet.getRange(i + 2, 1).setValue(actualCoStr); } catch (e) {}
+            try { fixNotificationDates_(normCo, actualCoStr); } catch (e) {}
+            checkoutDate = actualCoStr;
+            normCo = actualCoStr;
           }
         }
       }
-
-      // 現在のフォーム行番号に変換（ソート対策）、見つからなければ元の行番号を使用
-      var currentRowNum = (normCo && coToCurrentRow[normCo]) ? coToCurrentRow[normCo] : staleRowNum;
 
       // 次回予約情報: 常に最新データから計算（キャッシュは古くなる可能性があるため）
       var nextRes = null;

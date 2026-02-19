@@ -46,6 +46,35 @@ function getDeployId(text) {
   return null;
 }
 
+/** clasp deployments の出力から全デプロイIDを取得（AKfycb...形式のみ） */
+function getAllDeployIds(text) {
+  var ids = [];
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var m = lines[i].match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (m && ids.indexOf(m[1]) === -1) ids.push(m[1]);
+  }
+  return ids;
+}
+
+/** 保持すべきID以外の古いデプロイを削除（20件上限対策） */
+function cleanupOldDeploys(cwd, keepIds) {
+  var deps = run(clasp + ' deployments', cwd);
+  if (!deps.ok) return 0;
+  var allIds = getAllDeployIds(deps.out);
+  var deleted = 0;
+  for (var i = 0; i < allIds.length; i++) {
+    if (keepIds.indexOf(allIds[i]) === -1) {
+      var r = run(clasp + ' undeploy "' + allIds[i] + '"', cwd);
+      if (r.ok) {
+        deleted++;
+        console.log('  古いデプロイを削除: ' + allIds[i].substring(0, 25) + '...');
+      }
+    }
+  }
+  return deleted;
+}
+
 /** ブラウザを通常ウィンドウで開く */
 function openBrowser(url) {
   try {
@@ -137,7 +166,18 @@ function main() {
     if (r.ok) {
       mainId = savedMainId;
     } else {
-      console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
+      // 20件上限の可能性があるので、古いデプロイを削除してリトライ
+      if (r.out && r.out.indexOf('versioned deployments') !== -1) {
+        console.log('  20件上限に達しました。古いデプロイを削除してリトライ...');
+        cleanupOldDeploys(rootDir, [savedMainId]);
+        r = run(clasp + ' deploy --deploymentId "' + savedMainId + '" --description "メインアプリ ' + today + '"', rootDir);
+        if (r.ok) {
+          mainId = savedMainId;
+        }
+      }
+      if (!mainId) {
+        console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
+      }
     }
   }
 
@@ -175,6 +215,16 @@ function main() {
       config.ownerDeploymentId = mainId;
       config.staffDeploymentId = mainId;
       try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
+    }
+
+    // 古いデプロイを削除（20件上限対策：保持するIDのみ残す）
+    console.log('  古いデプロイを確認・削除...');
+    var keepIds = [mainId];
+    var deleted = cleanupOldDeploys(rootDir, keepIds);
+    if (deleted > 0) {
+      console.log('  ' + deleted + '件の古いデプロイを削除しました');
+    } else {
+      console.log('  削除対象なし');
     }
   } else {
     console.error('  デプロイに失敗しました。');

@@ -2212,7 +2212,7 @@ function setupAutoSyncTrigger_(enabled, intervalHours) {
       .create();
   }
 }
- */
+
 function importFromSpreadsheet(spreadsheetUrl, skipDuplicates) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。', imported: 0, skipped: 0 });

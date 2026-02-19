@@ -1441,7 +1441,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218t</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218u</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -2761,7 +2761,7 @@
           if (spotPhotos.before.length > 0) {
             html += '<div class="photo-grid" style="margin-top:6px;">';
             spotPhotos.before.forEach(function(photo) {
-              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="showPhotoModal(\'' + spot.id + '\', \'' + photo.fileId + '\', \'' + spot.name.replace(/'/g, "\\'") + '\')"></div>';
+              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="showPhotoModal(\'' + spot.id + '\', \'' + photo.fileId + '\', \'' + spot.name.replace(/'/g, "\\'") + '\', \'ビフォー\')"></div>';
               html += '<button class="photo-delete-btn" onclick="deletePhoto(\'' + spot.id + '\', \'' + photo.fileId + '\')">✕</button></div>';
             });
             html += '</div>';
@@ -2775,7 +2775,7 @@
           if (spotPhotos.after.length > 0) {
             html += '<div class="photo-grid" style="margin-top:6px;">';
             spotPhotos.after.forEach(function(photo) {
-              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="showPhotoModal(\'' + spot.id + '\', \'' + photo.fileId + '\', \'' + spot.name.replace(/'/g, "\\'") + '\')"></div>';
+              html += '<div class="photo-thumb-wrapper"><div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="showPhotoModal(\'' + spot.id + '\', \'' + photo.fileId + '\', \'' + spot.name.replace(/'/g, "\\'") + '\', \'アフター\')"></div>';
               html += '<button class="photo-delete-btn" onclick="deletePhoto(\'' + spot.id + '\', \'' + photo.fileId + '\')">✕</button></div>';
             });
             html += '</div>';
@@ -3386,7 +3386,7 @@
       }
     }
 
-    function showPhotoModal(spotId, fileId, spotName) {
+    function showPhotoModal(spotId, fileId, spotName, timing) {
       var overlay = document.createElement('div');
       overlay.className = 'photo-modal-overlay';
       overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
@@ -3395,6 +3395,7 @@
       modal.innerHTML = '<h3>📷 ' + (spotName || '') + '</h3>' +
         '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;" onerror="this.alt=\'画像を読み込めません\';"></div>' +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
+        '<button class="photo-modal-close" style="flex:1;background:#6c5ce7;color:white;border-color:#6c5ce7;" onclick="this.closest(\'.photo-modal-overlay\').remove();openRetagModal(\'' + spotId + '\', \'' + fileId + '\', \'' + (timing || 'ビフォー') + '\')">タグ変更</button>' +
         '<button class="photo-modal-close" style="flex:1;background:#e74c3c;color:white;border-color:#e74c3c;" onclick="this.closest(\'.photo-modal-overlay\').remove();deletePhoto(\'' + spotId + '\', \'' + fileId + '\')">削除</button>' +
         '</div>' +
         '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
@@ -3643,12 +3644,15 @@
       html += '<button class="tag-timing-btn" data-timing="アフター" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #e67e22;background:' + (aSel ? '#e67e22' : '#fef5ec') + ';color:' + (aSel ? '#fff' : '#e67e22') + ';border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">アフター</button>';
       html += '</div></div>';
 
-      // カテゴリ選択（大カテゴリのみ）
+      // カテゴリ＋個別箇所選択
       html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">撮影箇所</div>';
       html += '<div id="tagSpotList" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">';
       catOrder.forEach(function(cat) {
         var firstSpotId = categories[cat][0].id;
-        html += '<div class="tag-spot-item" data-spot-id="' + firstSpotId + '" onclick="selectTagSpot(this)" style="padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:14px;font-weight:bold;transition:background 0.15s;">' + escapeHtml(cat) + '</div>';
+        html += '<div class="tag-spot-item" data-spot-id="' + firstSpotId + '" onclick="selectTagSpot(this)" style="padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;font-weight:bold;background:#f8f9fa;transition:background 0.15s;">' + escapeHtml(cat) + '</div>';
+        categories[cat].forEach(function(spot) {
+          html += '<div class="tag-spot-item" data-spot-id="' + spot.id + '" onclick="selectTagSpot(this)" style="padding:8px 12px 8px 28px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px;transition:background 0.15s;">' + escapeHtml(spot.name) + '</div>';
+        });
       });
       html += '</div>';
 
@@ -3739,6 +3743,107 @@
         }).catch(function() { fail++; if (btn) btn.textContent = '振り分け中... ' + (done + fail) + '/' + total; reassignNext(idx + 1); });
       }
       reassignNext(0);
+    };
+
+    // === 既存写真のタグ変更 ===
+    window.openRetagModal = function(oldSpotId, fileId, currentTiming) {
+      var spots = checklistData.spots;
+      var categories = {};
+      var catOrder = [];
+      spots.forEach(function(spot) {
+        var cat = spot.category || 'その他';
+        if (!categories[cat]) { categories[cat] = []; catOrder.push(cat); }
+        categories[cat].push(spot);
+      });
+      if (checklistData.categoryOrder && checklistData.categoryOrder.length > 0) {
+        var orderMap = {};
+        checklistData.categoryOrder.forEach(function(o) { orderMap[o.path] = o.sortOrder; });
+        catOrder.sort(function(a, b) {
+          return (orderMap[a] !== undefined ? orderMap[a] : 99999) - (orderMap[b] !== undefined ? orderMap[b] : 99999);
+        });
+      }
+
+      var bSel = currentTiming === 'ビフォー';
+      var aSel = currentTiming === 'アフター';
+
+      var overlay = document.createElement('div');
+      overlay.className = 'photo-modal-overlay';
+      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+      var modal = document.createElement('div');
+      modal.className = 'photo-modal';
+      modal.style.cssText = 'max-height:90vh;overflow-y:auto;';
+
+      var html = '<h3 style="margin-bottom:8px;">📷 タグ変更</h3>';
+      html += '<div style="text-align:center;margin-bottom:12px;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400" style="max-width:100%;max-height:200px;border-radius:8px;"></div>';
+
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">タイミング</div>';
+      html += '<div style="display:flex;gap:8px;">';
+      html += '<button class="tag-timing-btn" data-timing="ビフォー" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #3498db;background:' + (bSel ? '#3498db' : '#eaf4fd') + ';color:' + (bSel ? '#fff' : '#3498db') + ';border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">ビフォー</button>';
+      html += '<button class="tag-timing-btn" data-timing="アフター" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #e67e22;background:' + (aSel ? '#e67e22' : '#fef5ec') + ';color:' + (aSel ? '#fff' : '#e67e22') + ';border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">アフター</button>';
+      html += '</div></div>';
+
+      html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">撮影箇所</div>';
+      html += '<div id="tagSpotList" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">';
+      catOrder.forEach(function(cat) {
+        var firstSpotId = categories[cat][0].id;
+        var isCur = firstSpotId === oldSpotId;
+        html += '<div class="tag-spot-item" data-spot-id="' + firstSpotId + '" onclick="selectTagSpot(this)" style="padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;font-weight:bold;background:' + (isCur ? '#e8e5ff' : '#f8f9fa') + ';transition:background 0.15s;">' + escapeHtml(cat) + (isCur ? ' (現在)' : '') + '</div>';
+        categories[cat].forEach(function(spot) {
+          var isSpotCur = spot.id === oldSpotId;
+          html += '<div class="tag-spot-item" data-spot-id="' + spot.id + '" onclick="selectTagSpot(this)" style="padding:8px 12px 8px 28px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px;background:' + (isSpotCur ? '#e8e5ff' : '') + ';font-weight:' + (isSpotCur ? 'bold' : 'normal') + ';transition:background 0.15s;">' + escapeHtml(spot.name) + (isSpotCur ? ' (現在)' : '') + '</div>';
+        });
+      });
+      html += '</div>';
+
+      html += '<div style="display:flex;gap:8px;margin-top:12px;">';
+      html += '<button id="tagConfirmBtn" class="photo-modal-close" style="flex:1;background:#6c5ce7;color:white;border-color:#6c5ce7;" onclick="confirmRetag(\'' + oldSpotId + '\', \'' + fileId + '\')">変更を確定</button>';
+      html += '</div>';
+      html += '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">キャンセル</button>';
+
+      modal.innerHTML = html;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      window._tagSelectedTiming = currentTiming;
+      window._tagSelectedSpotId = oldSpotId;
+    };
+
+    window.confirmRetag = function(oldSpotId, fileId) {
+      var timing = window._tagSelectedTiming;
+      var newSpotId = window._tagSelectedSpotId;
+      if (!timing || !newSpotId) return;
+
+      var overlay = document.querySelector('.photo-modal-overlay');
+      var btn = document.getElementById('tagConfirmBtn');
+      if (btn) { btn.textContent = '変更中...'; btn.style.pointerEvents = 'none'; }
+
+      callGAS('reassignChecklistPhoto', [checkoutDate, oldSpotId, fileId, newSpotId, timing]).then(function(res) {
+        if (res.success) {
+          // ローカルデータ: 旧spotから削除
+          var oldData = checklistData.photos[oldSpotId];
+          if (oldData) {
+            ['before', 'after', 'unsorted'].forEach(function(key) {
+              if (oldData[key]) oldData[key] = oldData[key].filter(function(p) { return p.fileId !== fileId; });
+            });
+          }
+          // 新spotに追加
+          if (!checklistData.photos[newSpotId]) checklistData.photos[newSpotId] = { before: [], after: [] };
+          var timingKey = timing === 'ビフォー' ? 'before' : 'after';
+          checklistData.photos[newSpotId][timingKey].push({ fileId: fileId, by: staffName, at: new Date() });
+
+          if (overlay) overlay.remove();
+          showSaveStatus('saved');
+          renderPhotoSection();
+          renderChecklist();
+        } else {
+          alert('タグ変更に失敗しました: ' + (res.error || ''));
+          if (btn) { btn.textContent = '変更を確定'; btn.style.pointerEvents = 'auto'; }
+        }
+      }).catch(function() {
+        alert('タグ変更に失敗しました');
+        if (btn) { btn.textContent = '変更を確定'; btn.style.pointerEvents = 'auto'; }
+      });
     };
 
     function updateMemoSubmitBtn() {

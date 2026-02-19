@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219x</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219y</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1371,49 +1371,49 @@
         <p class="small text-muted mb-2">各メール通知の送信ON/OFFを設定します。OFFにすると該当メールは送信されません。</p>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyRecruitStart" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyRecruitStart">
           <label class="form-check-label" for="notifyRecruitStart"><strong>募集開始通知</strong></label>
           <p class="small text-muted mb-0 ms-4">新しい清掃募集を作成した際に、登録済みの全スタッフへ募集案内メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyStaffConfirm" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyStaffConfirm">
           <label class="form-check-label" for="notifyStaffConfirm"><strong>スタッフ確定通知</strong></label>
           <p class="small text-muted mb-0 ms-4">オーナーが清掃スタッフを確定した際に、全スタッフへ確定結果メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancel" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancel">
           <label class="form-check-label" for="notifyCancel"><strong>予約キャンセル通知</strong></label>
           <p class="small text-muted mb-0 ms-4">iCal同期で予約キャンセルを検知した際に、担当スタッフとオーナーへ通知メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelRequest" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelRequest">
           <label class="form-check-label" for="notifyCancelRequest"><strong>辞退申請通知</strong></label>
           <p class="small text-muted mb-0 ms-4">スタッフが清掃の辞退を申請した際に、オーナーへ通知メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelApprove" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelApprove">
           <label class="form-check-label" for="notifyCancelApprove"><strong>辞退承認通知</strong></label>
           <p class="small text-muted mb-0 ms-4">オーナーが辞退申請を承認した際に、申請したスタッフへ承認結果メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelReject" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelReject">
           <label class="form-check-label" for="notifyCancelReject"><strong>辞退却下通知</strong></label>
           <p class="small text-muted mb-0 ms-4">オーナーが辞退申請を却下した際に、申請したスタッフへ却下結果メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCleaningDone" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCleaningDone">
           <label class="form-check-label" for="notifyCleaningDone"><strong>清掃完了通知</strong></label>
           <p class="small text-muted mb-0 ms-4">スタッフがチェックリストを完了した際に、オーナーへ清掃完了報告メールを送信します。</p>
         </div>
 
         <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyInvoice" checked>
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyInvoice">
           <label class="form-check-label" for="notifyInvoice"><strong>請求書メール送信</strong></label>
           <p class="small text-muted mb-0 ms-4">請求書を作成した際に、オーナーへPDF添付の請求書メールを送信します。OFFの場合もPDFは生成されます。</p>
         </div>
@@ -7054,7 +7054,7 @@
             if (r.success && r.settings) {
               EMAIL_NOTIFY_KEYS.forEach(function(key) {
                 var el = document.getElementById(key);
-                if (el) el.checked = r.settings[key] !== false;
+                if (el) el.checked = r.settings[key] === true;
               });
             }
           } catch (e) {}

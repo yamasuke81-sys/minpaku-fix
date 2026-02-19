@@ -3304,7 +3304,7 @@ function getEmailNotifySettings() {
     var settings = {};
     for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
       var val = map[EMAIL_NOTIFY_KEYS_[i]];
-      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = val === 'false' ? false : true; // デフォルトON
+      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = val === 'true' ? true : false; // デフォルトOFF
     }
     return JSON.stringify({ success: true, settings: settings });
   } catch (e) {
@@ -3343,20 +3343,20 @@ function saveEmailNotifySettings(settings) {
   }
 }
 
-/** メール通知が有効かチェックするヘルパー（デフォルトtrue） */
+/** メール通知が有効かチェックするヘルパー（デフォルトfalse） */
 function isEmailNotifyEnabled_(sheetKey) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
-    if (!sheet || sheet.getLastRow() < 2) return true;
+    if (!sheet || sheet.getLastRow() < 2) return false;
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0] || '').trim() === sheetKey) {
-        return String(rows[i][1]).trim() !== 'false';
+        return String(rows[i][1]).trim() === 'true';
       }
     }
-    return true; // キーが見つからない場合はデフォルトON
+    return false; // キーが見つからない場合はデフォルトOFF
   } catch (e) {
-    return true;
+    return false;
   }
 }
 

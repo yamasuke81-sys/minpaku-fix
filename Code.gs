@@ -2168,6 +2168,80 @@ function autoSyncFromICal() {
 }
 
 /**
+ * iCal同期バグで誤ってキャンセルされた過去予約を復元する（一回限りの修正用）
+ * GASスクリプトエディタから手動実行: restoreICalCancelledPastBookings()
+ */
+function restoreICalCancelledPastBookings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var formSheet = ss.getSheetByName(SHEET_NAME);
+  if (!formSheet || formSheet.getLastRow() < 2) return '対象シートが見つかりません';
+
+  var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+  var colMap = buildColumnMap(headers);
+  if (colMap.cancelledAt < 0) return 'キャンセル日時列がありません';
+  if (colMap.checkOut < 0) return 'チェックアウト列がありません';
+
+  var lastRow = formSheet.getLastRow();
+  var data = formSheet.getRange(2, 1, lastRow - 1, formSheet.getLastColumn()).getValues();
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+
+  var restored = [];
+  for (var i = 0; i < data.length; i++) {
+    var cancelledVal = String(data[i][colMap.cancelledAt] || '').trim();
+    if (!cancelledVal) continue; // キャンセルされていない → スキップ
+
+    var coRaw = data[i][colMap.checkOut];
+    var coDate = coRaw instanceof Date ? coRaw : new Date(String(coRaw));
+    if (isNaN(coDate.getTime())) continue;
+    coDate.setHours(0, 0, 0, 0);
+
+    if (coDate >= today) continue; // 未来の予約はスキップ（正当なキャンセルの可能性）
+
+    var rowNumber = i + 2;
+    var guestName = colMap.guestName >= 0 ? String(data[i][colMap.guestName] || '').trim() : '';
+    var ciRaw = colMap.checkIn >= 0 ? data[i][colMap.checkIn] : '';
+    var ciStr = ciRaw instanceof Date ? Utilities.formatDate(ciRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(ciRaw || '');
+    var coStr = coRaw instanceof Date ? Utilities.formatDate(coRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(coRaw || '');
+    var cleaningStaff = colMap.cleaningStaff >= 0 ? String(data[i][colMap.cleaningStaff] || '').trim() : '';
+
+    // キャンセル日時をクリア
+    formSheet.getRange(rowNumber, colMap.cancelledAt + 1).setValue('');
+    restored.push({ row: rowNumber, guest: guestName, ci: ciStr, co: coStr, cancelled: cancelledVal, staff: cleaningStaff });
+  }
+
+  // 募集シートのステータスも復元
+  var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+  if (recruitSheet && recruitSheet.getLastRow() >= 2) {
+    var rLastRow = recruitSheet.getLastRow();
+    var rData = recruitSheet.getRange(2, 1, rLastRow - 1, 5).getValues();
+    for (var ri = 0; ri < rData.length; ri++) {
+      var rRowNum = parseInt(rData[ri][1], 10);
+      var rStatus = String(rData[ri][3] || '').trim();
+      if (rStatus !== 'キャンセル') continue;
+      // この募集が復元対象の予約に対応するか
+      for (var j = 0; j < restored.length; j++) {
+        if (rRowNum === restored[j].row) {
+          var newStatus = restored[j].staff ? 'スタッフ確定済み' : '募集中';
+          recruitSheet.getRange(ri + 2, 4).setValue(newStatus);
+          Logger.log('募集 行' + (ri + 2) + ' ステータス復元: キャンセル → ' + newStatus);
+          break;
+        }
+      }
+    }
+  }
+
+  // ログ出力
+  Logger.log('=== iCalキャンセル復元結果 ===');
+  Logger.log('復元件数: ' + restored.length);
+  for (var k = 0; k < restored.length; k++) {
+    var r = restored[k];
+    Logger.log('行' + r.row + ': ' + r.guest + ' (' + r.ci + '～' + r.co + ') キャンセル日時=' + r.cancelled);
+  }
+
+  return '復元完了: ' + restored.length + '件';
+}
+
+/**
  * 自動同期設定の取得
  */
 function getAutoSyncSettings() {

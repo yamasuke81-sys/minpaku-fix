@@ -1437,11 +1437,12 @@
       to { transform: translateX(-50%) translateY(0); opacity: 1; }
     }
   </style>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head>
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0219b</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0219c</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1507,9 +1508,9 @@
         <div id="completionInfo" style="display:none;margin-top:8px;padding:8px 10px;background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;font-size:13px;color:#155724;text-align:center;"></div>
       </div>
 
-      <!-- コインランドリー状況（清掃完了ボタンの下） -->
-      <div id="laundrySection" class="laundry-section" style="margin:8px 12px 16px;padding:12px;background:#f8f9fa;border-radius:10px;border:1px solid #dee2e6;">
-        <div style="font-size:14px;font-weight:700;color:#2c3e50;margin-bottom:10px;display:flex;align-items:center;gap:6px;">🧺 コインランドリー状況</div>
+      <!-- クリーニング状況（清掃完了ボタンの下） -->
+      <div id="laundrySection" class="laundry-section" style="margin:8px 12px 16px;padding:12px;background:#e2e3e5;border-radius:10px;border:1px solid #c4c8cb;">
+        <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;"><i class="bi bi-basket2"></i> クリーニング状況</div>
         <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
       </div>
     </div>
@@ -5526,7 +5527,7 @@
     })();
 
     // ==========================================
-    // コインランドリー状況
+    // クリーニング状況
     // ==========================================
     function loadLaundryStatus() {
       var container = document.getElementById('laundryContent');
@@ -5549,37 +5550,37 @@
       var html = '';
 
       // ステップ1: 出す
-      html += '<div style="display:flex;align-items:center;gap:8px;min-height:36px;margin-bottom:4px;">';
+      html += '<div style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;margin-bottom:4px;">';
       html += laundryBadge(hasSent, '1');
       if (hasSent) {
         html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.sentAt) + '　' + escapeHtml(d.sentBy) + '</span>';
         if (lastStep === 'sent') html += laundryCancelBtn('sent');
       } else {
-        html += '<button onclick="doLaundryStep(\'sent\',this)" class="laundry-action-btn" style="flex:1;">クリーニングに出した</button>';
+        html += '<button onclick="doLaundryStep(\'sent\',this)" class="laundry-action-btn" style="flex:1;"><i class="bi bi-box-arrow-up-right" style="margin-right:4px;"></i>クリーニングに出した</button>';
       }
       html += '</div>';
 
       // ステップ2: 受取
-      html += '<div style="display:flex;align-items:center;gap:8px;min-height:36px;margin-bottom:4px;">';
+      html += '<div style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;margin-bottom:4px;">';
       html += laundryBadge(hasReceived, '2');
       if (hasReceived) {
         html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.receivedAt) + '　' + escapeHtml(d.receivedBy) + '</span>';
         if (lastStep === 'received') html += laundryCancelBtn('received');
       } else if (hasSent) {
-        html += '<button onclick="doLaundryStep(\'received\',this)" class="laundry-action-btn" style="flex:1;">受け取った</button>';
+        html += '<button onclick="doLaundryStep(\'received\',this)" class="laundry-action-btn" style="flex:1;"><i class="bi bi-box-arrow-in-down" style="margin-right:4px;"></i>受け取った</button>';
       } else {
         html += '<span style="flex:1;font-size:13px;color:#aaa;">受け取り（出した後に有効）</span>';
       }
       html += '</div>';
 
       // ステップ3: 施設に戻す
-      html += '<div style="display:flex;align-items:center;gap:8px;min-height:36px;">';
+      html += '<div style="display:flex;align-items:center;gap:0.5rem;min-height:2rem;">';
       html += laundryBadge(hasReturned, '3');
       if (hasReturned) {
         html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.returnedAt) + '　' + escapeHtml(d.returnedBy) + '</span>';
         if (lastStep === 'returned') html += laundryCancelBtn('returned');
       } else if (hasReceived) {
-        html += '<button onclick="doLaundryStep(\'returned\',this)" class="laundry-action-btn" style="flex:1;">施設に戻した</button>';
+        html += '<button onclick="doLaundryStep(\'returned\',this)" class="laundry-action-btn" style="flex:1;"><i class="bi bi-house-check" style="margin-right:4px;"></i>施設に戻した</button>';
       } else {
         html += '<span style="flex:1;font-size:13px;color:#aaa;">施設に戻す（受取後に有効）</span>';
       }
@@ -5589,13 +5590,13 @@
     }
 
     function laundryBadge(done, num) {
-      var bg = done ? '#198754' : '#adb5bd';
-      var icon = done ? '✓' : num;
-      return '<span style="width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:' + bg + ';color:#fff;font-size:12px;font-weight:700;flex-shrink:0;">' + icon + '</span>';
+      var bg = done ? '#198754' : '#6c757d';
+      var icon = done ? '<i class="bi bi-check"></i>' : num;
+      return '<span style="width:1.5rem;height:1.5rem;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:' + bg + ';color:#fff;font-size:0.75rem;font-weight:700;flex-shrink:0;">' + icon + '</span>';
     }
 
     function laundryCancelBtn(step) {
-      return '<button onclick="cancelLaundryStep(\'' + step + '\',this)" style="font-size:11px;padding:2px 6px;border:1px solid #ccc;border-radius:4px;background:#fff;color:#666;cursor:pointer;flex-shrink:0;">取消</button>';
+      return '<button onclick="cancelLaundryStep(\'' + step + '\',this)" style="font-size:0.7rem;padding:0 0.25rem;border:1px solid #6c757d;border-radius:4px;background:#fff;color:#6c757d;cursor:pointer;flex-shrink:0;">取消</button>';
     }
 
     function formatLaundryTime(dtStr) {

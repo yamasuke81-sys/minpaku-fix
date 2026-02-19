@@ -46,33 +46,53 @@ function getDeployId(text) {
   return null;
 }
 
-/** clasp deployments の出力から全デプロイIDを取得（AKfycb...形式のみ） */
-function getAllDeployIds(text) {
-  var ids = [];
+/** clasp versions の出力からバージョン数をカウント */
+function countVersions(text) {
+  var count = 0;
   var lines = text.split('\n');
   for (var i = 0; i < lines.length; i++) {
-    var m = lines[i].match(/(AKfycb[A-Za-z0-9_-]{20,})/);
-    if (m && ids.indexOf(m[1]) === -1) ids.push(m[1]);
+    // "1 - " や "42 - " のような行をカウント
+    if (/^\d+\s+-\s+/.test(lines[i].trim())) count++;
   }
-  return ids;
+  return count;
 }
 
-/** 保持すべきID以外の古いデプロイを削除（20件上限対策） */
-function cleanupOldDeploys(cwd, keepIds) {
-  var deps = run(clasp + ' deployments', cwd);
-  if (!deps.ok) return 0;
-  var allIds = getAllDeployIds(deps.out);
-  var deleted = 0;
-  for (var i = 0; i < allIds.length; i++) {
-    if (keepIds.indexOf(allIds[i]) === -1) {
-      var r = run(clasp + ' undeploy "' + allIds[i] + '"', cwd);
-      if (r.ok) {
-        deleted++;
-        console.log('  古いデプロイを削除: ' + allIds[i].substring(0, 25) + '...');
-      }
-    }
+/** .clasp.json からスクリプトIDを読み取る */
+function getScriptId(dir) {
+  var claspJsonPath = path.join(dir, '.clasp.json');
+  if (fs.existsSync(claspJsonPath)) {
+    try {
+      var json = JSON.parse(fs.readFileSync(claspJsonPath, 'utf8'));
+      return json.scriptId || '';
+    } catch (e) {}
   }
-  return deleted;
+  return '';
+}
+
+var VERSION_LIMIT = 200;
+var VERSION_WARN = 150;
+
+/** バージョン数を表示し、上限に近い場合は警告+ブラウザで管理画面を開く */
+function checkVersionCount(label, cwd) {
+  var r = run(clasp + ' versions', cwd, 30000);
+  if (!r.ok) {
+    console.log('  ' + label + ': バージョン数の取得に失敗');
+    return;
+  }
+  var count = countVersions(r.out);
+  var bar = count + '/' + VERSION_LIMIT + '件';
+  if (count >= VERSION_WARN) {
+    console.log('  ⚠ ' + label + ': ' + bar + ' — バージョン削除が必要です！');
+    var scriptId = getScriptId(cwd);
+    if (scriptId) {
+      var versionsUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
+      console.log('    GAS管理画面で手動削除してください:');
+      console.log('    ' + versionsUrl);
+      openBrowser(versionsUrl);
+    }
+  } else {
+    console.log('  ' + label + ': ' + bar);
+  }
 }
 
 /** ブラウザを通常ウィンドウで開く */
@@ -166,18 +186,7 @@ function main() {
     if (r.ok) {
       mainId = savedMainId;
     } else {
-      // 20件上限の可能性があるので、古いデプロイを削除してリトライ
-      if (r.out && r.out.indexOf('versioned deployments') !== -1) {
-        console.log('  20件上限に達しました。古いデプロイを削除してリトライ...');
-        cleanupOldDeploys(rootDir, [savedMainId]);
-        r = run(clasp + ' deploy --deploymentId "' + savedMainId + '" --description "メインアプリ ' + today + '"', rootDir);
-        if (r.ok) {
-          mainId = savedMainId;
-        }
-      }
-      if (!mainId) {
-        console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
-      }
+      console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
     }
   }
 
@@ -215,16 +224,6 @@ function main() {
       config.ownerDeploymentId = mainId;
       config.staffDeploymentId = mainId;
       try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
-    }
-
-    // 古いデプロイを削除（20件上限対策：保持するIDのみ残す）
-    console.log('  古いデプロイを確認・削除...');
-    var keepIds = [mainId];
-    var deleted = cleanupOldDeploys(rootDir, keepIds);
-    if (deleted > 0) {
-      console.log('  ' + deleted + '件の古いデプロイを削除しました');
-    } else {
-      console.log('  削除対象なし');
     }
   } else {
     console.error('  デプロイに失敗しました。');
@@ -286,6 +285,14 @@ function main() {
     }
   } else {
     console.error('  エラー: ' + clDeployScript + ' が見つかりません');
+  }
+
+  // === バージョン数チェック（200件上限） ===
+  console.log('');
+  console.log('[バージョン数チェック]');
+  checkVersionCount('メインアプリ', rootDir);
+  if (fs.existsSync(checklistDir)) {
+    checkVersionCount('チェックリスト', checklistDir);
   }
 
   console.log('');

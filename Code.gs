@@ -3302,7 +3302,7 @@ function getEmailNotifySettings() {
     var settings = {};
     for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
       var val = map[EMAIL_NOTIFY_KEYS_[i]];
-      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = val === 'true' ? true : false; // デフォルトOFF
+      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = val === true || String(val).trim() === 'true'; // デフォルトOFF
     }
     return JSON.stringify({ success: true, settings: settings });
   } catch (e) {
@@ -3349,7 +3349,8 @@ function isEmailNotifyEnabled_(sheetKey) {
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0] || '').trim() === sheetKey) {
-        return String(rows[i][1]).trim() === 'true';
+        var v = rows[i][1];
+        return v === true || String(v).trim() === 'true';
       }
     }
     return false; // キーが見つからない場合はデフォルトOFF

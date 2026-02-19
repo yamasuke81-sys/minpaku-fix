@@ -1426,6 +1426,108 @@ function fixNotificationDates_(oldDateStr, newDateStr) {
 }
 
 /**
+ * 孤立した募集エントリを自動修復する
+ * 募集シートの日付がフォームシートのどの予約とも一致しない場合、
+ * 回答データ（立候補シート）を持つ孤立エントリを、未紐付けの予約と照合して修復する
+ */
+function repairOrphanedRecruitEntries_(recruitSheet, rows, coToCurrentRow, formData, formColMap) {
+  if (!rows || !rows.length || !formData || !formColMap || formColMap.checkOut < 0) return;
+
+  // 1. 孤立エントリと紐付済み日付を特定
+  var claimedDates = {};
+  var orphaned = [];
+  for (var i = 0; i < rows.length; i++) {
+    var rCo = parseDate(rows[i][0]);
+    if (!rCo) continue;
+    var rCoStr = toDateKeySafe_(rCo);
+    if (rCoStr && coToCurrentRow[rCoStr]) {
+      claimedDates[rCoStr] = true;
+    } else if (rCoStr) {
+      orphaned.push({ idx: i, recruitRow: i + 2, oldDate: rCoStr });
+    }
+  }
+  if (orphaned.length === 0) return;
+
+  // 2. 回答を持つ孤立エントリのみ対象（回答なし＝削除された予約の募集なので無視）
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
+  var volByRid = {};
+  if (volSheet && volSheet.getLastRow() >= 2) {
+    var volLastCol = Math.max(volSheet.getLastColumn(), 6);
+    var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
+    for (var vi = 0; vi < volData.length; vi++) {
+      var vRid = String(volData[vi][0] || '').trim();
+      var vStatus = String(volData[vi][5] || '').trim();
+      if (vRid && vStatus && vStatus !== '×' && vStatus !== '未回答') {
+        if (!volByRid[vRid]) volByRid[vRid] = [];
+        volByRid[vRid].push(vStatus);
+      }
+    }
+  }
+  var orphanedWithVol = orphaned.filter(function(o) {
+    return volByRid['r' + o.recruitRow] && volByRid['r' + o.recruitRow].length > 0;
+  });
+  if (orphanedWithVol.length === 0) return;
+
+  // 3. 募集エントリに紐付いていないフォーム予約を特定
+  var allFormDates = {};
+  for (var f = 0; f < formData.length; f++) {
+    var fCo = parseDate(formData[f][formColMap.checkOut]);
+    if (!fCo) continue;
+    var fCoStr = toDateKeySafe_(fCo);
+    if (fCoStr && !allFormDates[fCoStr]) allFormDates[fCoStr] = f + 2;
+  }
+  var unclaimedBookings = [];
+  Object.keys(allFormDates).forEach(function(dateStr) {
+    if (!claimedDates[dateStr]) {
+      unclaimedBookings.push({ date: dateStr, formRow: allFormDates[dateStr] });
+    }
+  });
+
+  // 4. 孤立エントリが1件＆未紐付予約が1件なら自動修復
+  if (orphanedWithVol.length === 1 && unclaimedBookings.length === 1) {
+    var o = orphanedWithVol[0];
+    var b = unclaimedBookings[0];
+    // 募集シートの日付と行番号を修正
+    recruitSheet.getRange(o.recruitRow, 1).setValue(b.date);
+    recruitSheet.getRange(o.recruitRow, 2).setValue(b.formRow);
+    // rows配列も更新（後続処理で使うため）
+    rows[o.idx][0] = b.date;
+    rows[o.idx][1] = b.formRow;
+    // 通知メッセージも修正
+    fixNotificationDates_(o.oldDate, b.date);
+    return;
+  }
+
+  // 5. 複数件の場合は近い日付順でマッチング
+  if (orphanedWithVol.length > 0 && unclaimedBookings.length > 0) {
+    var usedBookings = {};
+    orphanedWithVol.forEach(function(o) {
+      var bestDist = Infinity;
+      var bestMatch = null;
+      var oDate = new Date(o.oldDate);
+      unclaimedBookings.forEach(function(b) {
+        if (usedBookings[b.date]) return;
+        var bDate = new Date(b.date);
+        var dist = Math.abs(bDate - oDate);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestMatch = b;
+        }
+      });
+      if (bestMatch) {
+        usedBookings[bestMatch.date] = true;
+        recruitSheet.getRange(o.recruitRow, 1).setValue(bestMatch.date);
+        recruitSheet.getRange(o.recruitRow, 2).setValue(bestMatch.formRow);
+        rows[o.idx][0] = bestMatch.date;
+        rows[o.idx][1] = bestMatch.formRow;
+        fixNotificationDates_(o.oldDate, bestMatch.date);
+      }
+    });
+  }
+}
+
+/**
  * 予約を削除（オーナーのみ）キャンセルや誤登録の削除用
  */
 function deleteBooking(rowNumber) {
@@ -6329,6 +6431,9 @@ function getRecruitmentStatusMap() {
         if (fCoStr && !coToCurrentRow[fCoStr]) coToCurrentRow[fCoStr] = f + 2;
       }
     }
+
+    // 孤立した募集エントリ（日付がフォームシートに存在しない）を自動修復
+    try { repairOrphanedRecruitEntries_(recruitSheet, rows, coToCurrentRow, formData, formColMap); } catch (e) {}
 
     for (var i = 0; i < rows.length; i++) {
       var staleRowNum = Number(rows[i][1]);

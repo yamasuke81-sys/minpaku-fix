@@ -1426,29 +1426,34 @@ function fixNotificationDates_(oldDateStr, newDateStr) {
 }
 
 /**
- * 孤立した募集エントリを自動修復する
- * 募集シートの日付がフォームシートのどの予約とも一致しない場合、
- * 回答データ（立候補シート）を持つ孤立エントリを、未紐付けの予約と照合して修復する
+ * 破損した募集エントリを自動修復する
+ * 日付書き換えバグにより、遠い未来の日付に回答データが紐付いてしまったケースを修復。
+ * 検出: 120日以上先の日付なのにアクティブな回答がある → 破損の疑い
+ * 修復: 回答のない近日エントリと日付・行番号を入れ替える
  */
 function repairOrphanedRecruitEntries_(recruitSheet, rows, coToCurrentRow, formData, formColMap) {
-  if (!rows || !rows.length || !formData || !formColMap || formColMap.checkOut < 0) return;
+  if (!rows || !rows.length) return;
 
-  // 1. 孤立エントリと紐付済み日付を特定
-  var claimedDates = {};
-  var orphaned = [];
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var farFutureCutoff = new Date(today);
+  farFutureCutoff.setDate(farFutureCutoff.getDate() + 120);
+  var farFutureStr = toDateKeySafe_(farFutureCutoff);
+  var todayStr = toDateKeySafe_(today);
+
+  // 1. 120日以上先の日付を持つ募集エントリを抽出
+  var farFutureEntries = [];
   for (var i = 0; i < rows.length; i++) {
     var rCo = parseDate(rows[i][0]);
     if (!rCo) continue;
     var rCoStr = toDateKeySafe_(rCo);
-    if (rCoStr && coToCurrentRow[rCoStr]) {
-      claimedDates[rCoStr] = true;
-    } else if (rCoStr) {
-      orphaned.push({ idx: i, recruitRow: i + 2, oldDate: rCoStr });
+    if (rCoStr && rCoStr > farFutureStr) {
+      farFutureEntries.push({ idx: i, recruitRow: i + 2, date: rCoStr, rid: 'r' + (i + 2) });
     }
   }
-  if (orphaned.length === 0) return;
+  if (farFutureEntries.length === 0) return;
 
-  // 2. 回答を持つ孤立エントリのみ対象（回答なし＝削除された予約の募集なので無視）
+  // 2. 立候補シートからアクティブな回答データを取得
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
   var volByRid = {};
@@ -1457,73 +1462,75 @@ function repairOrphanedRecruitEntries_(recruitSheet, rows, coToCurrentRow, formD
     var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
     for (var vi = 0; vi < volData.length; vi++) {
       var vRid = String(volData[vi][0] || '').trim();
-      var vStatus = String(volData[vi][5] || '').trim();
-      if (vRid && vStatus && vStatus !== '×' && vStatus !== '未回答') {
-        if (!volByRid[vRid]) volByRid[vRid] = [];
-        volByRid[vRid].push(vStatus);
+      var vStatus = normalizeVolStatus_(String(volData[vi][5] || '').trim());
+      if (vRid && vStatus && vStatus !== '未回答' && vStatus !== '×') {
+        if (!volByRid[vRid]) volByRid[vRid] = { count: 0, latestResponse: '' };
+        volByRid[vRid].count++;
+        var respTime = String(volData[vi][3] || '').trim();
+        if (respTime > volByRid[vRid].latestResponse) volByRid[vRid].latestResponse = respTime;
       }
     }
   }
-  var orphanedWithVol = orphaned.filter(function(o) {
-    return volByRid['r' + o.recruitRow] && volByRid['r' + o.recruitRow].length > 0;
-  });
-  if (orphanedWithVol.length === 0) return;
 
-  // 3. 募集エントリに紐付いていないフォーム予約を特定
-  var allFormDates = {};
-  for (var f = 0; f < formData.length; f++) {
-    var fCo = parseDate(formData[f][formColMap.checkOut]);
-    if (!fCo) continue;
-    var fCoStr = toDateKeySafe_(fCo);
-    if (fCoStr && !allFormDates[fCoStr]) allFormDates[fCoStr] = f + 2;
-  }
-  var unclaimedBookings = [];
-  Object.keys(allFormDates).forEach(function(dateStr) {
-    if (!claimedDates[dateStr]) {
-      unclaimedBookings.push({ date: dateStr, formRow: allFormDates[dateStr] });
+  // 3. 120日以上先の日付 + アクティブ回答あり → 破損の疑い
+  var corrupted = farFutureEntries.filter(function(e) {
+    return volByRid[e.rid] && volByRid[e.rid].count > 0;
+  });
+  if (corrupted.length === 0) return;
+
+  // 4. 今日〜120日以内で回答なしのエントリ（checkAndCreateRecruitments が作った正規エントリ候補）
+  var nearTermNoVol = [];
+  for (var j = 0; j < rows.length; j++) {
+    var rCo2 = parseDate(rows[j][0]);
+    if (!rCo2) continue;
+    var rCoStr2 = toDateKeySafe_(rCo2);
+    if (!rCoStr2 || rCoStr2 <= todayStr || rCoStr2 > farFutureStr) continue;
+    var rid2 = 'r' + (j + 2);
+    if (!volByRid[rid2] || volByRid[rid2].count === 0) {
+      nearTermNoVol.push({ idx: j, recruitRow: j + 2, date: rCoStr2 });
     }
-  });
-
-  // 4. 孤立エントリが1件＆未紐付予約が1件なら自動修復
-  if (orphanedWithVol.length === 1 && unclaimedBookings.length === 1) {
-    var o = orphanedWithVol[0];
-    var b = unclaimedBookings[0];
-    // 募集シートの日付と行番号を修正
-    recruitSheet.getRange(o.recruitRow, 1).setValue(b.date);
-    recruitSheet.getRange(o.recruitRow, 2).setValue(b.formRow);
-    // rows配列も更新（後続処理で使うため）
-    rows[o.idx][0] = b.date;
-    rows[o.idx][1] = b.formRow;
-    // 通知メッセージも修正
-    fixNotificationDates_(o.oldDate, b.date);
-    return;
   }
+  if (nearTermNoVol.length === 0) return;
 
-  // 5. 複数件の場合は近い日付順でマッチング
-  if (orphanedWithVol.length > 0 && unclaimedBookings.length > 0) {
-    var usedBookings = {};
-    orphanedWithVol.forEach(function(o) {
-      var bestDist = Infinity;
-      var bestMatch = null;
-      var oDate = new Date(o.oldDate);
-      unclaimedBookings.forEach(function(b) {
-        if (usedBookings[b.date]) return;
-        var bDate = new Date(b.date);
-        var dist = Math.abs(bDate - oDate);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestMatch = b;
-        }
-      });
-      if (bestMatch) {
-        usedBookings[bestMatch.date] = true;
-        recruitSheet.getRange(o.recruitRow, 1).setValue(bestMatch.date);
-        recruitSheet.getRange(o.recruitRow, 2).setValue(bestMatch.formRow);
-        rows[o.idx][0] = bestMatch.date;
-        rows[o.idx][1] = bestMatch.formRow;
-        fixNotificationDates_(o.oldDate, bestMatch.date);
+  // 5. 破損エントリと近日エントリの日付・行番号を入れ替え
+  for (var ci = 0; ci < corrupted.length; ci++) {
+    var c = corrupted[ci];
+    var volInfo = volByRid[c.rid];
+    // 回答日時に最も近い日付の近日エントリをマッチ
+    var respDate = volInfo.latestResponse ? volInfo.latestResponse.substring(0, 10) : todayStr;
+    var bestMatch = null;
+    var bestDist = Infinity;
+    for (var ni = 0; ni < nearTermNoVol.length; ni++) {
+      var n = nearTermNoVol[ni];
+      var dist = Math.abs(new Date(n.date) - new Date(respDate));
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestMatch = n;
       }
-    });
+    }
+    if (!bestMatch) continue;
+
+    // 日付と行番号を入れ替え
+    var cOldDate = c.date;
+    var cOldRowNum = Number(rows[c.idx][1]) || 0;
+    var nOldDate = bestMatch.date;
+    var nOldRowNum = Number(rows[bestMatch.idx][1]) || 0;
+
+    recruitSheet.getRange(c.recruitRow, 1).setValue(nOldDate);
+    recruitSheet.getRange(c.recruitRow, 2).setValue(nOldRowNum);
+    rows[c.idx][0] = nOldDate;
+    rows[c.idx][1] = nOldRowNum;
+
+    recruitSheet.getRange(bestMatch.recruitRow, 1).setValue(cOldDate);
+    recruitSheet.getRange(bestMatch.recruitRow, 2).setValue(cOldRowNum);
+    rows[bestMatch.idx][0] = cOldDate;
+    rows[bestMatch.idx][1] = cOldRowNum;
+
+    // 通知メッセージ修正
+    fixNotificationDates_(cOldDate, nOldDate);
+
+    // 使用済みマーク
+    nearTermNoVol.splice(nearTermNoVol.indexOf(bestMatch), 1);
   }
 }
 

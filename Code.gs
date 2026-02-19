@@ -2346,72 +2346,72 @@ function autoSyncFromICal() {
           continue;
         }
         var icalText = resp.getContentText();
-      } catch (fetchErr) {
-        syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' ' + fetchErr.toString().substring(0, 50));
-        continue;
-      }
 
-      var events = parseICal_(icalText, platformName);
-      var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
-      var nextRow = formSheet.getLastRow() + 1;
-      var validPairs = {};
-      for (var vi = 0; vi < events.length; vi++) validPairs[events[vi].checkIn + '|' + events[vi].checkOut] = true;
-      var platformAdded = 0;
+        var events = parseICal_(icalText, platformName);
+        var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
+        var nextRow = formSheet.getLastRow() + 1;
+        var validPairs = {};
+        for (var vi = 0; vi < events.length; vi++) validPairs[events[vi].checkIn + '|' + events[vi].checkOut] = true;
+        var platformAdded = 0;
 
-      for (var ei = 0; ei < events.length; ei++) {
-        var ev = events[ei];
-        var key = ev.checkIn + '|' + ev.checkOut;
-        if (existingPairs[key]) {
-          var updateRowNum = existingRowByKey[key];
-          if (updateRowNum) {
-            var existingIcal = colMap.icalSync >= 0 ? String(formSheet.getRange(updateRowNum, colMap.icalSync + 1).getValue() || '').trim().toLowerCase() : '';
-            if (!existingIcal) {
-              if (colMap.icalSync >= 0) formSheet.getRange(updateRowNum, colMap.icalSync + 1).setValue(ev.platform || '');
-              if (colMap.icalGuestCount >= 0 && ev.guestCount) formSheet.getRange(updateRowNum, colMap.icalGuestCount + 1).setValue(ev.guestCount || '');
+        for (var ei = 0; ei < events.length; ei++) {
+          var ev = events[ei];
+          var key = ev.checkIn + '|' + ev.checkOut;
+          if (existingPairs[key]) {
+            var updateRowNum = existingRowByKey[key];
+            if (updateRowNum) {
+              var existingIcal = colMap.icalSync >= 0 ? String(formSheet.getRange(updateRowNum, colMap.icalSync + 1).getValue() || '').trim().toLowerCase() : '';
+              if (!existingIcal) {
+                if (colMap.icalSync >= 0) formSheet.getRange(updateRowNum, colMap.icalSync + 1).setValue(ev.platform || '');
+                if (colMap.icalGuestCount >= 0 && ev.guestCount) formSheet.getRange(updateRowNum, colMap.icalGuestCount + 1).setValue(ev.guestCount || '');
+              }
+            }
+            continue;
+          }
+          existingPairs[key] = true;
+          existingRowByKey[key] = nextRow;
+          ensureICalGuestCountColumn_();
+          ensureCancelledAtColumn_();
+          colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
+          var rowData = new Array(formSheet.getLastColumn()).fill('');
+          if (colMap.checkIn >= 0) rowData[colMap.checkIn] = ev.checkIn;
+          if (colMap.checkOut >= 0) rowData[colMap.checkOut] = ev.checkOut;
+          if (colMap.icalSync >= 0) rowData[colMap.icalSync] = ev.platform || '';
+          if (colMap.icalGuestCount >= 0) rowData[colMap.icalGuestCount] = ev.guestCount || '';
+          formSheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
+          nextRow++;
+          platformAdded++;
+          added++;
+          try { sendImmediateReminderIfNeeded_(ss, ev.checkIn, ev.checkOut, platformName); } catch (e) {}
+        }
+
+        // iCalから消えた予約のキャンセル処理
+        if (formLastRow >= 2) {
+          var refreshData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+          for (var ci = 0; ci < refreshData.length; ci++) {
+            var icalSrc = colMap.icalSync >= 0 ? String(refreshData[ci][colMap.icalSync] || '').trim().toLowerCase() : '';
+            if (!icalSrc || icalSrc !== platformName.toLowerCase()) continue;
+            var cik = toDateKeySafe_(refreshData[ci][colMap.checkIn]);
+            var cok = toDateKeySafe_(refreshData[ci][colMap.checkOut]);
+            if (!cik || !cok) continue;
+            // チェックアウト日が過去の予約はキャンセル判定対象外（iCalから消えるのは正常）
+            var coDateAuto = cok ? new Date(cok) : null;
+            var todayAuto = new Date(); todayAuto.setHours(0,0,0,0);
+            var isPastAuto = coDateAuto && coDateAuto < todayAuto;
+            if (!validPairs[cik + '|' + cok] && !isPastAuto) {
+              try { markBookingCancelled_(formSheet, ci + 2, colMap); } catch (e) {}
             }
           }
-          continue;
         }
-        existingPairs[key] = true;
-        existingRowByKey[key] = nextRow;
-        ensureICalGuestCountColumn_();
-        ensureCancelledAtColumn_();
-        colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
-        var rowData = new Array(formSheet.getLastColumn()).fill('');
-        if (colMap.checkIn >= 0) rowData[colMap.checkIn] = ev.checkIn;
-        if (colMap.checkOut >= 0) rowData[colMap.checkOut] = ev.checkOut;
-        if (colMap.icalSync >= 0) rowData[colMap.icalSync] = ev.platform || '';
-        if (colMap.icalGuestCount >= 0) rowData[colMap.icalGuestCount] = ev.guestCount || '';
-        formSheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
-        nextRow++;
-        platformAdded++;
-        added++;
-        try { sendImmediateReminderIfNeeded_(ss, ev.checkIn, ev.checkOut, platformName); } catch (e) {}
-      }
 
-      // iCalから消えた予約のキャンセル処理
-      if (formLastRow >= 2) {
-        var refreshData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
-        for (var ci = 0; ci < refreshData.length; ci++) {
-          var icalSrc = colMap.icalSync >= 0 ? String(refreshData[ci][colMap.icalSync] || '').trim().toLowerCase() : '';
-          if (!icalSrc || icalSrc !== platformName.toLowerCase()) continue;
-          var cik = toDateKeySafe_(refreshData[ci][colMap.checkIn]);
-          var cok = toDateKeySafe_(refreshData[ci][colMap.checkOut]);
-          if (!cik || !cok) continue;
-          // チェックアウト日が過去の予約はキャンセル判定対象外（iCalから消えるのは正常）
-          var coDateAuto = cok ? new Date(cok) : null;
-          var todayAuto = new Date(); todayAuto.setHours(0,0,0,0);
-          var isPastAuto = coDateAuto && coDateAuto < todayAuto;
-          if (!validPairs[cik + '|' + cok] && !isPastAuto) {
-            try { markBookingCancelled_(formSheet, ci + 2, colMap); } catch (e) {}
-          }
-        }
+        var statusStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' (自動) 取得' + events.length + '件';
+        if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
+        syncSheet.getRange(si + 2, 4).setValue(statusStr);
+        if (platformAdded > 0) addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました');
+      } catch (platformErr) {
+        try { syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' エラー: ' + String(platformErr).substring(0, 60)); } catch (e) {}
+        Logger.log('autoSyncFromICal ' + platformName + ': ' + platformErr.toString());
       }
-
-      var statusStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' (自動) 取得' + events.length + '件';
-      if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
-      syncSheet.getRange(si + 2, 4).setValue(statusStr);
-      if (platformAdded > 0) addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました');
     }
 
     if (added > 0) {

@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -4124,6 +4124,11 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var res = JSON.parse(jsonStr);
+            if (!res.success && res.error) {
+              document.getElementById('recruitList').innerHTML = '<p class="text-danger small">エラー: ' + escapeHtml(res.error) + '</p>';
+              document.getElementById('loadingOverlay').style.display = 'none';
+              return;
+            }
             var today = new Date().toISOString().slice(0, 10);
             var hidePast = window.hidePastRecruitments !== false;
             var list = (res.success && res.list && res.list.length) ? res.list : [];
@@ -4185,7 +4190,8 @@
             document.getElementById('recruitList').innerHTML = '<p class="text-danger">読み込みに失敗しました。</p>';
           }
           document.getElementById('loadingOverlay').style.display = 'none';
-        }).withFailureHandler(function() {
+        }).withFailureHandler(function(e) {
+          document.getElementById('recruitList').innerHTML = '<p class="text-danger small">通信エラー: ' + escapeHtml(String(e || '')) + '</p>';
           document.getElementById('loadingOverlay').style.display = 'none';
         }).getRecruitmentList();
         if (window.isOwnerUser && !window.staffMode) {

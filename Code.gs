@@ -3192,13 +3192,16 @@ function getRecruitmentList() {
   try {
     ensureSheetsExist();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    // タブを開いた時に未作成の募集を自動作成
+    try { checkAndCreateRecruitments(); } catch (e) {}
     const sheet = ss.getSheetByName(SHEET_RECRUIT);
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     ensureRecruitNotifyMethodColumn_();
     ensureRecruitDetailColumns_();
     const lastRow = Math.max(sheet.getLastRow(), 1);
     const maxCol = Math.max(sheet.getLastColumn(), 15);
-    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, maxCol).getValues() : [];
+    var numRows = lastRow - 1;
+    const rows = numRows >= 1 ? sheet.getRange(2, 1, numRows, maxCol).getValues() : [];
     const list = [];
     for (var i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -3243,7 +3246,7 @@ function getRecruitmentList() {
     var allStaff = getAllActiveStaff_(ss);
     var volLastCol = (volSheet && volSheet.getLastColumn()) ? Math.max(volSheet.getLastColumn(), 7) : 7;
     ensureVolunteerStatusColumns_();
-    var allVolRows = (volSheet && volSheet.getLastRow() >= 2) ? volSheet.getRange(2, 1, volSheet.getLastRow(), volLastCol).getValues() : [];
+    var allVolRows = (volSheet && volSheet.getLastRow() >= 2) ? volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues() : [];
     var responsesByRid = {};
     allVolRows.forEach(function(vr) {
       var rid = String(vr[0] || '').trim();
@@ -4376,7 +4379,13 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         if (isMe) pendingCancelMap[crRid] = true;
       }
     }
+    var seenCheckouts = {};
     for (var i = 0; i < data.length; i++) {
+      // キャンセル済み予約はスキップ
+      if (colMap.cancelledAt >= 0) {
+        var cancelledVal = String(data[i][colMap.cancelledAt] || '').trim();
+        if (cancelledVal) continue;
+      }
       var cleaningStaff = String(data[i][colMap.cleaningStaff] || '').trim();
       if (!cleaningStaff) continue;
       var names = cleaningStaff.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
@@ -4393,6 +4402,9 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
       var d = new Date(checkOut);
       if (d.getFullYear() !== targetYear || (d.getMonth() + 1) !== targetMonth) continue;
       var coKey = toDateKeySafe_(checkOut);
+      // 同じチェックアウト日の重複を排除
+      if (seenCheckouts[coKey]) continue;
+      seenCheckouts[coKey] = true;
       var rri = recruitRowMap[coKey] || 0;
       var cancelPending = rri ? !!pendingCancelMap['r' + rri] : false;
       list.push({

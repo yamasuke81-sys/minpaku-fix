@@ -246,6 +246,54 @@ function main() {
     }
   }
 
+  // === ゲートウェイデプロイメント（永続URL用） ===
+  if (mainId) {
+    var savedGatewayId = (config.gatewayDeploymentId || '').trim();
+    var gatewayId = null;
+
+    if (savedGatewayId) {
+      console.log('  ゲートウェイ: 保存済みIDで更新中...');
+      var gResult = run(clasp + ' deploy --deploymentId "' + savedGatewayId + '" --description "ゲートウェイ ' + today + '"', rootDir);
+      if (gResult.ok) {
+        gatewayId = savedGatewayId;
+      } else {
+        console.log('  ゲートウェイ: 保存済みIDでの更新に失敗。新規作成...');
+      }
+    }
+
+    if (!gatewayId) {
+      console.log('  ゲートウェイ: 新規作成中...');
+      var gResult = run(clasp + ' deploy --description "ゲートウェイ ' + today + '"', rootDir);
+      if (gResult.ok) {
+        var gm = gResult.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+        if (gm) gatewayId = gm[1];
+      }
+    }
+
+    if (gatewayId) {
+      var gatewayUrl = 'https://script.google.com/macros/s/' + gatewayId + '/exec';
+      console.log('  ゲートウェイ: OK');
+      urls.push({ label: 'ゲートウェイ（ブックマーク用）', url: gatewayUrl });
+      urls.push({ label: 'ゲートウェイ＋スタッフ', url: gatewayUrl + '?staff=1' });
+
+      if (gatewayId !== savedGatewayId) {
+        config.gatewayDeploymentId = gatewayId;
+        try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
+      }
+
+      // ゲートウェイURLをGASに保存
+      try {
+        var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
+        execSync('curl -sL "' + baseUrl + '?action=setGatewayUrl&url=' + encodeURIComponent(gatewayUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+        console.log('  ゲートウェイURL保存: OK');
+      } catch (e) {
+        console.log('  ゲートウェイURL保存失敗（次回リトライ）: ' + e.message);
+      }
+    } else {
+      console.log('  ゲートウェイ: 作成に失敗（メインURLは引き続き有効）');
+    }
+  }
+
   // === チェックリストアプリ（deploy-checklist.js に委譲） ===
   console.log('[3/3] チェックリストアプリ: deploy-checklist.js を実行...');
   console.log('');

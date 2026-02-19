@@ -138,6 +138,36 @@ function doGet(e) {
     PropertiesService.getScriptProperties().setProperty('CHECKLIST_APP_URL', String(url).trim());
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
+  // ゲートウェイURL保存アクション
+  if (action === 'setGatewayUrl' && url && typeof url === 'string') {
+    PropertiesService.getScriptProperties().setProperty('GATEWAY_URL', String(url).trim());
+    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+  }
+  // 自動リダイレクト: 古いデプロイメントURLでアクセスされた場合、最新URLに転送
+  try {
+    var currentDeployUrl = ScriptApp.getService().getUrl() || '';
+    var storedBaseUrl = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '';
+    if (currentDeployUrl && storedBaseUrl && currentDeployUrl !== storedBaseUrl && !action) {
+      // クエリパラメータを引き継ぐ
+      var redirectTo = storedBaseUrl;
+      var qParts = [];
+      for (var pKey in params) {
+        if (params.hasOwnProperty(pKey) && pKey !== 'action' && pKey !== 'url') {
+          qParts.push(encodeURIComponent(pKey) + '=' + encodeURIComponent(params[pKey]));
+        }
+      }
+      if (qParts.length > 0) {
+        redirectTo += (redirectTo.indexOf('?') >= 0 ? '&' : '?') + qParts.join('&');
+      }
+      return HtmlService.createHtmlOutput(
+        '<html><head><meta http-equiv="refresh" content="0;url=' + redirectTo + '">' +
+        '<script>window.top.location.href="' + redirectTo + '";</script></head>' +
+        '<body style="font-family:sans-serif;text-align:center;padding:40px;">' +
+        '<p>新しいURLに移動しています...</p>' +
+        '<p><a href="' + redirectTo + '">自動で移動しない場合はこちら</a></p></body></html>'
+      ).setTitle('リダイレクト中').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+  } catch (redirectErr) { /* リダイレクトエラーは無視して通常表示にフォールバック */ }
   const template = HtmlService.createTemplateFromFile('index');
   // デプロイURLを取得（複数フォールバック）
   var baseUrl = '';
@@ -6772,6 +6802,11 @@ function checkAndCreateRecruitments() {
 }
 
 function checkAndSendReminders() {
+  // トリガー重複クリーンアップ
+  ensureSingleTrigger_('checkAndSendReminders');
+  // 排他ロック: 同時実行による重複送信を防止
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
   try {
     const res = JSON.parse(getRecruitmentSettings());
     if (!res.success || !res.settings) return;
@@ -6826,6 +6861,8 @@ function checkAndSendReminders() {
     }
   } catch (e) {
     Logger.log('checkAndSendReminders: ' + e.toString());
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
   }
 }
 
@@ -6967,10 +7004,81 @@ function buildCleaningDetailUrl_(checkoutDateStr) {
 }
 
 /**
+ * トリガー重複クリーンアップ: 指定関数のトリガーが複数ある場合、1つだけ残して削除
+ */
+function ensureSingleTrigger_(funcName) {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    var found = [];
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === funcName) found.push(triggers[i]);
+    }
+    // 2つ以上ある場合、最初の1つを残して残りを削除
+    for (var j = 1; j < found.length; j++) {
+      try { ScriptApp.deleteTrigger(found[j]); } catch (e) {}
+    }
+  } catch (e) {}
+}
+
+/**
+ * リマインド関連トリガーを一括セットアップ（重複を防止して1つずつ作成）
+ * 設定画面から呼び出せる。手動でGASエディタに入る必要がなくなる。
+ */
+function setupReminderTriggers() {
+  try {
+    // 既存の該当トリガーを全削除
+    var funcNames = ['checkAndSendReminders', 'checkAndSendReminderEmails'];
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      if (funcNames.indexOf(triggers[i].getHandlerFunction()) >= 0) {
+        ScriptApp.deleteTrigger(triggers[i]);
+      }
+    }
+    // 1時間ごとのトリガーを1つずつ作成
+    ScriptApp.newTrigger('checkAndSendReminders')
+      .timeBased()
+      .everyHours(1)
+      .create();
+    ScriptApp.newTrigger('checkAndSendReminderEmails')
+      .timeBased()
+      .everyHours(1)
+      .create();
+    return JSON.stringify({ success: true, message: 'リマインドトリガーを設定しました（1時間ごと×2関数）' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 現在のトリガー一覧を取得（デバッグ・確認用）
+ */
+function listTriggers() {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    var list = [];
+    for (var i = 0; i < triggers.length; i++) {
+      list.push({
+        func: triggers[i].getHandlerFunction(),
+        type: triggers[i].getEventType().toString(),
+        id: triggers[i].getUniqueId()
+      });
+    }
+    return JSON.stringify({ success: true, triggers: list });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * オーナー向けリマインドメールのチェック＆送信
  * 時間ベースのトリガーから呼ばれる（1時間ごと推奨）
  */
 function checkAndSendReminderEmails() {
+  // トリガー重複クリーンアップ（複数トリガーが設定されていたら1つに整理）
+  ensureSingleTrigger_('checkAndSendReminderEmails');
+  // 排他ロック: 同時実行による重複送信を防止
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return; // 5秒待って取れなければスキップ
   try {
     ensureSheetsExist();
     ensureRecruitOwnerReminderColumn_();
@@ -7103,6 +7211,8 @@ function checkAndSendReminderEmails() {
     }
   } catch (e) {
     Logger.log('checkAndSendReminderEmails: ' + e.toString());
+  } finally {
+    try { lock.releaseLock(); } catch (e) {}
   }
 }
 
@@ -7121,6 +7231,12 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
       if (String(row[0] || '').trim() === '即時通知有効') immediateEnabled = String(row[1] || 'yes').trim();
     });
     if (immediateEnabled !== 'yes') return;
+
+    // 重複送信防止: 同じチェックイン/チェックアウトの組み合わせで本日送信済みならスキップ
+    var todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+    var immPropKey = 'immRemind_' + checkInStr + '_' + checkOutStr + '_' + todayStr;
+    var immProps = PropertiesService.getScriptProperties();
+    if (immProps.getProperty(immPropKey)) return;
 
     // チェックイン日が1週間以内かチェック
     var checkinDate = parseDate(checkInStr);
@@ -7161,6 +7277,7 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
         + '清掃詳細: ' + detailLink + '\n\n'
         + '早急に清掃スタッフの手配をお願いします。';
     GmailApp.sendEmail(ownerEmail, subject, body);
+    immProps.setProperty(immPropKey, '1');
     addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
   } catch (e) {
     Logger.log('sendImmediateReminderIfNeeded_: ' + e.toString());
@@ -7592,6 +7709,12 @@ function notifyCleaningComplete(checkoutDate) {
     var dateKey = String(checkoutDate || '').trim();
     if (!dateKey) return JSON.stringify({ success: false, error: 'チェックアウト日が指定されていません。' });
 
+    // 重複送信防止: 同じチェックアウト日の完了通知を本日送信済みならスキップ
+    var ccTodayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+    var ccPropKey = 'cleanComplete_' + dateKey + '_' + ccTodayStr;
+    var ccProps = PropertiesService.getScriptProperties();
+    if (ccProps.getProperty(ccPropKey)) return JSON.stringify({ success: true, message: '既に清掃完了通知を送信済みです。' });
+
     var clRes = JSON.parse(getChecklistForDate(dateKey));
     if (!clRes.success) return JSON.stringify({ success: false, error: clRes.error });
     if (!clRes.isComplete) return JSON.stringify({ success: false, error: 'まだ未完了の項目があります。' });
@@ -7618,6 +7741,7 @@ function notifyCleaningComplete(checkoutDate) {
         GmailApp.sendEmail(ownerEmail, subject, body);
       }
     }
+    ccProps.setProperty(ccPropKey, '1');
     return JSON.stringify({ success: true, message: '清掃完了通知を送信しました。' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

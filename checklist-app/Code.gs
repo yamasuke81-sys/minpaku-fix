@@ -1142,6 +1142,12 @@ function uploadMemoPhoto(checkoutDate, base64Data, staffName) {
  */
 function notifyCleaningComplete(checkoutDate, staffName) {
   try {
+    // 重複送信防止: 同じチェックアウト日の完了通知を本日送信済みならスキップ
+    var ccTodayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+    var ccPropKey = 'clCleanComplete_' + String(checkoutDate || '').trim() + '_' + ccTodayStr;
+    var ccProps = PropertiesService.getScriptProperties();
+    if (ccProps.getProperty(ccPropKey)) return JSON.stringify({ success: true, message: '既に清掃完了通知を送信済みです。' });
+
     var bookingSs = getBookingSpreadsheet_();
     var ownerSheet = bookingSs.getSheetByName(CL_OWNER_SHEET);
     if (!ownerSheet || ownerSheet.getLastRow() < 2) {
@@ -1254,6 +1260,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       return JSON.stringify({ success: true, message: 'メール通知はOFFに設定されています。' });
     }
     GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
+    ccProps.setProperty(ccPropKey, '1');
 
     // メインアプリの通知にも追加
     try {

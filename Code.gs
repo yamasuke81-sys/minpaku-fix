@@ -2902,11 +2902,17 @@ function saveStaff(rowIndex, data) {
     const sheet = ss.getSheetByName(SHEET_STAFF);
     const lastRow = sheet.getLastRow();
     if (rowIndex && rowIndex >= 2 && rowIndex <= lastRow) {
+      // 名前変更を検知して関連シートに伝播
+      var oldName = String(sheet.getRange(rowIndex, 1).getValue() || '').trim();
+      var newName = (data.name || '').trim();
       sheet.getRange(rowIndex, 1, 1, 9).setValues([[
         data.name || '', data.address || '', data.email || '',
         data.bankName || '', data.bankBranch || '', data.accountType || '',
         data.accountNumber || '', data.accountHolder || '', data.active !== 'N' ? 'Y' : 'N'
       ]]);
+      if (oldName && newName && oldName !== newName) {
+        propagateStaffNameChange_(ss, oldName, newName);
+      }
       return JSON.stringify({ success: true, rowIndex: rowIndex });
     }
     const nextRow = lastRow + 1;
@@ -2918,6 +2924,86 @@ function saveStaff(rowIndex, data) {
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * スタッフ名変更時に関連シートの名前を一括更新
+ */
+function propagateStaffNameChange_(ss, oldName, newName) {
+  try {
+    // 単一カラムの名前を置換するヘルパー
+    function replaceInColumn(sheetName, col) {
+      var s = ss.getSheetByName(sheetName);
+      if (!s || s.getLastRow() < 2) return;
+      var range = s.getRange(2, col, s.getLastRow() - 1, 1);
+      var vals = range.getValues();
+      var changed = false;
+      for (var i = 0; i < vals.length; i++) {
+        if (String(vals[i][0]).trim() === oldName) {
+          vals[i][0] = newName;
+          changed = true;
+        }
+      }
+      if (changed) range.setValues(vals);
+    }
+
+    // カンマ区切りの名前リスト内を置換するヘルパー
+    function replaceInListColumn(sheetName, col) {
+      var s = ss.getSheetByName(sheetName);
+      if (!s || s.getLastRow() < 2) return;
+      var range = s.getRange(2, col, s.getLastRow() - 1, 1);
+      var vals = range.getValues();
+      var changed = false;
+      for (var i = 0; i < vals.length; i++) {
+        var val = String(vals[i][0] || '').trim();
+        if (!val) continue;
+        var names = val.split(/[,、]/).map(function(n) { return n.trim(); });
+        var updated = names.map(function(n) { return n === oldName ? newName : n; });
+        var joined = updated.join('、');
+        if (joined !== val) { vals[i][0] = joined; changed = true; }
+      }
+      if (changed) range.setValues(vals);
+    }
+
+    // 募集_立候補: B列(スタッフ名)
+    replaceInColumn(SHEET_RECRUIT_VOLUNTEERS, 2);
+    // 募集: E列(選定スタッフ) - カンマ区切り
+    replaceInListColumn(SHEET_RECRUIT, 5);
+    // キャンセル申請: B列(スタッフ名)
+    replaceInColumn(SHEET_CANCEL_REQUESTS, 2);
+    // 回答変更要請: B列(スタッフ名)
+    var rcSheet = ss.getSheetByName('回答変更要請');
+    if (rcSheet && rcSheet.getLastRow() >= 2) {
+      var rcRange = rcSheet.getRange(2, 2, rcSheet.getLastRow() - 1, 1);
+      var rcVals = rcRange.getValues();
+      var rcChanged = false;
+      for (var ri = 0; ri < rcVals.length; ri++) {
+        if (String(rcVals[ri][0]).trim() === oldName) { rcVals[ri][0] = newName; rcChanged = true; }
+      }
+      if (rcChanged) rcRange.setValues(rcVals);
+    }
+    // フォーム回答: 清掃スタッフ列 - カンマ区切り
+    var formSheet = ss.getSheetByName(SHEET_NAME);
+    if (formSheet && formSheet.getLastRow() >= 2) {
+      var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+      var colMap = buildColumnMap(headers);
+      if (colMap.cleaningStaff >= 0) {
+        replaceInListColumn(SHEET_NAME, colMap.cleaningStaff + 1);
+      }
+    }
+    // スタッフ報酬: A列
+    replaceInColumn(SHEET_COMPENSATION, 1);
+    // 請求書関連: A列
+    replaceInColumn(SHEET_INVOICE_HISTORY, 1);
+    replaceInColumn(SHEET_INVOICE_EXTRA, 1);
+    replaceInColumn(SHEET_INVOICE_EXCLUDED, 1);
+    // クリーニング連絡: B列(出した人), D列(受け取った人), F列(施設に戻した人)
+    replaceInColumn(SHEET_LAUNDRY, 2);
+    replaceInColumn(SHEET_LAUNDRY, 4);
+    replaceInColumn(SHEET_LAUNDRY, 6);
+  } catch (e) {
+    Logger.log('propagateStaffNameChange_: ' + e.toString());
   }
 }
 

@@ -4960,27 +4960,42 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
           };
         }
       }
+      var _dbg = { staff: staff, targetYear: targetYear, targetMonth: targetMonth, volCount: volData.length, recruitCount: rAllData.length, myEntries: [], recruitSample: [] };
+      // 募集エントリのサンプル（最新5件）
+      var _rKeys = Object.keys(recruitInfoMap);
+      for (var _rki = Math.max(0, _rKeys.length - 5); _rki < _rKeys.length; _rki++) {
+        var _rk = _rKeys[_rki];
+        _dbg.recruitSample.push({ rid: _rk, date: recruitInfoMap[_rk].checkoutDate, status: recruitInfoMap[_rk].status, bookingRow: recruitInfoMap[_rk].bookingRowNumber });
+      }
       for (var vi = 0; vi < volData.length; vi++) {
         var vRid = String(volData[vi][0] || '').trim();
         var vName = String(volData[vi][1] || '').trim();
         var vEmail = String(volData[vi][2] || '').trim().toLowerCase();
         var vStatus = String(volData[vi][5] || '').trim();
         // ◎ or △ のみ
-        if (vStatus !== '◎' && vStatus !== '△') continue;
+        if (vStatus !== '◎' && vStatus !== '△') {
+          // デバッグ: この人のエントリでスキップされた場合も記録
+          var _isMe = (vName && vName.toLowerCase() === staff) || (vEmail && vEmail === staff);
+          if (_isMe) _dbg.myEntries.push({ rid: vRid, name: vName, status: vStatus, skipReason: 'status_not_match', rawCol5: String(volData[vi][5]) });
+          continue;
+        }
         // 自分の回答かチェック
         var isMyVol = (vName && vName.toLowerCase() === staff) || (vEmail && vEmail === staff);
         if (!isMyVol) continue;
+        // デバッグ: ステータスマッチした自分のエントリ
+        var _dbgEntry = { rid: vRid, name: vName, status: vStatus, skipReason: 'none' };
         var rInfo = recruitInfoMap[vRid];
-        if (!rInfo) continue;
+        if (!rInfo) { _dbgEntry.skipReason = 'no_recruitInfo_for_' + vRid; _dbg.myEntries.push(_dbgEntry); continue; }
         // キャンセルされた募集は除外
-        if (rInfo.status === 'キャンセル') continue;
+        if (rInfo.status === 'キャンセル') { _dbgEntry.skipReason = 'cancelled'; _dbg.myEntries.push(_dbgEntry); continue; }
         // 対象月チェック
         var coDate = parseDate(rInfo.checkoutDate);
-        if (!coDate) continue;
+        if (!coDate) { _dbgEntry.skipReason = 'coDate_null_from_' + rInfo.checkoutDate; _dbg.myEntries.push(_dbgEntry); continue; }
         var cd = new Date(coDate);
-        if (cd.getFullYear() !== targetYear || (cd.getMonth() + 1) !== targetMonth) continue;
+        if (cd.getFullYear() !== targetYear || (cd.getMonth() + 1) !== targetMonth) { _dbgEntry.skipReason = 'month_mismatch_' + cd.getFullYear() + '-' + (cd.getMonth()+1) + '_vs_' + targetYear + '-' + targetMonth; _dbgEntry.recruitDate = rInfo.checkoutDate; _dbg.myEntries.push(_dbgEntry); continue; }
         // 既に確定済みリストにあるものは重複しない
-        if (confirmedCheckouts[rInfo.checkoutDate]) continue;
+        if (confirmedCheckouts[rInfo.checkoutDate]) { _dbgEntry.skipReason = 'already_confirmed'; _dbg.myEntries.push(_dbgEntry); continue; }
+        _dbgEntry.skipReason = 'ADDED'; _dbg.myEntries.push(_dbgEntry);
         // フォームシートから行番号を検索（checkoutDateで照合）
         var formRowNum = rInfo.bookingRowNumber;
         if (!formRowNum) {
@@ -5005,7 +5020,7 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
     // 確定済みには confirmed: true をセット
     list.forEach(function(item) { if (item.confirmed === undefined) item.confirmed = true; });
     list.sort(function(a, b) { return (a.checkoutDate || '').localeCompare(b.checkoutDate || ''); });
-    return JSON.stringify({ success: true, list: list });
+    return JSON.stringify({ success: true, list: list, _debug: typeof _dbg !== 'undefined' ? _dbg : null });
   } catch (e) {
     return JSON.stringify({ success: false, list: [], error: e.toString() });
   }

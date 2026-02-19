@@ -355,15 +355,14 @@ function main() {
   });
   console.log('');
 
-  // ブラウザで2つ開く: オーナー(通常)、スタッフ(シークレット)
+  // ブラウザで2つだけ開く: オーナー(通常)、スタッフ(シークレット)
   urls.forEach(function(u) {
-    if (u.label === 'チェックリスト') return; // チェックリストは開かない
-    if (u.label === 'スタッフ用') {
-      console.log('  シークレットウィンドウで開く: ' + u.label);
-      openBrowserIncognito(u.url);
-    } else {
+    if (u.label === 'オーナー用') {
       console.log('  通常ウィンドウで開く: ' + u.label);
       openBrowser(u.url);
+    } else if (u.label === 'スタッフ用') {
+      console.log('  シークレットウィンドウで開く: ' + u.label);
+      openBrowserIncognito(u.url);
     }
   });
 }

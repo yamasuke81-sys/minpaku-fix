@@ -4960,12 +4960,39 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
           };
         }
       }
-      var _dbg = { staff: staff, targetYear: targetYear, targetMonth: targetMonth, volCount: volData.length, recruitCount: rAllData.length, myEntries: [], recruitSample: [] };
-      // 募集エントリのサンプル（最新5件）
+      var _dbg = { staff: staff, targetYear: targetYear, targetMonth: targetMonth, volCount: volData.length, recruitCount: rAllData.length, myEntries: [], aprilRecruits: [], myRecruitDetail: {} };
+      // 4月の募集エントリを全て表示
       var _rKeys = Object.keys(recruitInfoMap);
-      for (var _rki = Math.max(0, _rKeys.length - 5); _rki < _rKeys.length; _rki++) {
+      for (var _rki = 0; _rki < _rKeys.length; _rki++) {
         var _rk = _rKeys[_rki];
-        _dbg.recruitSample.push({ rid: _rk, date: recruitInfoMap[_rk].checkoutDate, status: recruitInfoMap[_rk].status, bookingRow: recruitInfoMap[_rk].bookingRowNumber });
+        var _ri = recruitInfoMap[_rk];
+        var _rd = parseDate(_ri.checkoutDate);
+        if (_rd && new Date(_rd).getMonth() + 1 === targetMonth) {
+          _dbg.aprilRecruits.push({ rid: _rk, date: _ri.checkoutDate, status: _ri.status, bookingRow: _ri.bookingRowNumber });
+        }
+      }
+      // ユーザーの回答に関連する募集エントリの詳細（元の募集シート日付とrBookingRowの情報）
+      var _myRids = {};
+      for (var _vdi = 0; _vdi < volData.length; _vdi++) {
+        var _vdName = String(volData[_vdi][1] || '').trim();
+        var _vdEmail = String(volData[_vdi][2] || '').trim().toLowerCase();
+        if ((_vdName && _vdName.toLowerCase() === staff) || (_vdEmail && _vdEmail === staff)) {
+          _myRids[String(volData[_vdi][0] || '').trim()] = true;
+        }
+      }
+      for (var _mri = 0; _mri < rAllData.length; _mri++) {
+        var _mrid = 'r' + (_mri + 2);
+        if (!_myRids[_mrid]) continue;
+        var _origDate = rAllData[_mri][0] ? String(rAllData[_mri][0]) : 'empty';
+        var _bRow = rAllData[_mri][1] ? Number(rAllData[_mri][1]) : 0;
+        var _formDate = 'N/A';
+        if (_bRow >= 2 && _bRow <= data.length + 1) {
+          var _fCo = parseDate(data[_bRow - 2][colMap.checkOut]);
+          _formDate = _fCo ? toDateKeySafe_(_fCo) : 'parse_failed';
+        } else {
+          _formDate = 'bRow_invalid_' + _bRow;
+        }
+        _dbg.myRecruitDetail[_mrid] = { origSheetDate: _origDate, bookingRow: _bRow, formDateAtRow: _formDate, finalDate: recruitInfoMap[_mrid] ? recruitInfoMap[_mrid].checkoutDate : 'not_in_map' };
       }
       for (var vi = 0; vi < volData.length; vi++) {
         var vRid = String(volData[vi][0] || '').trim();

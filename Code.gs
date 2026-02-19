@@ -143,46 +143,27 @@ function doGet(e) {
     PropertiesService.getScriptProperties().setProperty('GATEWAY_URL', String(url).trim());
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
-  // 自動リダイレクト: 古いデプロイメントURLでアクセスされた場合、最新URLに転送
-  try {
-    var currentDeployUrl = ScriptApp.getService().getUrl() || '';
-    var storedBaseUrl = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '';
-    if (currentDeployUrl && storedBaseUrl && currentDeployUrl !== storedBaseUrl && !action) {
-      // クエリパラメータを引き継ぐ
-      var redirectTo = storedBaseUrl;
-      var qParts = [];
-      for (var pKey in params) {
-        if (params.hasOwnProperty(pKey) && pKey !== 'action' && pKey !== 'url') {
-          qParts.push(encodeURIComponent(pKey) + '=' + encodeURIComponent(params[pKey]));
-        }
-      }
-      if (qParts.length > 0) {
-        redirectTo += (redirectTo.indexOf('?') >= 0 ? '&' : '?') + qParts.join('&');
-      }
-      return HtmlService.createHtmlOutput(
-        '<html><head><meta http-equiv="refresh" content="0;url=' + redirectTo + '">' +
-        '<script>window.top.location.href="' + redirectTo + '";</script></head>' +
-        '<body style="font-family:sans-serif;text-align:center;padding:40px;">' +
-        '<p>新しいURLに移動しています...</p>' +
-        '<p><a href="' + redirectTo + '">自動で移動しない場合はこちら</a></p></body></html>'
-      ).setTitle('リダイレクト中').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-  } catch (redirectErr) { /* リダイレクトエラーは無視して通常表示にフォールバック */ }
+  // ゲートウェイ対応: どのデプロイメントからアクセスされても正常に動作するよう
+  // APP_BASE_URL（最新のメインURL）を優先使用し、古いURLで上書きしない
   const template = HtmlService.createTemplateFromFile('index');
-  // デプロイURLを取得（複数フォールバック）
-  var baseUrl = '';
-  try { baseUrl = ScriptApp.getService().getUrl() || ''; } catch(e) {}
-  if (!baseUrl) {
-    try { baseUrl = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {}
-  }
+  var currentDeployUrl = '';
+  try { currentDeployUrl = ScriptApp.getService().getUrl() || ''; } catch(e) {}
+  var storedBaseUrl = '';
+  try { storedBaseUrl = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {}
+  // baseURL決定: 保存済みURLがあればそれを優先（ゲートウェイからでも正しいURLを使う）
+  var baseUrl = storedBaseUrl || currentDeployUrl;
   if (!baseUrl) {
     try {
       var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || '';
       if (depId) baseUrl = 'https://script.google.com/macros/s/' + depId + '/exec';
     } catch(e) {}
   }
+  // APP_BASE_URLの更新: メインデプロイメントからのアクセス時のみ（ゲートウェイから上書きしない）
+  if (currentDeployUrl && (!storedBaseUrl || currentDeployUrl === storedBaseUrl)) {
+    try { PropertiesService.getScriptProperties().setProperty('APP_BASE_URL', currentDeployUrl); } catch(e) {}
+    baseUrl = currentDeployUrl;
+  }
   if (baseUrl) {
-    try { PropertiesService.getScriptProperties().setProperty('APP_BASE_URL', baseUrl); } catch(e) {}
     // スタッフURLも未保存なら自動保存
     try {
       if (!PropertiesService.getDocumentProperties().getProperty('staffDeployUrl')) {

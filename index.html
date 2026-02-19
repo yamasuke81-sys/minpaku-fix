@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219r</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219s</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2191,7 +2191,8 @@
             var bookStaff = (b.cleaningStaff || '').trim();
             var isConfirmed = (recStatus === 'スタッフ確定済み') || (recStatus === '選定済');
             var isRecruiting = recStatus && !isConfirmed;
-            var isDecided = isConfirmed || (!!bookStaff && !isRecruiting);
+            // 清掃担当が設定されていれば、募集ステータスに関係なく「確定済み」扱い
+            var isDecided = isConfirmed || !!bookStaff || !!recStaff;
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             if (isCancelled) cleaningClasses.push('fc-event-cancelled');
             var curStaff = (window.currentUserName || '').trim().toLowerCase();
@@ -3699,7 +3700,8 @@
                     var rec = window._recruitFullMap[b.rowNumber] || {};
                     var isCnf = (rec.status === '選定済') || (rec.status === 'スタッフ確定済み');
                     var hasDirectStaff = !!(b.cleaningStaff && String(b.cleaningStaff).trim());
-                    if ((isCnf || hasDirectStaff) && b.checkOutParsed) {
+                    var hasRecStaff = !!((rec.staff || '').trim());
+                    if ((isCnf || hasDirectStaff || hasRecStaff) && b.checkOutParsed) {
                       var d2 = new Date(b.checkOutParsed);
                       staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
                     }
@@ -4196,8 +4198,12 @@
             document.getElementById('panelNotifications').style.display = tab === 'notifications' ? 'block' : 'none';
             document.getElementById('panelSettings').style.display = tab === 'settings' ? 'block' : 'none';
             document.getElementById('panelStaffTest').style.display = tab === 'staffTest' ? 'block' : 'none';
-            if (tab === 'calendar') {
-              setTimeout(function() { if (calendar) calendar.updateSize(); }, 50);
+            if (tab === 'calendar' && calendar) {
+              // FullCalendar は display:none の間にサイズ計算できないため、
+              // 表示直後と少し遅れての2段階でサイズ再計算を実行
+              calendar.updateSize();
+              setTimeout(function() { if (calendar) calendar.updateSize(); }, 100);
+              setTimeout(function() { if (calendar) calendar.updateSize(); }, 300);
             }
             if (tab === 'recruit') loadRecruitList();
             if (tab === 'staffSchedule') loadStaffSchedule();

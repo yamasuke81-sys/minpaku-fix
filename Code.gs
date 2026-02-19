@@ -2030,8 +2030,180 @@ function syncFromICal() {
 }
 
 /**
- * 別スプレッドシートから予約データを読み込み（オーナーのみ）
- * フォーム回答のバックアップや削除したスプシの復元用
+ * 自動iCal同期（トリガーから呼ばれる版 - requireOwner不要）
+ */
+function autoSyncFromICal() {
+  try {
+    ensureSheetsExist();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const syncSheet = ss.getSheetByName(SHEET_SYNC_SETTINGS);
+    const formSheet = ss.getSheetByName(SHEET_NAME);
+    if (!syncSheet || !formSheet) return;
+
+    var lastRow = syncSheet.getLastRow();
+    if (lastRow < 2) return;
+
+    ensureICalSyncColumn_();
+    if (syncSheet.getLastColumn() < 4) {
+      syncSheet.insertColumnAfter(3);
+      syncSheet.getRange(1, 4).setValue('最終同期');
+    }
+    var syncRows = syncSheet.getRange(2, 1, lastRow, 4).getValues();
+    var existingPairs = {};
+    var existingRowByKey = {};
+    var formLastRow = formSheet.getLastRow();
+    var formLastCol = formSheet.getLastColumn();
+    if (formLastRow >= 2 && formLastCol >= 1) {
+      var headers = formSheet.getRange(1, 1, 1, formLastCol).getValues()[0];
+      var colMap = buildColumnMap(headers);
+      if (colMap.checkIn >= 0 && colMap.checkOut >= 0) {
+        var data = formSheet.getRange(2, 1, formLastRow, formLastCol).getValues();
+        for (var i = 0; i < data.length; i++) {
+          var ciKey = toDateKeySafe_(data[i][colMap.checkIn]);
+          var coKey = toDateKeySafe_(data[i][colMap.checkOut]);
+          if (ciKey && coKey) {
+            var k = ciKey + '|' + coKey;
+            existingPairs[k] = true;
+            existingRowByKey[k] = i + 2;
+          }
+        }
+      }
+    }
+
+    var added = 0;
+    for (var si = 0; si < syncRows.length; si++) {
+      var platformName = String(syncRows[si][0] || '').trim();
+      var url = String(syncRows[si][1] || '').trim();
+      var active = String(syncRows[si][2] || 'Y').trim();
+      if (!platformName || !url || active === 'N') continue;
+
+      try {
+        var resp = UrlFetchApp.fetch(url, {
+          muteHttpExceptions: true, followRedirects: true,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CalendarSync/1.0)' }
+        });
+        if (resp.getResponseCode() !== 200) {
+          syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' HTTP ' + resp.getResponseCode());
+          continue;
+        }
+        var icalText = resp.getContentText();
+      } catch (fetchErr) {
+        syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' ' + fetchErr.toString().substring(0, 50));
+        continue;
+      }
+
+      var events = parseICal_(icalText, platformName);
+      var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
+      var nextRow = formSheet.getLastRow() + 1;
+      var validPairs = {};
+      for (var vi = 0; vi < events.length; vi++) validPairs[events[vi].checkIn + '|' + events[vi].checkOut] = true;
+      var platformAdded = 0;
+
+      for (var ei = 0; ei < events.length; ei++) {
+        var ev = events[ei];
+        var key = ev.checkIn + '|' + ev.checkOut;
+        if (existingPairs[key]) {
+          var updateRowNum = existingRowByKey[key];
+          if (updateRowNum) {
+            var existingIcal = colMap.icalSync >= 0 ? String(formSheet.getRange(updateRowNum, colMap.icalSync + 1).getValue() || '').trim().toLowerCase() : '';
+            if (!existingIcal) {
+              if (colMap.icalSync >= 0) formSheet.getRange(updateRowNum, colMap.icalSync + 1).setValue(ev.platform || '');
+              if (colMap.icalGuestCount >= 0 && ev.guestCount) formSheet.getRange(updateRowNum, colMap.icalGuestCount + 1).setValue(ev.guestCount || '');
+            }
+          }
+          continue;
+        }
+        existingPairs[key] = true;
+        existingRowByKey[key] = nextRow;
+        ensureICalGuestCountColumn_();
+        ensureCancelledAtColumn_();
+        colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
+        var rowData = new Array(formSheet.getLastColumn()).fill('');
+        if (colMap.checkIn >= 0) rowData[colMap.checkIn] = ev.checkIn;
+        if (colMap.checkOut >= 0) rowData[colMap.checkOut] = ev.checkOut;
+        if (colMap.icalSync >= 0) rowData[colMap.icalSync] = ev.platform || '';
+        if (colMap.icalGuestCount >= 0) rowData[colMap.icalGuestCount] = ev.guestCount || '';
+        formSheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
+        nextRow++;
+        platformAdded++;
+        added++;
+        try { sendImmediateReminderIfNeeded_(ss, ev.checkIn, ev.checkOut, platformName); } catch (e) {}
+      }
+
+      // iCalから消えた予約のキャンセル処理
+      if (formLastRow >= 2) {
+        var refreshData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+        for (var ci = 0; ci < refreshData.length; ci++) {
+          var icalSrc = colMap.icalSync >= 0 ? String(refreshData[ci][colMap.icalSync] || '').trim().toLowerCase() : '';
+          if (!icalSrc || icalSrc !== platformName.toLowerCase()) continue;
+          var cik = toDateKeySafe_(refreshData[ci][colMap.checkIn]);
+          var cok = toDateKeySafe_(refreshData[ci][colMap.checkOut]);
+          if (!cik || !cok) continue;
+          if (!validPairs[cik + '|' + cok]) {
+            try { markBookingCancelled_(formSheet, ci + 2, colMap); } catch (e) {}
+          }
+        }
+      }
+
+      var statusStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' (自動) 取得' + events.length + '件';
+      if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
+      syncSheet.getRange(si + 2, 4).setValue(statusStr);
+      if (platformAdded > 0) addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました');
+    }
+
+    if (added > 0) {
+      try { checkAndCreateRecruitments(); } catch (re) {}
+    }
+  } catch (e) {
+    Logger.log('autoSyncFromICal: ' + e.toString());
+  }
+}
+
+/**
+ * 自動同期設定の取得
+ */
+function getAutoSyncSettings() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var enabled = props.getProperty('AUTO_SYNC_ENABLED') === 'true';
+    var intervalHours = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_HOURS'), 10) || 1;
+    return JSON.stringify({ success: true, enabled: enabled, intervalHours: intervalHours });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 自動同期設定の保存＋トリガー設定
+ */
+function saveAutoSyncSettings(enabled, intervalHours) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('AUTO_SYNC_ENABLED', enabled ? 'true' : 'false');
+    props.setProperty('AUTO_SYNC_INTERVAL_HOURS', String(intervalHours || 1));
+    setupAutoSyncTrigger_(enabled, intervalHours);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function setupAutoSyncTrigger_(enabled, intervalHours) {
+  // 既存のautoSyncトリガーを全て削除
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === 'autoSyncFromICal') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  if (enabled) {
+    ScriptApp.newTrigger('autoSyncFromICal')
+      .timeBased()
+      .everyHours(intervalHours || 1)
+      .create();
+  }
+}
  */
 function importFromSpreadsheet(spreadsheetUrl, skipDuplicates) {
   try {

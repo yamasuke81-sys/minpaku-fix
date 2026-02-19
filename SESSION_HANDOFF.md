@@ -1,8 +1,8 @@
 # セッション引き継ぎファイル
 
-> **最終更新**: 2026-02-17
+> **最終更新**: 2026-02-19
 > **作業ブランチ**: `claude/review-handoff-docs-5WgKR`（EbLOg統合済み・最新デプロイ対象）
-> **最新コミット**: `0ce1231 merge: EbLOgブランチの最新コード変更を統合`
+> **最新コミット**: `0710efd fix: メール重複送信防止 + ゲートウェイデプロイメントでURL永続化`
 
 ---
 
@@ -220,6 +220,26 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 
 ---
 
+## 2026-02-19 セッションで完了した作業
+
+### 19. メール重複送信防止
+- `checkAndSendReminderEmails()`, `checkAndSendReminders()` にLockService排他制御を追加
+- `ensureSingleTrigger_()` でトリガー重複を自動クリーンアップ
+- `setupReminderTriggers()` でUIからトリガー一括セットアップ可能に（GASエディタ不要）
+- `sendImmediateReminderIfNeeded_()`, `notifyCleaningComplete()` にPropertiesService重複防止を追加
+- index.html に「トリガーをセットアップ」ボタンを追加
+- **コミット**: 0710efd
+
+### 20. ゲートウェイデプロイメント（URL永続化）
+- `doGet()` に自動リダイレクト機能を追加（古いデプロイURL → 最新URLへ転送）
+- `deploy-all.js` にゲートウェイデプロイメント作成・更新機能を追加
+- `deploy-config.json` に `gatewayDeploymentId` を保存
+- GAS ScriptProperties に `GATEWAY_URL` を保存
+- ゲートウェイURLをブックマークすれば、メインURLが変わっても自動リダイレクト
+- **コミット**: 0710efd
+
+---
+
 ## 未完了・要確認事項
 
 ### 要テスト（デプロイ後）
@@ -237,9 +257,19 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
    - チェック解除→復活しないか
    - カテゴリ表示が正しいか
 
+4. **メール重複送信防止の動作確認**
+   - 設定画面の「トリガーをセットアップ」ボタンが正常に動作するか
+   - リマインドメールが1通だけ届くか（3通の重複が解消されたか）
+   - GASエディタでトリガー一覧を確認し、重複がないか
+
+5. **ゲートウェイデプロイメントの動作確認**
+   - `deploy-all.js` 実行後に「ゲートウェイ（ブックマーク用）」URLが表示されるか
+   - ゲートウェイURLにアクセスして正常にメイン画面が表示されるか
+   - ゲートウェイURL+?staff=1 でスタッフ画面が表示されるか
+
 ### 未解決の既存問題
 
-4. **2/23 日付の黄色背景問題** - スプレッドシートのデータ問題の可能性
+6. **2/23 日付の黄色背景問題** - スプレッドシートのデータ問題の可能性
 
 ### 将来の課題
 - 条件分岐対応（BBQ利用あり/なし、宿泊人数による表示切替）

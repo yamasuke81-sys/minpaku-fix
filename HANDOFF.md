@@ -1,8 +1,8 @@
 # minpaku-fix プロジェクト引き継ぎ資料
 
-> **最終更新**: 2026-02-17
+> **最終更新**: 2026-02-19
 > **作業ブランチ**: `claude/review-handoff-docs-5WgKR`（EbLOg統合済み・最新デプロイ対象）
-> **最新コミット**: `0ce1231 merge: EbLOgブランチの最新コード変更を統合`
+> **最新コミット**: `0710efd fix: メール重複送信防止 + ゲートウェイデプロイメントでURL永続化`
 
 ---
 
@@ -36,7 +36,7 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 | 用途 | 予約カレンダー表示、清掃募集、iCal同期 | 清掃チェックリスト（スタッフ用） |
 | Script ID | `1cFH0kD81gR6DC1RPBFyMJNXLI52nGYSOl6w461bkz_Byx1nE-4C0yD4w` | `18PILN4GA1DyQY9nkf2lV1GVxAXV95LT51vh2erWB1NZ8uNX54kVqlx3w` |
 | 主要ファイル | `Code.gs` (~6927行), `index.html` (~6537行) | `checklist-app/Code.gs` (~2888行), `checklist-app/checklist.html` (~4718行) |
-| デプロイ | 1つのデプロイ（?staff=1でスタッフ用） | 1つのデプロイ |
+| デプロイ | メイン+ゲートウェイの2つ（?staff=1でスタッフ用） | 1つのデプロイ |
 
 ## 2. ユーザー環境
 
@@ -189,6 +189,9 @@ fdcb1dc 清掃詳細・宿泊詳細モーダルのUIを全面リデザイン
 |------|------|------|
 | deploy-all.js改善 | デプロイID1つ前提にシンプル化 | **完了** |
 | マニュアル生成ツール | Puppeteer＋スクショ自動撮影 | **完了** |
+| メール重複送信防止 | LockService/PropertiesServiceで重複防止 | **完了** |
+| トリガー管理 | setupReminderTriggers()でUI一括セットアップ | **完了** |
+| ゲートウェイデプロイメント | URL永続化のための自動リダイレクト | **完了** |
 
 ---
 
@@ -359,6 +362,30 @@ function callGAS(functionName, args) {
   2. `clasp deployments` の出力から説明文で検索（フォールバック）
   3. 新規作成（最終手段。URLが変わる）
 
+### ゲートウェイデプロイメント（URL永続化・重要）
+
+メインアプリのURLが将来変更されてもブックマークが無効にならないよう、**ゲートウェイデプロイメント**を導入済み。
+
+**仕組み:**
+```
+ゲートウェイURL（ブックマーク用）
+  → doGet() が ScriptApp.getService().getUrl() と APP_BASE_URL を比較
+  → 異なる場合 → 最新URLに自動リダイレクト（クエリパラメータ引き継ぎ）
+  → 同じ場合 → 通常表示
+```
+
+**構成:**
+- `deploy-config.json` に `gatewayDeploymentId` として保存
+- `deploy-all.js` がデプロイ時にメインと一緒にゲートウェイも更新
+- `Code.gs` の `doGet()` 内にリダイレクトロジックあり（`action=setGatewayUrl` でURL保存）
+- GAS ScriptProperties キー `GATEWAY_URL` にゲートウェイURL保存
+
+**運用ルール:**
+- ユーザーにはゲートウェイURLをブックマークさせる
+- メインのデプロイIDが変わっても、ゲートウェイ経由でアクセスすれば自動で最新URLに転送される
+- ゲートウェイデプロイメント自体の削除は厳禁（ブックマークが無効になる）
+- `deploy-config.json` の `gatewayDeploymentId` を失うとゲートウェイURLが変わるため注意
+
 ### メインアプリのスタッフ用アクセス
 - オーナー用URLに `?staff=1` を付けるとスタッフ用画面として動作
 - deploy-all.js で自動的にスタッフ用URLも生成
@@ -422,9 +449,17 @@ function callGAS(functionName, args) {
 - ロジックは `deploy-all.js` に集約し、bat は短いラッパーに保つのが安全
 
 ### デプロイ時の注意
-- `deploy-config.json` は `.gitignore` 対象。紛失するとURLが変わる
+- `deploy-config.json` は `.gitignore` 対象。紛失するとURLが変わる（ゲートウェイURLも変わる）
+- `deploy-config.json` のキー: `ownerDeploymentId`, `staffDeploymentId`, `gatewayDeploymentId`, `checklistDeploymentId`
 - `npx clasp` ではなく `node_modules/.bin/clasp` を直接実行（JSON5エラー回避）
 - clasp login のセッションは数週間有効。期限切れ時は再ログインが必要
+
+### メール送信の重複防止（重要）
+- トリガー実行関数（`checkAndSendReminderEmails`, `checkAndSendReminders`）は `LockService.getScriptLock()` で排他制御
+- `ensureSingleTrigger_()` が実行時にトリガー重複を自動クリーンアップ
+- `setupReminderTriggers()` でUIから一括セットアップ可能（手動GASエディタ不要）
+- `sendImmediateReminderIfNeeded_()`, `notifyCleaningComplete()` はPropertiesServiceで日次重複防止
+- UI操作起点のメール（`notifyStaffForRecruitment`, `notifyStaffConfirmation`, `approveCancelRequest`, `rejectCancelRequest`, `cancelBookingFromICal_`）は未対策（低リスク）
 
 ### iCal同期
 - 正常動作中（トリガーで定期実行）
@@ -474,6 +509,8 @@ function callGAS(functionName, args) {
 | @HEAD deployment修正不可 | HEADはread-only | `@HEAD` 除外済み |
 | CSSが適用されない | GAS CSSサニタイザー | bodyセレクタを#contentAreaに変更（対応済み） |
 | スタッフ選択が復活する | 粘着ユニオン問題 | deviceId別管理に修正（対応済み） |
+| メールが重複送信される | トリガー重複 or 同時実行 | LockService + ensureSingleTrigger_() で対応済み。設定画面の「トリガーをセットアップ」ボタンで整理可能 |
+| URLが変わってブックマークが切れた | deploy-config.json紛失 | ゲートウェイURL経由なら自動リダイレクト。ゲートウェイURLをブックマークに推奨 |
 
 ---
 

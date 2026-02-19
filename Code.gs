@@ -6532,19 +6532,29 @@ function notifyStaffConfirmation(recruitRowIndex) {
 function checkAndCreateRecruitments() {
   try {
     ensureSheetsExist();
-    // 注: getRecruitmentSettings() は requireOwner() を含むため、
-    // onFormSubmit等の非オーナー文脈で呼ばれると失敗する。
-    // この関数では設定値を実際には使用しないため、直接処理する。
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const formSheet = ss.getSheetByName(SHEET_NAME);
     const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
-    if (!formSheet || formSheet.getLastRow() < 2) return;
+    if (!formSheet || !recruitSheet || formSheet.getLastRow() < 2) return;
     const headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     const colMap = buildColumnMap(headers);
     if (colMap.checkOut < 0) return;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    // 過去60日前までの予約も募集エントリを作成（履歴表示用）
+    var cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - 60);
     const data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+    // 既存の募集行番号を一括取得（ループ内で毎回読まない）
+    var existingRowNums = {};
+    if (recruitSheet.getLastRow() >= 2) {
+      var existData = recruitSheet.getRange(2, 2, recruitSheet.getLastRow() - 1, 1).getValues();
+      for (var ei = 0; ei < existData.length; ei++) {
+        existingRowNums[Number(existData[ei][0])] = true;
+      }
+    }
+    ensureRecruitNotifyMethodColumn_();
+    ensureRecruitDetailColumns_();
     for (var i = 0; i < data.length; i++) {
       // キャンセル済みの予約はスキップ
       if (colMap.cancelledAt >= 0) {
@@ -6556,21 +6566,17 @@ function checkAndCreateRecruitments() {
       if (!checkOut) continue;
       const co = new Date(checkOut);
       co.setHours(0, 0, 0, 0);
-      if (co < today) continue;
+      if (co < cutoff) continue;
       const checkoutStr = toDateKeySafe_(checkOut);
       const rowNumber = i + 2;
-      const existing = recruitSheet.getRange(2, 2, Math.max(recruitSheet.getLastRow(), 1), 2).getValues();
-      var found = false;
-      for (var j = 0; j < existing.length; j++) {
-        if (Number(existing[j][0]) === rowNumber) { found = true; break; }
-      }
-      if (!found) {
-        ensureRecruitNotifyMethodColumn_();
-        const nextRow = recruitSheet.getLastRow() + 1;
-        const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
-        ensureRecruitDetailColumns_();
-        recruitSheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutStr, rowNumber, '', '募集中', '', '', now, '', 'メール', '', '', '', '', '', '']]);
-      }
+      if (existingRowNums[rowNumber]) continue;
+      // スタッフが既に確定済みか判定
+      var assignedStaff = colMap.cleaningStaff >= 0 ? String(data[i][colMap.cleaningStaff] || '').trim() : '';
+      var status = assignedStaff ? 'スタッフ確定済み' : '募集中';
+      const nextRow = recruitSheet.getLastRow() + 1;
+      const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+      recruitSheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutStr, rowNumber, '', status, assignedStaff, '', now, '', 'メール', '', '', '', '', '', '']]);
+      existingRowNums[rowNumber] = true;
     }
   } catch (e) {
     Logger.log('checkAndCreateRecruitments: ' + e.toString());
@@ -6589,7 +6595,7 @@ function checkAndSendReminders() {
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return;
     const maxCol = Math.max(recruitSheet.getLastColumn(), 9);
-    const rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), maxCol).getValues();
+    const rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, maxCol).getValues();
     const today = new Date();
     var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
     var props = PropertiesService.getScriptProperties();

@@ -1441,7 +1441,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218s</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218t</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -3643,14 +3643,12 @@
       html += '<button class="tag-timing-btn" data-timing="アフター" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #e67e22;background:' + (aSel ? '#e67e22' : '#fef5ec') + ';color:' + (aSel ? '#fff' : '#e67e22') + ';border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">アフター</button>';
       html += '</div></div>';
 
-      // 箇所選択
+      // カテゴリ選択（大カテゴリのみ）
       html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">撮影箇所</div>';
       html += '<div id="tagSpotList" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">';
       catOrder.forEach(function(cat) {
-        html += '<div style="background:#f8f9fa;padding:6px 10px;font-size:12px;font-weight:bold;color:#666;border-bottom:1px solid #eee;">' + escapeHtml(cat) + '</div>';
-        categories[cat].forEach(function(spot) {
-          html += '<div class="tag-spot-item" data-spot-id="' + spot.id + '" onclick="selectTagSpot(this)" style="padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:14px;transition:background 0.15s;">' + escapeHtml(spot.name) + '</div>';
-        });
+        var firstSpotId = categories[cat][0].id;
+        html += '<div class="tag-spot-item" data-spot-id="' + firstSpotId + '" onclick="selectTagSpot(this)" style="padding:12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:14px;font-weight:bold;transition:background 0.15s;">' + escapeHtml(cat) + '</div>';
       });
       html += '</div>';
 

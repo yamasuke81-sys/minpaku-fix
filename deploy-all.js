@@ -118,18 +118,66 @@ function main() {
   console.log('  OK');
 
   console.log('[2/3] メインアプリ: デプロイを更新...');
-  var mainDeps = run(clasp + ' deployments', rootDir);
-  var mainId = mainDeps.ok ? getDeployId(mainDeps.out) : null;
   var today = new Date().toISOString().slice(0, 10);
+
+  // deploy-config.json から保存済みIDを読み込む（URL固定のため最優先）
+  var configPath = path.join(rootDir, 'deploy-config.json');
+  var config = {};
+  if (fs.existsSync(configPath)) {
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (e) {}
+  }
+  var savedMainId = (config.ownerDeploymentId || '').trim();
+
+  var mainId = null;
+
+  // 優先順位1: deploy-config.json の保存済みID
+  if (savedMainId) {
+    console.log('  保存済みデプロイIDで更新: ' + savedMainId.substring(0, 30) + '...');
+    var r = run(clasp + ' deploy --deploymentId "' + savedMainId + '" --description "メインアプリ ' + today + '"', rootDir);
+    if (r.ok) {
+      mainId = savedMainId;
+    } else {
+      console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
+    }
+  }
+
+  // 優先順位2: clasp deployments から探す
+  if (!mainId) {
+    var mainDeps = run(clasp + ' deployments', rootDir);
+    var foundId = mainDeps.ok ? getDeployId(mainDeps.out) : null;
+    if (foundId) {
+      console.log('  既存デプロイを発見。更新: ' + foundId.substring(0, 30) + '...');
+      var r = run(clasp + ' deploy --deploymentId "' + foundId + '" --description "メインアプリ ' + today + '"', rootDir);
+      if (r.ok) {
+        mainId = foundId;
+      }
+    }
+  }
+
+  // 優先順位3: 新規作成（最終手段）
+  if (!mainId) {
+    console.log('  既存デプロイが見つかりません。新規作成...');
+    var r = run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);
+    if (r.ok) {
+      var m = r.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+      if (m) mainId = m[1];
+    }
+  }
+
   if (mainId) {
-    var r = run(clasp + ' deploy --deploymentId "' + mainId + '" --description "メインアプリ ' + today + '"', rootDir);
-    console.log('  デプロイ: ' + (r.ok ? 'OK' : '失敗 - ' + r.out.slice(0, 200)));
+    console.log('  デプロイ: OK');
     var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
     urls.push({ label: 'オーナー用', url: baseUrl });
     urls.push({ label: 'スタッフ用', url: baseUrl + '?staff=1' });
+
+    // deploy-config.json にIDを保存（次回以降URLが変わらない）
+    if (mainId !== savedMainId) {
+      config.ownerDeploymentId = mainId;
+      config.staffDeploymentId = mainId;
+      try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
+    }
   } else {
-    console.log('  既存デプロイが見つかりません。新規作成...');
-    run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);
+    console.error('  デプロイに失敗しました。');
   }
 
   // === オーナーURL・スタッフ用URLをGASに保存 ===

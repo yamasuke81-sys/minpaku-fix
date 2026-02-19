@@ -4931,19 +4931,23 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
         if (rCoDate) {
           var coKey = toDateKeySafe_(rCoDate);
           var coDisp = Utilities.formatDate(rCoDate, 'Asia/Tokyo', 'yyyy/M/d');
-          // チェックアウト日→現在の行番号のマップで正しい行を特定
-          var matchedByDate = !!coToCurrentFormRow[coKey];
-          var correctedRow = coToCurrentFormRow[coKey] || rBookingRow;
-          if (correctedRow >= 2 && correctedRow <= data.length + 1) {
-            var fCoVal = data[correctedRow - 2][colMap.checkOut];
-            var fCo = parseDate(fCoVal);
+          // フォームシートから正しいチェックアウト日を取得
+          // 優先順位: 1. rBookingRowの行の日付（ソート後に同期済みなので信頼性が高い）
+          //          2. 日付ベースのフォームシート照合
+          //          3. 募集シートの日付（フォールバック）
+          if (rBookingRow >= 2 && rBookingRow <= data.length + 1) {
+            var fCo = parseDate(data[rBookingRow - 2][colMap.checkOut]);
             if (fCo) {
-              var fCoKey = toDateKeySafe_(fCo);
-              // 日付マップで一致した場合のみフォームの値を採用。
-              // rBookingRowフォールバックの場合は、フォームの日付が募集の日付と一致する場合のみ採用（行番号ずれ防止）
-              if (matchedByDate || fCoKey === coKey) {
-                coKey = fCoKey || coKey;
-                coDisp = Utilities.formatDate(fCo, 'Asia/Tokyo', 'yyyy/M/d');
+              coKey = toDateKeySafe_(fCo) || coKey;
+              coDisp = Utilities.formatDate(fCo, 'Asia/Tokyo', 'yyyy/M/d');
+            }
+          } else if (coToCurrentFormRow[coKey]) {
+            var fRow = coToCurrentFormRow[coKey];
+            if (fRow >= 2 && fRow <= data.length + 1) {
+              var fCo2 = parseDate(data[fRow - 2][colMap.checkOut]);
+              if (fCo2) {
+                coKey = toDateKeySafe_(fCo2) || coKey;
+                coDisp = Utilities.formatDate(fCo2, 'Asia/Tokyo', 'yyyy/M/d');
               }
             }
           }

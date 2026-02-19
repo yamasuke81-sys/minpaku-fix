@@ -4330,7 +4330,7 @@ function getStaffNamesForSelection() {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
-    const lastCol = Math.max(sheet.getLastColumn(), 10);
+    const lastCol = Math.max(sheet.getLastColumn(), 11);
     const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
     const list = rows
       .map(function(row) {
@@ -4339,9 +4339,11 @@ function getStaffNamesForSelection() {
         var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
         if (active === 'N') return null;
         var hasPassword = lastCol >= 10 ? !!String(row[9] || '').trim() : false;
-        return (name || email) ? { name: name || email, email: email, hasPassword: hasPassword } : null;
+        var displayOrder = parseInt(row[10], 10) || 9999;
+        return (name || email) ? { name: name || email, email: email, hasPassword: hasPassword, displayOrder: displayOrder } : null;
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort(function(a, b) { return a.displayOrder - b.displayOrder; });
     return JSON.stringify({ success: true, list: list });
   } catch (e) {
     return JSON.stringify({ success: false, list: [], error: e.toString() });

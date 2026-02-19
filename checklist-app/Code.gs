@@ -294,12 +294,19 @@ function getCleaningStaffList() {
     if (!staffSheet || staffSheet.getLastRow() < 2) {
       return JSON.stringify({ success: true, list: [] });
     }
-    var data = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 2).getValues();
-    var list = [];
+    var lastCol = Math.max(staffSheet.getLastColumn(), 11);
+    var data = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
+    var items = [];
     data.forEach(function(row) {
       var name = String(row[0] || '').trim();
-      if (name) list.push(name);
+      var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
+      if (name && active !== 'N') {
+        var order = parseInt(row[10], 10) || 9999;
+        items.push({ name: name, order: order });
+      }
     });
+    items.sort(function(a, b) { return a.order - b.order; });
+    var list = items.map(function(item) { return item.name; });
     return JSON.stringify({ success: true, list: list });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), list: [] });

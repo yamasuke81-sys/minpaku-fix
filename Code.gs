@@ -1989,8 +1989,12 @@ function syncFromICal() {
           var coKey = toDateKeySafe_(formData[ri][colMap.checkOut]);
           if (!ciKey || !coKey) continue;
           var cancelledVal = colMap.cancelledAt >= 0 ? String(formData[ri][colMap.cancelledAt] || '').trim() : '';
-          if (!validPairs[ciKey + '|' + coKey]) {
-            // iCalから消えた → キャンセルマーク（未キャンセルの場合のみ）
+          // チェックアウト日が過去の予約はキャンセル判定対象外（iCalから消えるのは正常）
+          var coDate = coKey ? new Date(coKey) : null;
+          var todaySync = new Date(); todaySync.setHours(0,0,0,0);
+          var isPast = coDate && coDate < todaySync;
+          if (!validPairs[ciKey + '|' + coKey] && !isPast) {
+            // iCalから消えた（未来の予約のみ） → キャンセルマーク（未キャンセルの場合のみ）
             if (!cancelledVal) {
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;
@@ -2139,7 +2143,11 @@ function autoSyncFromICal() {
           var cik = toDateKeySafe_(refreshData[ci][colMap.checkIn]);
           var cok = toDateKeySafe_(refreshData[ci][colMap.checkOut]);
           if (!cik || !cok) continue;
-          if (!validPairs[cik + '|' + cok]) {
+          // チェックアウト日が過去の予約はキャンセル判定対象外（iCalから消えるのは正常）
+          var coDateAuto = cok ? new Date(cok) : null;
+          var todayAuto = new Date(); todayAuto.setHours(0,0,0,0);
+          var isPastAuto = coDateAuto && coDateAuto < todayAuto;
+          if (!validPairs[cik + '|' + cok] && !isPastAuto) {
             try { markBookingCancelled_(formSheet, ci + 2, colMap); } catch (e) {}
           }
         }

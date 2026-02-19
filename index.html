@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5026,9 +5026,13 @@
             var html = '';
             if (res.success && res.list && res.list.length) {
               res.list.forEach(function(s) {
+                var isActive = s.active !== 'N';
+                var toggleId = 'syncToggle_' + s.rowIndex;
                 html += '<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between align-items-start">';
                 html += '<div><strong>' + escapeHtml(s.platformName) + '</strong><br><small class="text-muted">' + escapeHtml(s.icalUrl || '(未設定)') + '</small>';
                 if (s.lastSync) html += '<br><small class="text-success">' + escapeHtml(s.lastSync) + '</small>';
+                html += '<div class="form-check form-switch mt-1"><input class="form-check-input syncActiveToggle" type="checkbox" id="' + toggleId + '" data-row="' + s.rowIndex + '" data-name="' + escapeHtml(s.platformName) + '" data-url="' + escapeHtml(s.icalUrl) + '"' + (isActive ? ' checked' : '') + '>';
+                html += '<label class="form-check-label small" for="' + toggleId + '">自動同期</label></div>';
                 html += '</div>';
                 html += '<div><button type="button" class="btn btn-sm btn-outline-secondary btnEditSync" data-row="' + s.rowIndex + '" data-name="' + escapeHtml(s.platformName) + '" data-url="' + escapeHtml(s.icalUrl) + '">編集</button> ';
                 html += '<button type="button" class="btn btn-sm btn-outline-danger btnDelSync" data-row="' + s.rowIndex + '">削除</button></div></div></div>';
@@ -5044,6 +5048,25 @@
                 var name = this.getAttribute('data-name');
                 var url = this.getAttribute('data-url');
                 openSyncFormModal(row, name, url);
+              });
+            });
+            document.querySelectorAll('.syncActiveToggle').forEach(function(toggle) {
+              toggle.addEventListener('change', function() {
+                var row = parseInt(this.getAttribute('data-row'), 10);
+                var name = this.getAttribute('data-name');
+                var url = this.getAttribute('data-url');
+                var active = this.checked ? 'Y' : 'N';
+                var el = this;
+                el.disabled = true;
+                google.script.run.withSuccessHandler(function(j) {
+                  el.disabled = false;
+                  var r = JSON.parse(j);
+                  if (!r.success) { el.checked = !el.checked; alert(r.error || '保存に失敗しました'); }
+                }).withFailureHandler(function(e) {
+                  el.disabled = false;
+                  el.checked = !el.checked;
+                  alert(e.message || '保存に失敗しました');
+                }).setSyncSetting(row, name, url, active);
               });
             });
             document.querySelectorAll('.btnDelSync').forEach(function(btn) {

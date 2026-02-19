@@ -1441,7 +1441,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218q</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218r</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1645,6 +1645,7 @@
   <!-- 非表示のファイル入力 -->
   <input type="file" id="photoInput" accept="image/*" capture="environment">
   <input type="file" id="bulkPhotoInput" accept="image/*" multiple>
+  <input type="file" id="unsortedPhotoInput" accept="image/*" multiple>
   <input type="file" id="examplePhotoInput" accept="image/*">
   <input type="file" id="itemPhotoInput" accept="image/*">
   <input type="file" id="memoPhotoInput" accept="image/*" capture="environment">
@@ -2666,10 +2667,42 @@
         return p.before.length > 0 || p.after.length > 0;
       }).length;
 
+      // 未整理写真の収集
+      var unsortedPhotos = [];
+      var unsortedData = photos['__unsorted__'];
+      if (unsortedData) {
+        (unsortedData.before || []).concat(unsortedData.after || []).concat(unsortedData.unsorted || []).forEach(function(p) {
+          unsortedPhotos.push(p);
+        });
+      }
+
       var html = '<div style="padding:12px;"><div style="font-size:14px;font-weight:bold;color:#2c3e50;margin-bottom:8px;">撮影進捗: ' + doneSpots + ' / ' + totalSpots + ' 箇所</div>';
       html += '<div style="height:6px;background:#ecf0f1;border-radius:3px;overflow:hidden;margin-bottom:8px;"><div style="height:100%;background:#e67e22;width:' + (totalSpots > 0 ? Math.round(doneSpots / totalSpots * 100) : 0) + '%;border-radius:3px;"></div></div>';
       html += '<div style="margin-bottom:4px;"><button id="btnPhotoExpandAll" class="action-btn" onclick="toggleAllPhotoCategories()">' + (allPhotoExpanded ? '全折り' : '全展開') + '</button></div>';
       html += '</div>';
+
+      // === 未整理セクション（一番上） ===
+      html += '<div class="photo-section" style="border-left:3px solid #6c5ce7;">';
+      html += '<div class="photo-cat-header" style="background:#f0edff;" onclick="togglePhotoCategory(\'photoCat_unsorted\')">';
+      html += '<span class="photo-cat-toggle" id="toggle_photoCat_unsorted">▼</span>';
+      html += '<h3>📥 未整理 <span style="font-size:12px;font-weight:normal;color:#6c5ce7;">(' + unsortedPhotos.length + '枚)</span></h3>';
+      html += '<button class="photo-cat-bulk-btn before" style="background:#6c5ce7;" onclick="event.stopPropagation();openUnsortedUpload()">一括アップロード</button>';
+      html += '</div>';
+      html += '<div class="photo-cat-body" id="body_photoCat_unsorted">';
+      if (unsortedPhotos.length === 0) {
+        html += '<div style="padding:16px;text-align:center;color:#999;font-size:13px;">写真を一括アップロードした後、各写真にタグ付けできます</div>';
+      } else {
+        html += '<div class="photo-grid" style="padding:8px;grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));">';
+        unsortedPhotos.forEach(function(photo) {
+          html += '<div class="photo-thumb-wrapper" style="position:relative;">';
+          html += '<div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="openTagModal(\'' + photo.fileId + '\')"></div>';
+          html += '<button class="photo-delete-btn" onclick="deletePhoto(\'__unsorted__\', \'' + photo.fileId + '\')">✕</button>';
+          html += '<button style="position:absolute;bottom:2px;left:2px;right:2px;background:#6c5ce7;color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 0;cursor:pointer;opacity:0.9;" onclick="openTagModal(\'' + photo.fileId + '\')">振り分け</button>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div></div>';
 
       catOrder.forEach(function(cat) {
         var catId = 'photoCat_' + cat.replace(/[^a-zA-Z0-9\u3000-\u9fff]/g, '_');
@@ -3465,6 +3498,177 @@
       uploadNext(0);
       event.target.value = '';
     }
+
+    // === 未整理写真アップロード ===
+    function openUnsortedUpload() {
+      var input = document.getElementById('unsortedPhotoInput');
+      input.value = '';
+      input.click();
+    }
+
+    document.getElementById('unsortedPhotoInput').addEventListener('change', function(event) {
+      var files = Array.prototype.slice.call(event.target.files);
+      if (!files.length) return;
+      var names = getSelectedStaffNames();
+      var who = names.length > 0 ? names.join(', ') : staffName;
+      var totalCount = files.length;
+      var doneCount = 0;
+      var failCount = 0;
+      showBulkProgress('未整理', 0, totalCount);
+
+      function uploadNext(idx) {
+        if (idx >= files.length) {
+          hideBulkProgress();
+          showSaveStatus(failCount === 0 ? 'saved' : 'error');
+          if (failCount > 0) alert(failCount + '枚の写真がアップロードに失敗しました');
+          renderPhotoSection();
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var base64 = e.target.result.split(',')[1];
+          callGAS('uploadChecklistPhoto', [checkoutDate, '__unsorted__', '未整理', base64, who]).then(function(res) {
+            if (res.success) {
+              doneCount++;
+              if (!checklistData.photos['__unsorted__']) checklistData.photos['__unsorted__'] = { before: [], after: [], unsorted: [] };
+              checklistData.photos['__unsorted__'].unsorted.push({ fileId: res.fileId, by: who, at: new Date(), timing: '未整理' });
+            } else { failCount++; }
+            showBulkProgress('未整理', doneCount + failCount, totalCount);
+            uploadNext(idx + 1);
+          }).catch(function() { failCount++; showBulkProgress('未整理', doneCount + failCount, totalCount); uploadNext(idx + 1); });
+        };
+        reader.onerror = function() { failCount++; uploadNext(idx + 1); };
+        reader.readAsDataURL(files[idx]);
+      }
+      uploadNext(0);
+      event.target.value = '';
+    });
+
+    // === タグ付けモーダル ===
+    function openTagModal(fileId) {
+      var spots = checklistData.spots;
+      // カテゴリごとにグループ化
+      var categories = {};
+      var catOrder = [];
+      spots.forEach(function(spot) {
+        var cat = spot.category || 'その他';
+        if (!categories[cat]) { categories[cat] = []; catOrder.push(cat); }
+        categories[cat].push(spot);
+      });
+      if (checklistData.categoryOrder && checklistData.categoryOrder.length > 0) {
+        var orderMap = {};
+        checklistData.categoryOrder.forEach(function(o) { orderMap[o.path] = o.sortOrder; });
+        catOrder.sort(function(a, b) {
+          return (orderMap[a] !== undefined ? orderMap[a] : 99999) - (orderMap[b] !== undefined ? orderMap[b] : 99999);
+        });
+      }
+
+      var overlay = document.createElement('div');
+      overlay.className = 'photo-modal-overlay';
+      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+      var modal = document.createElement('div');
+      modal.className = 'photo-modal';
+      modal.style.cssText = 'max-height:90vh;overflow-y:auto;';
+
+      var html = '<h3 style="margin-bottom:8px;">📷 写真の振り分け</h3>';
+      html += '<div style="text-align:center;margin-bottom:12px;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400" style="max-width:100%;max-height:200px;border-radius:8px;"></div>';
+
+      // タイミング選択
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">タイミング</div>';
+      html += '<div style="display:flex;gap:8px;">';
+      html += '<button class="tag-timing-btn" data-timing="ビフォー" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #3498db;background:#eaf4fd;color:#3498db;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">ビフォー</button>';
+      html += '<button class="tag-timing-btn" data-timing="アフター" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #e67e22;background:#fef5ec;color:#e67e22;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">アフター</button>';
+      html += '</div></div>';
+
+      // 箇所選択（カテゴリ別）
+      html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">撮影箇所</div>';
+      html += '<div id="tagSpotList" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">';
+      catOrder.forEach(function(cat) {
+        html += '<div style="background:#f8f9fa;padding:6px 10px;font-size:12px;font-weight:bold;color:#666;border-bottom:1px solid #eee;">' + escapeHtml(cat) + '</div>';
+        categories[cat].forEach(function(spot) {
+          html += '<div class="tag-spot-item" data-spot-id="' + spot.id + '" onclick="selectTagSpot(this)" style="padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:14px;transition:background 0.15s;">' + escapeHtml(spot.name) + '</div>';
+        });
+      });
+      html += '</div>';
+
+      html += '<div style="display:flex;gap:8px;margin-top:12px;">';
+      html += '<button id="tagConfirmBtn" class="photo-modal-close" style="flex:1;background:#6c5ce7;color:white;border-color:#6c5ce7;opacity:0.5;pointer-events:none;" onclick="confirmTag(\'' + fileId + '\')">振り分け確定</button>';
+      html += '</div>';
+      html += '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">キャンセル</button>';
+
+      modal.innerHTML = html;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+    }
+
+    window._tagSelectedTiming = null;
+    window._tagSelectedSpotId = null;
+
+    window.selectTagTiming = function(btn) {
+      document.querySelectorAll('.tag-timing-btn').forEach(function(b) {
+        b.style.opacity = '0.4'; b.style.fontWeight = 'normal';
+      });
+      btn.style.opacity = '1'; btn.style.fontWeight = 'bold';
+      window._tagSelectedTiming = btn.dataset.timing;
+      updateTagConfirmBtn();
+    };
+
+    window.selectTagSpot = function(el) {
+      document.querySelectorAll('.tag-spot-item').forEach(function(item) {
+        item.style.background = ''; item.style.fontWeight = '';
+      });
+      el.style.background = '#e8e5ff'; el.style.fontWeight = 'bold';
+      window._tagSelectedSpotId = el.dataset.spotId;
+      updateTagConfirmBtn();
+    };
+
+    function updateTagConfirmBtn() {
+      var btn = document.getElementById('tagConfirmBtn');
+      if (!btn) return;
+      if (window._tagSelectedTiming && window._tagSelectedSpotId) {
+        btn.style.opacity = '1'; btn.style.pointerEvents = 'auto';
+      } else {
+        btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none';
+      }
+    }
+
+    window.confirmTag = function(fileId) {
+      var timing = window._tagSelectedTiming;
+      var spotId = window._tagSelectedSpotId;
+      if (!timing || !spotId) return;
+
+      var overlay = document.querySelector('.photo-modal-overlay');
+      var btn = document.getElementById('tagConfirmBtn');
+      if (btn) { btn.textContent = '振り分け中...'; btn.style.pointerEvents = 'none'; }
+
+      callGAS('reassignChecklistPhoto', [checkoutDate, '__unsorted__', fileId, spotId, timing]).then(function(res) {
+        if (res.success) {
+          // ローカルデータ更新: unsortedから削除
+          var us = checklistData.photos['__unsorted__'];
+          if (us) {
+            ['before', 'after', 'unsorted'].forEach(function(key) {
+              if (us[key]) us[key] = us[key].filter(function(p) { return p.fileId !== fileId; });
+            });
+          }
+          // 振り分け先に追加
+          if (!checklistData.photos[spotId]) checklistData.photos[spotId] = { before: [], after: [] };
+          var timingKey = timing === 'ビフォー' ? 'before' : 'after';
+          checklistData.photos[spotId][timingKey].push({ fileId: fileId, by: staffName, at: new Date() });
+
+          if (overlay) overlay.remove();
+          showSaveStatus('saved');
+          renderPhotoSection();
+          renderChecklist();
+        } else {
+          alert('振り分けに失敗しました: ' + (res.error || ''));
+          if (btn) { btn.textContent = '振り分け確定'; btn.style.pointerEvents = 'auto'; }
+        }
+      }).catch(function() {
+        alert('振り分けに失敗しました');
+        if (btn) { btn.textContent = '振り分け確定'; btn.style.pointerEvents = 'auto'; }
+      });
+    };
 
     function updateMemoSubmitBtn() {
       var btn = document.getElementById('memoSubmitBtn');

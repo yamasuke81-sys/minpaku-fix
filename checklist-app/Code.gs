@@ -477,9 +477,10 @@ function getChecklistForDate(checkoutDate, deviceId) {
           var spotId = String(row[1]);
           var timing = String(row[5] || '');
           if (!photos[spotId]) photos[spotId] = { before: [], after: [] };
-          var photoData = { fileId: String(row[2]), by: String(row[3] || ''), at: String(row[4] || '') };
+          var photoData = { fileId: String(row[2]), by: String(row[3] || ''), at: String(row[4] || ''), timing: timing };
           if (timing === 'ビフォー') photos[spotId].before.push(photoData);
           else if (timing === 'アフター') photos[spotId].after.push(photoData);
+          else { if (!photos[spotId].unsorted) photos[spotId].unsorted = []; photos[spotId].unsorted.push(photoData); }
         }
       });
     }
@@ -2545,8 +2546,30 @@ function deleteChecklistPhoto(checkoutDate, spotId, fileId) {
 }
 
 /**
- * チェックリスト項目の見本写真をアップロード
+ * 未整理写真の振り分け: spotIdとtimingを変更
  */
+function reassignChecklistPhoto(checkoutDate, oldSpotId, fileId, newSpotId, newTiming) {
+  try {
+    if (!fileId || !newSpotId || !newTiming) return JSON.stringify({ success: false, error: 'パラメータ不足' });
+    var sheet = clSheet_(SHEET_CL_PHOTOS);
+    var targetDate = normDateStr_(checkoutDate);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: '写真が見つかりません' });
+    var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (normDateStr_(data[i][0]) === targetDate && String(data[i][1]) === String(oldSpotId) && String(data[i][2]) === String(fileId)) {
+        sheet.getRange(i + 2, 2).setValue(newSpotId);  // spotId更新
+        sheet.getRange(i + 2, 6).setValue(newTiming);   // timing更新
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: '対象の写真が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
 function uploadChecklistItemPhoto(itemId, base64Data) {
   try {
     if (!itemId || !base64Data) return JSON.stringify({ success: false, error: 'データが不足しています' });

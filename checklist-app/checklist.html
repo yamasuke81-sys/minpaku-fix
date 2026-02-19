@@ -1441,7 +1441,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218r</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0218s</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -2686,18 +2686,30 @@
       html += '<div class="photo-cat-header" style="background:#f0edff;" onclick="togglePhotoCategory(\'photoCat_unsorted\')">';
       html += '<span class="photo-cat-toggle" id="toggle_photoCat_unsorted">▼</span>';
       html += '<h3>📥 未整理 <span style="font-size:12px;font-weight:normal;color:#6c5ce7;">(' + unsortedPhotos.length + '枚)</span></h3>';
-      html += '<button class="photo-cat-bulk-btn before" style="background:#6c5ce7;" onclick="event.stopPropagation();openUnsortedUpload()">一括アップロード</button>';
+      html += '<button class="photo-cat-bulk-btn before" style="background:#6c5ce7;" onclick="event.stopPropagation();openUnsortedUpload(\'未整理\')">一括</button>';
+      html += '<button class="photo-cat-bulk-btn before" onclick="event.stopPropagation();openUnsortedUpload(\'ビフォー\')">前一括</button>';
+      html += '<button class="photo-cat-bulk-btn after" onclick="event.stopPropagation();openUnsortedUpload(\'アフター\')">後一括</button>';
       html += '</div>';
       html += '<div class="photo-cat-body" id="body_photoCat_unsorted">';
       if (unsortedPhotos.length === 0) {
         html += '<div style="padding:16px;text-align:center;color:#999;font-size:13px;">写真を一括アップロードした後、各写真にタグ付けできます</div>';
       } else {
+        // 全選択/解除 + 振り分けボタン
+        html += '<div style="padding:8px 8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+        html += '<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="unsortedSelectAll" onchange="toggleUnsortedSelectAll(this.checked)"> 全選択</label>';
+        html += '<button id="unsortedBulkTagBtn" class="action-btn" style="background:#6c5ce7;color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;display:none;" onclick="openBulkTagModal()">選択した写真を振り分け</button>';
+        html += '</div>';
         html += '<div class="photo-grid" style="padding:8px;grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));">';
         unsortedPhotos.forEach(function(photo) {
+          var pTiming = photo.timing || '未整理';
+          var timingLabel = pTiming === 'ビフォー' ? '前' : pTiming === 'アフター' ? '後' : '';
+          var timingColor = pTiming === 'ビフォー' ? '#3498db' : pTiming === 'アフター' ? '#e67e22' : '';
           html += '<div class="photo-thumb-wrapper" style="position:relative;">';
-          html += '<div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="openTagModal(\'' + photo.fileId + '\')"></div>';
-          html += '<button class="photo-delete-btn" onclick="deletePhoto(\'__unsorted__\', \'' + photo.fileId + '\')">✕</button>';
-          html += '<button style="position:absolute;bottom:2px;left:2px;right:2px;background:#6c5ce7;color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 0;cursor:pointer;opacity:0.9;" onclick="openTagModal(\'' + photo.fileId + '\')">振り分け</button>';
+          html += '<input type="checkbox" class="unsorted-photo-cb" data-file-id="' + photo.fileId + '" data-timing="' + pTiming + '" onchange="updateUnsortedSelection()" style="position:absolute;top:4px;right:4px;z-index:2;width:18px;height:18px;cursor:pointer;">';
+          html += '<div class="photo-thumb" style="position:absolute;top:0;left:0;right:0;bottom:0;background-image:url(https://drive.google.com/thumbnail?id=' + photo.fileId + '&sz=w200);cursor:pointer;" onclick="openTagModal(\'' + photo.fileId + '\', \'' + pTiming + '\')"></div>';
+          html += '<button class="photo-delete-btn" style="top:auto;bottom:24px;" onclick="deletePhoto(\'__unsorted__\', \'' + photo.fileId + '\')">✕</button>';
+          if (timingLabel) html += '<span style="position:absolute;top:4px;left:2px;background:' + timingColor + ';color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:bold;">' + timingLabel + '</span>';
+          html += '<button style="position:absolute;bottom:2px;left:2px;right:2px;background:#6c5ce7;color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 0;cursor:pointer;opacity:0.9;" onclick="openTagModal(\'' + photo.fileId + '\', \'' + pTiming + '\')">振り分け</button>';
           html += '</div>';
         });
         html += '</div>';
@@ -3500,7 +3512,9 @@
     }
 
     // === 未整理写真アップロード ===
-    function openUnsortedUpload() {
+    var unsortedUploadTiming = '未整理';
+    function openUnsortedUpload(timing) {
+      unsortedUploadTiming = timing || '未整理';
       var input = document.getElementById('unsortedPhotoInput');
       input.value = '';
       input.click();
@@ -3509,12 +3523,14 @@
     document.getElementById('unsortedPhotoInput').addEventListener('change', function(event) {
       var files = Array.prototype.slice.call(event.target.files);
       if (!files.length) return;
+      var timing = unsortedUploadTiming;
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
       var totalCount = files.length;
       var doneCount = 0;
       var failCount = 0;
-      showBulkProgress('未整理', 0, totalCount);
+      var label = timing === '未整理' ? '未整理' : (timing === 'ビフォー' ? 'ビフォー一括' : 'アフター一括');
+      showBulkProgress(label, 0, totalCount);
 
       function uploadNext(idx) {
         if (idx >= files.length) {
@@ -3527,15 +3543,16 @@
         var reader = new FileReader();
         reader.onload = function(e) {
           var base64 = e.target.result.split(',')[1];
-          callGAS('uploadChecklistPhoto', [checkoutDate, '__unsorted__', '未整理', base64, who]).then(function(res) {
+          callGAS('uploadChecklistPhoto', [checkoutDate, '__unsorted__', timing, base64, who]).then(function(res) {
             if (res.success) {
               doneCount++;
               if (!checklistData.photos['__unsorted__']) checklistData.photos['__unsorted__'] = { before: [], after: [], unsorted: [] };
-              checklistData.photos['__unsorted__'].unsorted.push({ fileId: res.fileId, by: who, at: new Date(), timing: '未整理' });
+              var timingKey = timing === 'ビフォー' ? 'before' : timing === 'アフター' ? 'after' : 'unsorted';
+              checklistData.photos['__unsorted__'][timingKey].push({ fileId: res.fileId, by: who, at: new Date(), timing: timing });
             } else { failCount++; }
-            showBulkProgress('未整理', doneCount + failCount, totalCount);
+            showBulkProgress(label, doneCount + failCount, totalCount);
             uploadNext(idx + 1);
-          }).catch(function() { failCount++; showBulkProgress('未整理', doneCount + failCount, totalCount); uploadNext(idx + 1); });
+          }).catch(function() { failCount++; showBulkProgress(label, doneCount + failCount, totalCount); uploadNext(idx + 1); });
         };
         reader.onerror = function() { failCount++; uploadNext(idx + 1); };
         reader.readAsDataURL(files[idx]);
@@ -3544,10 +3561,42 @@
       event.target.value = '';
     });
 
-    // === タグ付けモーダル ===
-    function openTagModal(fileId) {
+    // === チェックボックス選択管理 ===
+    window.toggleUnsortedSelectAll = function(checked) {
+      document.querySelectorAll('.unsorted-photo-cb').forEach(function(cb) { cb.checked = checked; });
+      updateUnsortedSelection();
+    };
+    window.updateUnsortedSelection = function() {
+      var checked = document.querySelectorAll('.unsorted-photo-cb:checked');
+      var btn = document.getElementById('unsortedBulkTagBtn');
+      if (btn) {
+        btn.style.display = checked.length > 0 ? 'inline-block' : 'none';
+        btn.textContent = checked.length + '枚を振り分け';
+      }
+    };
+    // 一括タグ付けモーダル（複数選択時）
+    window.openBulkTagModal = function() {
+      var checked = document.querySelectorAll('.unsorted-photo-cb:checked');
+      var fileIds = [];
+      var defaultTiming = null;
+      checked.forEach(function(cb) {
+        fileIds.push(cb.dataset.fileId);
+        var t = cb.dataset.timing;
+        if (t === 'ビフォー' || t === 'アフター') {
+          if (!defaultTiming) defaultTiming = t;
+        }
+      });
+      if (fileIds.length === 0) return;
+      openTagModalMulti(fileIds, defaultTiming);
+    };
+
+    // === タグ付けモーダル（単体・複数共通） ===
+    function openTagModal(fileId, currentTiming) {
+      openTagModalMulti([fileId], (currentTiming === 'ビフォー' || currentTiming === 'アフター') ? currentTiming : null);
+    }
+
+    function openTagModalMulti(fileIds, defaultTiming) {
       var spots = checklistData.spots;
-      // カテゴリごとにグループ化
       var categories = {};
       var catOrder = [];
       spots.forEach(function(spot) {
@@ -3570,18 +3619,31 @@
       modal.className = 'photo-modal';
       modal.style.cssText = 'max-height:90vh;overflow-y:auto;';
 
-      var html = '<h3 style="margin-bottom:8px;">📷 写真の振り分け</h3>';
-      html += '<div style="text-align:center;margin-bottom:12px;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400" style="max-width:100%;max-height:200px;border-radius:8px;"></div>';
+      var isBulk = fileIds.length > 1;
+      var html = '<h3 style="margin-bottom:8px;">📷 ' + (isBulk ? fileIds.length + '枚の写真を振り分け' : '写真の振り分け') + '</h3>';
+
+      // プレビュー（単体なら大きく、複数なら小さく並べる）
+      if (isBulk) {
+        html += '<div style="display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding:4px 0;">';
+        fileIds.forEach(function(fid) {
+          html += '<img src="https://drive.google.com/thumbnail?id=' + fid + '&sz=w100" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0;">';
+        });
+        html += '</div>';
+      } else {
+        html += '<div style="text-align:center;margin-bottom:12px;"><img src="https://drive.google.com/thumbnail?id=' + fileIds[0] + '&sz=w400" style="max-width:100%;max-height:200px;border-radius:8px;"></div>';
+      }
 
       // タイミング選択
+      var bSel = defaultTiming === 'ビフォー';
+      var aSel = defaultTiming === 'アフター';
       html += '<div style="margin-bottom:12px;">';
       html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">タイミング</div>';
       html += '<div style="display:flex;gap:8px;">';
-      html += '<button class="tag-timing-btn" data-timing="ビフォー" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #3498db;background:#eaf4fd;color:#3498db;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">ビフォー</button>';
-      html += '<button class="tag-timing-btn" data-timing="アフター" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #e67e22;background:#fef5ec;color:#e67e22;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">アフター</button>';
+      html += '<button class="tag-timing-btn" data-timing="ビフォー" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #3498db;background:' + (bSel ? '#3498db' : '#eaf4fd') + ';color:' + (bSel ? '#fff' : '#3498db') + ';border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">ビフォー</button>';
+      html += '<button class="tag-timing-btn" data-timing="アフター" onclick="selectTagTiming(this)" style="flex:1;padding:8px;border:2px solid #e67e22;background:' + (aSel ? '#e67e22' : '#fef5ec') + ';color:' + (aSel ? '#fff' : '#e67e22') + ';border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;">アフター</button>';
       html += '</div></div>';
 
-      // 箇所選択（カテゴリ別）
+      // 箇所選択
       html += '<div style="font-weight:bold;font-size:13px;margin-bottom:6px;">撮影箇所</div>';
       html += '<div id="tagSpotList" style="max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">';
       catOrder.forEach(function(cat) {
@@ -3593,24 +3655,29 @@
       html += '</div>';
 
       html += '<div style="display:flex;gap:8px;margin-top:12px;">';
-      html += '<button id="tagConfirmBtn" class="photo-modal-close" style="flex:1;background:#6c5ce7;color:white;border-color:#6c5ce7;opacity:0.5;pointer-events:none;" onclick="confirmTag(\'' + fileId + '\')">振り分け確定</button>';
+      html += '<button id="tagConfirmBtn" class="photo-modal-close" style="flex:1;background:#6c5ce7;color:white;border-color:#6c5ce7;' + (defaultTiming ? '' : 'opacity:0.5;pointer-events:none;') + '" onclick="confirmTagMulti()">振り分け確定</button>';
       html += '</div>';
       html += '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">キャンセル</button>';
 
       modal.innerHTML = html;
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
-    }
 
-    window._tagSelectedTiming = null;
-    window._tagSelectedSpotId = null;
+      window._tagFileIds = fileIds;
+      window._tagSelectedTiming = defaultTiming || null;
+      window._tagSelectedSpotId = null;
+    }
 
     window.selectTagTiming = function(btn) {
       document.querySelectorAll('.tag-timing-btn').forEach(function(b) {
-        b.style.opacity = '0.4'; b.style.fontWeight = 'normal';
+        var t = b.dataset.timing;
+        b.style.background = t === 'ビフォー' ? '#eaf4fd' : '#fef5ec';
+        b.style.color = t === 'ビフォー' ? '#3498db' : '#e67e22';
       });
-      btn.style.opacity = '1'; btn.style.fontWeight = 'bold';
-      window._tagSelectedTiming = btn.dataset.timing;
+      var t = btn.dataset.timing;
+      btn.style.background = t === 'ビフォー' ? '#3498db' : '#e67e22';
+      btn.style.color = '#fff';
+      window._tagSelectedTiming = t;
       updateTagConfirmBtn();
     };
 
@@ -3633,41 +3700,47 @@
       }
     }
 
-    window.confirmTag = function(fileId) {
+    window.confirmTagMulti = function() {
       var timing = window._tagSelectedTiming;
       var spotId = window._tagSelectedSpotId;
-      if (!timing || !spotId) return;
+      var fileIds = window._tagFileIds || [];
+      if (!timing || !spotId || fileIds.length === 0) return;
 
       var overlay = document.querySelector('.photo-modal-overlay');
       var btn = document.getElementById('tagConfirmBtn');
-      if (btn) { btn.textContent = '振り分け中...'; btn.style.pointerEvents = 'none'; }
+      var total = fileIds.length;
+      var done = 0;
+      var fail = 0;
+      if (btn) { btn.textContent = '振り分け中... 0/' + total; btn.style.pointerEvents = 'none'; }
 
-      callGAS('reassignChecklistPhoto', [checkoutDate, '__unsorted__', fileId, spotId, timing]).then(function(res) {
-        if (res.success) {
-          // ローカルデータ更新: unsortedから削除
-          var us = checklistData.photos['__unsorted__'];
-          if (us) {
-            ['before', 'after', 'unsorted'].forEach(function(key) {
-              if (us[key]) us[key] = us[key].filter(function(p) { return p.fileId !== fileId; });
-            });
-          }
-          // 振り分け先に追加
-          if (!checklistData.photos[spotId]) checklistData.photos[spotId] = { before: [], after: [] };
-          var timingKey = timing === 'ビフォー' ? 'before' : 'after';
-          checklistData.photos[spotId][timingKey].push({ fileId: fileId, by: staffName, at: new Date() });
-
+      function reassignNext(idx) {
+        if (idx >= fileIds.length) {
+          if (fail > 0) alert(fail + '枚の振り分けに失敗しました');
           if (overlay) overlay.remove();
-          showSaveStatus('saved');
+          showSaveStatus(fail === 0 ? 'saved' : 'error');
           renderPhotoSection();
           renderChecklist();
-        } else {
-          alert('振り分けに失敗しました: ' + (res.error || ''));
-          if (btn) { btn.textContent = '振り分け確定'; btn.style.pointerEvents = 'auto'; }
+          return;
         }
-      }).catch(function() {
-        alert('振り分けに失敗しました');
-        if (btn) { btn.textContent = '振り分け確定'; btn.style.pointerEvents = 'auto'; }
-      });
+        callGAS('reassignChecklistPhoto', [checkoutDate, '__unsorted__', fileIds[idx], spotId, timing]).then(function(res) {
+          if (res.success) {
+            done++;
+            // ローカルデータ更新
+            var us = checklistData.photos['__unsorted__'];
+            if (us) {
+              ['before', 'after', 'unsorted'].forEach(function(key) {
+                if (us[key]) us[key] = us[key].filter(function(p) { return p.fileId !== fileIds[idx]; });
+              });
+            }
+            if (!checklistData.photos[spotId]) checklistData.photos[spotId] = { before: [], after: [] };
+            var timingKey = timing === 'ビフォー' ? 'before' : 'after';
+            checklistData.photos[spotId][timingKey].push({ fileId: fileIds[idx], by: staffName, at: new Date() });
+          } else { fail++; }
+          if (btn) btn.textContent = '振り分け中... ' + (done + fail) + '/' + total;
+          reassignNext(idx + 1);
+        }).catch(function() { fail++; if (btn) btn.textContent = '振り分け中... ' + (done + fail) + '/' + total; reassignNext(idx + 1); });
+      }
+      reassignNext(0);
     };
 
     function updateMemoSubmitBtn() {

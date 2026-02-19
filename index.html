@@ -940,7 +940,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1132,11 +1132,29 @@
         <div id="jobList"></div>
       </div>
       <div id="settingsRecruitSettings" style="display:none;">
-
-        <div class="mb-2"><label>最少回答者数（これ未満でリマインド）</label><input type="number" class="form-control form-control-sm" id="minRespondents" min="1" value="2"></div>
-        <div class="mb-2"><label>リマインド間隔（週）</label><input type="number" class="form-control form-control-sm" id="reminderIntervalWeeks" min="1" value="1"></div>
-        <div class="mb-2"><label>選定人数（基本何人選ぶか）</label><input type="number" class="form-control form-control-sm" id="selectCount" min="1" value="2"></div>
+        <p class="small text-muted mb-2">募集に対する回答が少ない場合にスタッフへリマインドメールを送信します。最大5件設定できます。</p>
+        <div class="mb-2"><label class="form-label small">最少回答者数（これ未満でリマインド）</label><input type="number" class="form-control form-control-sm" id="minRespondents" min="1" value="2" style="max-width:100px;"></div>
+        <div class="mb-2"><label class="form-label small">選定人数（基本何人選ぶか）</label><input type="number" class="form-control form-control-sm" id="selectCount" min="1" value="2" style="max-width:100px;"></div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">リマインドスケジュール</label>
+        <div id="recruitReminderEntries">
+          <div class="row g-2 align-items-center mb-2 recruit-reminder-entry" data-idx="0"><div class="col-auto"><input class="form-check-input rr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 recruit-reminder-entry" data-idx="1"><div class="col-auto"><input class="form-check-input rr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 recruit-reminder-entry" data-idx="2"><div class="col-auto"><input class="form-check-input rr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 recruit-reminder-entry" data-idx="3"><div class="col-auto"><input class="form-check-input rr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 recruit-reminder-entry" data-idx="4"><div class="col-auto"><input class="form-check-input rr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+        </div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">送信先</label>
+        <p class="small text-muted mb-1">空欄の場合は登録済みの全スタッフに送信します。特定の宛先を指定する場合はカンマ区切りでメールアドレスを入力してください。</p>
+        <div class="mb-3"><input type="text" class="form-control form-control-sm" id="recruitReminderRecipients" placeholder="例: staff1@example.com, staff2@example.com"></div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">メール文面テンプレート</label>
+        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックアウト}</code> <code>{回答数}</code> <code>{最少回答者数}</code></p>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitReminderSubject" placeholder="例: 【民泊】清掃募集リマインド: {チェックアウト}"></div>
+        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitReminderBody" rows="4" placeholder="例: 清掃スタッフの回答がまだ{最少回答者数}名に達していません。&#10;チェックアウト: {チェックアウト}&#10;現在の回答数: {回答数}名"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRecruitSettings">募集設定を保存</button>
+        <p class="small text-muted mt-2">※ 送信には時間ベースのトリガー（1時間ごと）の設定が必要です。GASエディタで <code>checkAndSendReminders</code> のトリガーを追加してください。</p>
       </div>
       <div id="settingsReminderEmail" style="display:none;">
         <p class="small text-muted mb-2">チェックイン前にオーナーへリマインドメールを送信します。清掃スタッフが未確定（「募集中」）の予約が対象です。最大5件設定できます。</p>
@@ -1211,14 +1229,31 @@
         <p class="small text-muted mt-2">※ 送信には時間ベースのトリガー（1時間ごと）の設定が必要です。GASエディタで <code>checkAndSendReminderEmails</code> のトリガーを追加してください。</p>
       </div>
       <div id="settingsRosterReminder" style="display:none;">
-        <p class="small text-muted mb-2">チェックイン日が近い予約について、宿泊者名簿が未記入の場合にオーナー宛に通知とメールを送ります。オーナーは通知を見て、宿泊者に名簿記入を催促してください。</p>
+        <p class="small text-muted mb-2">チェックイン日が近い予約について、宿泊者名簿が未記入の場合にリマインドメールを送ります。最大5件設定できます。</p>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="rosterReminderEnabled">
           <label class="form-check-label" for="rosterReminderEnabled">名簿未入力リマインドを有効にする</label>
         </div>
-        <div class="mb-2"><label class="form-label small">チェックイン何日前に通知</label><input type="number" class="form-control form-control-sm" id="rosterReminderDaysBefore" min="1" max="30" value="3" style="max-width:100px;"></div>
-        <div class="mb-2"><label class="form-label small">通知時刻</label><select class="form-select form-select-sm" id="rosterReminderHour" style="max-width:120px;"></select></div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">リマインドスケジュール</label>
+        <div id="rosterReminderEntries">
+          <div class="row g-2 align-items-center mb-2 roster-reminder-entry" data-idx="0"><div class="col-auto"><input class="form-check-input rostr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rostr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rostr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 roster-reminder-entry" data-idx="1"><div class="col-auto"><input class="form-check-input rostr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rostr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rostr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 roster-reminder-entry" data-idx="2"><div class="col-auto"><input class="form-check-input rostr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rostr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rostr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 roster-reminder-entry" data-idx="3"><div class="col-auto"><input class="form-check-input rostr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rostr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rostr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+          <div class="row g-2 align-items-center mb-2 roster-reminder-entry" data-idx="4"><div class="col-auto"><input class="form-check-input rostr-enabled" type="checkbox"></div><div class="col"><input type="number" class="form-control form-control-sm rostr-days" min="1" max="90" placeholder="日前" style="width:70px;"></div><div class="col-auto small">日前</div><div class="col"><select class="form-control form-control-sm rostr-time" style="width:110px;"></select></div><div class="col-auto small">に送信</div></div>
+        </div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">送信先</label>
+        <p class="small text-muted mb-1">空欄の場合はオーナーに送信します。特定の宛先を指定する場合はカンマ区切りでメールアドレスを入力してください。</p>
+        <div class="mb-3"><input type="text" class="form-control form-control-sm" id="rosterReminderRecipients" placeholder="例: owner@example.com, manager@example.com"></div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">メール文面テンプレート</label>
+        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{ゲスト名}</code> <code>{チェックイン}</code> <code>{チェックアウト}</code> <code>{残り日数}</code></p>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="rosterReminderSubject" placeholder="例: 【民泊】名簿未入力リマインド: {ゲスト名} ({チェックイン})"></div>
+        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="rosterReminderBody" rows="4" placeholder="例: 宿泊者名簿が未記入です。&#10;ゲスト: {ゲスト名}&#10;チェックイン: {チェックイン}&#10;残り{残り日数}日です。"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿未入力リマインド設定を保存</button>
+        <p class="small text-muted mt-2">※ 送信には時間ベースのトリガー（1時間ごと）の設定が必要です。GASエディタで <code>checkAndSendRosterReminders</code> のトリガーを追加してください。</p>
       </div>
       <div id="settingsSync" style="display:none;">
         <p class="small text-muted">Airbnb・Booking.comなどのiCal URLを登録すると、予約を自動取り込みできます。宿泊者がフォームで詳細入力すると、既存予約にマージされます。</p>
@@ -6729,37 +6764,73 @@
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
               document.getElementById('minRespondents').value = r.settings.minRespondents || 2;
-              document.getElementById('reminderIntervalWeeks').value = r.settings.reminderIntervalWeeks || 1;
               document.getElementById('selectCount').value = r.settings.selectCount || 2;
+              // スケジュールエントリ
+              var entries = document.querySelectorAll('.recruit-reminder-entry');
+              (r.settings.schedules || []).forEach(function(sch, idx) {
+                if (idx >= entries.length) return;
+                var entry = entries[idx];
+                entry.querySelector('.rr-enabled').checked = !!sch.enabled;
+                entry.querySelector('.rr-days').value = sch.daysBefore || '';
+                var t = sch.time || '09:00';
+                var hour = ('0' + parseInt(t.split(':')[0], 10)).slice(-2);
+                entry.querySelector('.rr-time').value = hour + ':00';
+              });
+              // 送信先
+              document.getElementById('recruitReminderRecipients').value = r.settings.recipients || '';
+              // テンプレート
+              document.getElementById('recruitReminderSubject').value = r.settings.recruitReminderSubject || '';
+              document.getElementById('recruitReminderBody').value = r.settings.recruitReminderBody || '';
             }
           } catch (e) {}
         }).getRecruitmentSettings();
       }
 
       document.getElementById('btnSaveRecruitSettings').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        var schedules = [];
+        document.querySelectorAll('.recruit-reminder-entry').forEach(function(entry) {
+          schedules.push({
+            enabled: entry.querySelector('.rr-enabled').checked,
+            daysBefore: parseInt(entry.querySelector('.rr-days').value, 10) || 0,
+            time: entry.querySelector('.rr-time').value || '09:00'
+          });
+        });
         var settings = {
           minRespondents: parseInt(document.getElementById('minRespondents').value, 10) || 2,
-          reminderIntervalWeeks: parseInt(document.getElementById('reminderIntervalWeeks').value, 1) || 1,
-          selectCount: parseInt(document.getElementById('selectCount').value, 10) || 2
+          selectCount: parseInt(document.getElementById('selectCount').value, 10) || 2,
+          schedules: schedules,
+          recipients: document.getElementById('recruitReminderRecipients').value.trim(),
+          recruitReminderSubject: document.getElementById('recruitReminderSubject').value,
+          recruitReminderBody: document.getElementById('recruitReminderBody').value
         };
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '保存中...';
         google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
           var r = JSON.parse(jsonStr);
           alert(r.success ? '保存しました。' : (r.error || '失敗'));
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          alert('保存に失敗しました。');
         }).setRecruitmentSettings(settings);
       });
 
-      // 名簿リマインダー設定
+      // 募集設定・名簿リマインドの時刻selectに0〜23時のオプションを生成
       (function() {
-        var sel = document.getElementById('rosterReminderHour');
-        if (sel) {
+        document.querySelectorAll('select.rr-time, select.rostr-time').forEach(function(sel) {
           for (var h = 0; h <= 23; h++) {
             var opt = document.createElement('option');
-            opt.value = h;
+            opt.value = ('0' + h).slice(-2) + ':00';
             opt.textContent = h + '時';
-            if (h === 9) opt.selected = true;
             sel.appendChild(opt);
           }
-        }
+          sel.value = '09:00';
+        });
       })();
 
       function loadRosterReminderSettings() {
@@ -6768,8 +6839,22 @@
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
               document.getElementById('rosterReminderEnabled').checked = !!r.settings.rosterReminderEnabled;
-              document.getElementById('rosterReminderDaysBefore').value = r.settings.rosterReminderDaysBefore || 3;
-              document.getElementById('rosterReminderHour').value = r.settings.rosterReminderHour != null ? r.settings.rosterReminderHour : 9;
+              // スケジュールエントリ
+              var entries = document.querySelectorAll('.roster-reminder-entry');
+              (r.settings.schedules || []).forEach(function(sch, idx) {
+                if (idx >= entries.length) return;
+                var entry = entries[idx];
+                entry.querySelector('.rostr-enabled').checked = !!sch.enabled;
+                entry.querySelector('.rostr-days').value = sch.daysBefore || '';
+                var t = sch.time || '09:00';
+                var hour = ('0' + parseInt(t.split(':')[0], 10)).slice(-2);
+                entry.querySelector('.rostr-time').value = hour + ':00';
+              });
+              // 送信先
+              document.getElementById('rosterReminderRecipients').value = r.settings.recipients || '';
+              // テンプレート
+              document.getElementById('rosterReminderSubject').value = r.settings.rosterReminderSubject || '';
+              document.getElementById('rosterReminderBody').value = r.settings.rosterReminderBody || '';
             }
           } catch (e) {}
         }).getRosterReminderSettings();
@@ -6777,19 +6862,34 @@
 
       document.getElementById('btnSaveRosterReminder').addEventListener('click', function() {
         var btn = this;
-        setButtonLoading(btn, true);
+        if (btn.disabled) return;
+        var schedules = [];
+        document.querySelectorAll('.roster-reminder-entry').forEach(function(entry) {
+          schedules.push({
+            enabled: entry.querySelector('.rostr-enabled').checked,
+            daysBefore: parseInt(entry.querySelector('.rostr-days').value, 10) || 0,
+            time: entry.querySelector('.rostr-time').value || '09:00'
+          });
+        });
         var settings = {
           rosterReminderEnabled: document.getElementById('rosterReminderEnabled').checked,
-          rosterReminderDaysBefore: parseInt(document.getElementById('rosterReminderDaysBefore').value, 10) || 3,
-          rosterReminderHour: parseInt(document.getElementById('rosterReminderHour').value, 10) || 9
+          schedules: schedules,
+          recipients: document.getElementById('rosterReminderRecipients').value.trim(),
+          rosterReminderSubject: document.getElementById('rosterReminderSubject').value,
+          rosterReminderBody: document.getElementById('rosterReminderBody').value
         };
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '保存中...';
         google.script.run.withSuccessHandler(function(jsonStr) {
-          setButtonLoading(btn, false);
+          btn.disabled = false;
+          btn.textContent = origText;
           var r = JSON.parse(jsonStr);
           alert(r.success ? '保存しました。' : (r.error || '失敗'));
         }).withFailureHandler(function(e) {
-          setButtonLoading(btn, false);
-          alert(e.message);
+          btn.disabled = false;
+          btn.textContent = origText;
+          alert('保存に失敗しました。');
         }).saveRosterReminderSettings(settings);
       });
 

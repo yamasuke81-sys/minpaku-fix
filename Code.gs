@@ -3020,19 +3020,28 @@ function getRecruitmentSettings() {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow, 2).getValues() : [];
-    const settings = {};
+    const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    const map = {};
     rows.forEach(function(row) {
       const key = String(row[0] || '').trim();
-      if (key) settings[key] = row[1];
+      if (key) map[key] = row[1];
     });
+    // スケジュール（JSON配列）
+    var schedules = [];
+    try { schedules = JSON.parse(map['募集リマインドスケジュール'] || '[]'); } catch (e) { schedules = []; }
+    while (schedules.length < 5) {
+      schedules.push({ daysBefore: 0, time: '09:00', enabled: false });
+    }
     return JSON.stringify({
       success: true,
       settings: {
-        recruitStartWeeks: parseInt(settings['募集開始週数'], 10) || 4,
-        minRespondents: parseInt(settings['最少回答者数'], 10) || 2,
-        reminderIntervalWeeks: parseInt(settings['リマインド間隔週'], 1) || 1,
-        selectCount: parseInt(settings['選定人数'], 10) || 2
+        recruitStartWeeks: parseInt(map['募集開始週数'], 10) || 4,
+        minRespondents: parseInt(map['最少回答者数'], 10) || 2,
+        selectCount: parseInt(map['選定人数'], 10) || 2,
+        schedules: schedules,
+        recipients: String(map['募集リマインド送信先'] || ''),
+        recruitReminderSubject: String(map['募集リマインド件名'] || ''),
+        recruitReminderBody: String(map['募集リマインド本文'] || '')
       }
     });
   } catch (e) {
@@ -3046,17 +3055,31 @@ function setRecruitmentSettings(settings) {
     ensureSheetsExist();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
-    var keys = ['募集開始週数', '最少回答者数', 'リマインド間隔週', '選定人数'];
-    var values = [
-      settings.recruitStartWeeks != null ? settings.recruitStartWeeks : 4,
-      settings.minRespondents != null ? settings.minRespondents : 2,
-      settings.reminderIntervalWeeks != null ? settings.reminderIntervalWeeks : 1,
-      settings.selectCount != null ? settings.selectCount : 2
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var rowMap = {};
+    for (var i = 0; i < rows.length; i++) {
+      var key = String(rows[i][0] || '').trim();
+      if (key) rowMap[key] = i + 2;
+    }
+    var entries = [
+      ['最少回答者数', settings.minRespondents != null ? settings.minRespondents : 2],
+      ['選定人数', settings.selectCount != null ? settings.selectCount : 2],
+      ['募集リマインドスケジュール', JSON.stringify(settings.schedules || [])],
+      ['募集リマインド送信先', String(settings.recipients || '')],
+      ['募集リマインド件名', String(settings.recruitReminderSubject || '')],
+      ['募集リマインド本文', String(settings.recruitReminderBody || '')]
     ];
-    for (var i = 0; i < keys.length; i++) {
-      var row = i + 2;
-      sheet.getRange(row, 1).setValue(keys[i]);
-      sheet.getRange(row, 2).setValue(values[i]);
+    for (var ei = 0; ei < entries.length; ei++) {
+      var eKey = entries[ei][0], eVal = entries[ei][1];
+      if (rowMap[eKey]) {
+        sheet.getRange(rowMap[eKey], 2).setValue(eVal);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(eKey);
+        sheet.getRange(nr, 2).setValue(eVal);
+        rowMap[eKey] = nr;
+      }
     }
     return JSON.stringify({ success: true });
   } catch (e) {
@@ -3080,12 +3103,28 @@ function getRosterReminderSettings() {
       var key = String(row[0] || '').trim();
       if (key) map[key] = row[1];
     });
+    // スケジュール（JSON配列）
+    var schedules = [];
+    try { schedules = JSON.parse(map['名簿リマインドスケジュール'] || '[]'); } catch (e) { schedules = []; }
+    // 旧設定からの移行: スケジュールが空で旧設定がある場合、1件目に変換
+    if (schedules.length === 0) {
+      var oldDays = parseInt(map['名簿リマインダー日前'], 10);
+      var oldHour = parseInt(map['名簿リマインダー送信時刻'], 10);
+      if (oldDays > 0) {
+        schedules.push({ enabled: true, daysBefore: oldDays, time: ('0' + (oldHour || 9)).slice(-2) + ':00' });
+      }
+    }
+    while (schedules.length < 5) {
+      schedules.push({ daysBefore: 0, time: '09:00', enabled: false });
+    }
     return JSON.stringify({
       success: true,
       settings: {
         rosterReminderEnabled: map['名簿リマインダー有効'] === true || map['名簿リマインダー有効'] === 'true',
-        rosterReminderDaysBefore: parseInt(map['名簿リマインダー日前'], 10) || 3,
-        rosterReminderHour: parseInt(map['名簿リマインダー送信時刻'], 10) || 9
+        schedules: schedules,
+        recipients: String(map['名簿リマインド送信先'] || ''),
+        rosterReminderSubject: String(map['名簿リマインド件名'] || ''),
+        rosterReminderBody: String(map['名簿リマインド本文'] || '')
       }
     });
   } catch (e) {
@@ -3100,7 +3139,7 @@ function saveRosterReminderSettings(settings) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
     var lastRow = Math.max(sheet.getLastRow(), 1);
-    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 1).getValues() : [];
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
     var keyRowMap = {};
     rows.forEach(function(r, i) {
       var k = String(r[0] || '').trim();
@@ -3108,8 +3147,10 @@ function saveRosterReminderSettings(settings) {
     });
     var pairs = [
       ['名簿リマインダー有効', settings.rosterReminderEnabled ? 'true' : 'false'],
-      ['名簿リマインダー日前', settings.rosterReminderDaysBefore != null ? settings.rosterReminderDaysBefore : 3],
-      ['名簿リマインダー送信時刻', settings.rosterReminderHour != null ? settings.rosterReminderHour : 9]
+      ['名簿リマインドスケジュール', JSON.stringify(settings.schedules || [])],
+      ['名簿リマインド送信先', String(settings.recipients || '')],
+      ['名簿リマインド件名', String(settings.rosterReminderSubject || '')],
+      ['名簿リマインド本文', String(settings.rosterReminderBody || '')]
     ];
     pairs.forEach(function(pair) {
       var rowNum = keyRowMap[pair[0]];
@@ -3121,8 +3162,9 @@ function saveRosterReminderSettings(settings) {
         sheet.getRange(newRow, 2).setValue(pair[1]);
       }
     });
-    // トリガーの設定/解除
-    setupRosterReminderTrigger(settings.rosterReminderEnabled, settings.rosterReminderHour);
+    // トリガーの設定/解除（有効なスケジュールがあればトリガーON）
+    var hasEnabled = (settings.schedules || []).some(function(s) { return s.enabled && s.daysBefore > 0; });
+    setupRosterReminderTrigger(settings.rosterReminderEnabled && hasEnabled, 9);
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

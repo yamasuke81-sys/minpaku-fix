@@ -4823,10 +4823,11 @@ function resetStaffPassword(staffName) {
  * @param {string} staffIdentifier - スタッフ名またはメール
  * @param {string} yearMonth - YYYY-MM
  */
-function getStaffSchedule(staffIdentifier, yearMonth) {
+function getStaffSchedule(staffIdentifier, yearMonth, staffEmail) {
   try {
     if (!staffIdentifier || typeof staffIdentifier !== 'string') return JSON.stringify({ success: false, list: [] });
     var staff = String(staffIdentifier).trim().toLowerCase();
+    var staffEmailLower = staffEmail ? String(staffEmail).trim().toLowerCase() : '';
     ensureSheetsExist();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const formSheet = ss.getSheetByName(SHEET_NAME);
@@ -4877,11 +4878,13 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
       if (!cleaningStaff) continue;
       var names = cleaningStaff.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
       var isAssigned = names.some(function(n) {
-        return n.toLowerCase() === staff || (n.indexOf('@') >= 0 && n.toLowerCase() === staff);
+        var nl = n.toLowerCase();
+        return nl === staff || (staffEmailLower && nl === staffEmailLower);
       });
       if (!isAssigned) continue;
       var partners = names.filter(function(n) {
-        return n.toLowerCase() !== staff && (n.indexOf('@') < 0 || n.toLowerCase() !== staff);
+        var nl = n.toLowerCase();
+        return nl !== staff && (!staffEmailLower || nl !== staffEmailLower);
       });
       var checkOutVal = data[i][colMap.checkOut];
       var checkOut = parseDate(checkOutVal);
@@ -4960,78 +4963,27 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
           };
         }
       }
-      var _dbg = { staff: staff, targetYear: targetYear, targetMonth: targetMonth, volCount: volData.length, recruitCount: rAllData.length, myEntries: [], aprilRecruits: [], myRecruitDetail: {}, r12Volunteers: [] };
-      // 4月の募集エントリを全て表示
-      var _rKeys = Object.keys(recruitInfoMap);
-      for (var _rki = 0; _rki < _rKeys.length; _rki++) {
-        var _rk = _rKeys[_rki];
-        var _ri = recruitInfoMap[_rk];
-        var _rd = parseDate(_ri.checkoutDate);
-        if (_rd && new Date(_rd).getMonth() + 1 === targetMonth) {
-          _dbg.aprilRecruits.push({ rid: _rk, date: _ri.checkoutDate, status: _ri.status, bookingRow: _ri.bookingRowNumber });
-        }
-      }
-      // 4月募集の全ボランティアエントリを表示
-      for (var _r12i = 0; _r12i < volData.length; _r12i++) {
-        var _r12rid = String(volData[_r12i][0] || '').trim();
-        for (var _ai = 0; _ai < _dbg.aprilRecruits.length; _ai++) {
-          if (_r12rid === _dbg.aprilRecruits[_ai].rid) {
-            _dbg.r12Volunteers.push({ rid: _r12rid, name: String(volData[_r12i][1] || ''), email: String(volData[_r12i][2] || ''), status: String(volData[_r12i][5] || ''), col0to6: String(volData[_r12i][0]) + '|' + String(volData[_r12i][1]) + '|' + String(volData[_r12i][2]) + '|' + String(volData[_r12i][3]) + '|' + String(volData[_r12i][4]) + '|' + String(volData[_r12i][5]) + '|' + String(volData[_r12i][6] || '') });
-          }
-        }
-      }
-      // ユーザーの回答に関連する募集エントリの詳細（元の募集シート日付とrBookingRowの情報）
-      var _myRids = {};
-      for (var _vdi = 0; _vdi < volData.length; _vdi++) {
-        var _vdName = String(volData[_vdi][1] || '').trim();
-        var _vdEmail = String(volData[_vdi][2] || '').trim().toLowerCase();
-        if ((_vdName && _vdName.toLowerCase() === staff) || (_vdEmail && _vdEmail === staff)) {
-          _myRids[String(volData[_vdi][0] || '').trim()] = true;
-        }
-      }
-      for (var _mri = 0; _mri < rAllData.length; _mri++) {
-        var _mrid = 'r' + (_mri + 2);
-        if (!_myRids[_mrid]) continue;
-        var _origDate = rAllData[_mri][0] ? String(rAllData[_mri][0]) : 'empty';
-        var _bRow = rAllData[_mri][1] ? Number(rAllData[_mri][1]) : 0;
-        var _formDate = 'N/A';
-        if (_bRow >= 2 && _bRow <= data.length + 1) {
-          var _fCo = parseDate(data[_bRow - 2][colMap.checkOut]);
-          _formDate = _fCo ? toDateKeySafe_(_fCo) : 'parse_failed';
-        } else {
-          _formDate = 'bRow_invalid_' + _bRow;
-        }
-        _dbg.myRecruitDetail[_mrid] = { origSheetDate: _origDate, bookingRow: _bRow, formDateAtRow: _formDate, finalDate: recruitInfoMap[_mrid] ? recruitInfoMap[_mrid].checkoutDate : 'not_in_map' };
-      }
       for (var vi = 0; vi < volData.length; vi++) {
         var vRid = String(volData[vi][0] || '').trim();
         var vName = String(volData[vi][1] || '').trim();
         var vEmail = String(volData[vi][2] || '').trim().toLowerCase();
         var vStatus = String(volData[vi][5] || '').trim();
         // ◎ or △ のみ
-        if (vStatus !== '◎' && vStatus !== '△') {
-          // デバッグ: この人のエントリでスキップされた場合も記録
-          var _isMe = (vName && vName.toLowerCase() === staff) || (vEmail && vEmail === staff);
-          if (_isMe) _dbg.myEntries.push({ rid: vRid, name: vName, status: vStatus, skipReason: 'status_not_match', rawCol5: String(volData[vi][5]) });
-          continue;
-        }
-        // 自分の回答かチェック
-        var isMyVol = (vName && vName.toLowerCase() === staff) || (vEmail && vEmail === staff);
+        if (vStatus !== '◎' && vStatus !== '△') continue;
+        // 自分の回答かチェック（名前またはメールで照合）
+        var isMyVol = (vName && vName.toLowerCase() === staff) || (staffEmailLower && vEmail === staffEmailLower);
         if (!isMyVol) continue;
-        // デバッグ: ステータスマッチした自分のエントリ
-        var _dbgEntry = { rid: vRid, name: vName, status: vStatus, skipReason: 'none' };
         var rInfo = recruitInfoMap[vRid];
-        if (!rInfo) { _dbgEntry.skipReason = 'no_recruitInfo_for_' + vRid; _dbg.myEntries.push(_dbgEntry); continue; }
+        if (!rInfo) continue;
         // キャンセルされた募集は除外
-        if (rInfo.status === 'キャンセル') { _dbgEntry.skipReason = 'cancelled'; _dbg.myEntries.push(_dbgEntry); continue; }
+        if (rInfo.status === 'キャンセル') continue;
         // 対象月チェック
         var coDate = parseDate(rInfo.checkoutDate);
-        if (!coDate) { _dbgEntry.skipReason = 'coDate_null_from_' + rInfo.checkoutDate; _dbg.myEntries.push(_dbgEntry); continue; }
+        if (!coDate) continue;
         var cd = new Date(coDate);
-        if (cd.getFullYear() !== targetYear || (cd.getMonth() + 1) !== targetMonth) { _dbgEntry.skipReason = 'month_mismatch_' + cd.getFullYear() + '-' + (cd.getMonth()+1) + '_vs_' + targetYear + '-' + targetMonth; _dbgEntry.recruitDate = rInfo.checkoutDate; _dbg.myEntries.push(_dbgEntry); continue; }
+        if (cd.getFullYear() !== targetYear || (cd.getMonth() + 1) !== targetMonth) continue;
         // 既に確定済みリストにあるものは重複しない
-        if (confirmedCheckouts[rInfo.checkoutDate]) { _dbgEntry.skipReason = 'already_confirmed'; _dbg.myEntries.push(_dbgEntry); continue; }
-        _dbgEntry.skipReason = 'ADDED'; _dbg.myEntries.push(_dbgEntry);
+        if (confirmedCheckouts[rInfo.checkoutDate]) continue;
         // フォームシートから行番号を検索（checkoutDateで照合）
         var formRowNum = rInfo.bookingRowNumber;
         if (!formRowNum) {
@@ -5056,7 +5008,7 @@ function getStaffSchedule(staffIdentifier, yearMonth) {
     // 確定済みには confirmed: true をセット
     list.forEach(function(item) { if (item.confirmed === undefined) item.confirmed = true; });
     list.sort(function(a, b) { return (a.checkoutDate || '').localeCompare(b.checkoutDate || ''); });
-    return JSON.stringify({ success: true, list: list, _debug: typeof _dbg !== 'undefined' ? _dbg : null });
+    return JSON.stringify({ success: true, list: list });
   } catch (e) {
     return JSON.stringify({ success: false, list: [], error: e.toString() });
   }

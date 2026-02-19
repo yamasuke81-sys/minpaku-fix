@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220i</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5227,11 +5227,8 @@
             } else {
               el.innerHTML = '<p class="text-muted small">' + ym + ' の出勤予定・回答済みの予定はありません。</p>';
             }
-            if (r._debug) {
-              el.innerHTML += '<details class="mt-2"><summary class="text-muted small">デバッグ情報</summary><pre class="small" style="max-height:200px;overflow:auto;font-size:0.65rem;">' + JSON.stringify(r._debug, null, 2) + '</pre></details>';
-            }
           } catch (e) { el.innerHTML = '<p class="text-danger small">読み込み失敗</p>'; }
-        }).withFailureHandler(function() { el.innerHTML = '<p class="text-danger small">エラー</p>'; }).getStaffSchedule(staffId, ym);
+        }).withFailureHandler(function() { el.innerHTML = '<p class="text-danger small">エラー</p>'; }).getStaffSchedule(staffId, ym, window.currentUserEmail || '');
       }
       function loadNotificationListMain() {
         var el = document.getElementById('notificationListMain');

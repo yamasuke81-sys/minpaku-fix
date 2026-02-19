@@ -1454,7 +1454,7 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
       for (var sni = 0; sni < staffNames.length; sni++) {
         var name = staffNames[sni];
         var email = staffEmails[name] || '';
-        if (email) {
+        if (email && isEmailNotifyEnabled_('キャンセル通知有効')) {
           try {
             var subject = '【民泊】予約キャンセルのお知らせ: ' + coStr;
             var body = name + ' 様\n\n' + dateRange + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。\n\nご確認ください。';
@@ -1466,7 +1466,7 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
       try {
         var ownerRes = JSON.parse(getOwnerEmail());
         var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-        if (ownerEmail) {
+        if (ownerEmail && isEmailNotifyEnabled_('キャンセル通知有効')) {
           var oSubject = '【民泊】予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
           var oBody = '以下の予約がキャンセルされました。\n\n' +
             '期間: ' + dateRange + '\n' +
@@ -3090,6 +3090,92 @@ function setRecruitmentSettings(settings) {
 }
 
 /**********************************************
+ * メール通知ON/OFF設定
+ **********************************************/
+
+var EMAIL_NOTIFY_KEYS_ = [
+  '募集開始通知有効', 'スタッフ確定通知有効', 'キャンセル通知有効',
+  '辞退申請通知有効', '辞退承認通知有効', '辞退却下通知有効',
+  '清掃完了通知有効', '請求書送信通知有効'
+];
+var EMAIL_NOTIFY_JS_KEYS_ = [
+  'notifyRecruitStart', 'notifyStaffConfirm', 'notifyCancel',
+  'notifyCancelRequest', 'notifyCancelApprove', 'notifyCancelReject',
+  'notifyCleaningDone', 'notifyInvoice'
+];
+
+function getEmailNotifySettings() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = row[1];
+    });
+    var settings = {};
+    for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
+      var val = map[EMAIL_NOTIFY_KEYS_[i]];
+      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = val === 'false' ? false : true; // デフォルトON
+    }
+    return JSON.stringify({ success: true, settings: settings });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function saveEmailNotifySettings(settings) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var rowMap = {};
+    rows.forEach(function(r, i) {
+      var k = String(r[0] || '').trim();
+      if (k) rowMap[k] = i + 2;
+    });
+    for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
+      var sheetKey = EMAIL_NOTIFY_KEYS_[i];
+      var jsKey = EMAIL_NOTIFY_JS_KEYS_[i];
+      var val = settings[jsKey] !== false ? 'true' : 'false';
+      if (rowMap[sheetKey]) {
+        sheet.getRange(rowMap[sheetKey], 2).setValue(val);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(sheetKey);
+        sheet.getRange(nr, 2).setValue(val);
+        rowMap[sheetKey] = nr;
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** メール通知が有効かチェックするヘルパー（デフォルトtrue） */
+function isEmailNotifyEnabled_(sheetKey) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet || sheet.getLastRow() < 2) return true;
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() === sheetKey) {
+        return String(rows[i][1]).trim() !== 'false';
+      }
+    }
+    return true; // キーが見つからない場合はデフォルトON
+  } catch (e) {
+    return true;
+  }
+}
+
+/**********************************************
  * 名簿リマインダー設定
  **********************************************/
 
@@ -4061,6 +4147,7 @@ function createRecruitmentForBooking(bookingRowNumber, checkoutDateStr) {
 
 function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowNumber) {
   try {
+    if (!isEmailNotifyEnabled_('募集開始通知有効')) return;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) return;
@@ -4150,7 +4237,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     try {
       var ownerRes = JSON.parse(getOwnerEmail());
       var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-      if (ownerEmail) {
+      if (ownerEmail && isEmailNotifyEnabled_('辞退申請通知有効')) {
         var subject = '【民泊】清掃スタッフの出勤キャンセル要望: ' + dateStr;
         var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。';
         GmailApp.sendEmail(ownerEmail, subject, body);
@@ -4242,7 +4329,7 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     addNotification_('キャンセル承認', (sName || sEmail) + ' のキャンセルを承認しました（' + checkoutStr + '）');
 
     // スタッフにメール通知
-    if (sEmail) {
+    if (sEmail && isEmailNotifyEnabled_('辞退承認通知有効')) {
       try {
         var subject = '【民泊】出勤キャンセルが承認されました: ' + checkoutStr;
         var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。';
@@ -4287,7 +4374,7 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     addNotification_('キャンセル却下', (sName || sEmail) + ' のキャンセル申請を却下しました（' + checkoutStr + '）');
 
     // スタッフにメール通知
-    if (sEmail) {
+    if (sEmail && isEmailNotifyEnabled_('辞退却下通知有効')) {
       try {
         var subject = '【民泊】出勤キャンセルが却下されました: ' + checkoutStr;
         var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。';
@@ -5249,14 +5336,18 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         '請求書はGoogleドライブにも保存されています。\n' +
         'PDF: ' + pdfFile.getUrl() + '\n';
       try {
-        MailApp.sendEmail({
-          to: ownerEmail,
-          subject: subject,
-          body: bodyText,
-          attachments: [pdfBlob],
-          name: '請求書（自動送信）'
-        });
-        sendResult = '送信済み：' + ownerEmail;
+        if (!isEmailNotifyEnabled_('請求書送信通知有効')) {
+          sendResult = 'メール送信OFF（PDF作成は成功）';
+        } else {
+          MailApp.sendEmail({
+            to: ownerEmail,
+            subject: subject,
+            body: bodyText,
+            attachments: [pdfBlob],
+            name: '請求書（自動送信）'
+          });
+          sendResult = '送信済み：' + ownerEmail;
+        }
       } catch (mailErr) {
         sendResult = 'メール送信スキップ（PDF作成は成功）';
         Logger.log('メール送信エラー（PDF作成は成功、続行）: ' + mailErr);
@@ -6577,6 +6668,7 @@ function getConfirmationCopyText(recruitRowIndex) {
 function notifyStaffConfirmation(recruitRowIndex) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+    if (!isEmailNotifyEnabled_('スタッフ確定通知有効')) return JSON.stringify({ success: true, message: 'メール通知はOFFに設定されています。' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     if (!recruitSheet || recruitSheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません' });
@@ -7522,7 +7614,9 @@ function notifyCleaningComplete(checkoutDate) {
         body += '\n--- 特記事項 ---\n';
         clRes.memos.forEach(function(m) { body += '・' + m.text + '（' + m.author + ' ' + m.timestamp + '）\n'; });
       }
-      GmailApp.sendEmail(ownerEmail, subject, body);
+      if (isEmailNotifyEnabled_('清掃完了通知有効')) {
+        GmailApp.sendEmail(ownerEmail, subject, body);
+      }
     }
     return JSON.stringify({ success: true, message: '清掃完了通知を送信しました。' });
   } catch (e) {

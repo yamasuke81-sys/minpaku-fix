@@ -33,6 +33,25 @@ const SHEET_CL_STAFF_SELECTION = 'スタッフ選択記録';
 const CL_BOOKING_SHEET = 'フォームの回答 1';
 const CL_OWNER_SHEET = '設定_オーナー';
 const CL_STAFF_SHEET = '清掃スタッフ';
+const CL_RECRUIT_SETTINGS_SHEET = '募集設定';
+
+/** メール通知が有効かチェック（デフォルトtrue） */
+function isEmailNotifyEnabled_(sheetKey) {
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_RECRUIT_SETTINGS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return true;
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() === sheetKey) {
+        return String(rows[i][1]).trim() !== 'false';
+      }
+    }
+    return true;
+  } catch (e) {
+    return true;
+  }
+}
 
 /**
  * 診断用: Script Properties とスプレッドシートの状態を確認
@@ -1231,6 +1250,9 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     }
     htmlBody += '<p style="color:#888;font-size:12px;">詳細はチェックリストをご確認ください。</p></div>';
 
+    if (!isEmailNotifyEnabled_('清掃完了通知有効')) {
+      return JSON.stringify({ success: true, message: 'メール通知はOFFに設定されています。' });
+    }
     GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
 
     // メインアプリの通知にも追加

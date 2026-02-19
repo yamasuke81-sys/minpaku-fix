@@ -946,7 +946,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0219k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1121,6 +1121,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoice">請求書</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="emailNotify">メール通知</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsStaff">
@@ -1350,6 +1351,60 @@
           <div id="ownerInvDownloadResult" class="small mt-1" style="display:none;"></div>
         </div>
       </div>
+      <div id="settingsEmailNotify" style="display:none;">
+        <p class="small text-muted mb-2">各メール通知の送信ON/OFFを設定します。OFFにすると該当メールは送信されません。</p>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyRecruitStart" checked>
+          <label class="form-check-label" for="notifyRecruitStart"><strong>募集開始通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">新しい清掃募集を作成した際に、登録済みの全スタッフへ募集案内メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyStaffConfirm" checked>
+          <label class="form-check-label" for="notifyStaffConfirm"><strong>スタッフ確定通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">オーナーが清掃スタッフを確定した際に、全スタッフへ確定結果メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancel" checked>
+          <label class="form-check-label" for="notifyCancel"><strong>予約キャンセル通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">iCal同期で予約キャンセルを検知した際に、担当スタッフとオーナーへ通知メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelRequest" checked>
+          <label class="form-check-label" for="notifyCancelRequest"><strong>辞退申請通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">スタッフが清掃の辞退を申請した際に、オーナーへ通知メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelApprove" checked>
+          <label class="form-check-label" for="notifyCancelApprove"><strong>辞退承認通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">オーナーが辞退申請を承認した際に、申請したスタッフへ承認結果メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelReject" checked>
+          <label class="form-check-label" for="notifyCancelReject"><strong>辞退却下通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">オーナーが辞退申請を却下した際に、申請したスタッフへ却下結果メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCleaningDone" checked>
+          <label class="form-check-label" for="notifyCleaningDone"><strong>清掃完了通知</strong></label>
+          <p class="small text-muted mb-0 ms-4">スタッフがチェックリストを完了した際に、オーナーへ清掃完了報告メールを送信します。</p>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyInvoice" checked>
+          <label class="form-check-label" for="notifyInvoice"><strong>請求書メール送信</strong></label>
+          <p class="small text-muted mb-0 ms-4">請求書を作成した際に、オーナーへPDF添付の請求書メールを送信します。OFFの場合もPDFは生成されます。</p>
+        </div>
+
+        <button type="button" class="btn btn-sm btn-primary" id="btnSaveEmailNotify">メール通知設定を保存</button>
+      </div>
+
       <div id="settingsMaintenance" style="display:none;">
         <p class="small text-muted mb-2">スプレッドシートの空白行・空白列を削除してセル数を最適化します。Google Sheetsの1000万セル上限に近づいた場合に実行してください。</p>
         <button type="button" class="btn btn-sm btn-primary mb-2" id="btnTrimSpreadsheet">スプレッドシートを最適化</button>
@@ -6905,6 +6960,48 @@
         }).saveRosterReminderSettings(settings);
       });
 
+      // メール通知ON/OFF設定
+      var EMAIL_NOTIFY_KEYS = [
+        'notifyRecruitStart', 'notifyStaffConfirm', 'notifyCancel',
+        'notifyCancelRequest', 'notifyCancelApprove', 'notifyCancelReject',
+        'notifyCleaningDone', 'notifyInvoice'
+      ];
+      function loadEmailNotifySettings() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.settings) {
+              EMAIL_NOTIFY_KEYS.forEach(function(key) {
+                var el = document.getElementById(key);
+                if (el) el.checked = r.settings[key] !== false;
+              });
+            }
+          } catch (e) {}
+        }).getEmailNotifySettings();
+      }
+      document.getElementById('btnSaveEmailNotify').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        var settings = {};
+        EMAIL_NOTIFY_KEYS.forEach(function(key) {
+          var el = document.getElementById(key);
+          if (el) settings[key] = el.checked;
+        });
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '保存中...';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
+          var r = JSON.parse(jsonStr);
+          alert(r.success ? '保存しました。' : (r.error || '失敗'));
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          alert('保存に失敗しました。');
+        }).saveEmailNotifySettings(settings);
+      });
+
       // リマインド時刻selectに0〜23時のオプションを生成
       (function() {
         document.querySelectorAll('select.reminder-time').forEach(function(sel) {
@@ -7342,6 +7439,8 @@
           if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
           var invoiceEl = document.getElementById('settingsInvoice');
           if (invoiceEl) invoiceEl.style.display = t === 'invoice' ? 'block' : 'none';
+          var emailNotifyEl = document.getElementById('settingsEmailNotify');
+          if (emailNotifyEl) emailNotifyEl.style.display = t === 'emailNotify' ? 'block' : 'none';
           var maintEl = document.getElementById('settingsMaintenance');
           if (maintEl) maintEl.style.display = t === 'maintenance' ? 'block' : 'none';
           if (t === 'staff') loadStaffList();
@@ -7353,6 +7452,7 @@
           if (t === 'subOwners') loadSubOwnerList();
           if (t === 'notifications') loadNotificationList();
           if (t === 'invoice') loadInvoiceSettings_();
+          if (t === 'emailNotify') loadEmailNotifySettings();
         });
       });
 

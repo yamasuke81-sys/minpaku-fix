@@ -276,8 +276,8 @@
       .recruit-status-badge { font-size: 0.9rem; font-weight: 700; display: block; text-align: center; padding: 0.4rem 0.75rem; letter-spacing: 0.05em; margin: -0.75rem -0.75rem 0.5rem -0.75rem; border-radius: 10px 10px 0 0; border-bottom: 1px solid rgba(255,255,255,0.15); }
       .recruit-status-badge.status-undecided { background: rgba(255,255,255,0.08); color: #f5a3ad; }
       .recruit-status-badge.status-recruiting { background: rgba(255,255,255,0.08); color: #ffd866; }
-      .recruit-status-badge.status-decided { background: rgba(255,255,255,0.08); color: #a8f0c6; }
-      .recruit-status-badge.status-laundry { background: rgba(255,255,255,0.08); color: #e8ecf0; }
+      .recruit-status-badge.status-decided { background: rgba(255,255,255,0.12); color: #ffffff; }
+      .recruit-status-badge.status-laundry { background: rgba(255,255,255,0.12); color: #ffffff; }
       .table {
         color: #e0e0e0 !important;
       }
@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0220l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2743,7 +2743,7 @@
             }
             if (statusEl && cachedRec) {
               var cStatus = cachedRec.status || '';
-              var cIsConfirmed = (cStatus === 'スタッフ確定済み' || cStatus === '選定済');
+              var cIsConfirmed = (cStatus === 'スタッフ確定済み' || cStatus === '選定済') || !!((d.cleaningStaff || '').trim());
               statusEl.textContent = cIsConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
               statusEl.className = 'recruit-status-badge ' + (cIsConfirmed ? 'status-decided' : 'status-recruiting');
               statusEl.removeAttribute('style');
@@ -2799,9 +2799,9 @@
                   staffLabel.classList.add(resolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              // 募集レコードの実際のステータスを使用（募集フロー経由の確定のみ反映）
+              // 募集ステータス or 清掃担当割当済みで確定判定（カレンダー表示と同じロジック）
               var effectiveStatus = r.status;
-              var isEffConfirmed = (effectiveStatus === 'スタッフ確定済み' || effectiveStatus === '選定済');
+              var isEffConfirmed = (effectiveStatus === 'スタッフ確定済み' || effectiveStatus === '選定済') || !!resolvedStaff;
               if (statusEl && r.success) {
                 statusEl.textContent = isEffConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
                 statusEl.className = 'recruit-status-badge ' + (isEffConfirmed ? 'status-decided' : 'status-recruiting');
@@ -3082,7 +3082,7 @@
                 }
               }
               var ownerEffectiveStatus = r.status;
-              var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済');
+              var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済') || !!ownerResolvedStaff;
               // ステータス更新（editBtnAreaを含めてinnerHTMLで再構築）
               if (statusEl && r.success) {
                 var editBtnHtml = '<span id="eventModalEditStaffBtnArea" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);"></span>';

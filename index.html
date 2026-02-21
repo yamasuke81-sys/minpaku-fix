@@ -961,7 +961,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221d</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2038,15 +2038,12 @@
 
       // 宿泊イベントタイトル
       function formatBookingTitle(b) {
-        const nights = b.nights || 0;
-        const guests = formatGuestCount(b);
+        const adults = (b.guestCountAdults != null && b.guestCountAdults !== '') ? b.guestCountAdults : '?';
+        const infants = (b.guestCountInfants != null && b.guestCountInfants !== '') ? b.guestCountInfants : '?';
         const bbq = getBBQFlag(b.bbq);
-        const parking = getParkingFlag(b.parking);
+        const bbqMark = bbq === '有' ? '○' : bbq === '無' ? '×' : '?';
         const name = b.guestName || '(不明)';
-        const site = b.bookingSite || '';
-        var s = nights + '泊' + guests + 'BQ' + bbq;
-        if (parking) s += parking;
-        return s + ' ' + name + (site ? ' ' + site : '');
+        return '大' + adults + '、幼' + infants + '、BQ' + bbqMark + '、' + name;
       }
 
       // 清掃イベントタイトル（スタッフ名は頭1文字ずつ）

@@ -220,6 +220,9 @@ function doGet(e) {
   template.staffModeStr = isStaff ? 'yes' : 'no';
   // ディープリンク: 指定日付の清掃詳細モーダルを自動で開く
   template.initialCleaningDate = String(params.date || '');
+  // 閲覧専用モード: ?view=readonly
+  var isReadOnly = (String(params.view || '') === 'readonly');
+  template.readOnlyStr = isReadOnly ? 'yes' : 'no';
   // デバッグ用: クエリストリングをテンプレートに渡す（原因調査後に削除）
   template.debugQueryString = String(e.queryString || '');
   template.debugStaffParam = String(params.staff || '');

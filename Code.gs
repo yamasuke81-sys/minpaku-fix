@@ -2371,7 +2371,7 @@ function autoSyncFromICal() {
           existingPairs[key] = true;
           existingRowByKey[key] = nextRow;
           ensureICalGuestCountColumn_();
-          ensureCancelledAtColumn_();
+          ensureCancelledColumn_();
           colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
           var rowData = new Array(formSheet.getLastColumn()).fill('');
           if (colMap.checkIn >= 0) rowData[colMap.checkIn] = ev.checkIn;

@@ -2186,6 +2186,7 @@ function syncFromICal() {
 
       var events = parseICal_(icalText, platformName);
       var platformAdded = 0;
+      var platformCheckIns = [];
       var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
       var nextRow = formSheet.getLastRow() + 1;
       var validPairs = {};
@@ -2256,6 +2257,7 @@ function syncFromICal() {
         }
         nextRow++;
         added++;
+        platformCheckIns.push(ev.checkIn);
         platformAdded++;
       }
       var platformCancelled = 0;
@@ -2303,7 +2305,10 @@ function syncFromICal() {
       if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
       if (platformCancelled > 0) statusStr += ' キャンセル' + platformCancelled;
       syncSheet.getRange(si + 2, 4).setValue(statusStr);
-      if (platformAdded > 0) addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が追加されました');
+      if (platformAdded > 0) {
+        var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
+        addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が追加されました（チェックイン: ' + ciList + '）');
+      }
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '' });
     }
 
@@ -2380,6 +2385,7 @@ function autoSyncFromICal() {
         var validPairs = {};
         for (var vi = 0; vi < events.length; vi++) validPairs[events[vi].checkIn + '|' + events[vi].checkOut] = true;
         var platformAdded = 0;
+        var platformCheckIns = [];
 
         for (var ei = 0; ei < events.length; ei++) {
           var ev = events[ei];
@@ -2407,6 +2413,7 @@ function autoSyncFromICal() {
           if (colMap.icalGuestCount >= 0) rowData[colMap.icalGuestCount] = ev.guestCount || '';
           formSheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
           nextRow++;
+          platformCheckIns.push(ev.checkIn);
           platformAdded++;
           added++;
           try { sendImmediateReminderIfNeeded_(ss, ev.checkIn, ev.checkOut, platformName); } catch (e) {}
@@ -2434,7 +2441,10 @@ function autoSyncFromICal() {
         var statusStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' (自動) 取得' + events.length + '件';
         if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
         syncSheet.getRange(si + 2, 4).setValue(statusStr);
-        if (platformAdded > 0) addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました');
+        if (platformAdded > 0) {
+          var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
+          addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました（チェックイン: ' + ciList + '）');
+        }
       } catch (platformErr) {
         try { syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' エラー: ' + String(platformErr).substring(0, 60)); } catch (e) {}
         Logger.log('autoSyncFromICal ' + platformName + ': ' + platformErr.toString());

@@ -964,7 +964,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1904,6 +1904,8 @@
       // staffModeは文字列比較で確実に判定（GASテンプレートのboolean出力問題を回避）
       window.staffMode = ('<?= staffModeStr ?>' === 'yes');
       window.readOnly = ('<?= readOnlyStr ?>' === 'yes');
+      // 閲覧専用はスタッフビューベース（ゲスト情報等を非表示にするため）
+      if (window.readOnly) window.staffMode = true;
       window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
@@ -2064,6 +2066,7 @@
 
       // 清掃イベントタイトル（スタッフ名は頭1文字ずつ）
       function formatCleaningTitle(b) {
+        if (window.readOnly) return '清掃';
         var raw = (b.cleaningStaff && String(b.cleaningStaff).trim()) ? String(b.cleaningStaff).trim() : '';
         if (!raw) return '掃/未定';
         var initials = raw.split(/[,、]/).map(function(s) { return s.trim().charAt(0); }).filter(Boolean).join(',');
@@ -4071,7 +4074,7 @@
           var nr2 = document.getElementById('navRecruit');
           if (nr2) nr2.style.display = 'none';
         }
-        if (window.staffMode) {
+        if (window.staffMode && !window.readOnly) {
           var bar = document.getElementById('staffSelectorBar');
           if (bar) bar.style.display = 'block';
           var changeBtn = document.getElementById('btnStaffChange');

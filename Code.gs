@@ -3900,8 +3900,7 @@ function announceRecruitment(recruitRowIndex) {
       var detStr = getBookingDetailsForRecruit(bookingRowNumber, recruitRowIndex);
       var det = JSON.parse(detStr);
       var nextRes = det.success && det.nextReservation ? det.nextReservation : null;
-      var appUrl = '';
-      try { appUrl = ScriptApp.getService().getUrl(); } catch (e) {}
+      var appUrl = getLatestStaffUrl_();
       return JSON.stringify({ success: true, copyText: buildRecruitmentCopyText_(checkoutDateStr, nextRes, appUrl) });
     }
     notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowNumber);
@@ -7416,7 +7415,9 @@ function applyReminderTemplate_(template, vars) {
  */
 function buildCleaningDetailUrl_(checkoutDateStr) {
   var base = '';
-  try { base = ScriptApp.getService().getUrl(); } catch (e) {}
+  try { base = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  if (!base) { try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {} }
+  if (!base) { try { var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || ''; if (depId) base = 'https://script.google.com/macros/s/' + depId + '/exec'; } catch (e) {} }
   if (!base) return '';
   return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(checkoutDateStr);
 }

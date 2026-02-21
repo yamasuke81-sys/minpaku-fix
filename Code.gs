@@ -2454,6 +2454,8 @@ function autoSyncFromICal() {
     if (added > 0) {
       try { checkAndCreateRecruitments(); } catch (re) {}
     }
+    // 既読かつ10日以上経過した通知を自動クリーンアップ
+    try { cleanupOldReadNotifications_(); } catch (ce) {}
   } catch (e) {
     Logger.log('autoSyncFromICal: ' + e.toString());
   }
@@ -2845,6 +2847,30 @@ function clearAllNotifications() {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 既読かつ通知日から10日以上経過した通知を自動削除
+ */
+function cleanupOldReadNotifications_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  var now = new Date();
+  var cutoff = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+  var lastRow = sheet.getLastRow();
+  var lastCol = Math.max(sheet.getLastColumn(), 5);
+  var data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  // 下の行から削除（行番号ズレ防止）
+  for (var i = data.length - 1; i >= 0; i--) {
+    var readVal = String(data[i][3] || '').trim();
+    if (readVal !== 'Y' && readVal !== 'y') continue;
+    var atVal = data[i][0];
+    var atDate = (atVal instanceof Date) ? atVal : new Date(String(atVal));
+    if (isNaN(atDate.getTime())) continue;
+    if (atDate < cutoff) {
+      sheet.deleteRow(i + 2);
+    }
   }
 }
 

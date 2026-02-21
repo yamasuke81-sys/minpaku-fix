@@ -964,7 +964,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221i</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -977,7 +977,6 @@
     <div id="notificationBanner" class="alert alert-info py-2 mb-2 small" style="display:none;">
       <div class="d-flex justify-content-between align-items-center">
         <span class="fw-bold">新着通知:</span>
-        <button type="button" class="btn btn-sm btn-outline-danger py-0" id="btnClearAllNotifBanner">一括削除</button>
       </div>
       <div id="notificationBannerList" class="mt-1"></div>
       <a href="#" id="notificationBannerLink" class="alert-link mt-1 d-block">すべて見る</a>
@@ -1087,7 +1086,11 @@
     <div id="panelNotifications" style="display:none;">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <span class="fw-bold small">通知一覧</span>
-        <button type="button" class="btn btn-sm btn-outline-danger py-0" id="btnClearAllNotifList">一括削除</button>
+        <div class="d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-filter active" data-days="7">7日</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-filter" data-days="30">30日</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-filter" data-days="0">全期間</button>
+        </div>
       </div>
       <div id="notificationListMain"></div>
     </div>
@@ -5230,25 +5233,20 @@
           } catch (e) { el.innerHTML = '<p class="text-danger small">読み込み失敗</p>'; }
         }).withFailureHandler(function() { el.innerHTML = '<p class="text-danger small">エラー</p>'; }).getStaffSchedule(staffId, ym, window.currentUserEmail || '');
       }
+      var _notifFilterDays = 7;
+      (function() {
+        document.querySelectorAll('.btn-notif-filter').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            document.querySelectorAll('.btn-notif-filter').forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            _notifFilterDays = parseInt(this.getAttribute('data-days'), 10) || 0;
+            loadNotificationListMain();
+          });
+        });
+      })();
       function loadNotificationListMain() {
         var el = document.getElementById('notificationListMain');
         if (!el) return;
-        var clearListBtn = document.getElementById('btnClearAllNotifList');
-        if (clearListBtn) {
-          clearListBtn.onclick = function() {
-            customConfirm('全ての通知を削除しますか？').then(function(ok) {
-              if (!ok) return;
-              clearListBtn.disabled = true;
-              clearListBtn.textContent = '削除中...';
-              google.script.run.withSuccessHandler(function(j) {
-                var res = JSON.parse(j);
-                clearListBtn.disabled = false;
-                clearListBtn.textContent = '一括削除';
-                if (res.success) { loadNotificationListMain(); updateNotificationBanner(); }
-              }).withFailureHandler(function() { clearListBtn.disabled = false; clearListBtn.textContent = '一括削除'; }).clearAllNotifications();
-            });
-          };
-        }
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
@@ -5264,7 +5262,16 @@
                   });
                 }
               }
-              if (!notifItems.length) { el.innerHTML = '<p class="text-muted small">通知はまだありません。</p>'; return; }
+              // 期間フィルタ
+              if (_notifFilterDays > 0) {
+                var cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - _notifFilterDays);
+                notifItems = notifItems.filter(function(n) {
+                  var d = new Date(n.at);
+                  return !isNaN(d.getTime()) && d >= cutoff;
+                });
+              }
+              if (!notifItems.length) { el.innerHTML = '<p class="text-muted small">この期間の通知はありません。</p>'; return; }
               var html = notifItems.map(function(n) {
                 var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : 'secondary';
                 var readBtn = n.read ? '' : '<button type="button" class="btn btn-sm btn-outline-secondary py-0 flex-shrink-0 btn-notif-read" data-row="' + n.rowIndex + '">既読</button>';
@@ -5375,21 +5382,6 @@
                 };
               });
               banner.style.display = 'block';
-              var clearBtn = document.getElementById('btnClearAllNotifBanner');
-              if (clearBtn) {
-                clearBtn.onclick = function() {
-                  customConfirm('全ての通知を削除しますか？').then(function(ok) {
-                    if (!ok) return;
-                    clearBtn.disabled = true;
-                    clearBtn.textContent = '削除中...';
-                    google.script.run.withSuccessHandler(function(j) {
-                      var res = JSON.parse(j);
-                      if (res.success) { updateNotificationBanner(); loadNotificationListMain(); }
-                      else { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }
-                    }).withFailureHandler(function() { clearBtn.disabled = false; clearBtn.textContent = '一括削除'; }).clearAllNotifications();
-                  });
-                };
-              }
             } else {
               listEl.innerHTML = '';
               banner.style.display = 'none';

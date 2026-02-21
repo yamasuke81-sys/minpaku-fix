@@ -820,6 +820,33 @@ function getStaffDeployUrl() {
 }
 
 /**
+ * テキストコピー/メール用: 常に最新のスタッフURLを返す
+ * ScriptApp.getService().getUrl() を優先し、保存値にフォールバック
+ */
+function getLatestStaffUrl_() {
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  if (!url) {
+    try { url = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
+  }
+  if (!url) {
+    try {
+      var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || '';
+      if (depId) url = 'https://script.google.com/macros/s/' + depId + '/exec';
+    } catch (e) {}
+  }
+  if (!url) {
+    try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
+    return url;
+  }
+  if (url && url.indexOf('staff=1') < 0 && url.indexOf('staff=true') < 0) {
+    url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
+  }
+  try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
+  return url;
+}
+
+/**
  * デプロイスクリプト用シークレットを設定（初回1回のみ、スクリプトエディタで実行）
  * 1. 下の setupDeploySecret 内の 'mySecret123' を任意の文字列に変更
  * 2. メニュー「実行」→「関数を実行」→ setupDeploySecret を選択して実行
@@ -4339,16 +4366,7 @@ function getRecruitmentCopyText(checkoutDateStr, bookingRowNumber, detail) {
       var det = JSON.parse(detStr);
       if (det.success && det.nextReservation) nextRes = det.nextReservation;
     }
-    var appUrl = '';
-    try {
-      var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
-      if (stored && String(stored).trim()) {
-        appUrl = String(stored).trim();
-      } else {
-        appUrl = ScriptApp.getService().getUrl();
-        if (appUrl && appUrl.indexOf('staff=1') < 0 && appUrl.indexOf('staff=true') < 0) appUrl = appUrl + (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
-      }
-    } catch (e) {}
+    var appUrl = getLatestStaffUrl_();
     var copyText = buildRecruitmentCopyText_(checkoutDateStr, nextRes, appUrl);
     return JSON.stringify({ success: true, copyText: copyText });
   } catch (e) {
@@ -4558,12 +4576,7 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
       var det = JSON.parse(detStr);
       if (det.success && det.nextReservation) nextRes = det.nextReservation;
     } catch (er) {}
-    var appUrl = '';
-    try {
-      var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
-      if (stored && String(stored).trim()) appUrl = String(stored).trim();
-      else { appUrl = ScriptApp.getService().getUrl(); if (appUrl && appUrl.indexOf('staff=1') < 0) appUrl += (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'staff=1'; }
-    } catch (er) {}
+    var appUrl = getLatestStaffUrl_();
     var body = buildRecruitmentCopyText_(checkoutDateStr, nextRes, appUrl);
     var dm = (checkoutDateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     var fmtDate = dm ? dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日' : checkoutDateStr;
@@ -7091,13 +7104,7 @@ function getConfirmationCopyText(recruitRowIndex) {
       if (det.success && det.nextReservation) nextRes = det.nextReservation;
     } catch (e) {}
 
-    var appUrl = '';
-    try {
-      var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
-      if (stored && String(stored).trim()) appUrl = String(stored).trim();
-      else { appUrl = ScriptApp.getService().getUrl(); if (appUrl && appUrl.indexOf('staff=1') < 0) appUrl += (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'staff=1'; }
-    } catch (e) {}
-
+    var appUrl = getLatestStaffUrl_();
     var copyText = buildConfirmationCopyText_(checkoutDateStr, selectedStaff, volunteers, nextRes, appUrl);
     return JSON.stringify({ success: true, copyText: copyText });
   } catch (e) {
@@ -7143,13 +7150,7 @@ function notifyStaffConfirmation(recruitRowIndex) {
       if (det.success && det.nextReservation) nextRes = det.nextReservation;
     } catch (e) {}
 
-    var appUrl = '';
-    try {
-      var stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl');
-      if (stored && String(stored).trim()) appUrl = String(stored).trim();
-      else { appUrl = ScriptApp.getService().getUrl(); if (appUrl && appUrl.indexOf('staff=1') < 0) appUrl += (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'staff=1'; }
-    } catch (e) {}
-
+    var appUrl = getLatestStaffUrl_();
     var body = buildConfirmationCopyText_(checkoutDateStr, selectedStaff, volunteers, nextRes, appUrl);
     var dm = (checkoutDateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     var fmtDate = dm ? dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日' : checkoutDateStr;

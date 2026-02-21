@@ -964,7 +964,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1140,7 +1140,7 @@
           <label class="form-label small fw-bold">スタッフ用URL</label>
           <p class="small text-muted mb-1">コピーしてLINE等で共有できます。</p>
           <div class="d-flex gap-2 flex-wrap align-items-center">
-            <input type="url" class="form-control form-control-sm flex-grow-1" id="staffUrlInput" placeholder="自動生成されます" style="min-width:200px;" readonly>
+            <input type="url" class="form-control form-control-sm flex-grow-1" id="staffUrlInput" placeholder="?staff=1" style="min-width:200px;" readonly>
             <button type="button" class="btn btn-sm btn-primary" id="btnCopyStaffUrl">コピー</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenStaffUrl">開く</button>
           </div>
@@ -1149,7 +1149,7 @@
           <label class="form-label small fw-bold">閲覧専用URL（カレンダーのみ表示）</label>
           <p class="small text-muted mb-1">カレンダーの閲覧のみ可能です。編集・操作はできません。</p>
           <div class="d-flex gap-2 flex-wrap align-items-center">
-            <input type="url" class="form-control form-control-sm flex-grow-1" id="readonlyUrlInput" placeholder="自動生成されます" style="min-width:200px;" readonly>
+            <input type="url" class="form-control form-control-sm flex-grow-1" id="readonlyUrlInput" placeholder="?view=readonly" style="min-width:200px;" readonly>
             <button type="button" class="btn btn-sm btn-primary" id="btnCopyReadonlyUrl">コピー</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenReadonlyUrl">開く</button>
           </div>

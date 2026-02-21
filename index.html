@@ -964,7 +964,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221o</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221p</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1136,6 +1136,13 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsUrls">
+        <div class="mb-3 p-2 border rounded bg-warning bg-opacity-10">
+          <label class="form-label small fw-bold">オーナーURLを貼り付け</label>
+          <p class="small text-muted mb-1">オーナー用URLを貼り付けると、下のスタッフ用・閲覧専用URLが自動生成されます。</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="url" class="form-control form-control-sm flex-grow-1" id="ownerUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec" style="min-width:200px;">
+          </div>
+        </div>
         <div class="mb-3 p-2 border rounded bg-light">
           <label class="form-label small fw-bold">スタッフ用URL</label>
           <p class="small text-muted mb-1">コピーしてLINE等で共有できます。</p>
@@ -5637,15 +5644,42 @@
         if (dlBtn) dlBtn.disabled = cnt === 0;
       }
 
-      function loadSettings() {
-        // URL一覧: スタッフURL・閲覧専用URLを自動生成
+      // オーナーURLからスタッフ・閲覧専用URLを生成するヘルパー
+      function generateUrlsFromOwnerUrl(ownerUrl) {
         var staffInp = document.getElementById('staffUrlInput');
         var readonlyInp = document.getElementById('readonlyUrlInput');
+        if (!ownerUrl) {
+          if (staffInp) staffInp.value = '';
+          if (readonlyInp) readonlyInp.value = '';
+          return;
+        }
+        // 既存パラメータを除去してクリーンなベースURLを作る
+        var clean = ownerUrl.replace(/[?&](staff=1|view=readonly)/g, '').replace(/\?$/, '');
+        var sep = clean.indexOf('?') >= 0 ? '&' : '?';
+        if (staffInp) staffInp.value = clean + sep + 'staff=1';
+        if (readonlyInp) readonlyInp.value = clean + sep + 'view=readonly';
+      }
+
+      function loadSettings() {
+        // オーナーURL入力欄のイベントリスナー設定
+        var ownerInp = document.getElementById('ownerUrlInput');
+        var staffInp = document.getElementById('staffUrlInput');
+        var readonlyInp = document.getElementById('readonlyUrlInput');
+        if (ownerInp) {
+          ownerInp.addEventListener('input', function() {
+            generateUrlsFromOwnerUrl(ownerInp.value.trim());
+          });
+          ownerInp.addEventListener('paste', function() {
+            setTimeout(function() {
+              generateUrlsFromOwnerUrl(ownerInp.value.trim());
+            }, 0);
+          });
+        }
+        // URL一覧: スタッフURL・閲覧専用URLを自動生成
         var base = window.appBaseUrl || '';
         if (base) {
-          var sep = base.indexOf('?') >= 0 ? '&' : '?';
-          if (staffInp) staffInp.value = base + sep + 'staff=1';
-          if (readonlyInp) readonlyInp.value = base + sep + 'view=readonly';
+          if (ownerInp) ownerInp.value = base;
+          generateUrlsFromOwnerUrl(base);
         }
         if (staffInp) {
           // バックエンドから確実に取得（ScriptApp + プロパティ + デプロイID全て試行）
@@ -5653,13 +5687,10 @@
             try {
               var r = JSON.parse(jsonStr);
               if (r.success && r.url) {
-                staffInp.value = r.url;
-                // 閲覧専用URLもバックエンド取得のベースURLで更新
-                if (readonlyInp) {
-                  var rawBase = r.url.replace(/[?&]staff=1/, '');
-                  var s = rawBase.indexOf('?') >= 0 ? '&' : '?';
-                  readonlyInp.value = rawBase + s + 'view=readonly';
-                }
+                // スタッフURLからオーナーURLを逆算してセット
+                var rawBase = r.url.replace(/[?&]staff=1/, '');
+                if (ownerInp && !ownerInp.dataset.userEdited) ownerInp.value = rawBase;
+                generateUrlsFromOwnerUrl(rawBase);
               }
             } catch (e) {}
           }).getStaffDeployUrl();

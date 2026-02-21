@@ -3678,9 +3678,13 @@ function setupRosterReminderTrigger(enabled, hour) {
 
 function checkRosterReminder() {
   try {
+    ensureSingleTrigger_('checkRosterReminder'); // トリガー重複クリーンアップ
     var res = JSON.parse(getRosterReminderSettings());
     if (!res.success || !res.settings || !res.settings.rosterReminderEnabled) return;
-    var daysBefore = res.settings.rosterReminderDaysBefore || 3;
+    var schedules = res.settings.schedules || [];
+    var enabledSchedules = schedules.filter(function(s) { return s.enabled && s.daysBefore > 0; });
+    if (enabledSchedules.length === 0) return;
+    var daysBefore = Math.max.apply(null, enabledSchedules.map(function(s) { return s.daysBefore; }));
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) return;
@@ -3696,6 +3700,7 @@ function checkRosterReminder() {
       if ((hdr === HEADERS.CANCELLED_AT || hdr === 'キャンセル日時') && cancelledAtCol < 0) cancelledAtCol = h;
     }
     if (checkInCol < 0) return;
+    if (guestNameCols.length === 0) return; // 氏名列が見つからない場合はスキップ（全予約が誤検知になるため）
 
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     var today = new Date();
@@ -3739,10 +3744,9 @@ function checkRosterReminder() {
       return 'チェックイン ' + m.checkIn + '（行' + m.rowNumber + '）';
     });
     var message = '宿泊者名簿が未記入の予約が ' + missing.length + ' 件あります: ' + msgLines.join(', ');
-    addNotification_('名簿', message, { type: 'rosterReminder', missing: missing });
-
-    // 本日送信済みとして記録（1日1回まで）
+    // 本日送信済みとして先に記録（競合条件による重複通知を防止）
     PropertiesService.getScriptProperties().setProperty('rosterReminderLastSent', todayStr);
+    addNotification_('名簿', message, { type: 'rosterReminder', missing: missing });
 
     if (ownerEmail) {
       try {

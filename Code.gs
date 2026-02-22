@@ -7922,6 +7922,73 @@ function getCleaningModalData(checkoutDate, rowNumber) {
   }
 }
 
+/**
+ * 募集データの補足情報のみ取得（cancelRejected + responseChangeRequests）
+ * _recruitFullMap キャッシュにないデータだけを軽量に取得するヘルパー
+ * @param {number} bookingRowNumber フォームシートの行番号
+ * @return {object} { cancelRejected: [], responseChangeRequests: [] }
+ */
+function getRecruitSupplementary_(bookingRowNumber) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!recruitSheet || recruitSheet.getLastRow() < 2) return { cancelRejected: [], responseChangeRequests: [] };
+    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 2).getValues();
+    var recruitRowIndex = -1;
+    for (var i = 0; i < rows.length; i++) {
+      if (Number(rows[i][1]) === bookingRowNumber) { recruitRowIndex = i + 2; break; }
+    }
+    if (recruitRowIndex < 0) return { cancelRejected: [], responseChangeRequests: [] };
+    var rid = 'r' + recruitRowIndex;
+    // cancelRejected
+    var cancelRejected = [];
+    var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+    if (crSheet && crSheet.getLastRow() >= 2) {
+      var crRows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, Math.max(crSheet.getLastColumn(), 5)).getValues();
+      crRows.forEach(function(cr) {
+        if (String(cr[0] || '').trim() === rid && String(cr[4] || '').trim() === 'rejected') {
+          cancelRejected.push({ staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() });
+        }
+      });
+    }
+    // responseChangeRequests
+    var responseChangeRequests = [];
+    try {
+      var rcSheet = ss.getSheetByName('回答変更要請');
+      if (rcSheet && rcSheet.getLastRow() >= 2) {
+        var rcRows = rcSheet.getRange(2, 1, rcSheet.getLastRow() - 1, 7).getValues();
+        rcRows.forEach(function(rc, idx) {
+          if (String(rc[0]).trim() === rid && String(rc[6]).trim() === 'pending') {
+            responseChangeRequests.push({ rowIndex: idx + 2, staffName: String(rc[1]).trim(), email: String(rc[2]).trim(), newResponse: String(rc[3]).trim(), memo: String(rc[4]).trim(), requestedAt: String(rc[5]).trim() });
+          }
+        });
+      }
+    } catch (e) {}
+    return { cancelRejected: cancelRejected, responseChangeRequests: responseChangeRequests };
+  } catch (e) { return { cancelRejected: [], responseChangeRequests: [] }; }
+}
+
+/**
+ * 清掃詳細モーダル用の軽量データ取得（キャッシュにないデータのみ）
+ * _recruitFullMap にキャッシュがある場合に getCleaningModalData() の代わりに呼ぶ
+ * @param {string} checkoutDate yyyy-MM-dd
+ * @param {number} rowNumber フォームシートの行番号
+ * @return {string} JSON { success, data: { checklistUrl, laundry, supplementary }, light: true }
+ */
+function getCleaningModalDataLight(checkoutDate, rowNumber) {
+  try {
+    var result = {};
+    result.checklistUrl = PropertiesService.getScriptProperties().getProperty('CHECKLIST_APP_URL') || '';
+    try {
+      result.laundry = JSON.parse(getCleaningLaundryStatus(checkoutDate));
+    } catch (e) { result.laundry = { success: false }; }
+    result.supplementary = getRecruitSupplementary_(rowNumber);
+    return JSON.stringify({ success: true, data: result, light: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 /* --- 以下、統合型チェックリストのコード（別アプリに移行済み、後方互換のため残置） --- */
 
 /**********************************************

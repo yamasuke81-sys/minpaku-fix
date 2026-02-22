@@ -214,6 +214,10 @@ function doGet(e) {
     } catch(e) {}
   }
   template.baseUrl = baseUrl;
+  // オーナーが保存したURLをテンプレートに渡す（リロード時の即座表示用）
+  var savedOwnerUrl = '';
+  try { savedOwnerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
+  template.savedOwnerUrl = savedOwnerUrl;
   var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
   template.isStaffMode = isStaff;
   // GASテンプレートでbooleanが正しく出力されない場合の対策: 明示的に文字列で渡す

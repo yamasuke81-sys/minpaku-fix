@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0222b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0222c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1918,6 +1918,7 @@
       // 閲覧専用はスタッフビューベース（ゲスト情報等を非表示にするため）
       if (window.readOnly) window.staffMode = true;
       window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
+      window.savedOwnerUrl = <?= JSON.stringify(savedOwnerUrl) ?> || '';
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
       // デバッグ: デプロイ確認用
@@ -5679,26 +5680,38 @@
             }, 0);
           });
         }
-        // URL一覧: スタッフURL・閲覧専用URLを自動生成
-        var base = window.appBaseUrl || '';
+        // --- オーナーURL復元: 優先順位付き3層キャッシュ ---
+        // 1. サーバーテンプレート変数（保存済みownerBaseUrl、最も信頼性が高い）
+        // 2. localStorage キャッシュ（高速表示用）
+        // 3. window.appBaseUrl フォールバック（デプロイURL）
+        var cachedOwnerUrl = '';
+        try { cachedOwnerUrl = localStorage.getItem('ownerUrlCache') || ''; } catch(e) {}
+        var base = window.savedOwnerUrl || cachedOwnerUrl || window.appBaseUrl || '';
         if (base) {
           if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
+          // localStorageをサーバー値で更新
+          if (window.savedOwnerUrl) {
+            try { localStorage.setItem('ownerUrlCache', window.savedOwnerUrl); } catch(e) {}
+          }
         } else {
           // オーナーURLが未取得でもパラメータをデフォルト値として表示
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
         }
         if (staffInp) {
-          // バックエンドから確実に取得（ScriptApp + プロパティ + デプロイID全て試行）
+          // バックエンドから確実に取得（最終確認用 - 非同期）
           google.script.run.withSuccessHandler(function(jsonStr) {
             try {
               var r = JSON.parse(jsonStr);
               if (r.success && r.url) {
-                // スタッフURLからオーナーURLを逆算してセット
                 var rawBase = r.url.replace(/[?&]staff=1/, '');
-                if (ownerInp && !ownerInp.dataset.userEdited) ownerInp.value = rawBase;
-                generateUrlsFromOwnerUrl(rawBase);
+                if (ownerInp && !ownerInp.dataset.userEdited) {
+                  ownerInp.value = rawBase;
+                  generateUrlsFromOwnerUrl(rawBase);
+                }
+                // 非同期結果もlocalStorageに保存
+                try { localStorage.setItem('ownerUrlCache', rawBase); } catch(e) {}
               }
             } catch (e) {}
           }).getStaffDeployUrl();
@@ -6484,6 +6497,8 @@
               var msg = document.getElementById('ownerUrlSaveMsg');
               if (msg) { msg.style.display = 'block'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
               generateUrlsFromOwnerUrl(ownerUrl);
+              // localStorageにもキャッシュ（次回リロード時の即座表示用）
+              try { localStorage.setItem('ownerUrlCache', ownerUrl); } catch(e) {}
             } else {
               alert('保存に失敗しました: ' + (r.error || ''));
             }

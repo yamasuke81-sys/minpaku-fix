@@ -414,23 +414,87 @@ function getData() {
 
 /**
  * 初期データ一括取得（getData + getRecruitmentStatusMap をまとめて1回で返す）
+ * CacheService で90秒キャッシュ（書き込み操作時に無効化される）
  */
 function getInitData() {
   try {
+    var cache = CacheService.getScriptCache();
+    var cached = getChunkedCache_(cache, 'initData');
+    if (cached) return cached;
+
     var dataJson = getData();
     var recruitJson = getRecruitmentStatusMap();
     var dataResult = JSON.parse(dataJson);
     var recruitResult = JSON.parse(recruitJson);
-    return JSON.stringify({
+    var result = JSON.stringify({
       success: dataResult.success,
       data: dataResult.data,
       columnMap: dataResult.columnMap,
       recruitMap: recruitResult.success ? recruitResult.map : {},
       error: dataResult.error || null
     });
+    try { putChunkedCache_(cache, 'initData', result, 90); } catch (e) { /* ignore cache write errors */ }
+    return result;
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/* ====== チャンク分割キャッシュ ヘルパー ====== */
+
+/**
+ * 大きなJSON文字列をチャンク分割してCacheServiceに保存（100KB制限対応）
+ */
+function putChunkedCache_(cache, key, jsonStr, ttl) {
+  var CHUNK_SIZE = 90000;
+  if (jsonStr.length <= CHUNK_SIZE) {
+    cache.put(key, jsonStr, ttl);
+    cache.put(key + '_n', '1', ttl);
+    return;
+  }
+  var n = Math.ceil(jsonStr.length / CHUNK_SIZE);
+  var map = {};
+  map[key + '_n'] = String(n);
+  for (var i = 0; i < n; i++) {
+    map[key + '_' + i] = jsonStr.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+  }
+  cache.putAll(map, ttl);
+}
+
+/**
+ * チャンク分割されたキャッシュを復元して返す（未ヒット時はnull）
+ */
+function getChunkedCache_(cache, key) {
+  var nStr = cache.get(key + '_n');
+  if (!nStr) return null;
+  var n = parseInt(nStr, 10);
+  if (n === 1) return cache.get(key);
+  var keys = [];
+  for (var i = 0; i < n; i++) keys.push(key + '_' + i);
+  var vals = cache.getAll(keys);
+  var result = '';
+  for (var j = 0; j < n; j++) {
+    var v = vals[key + '_' + j];
+    if (!v) return null;
+    result += v;
+  }
+  return result;
+}
+
+/**
+ * initDataキャッシュを無効化する（すべての書き込み操作から呼ぶ）
+ */
+function invalidateInitDataCache_() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var nStr = cache.get('initData_n');
+    cache.remove('initData');
+    cache.remove('initData_n');
+    if (nStr) {
+      var n = parseInt(nStr, 10);
+      for (var i = 0; i < n; i++) cache.remove('initData_' + i);
+    }
+  } catch (e) { /* ignore */ }
 }
 
 /**
@@ -617,6 +681,7 @@ function saveBookingMemo(rowNumber, memoText) {
     var colMap = buildColumnMap(headers);
     if (colMap.memo < 0) return JSON.stringify({ success: false, error: 'メモ列が見つかりません。' });
     sheet.getRange(rowNumber, colMap.memo + 1).setValue(memoText || '');
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -640,6 +705,7 @@ function saveGuestCount(rowNumber, adults, infants) {
     if (colMap.guestCountInfants >= 0) {
       sheet.getRange(rowNumber, colMap.guestCountInfants + 1).setValue(infants != null && infants !== '' ? String(infants) : '');
     }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -661,6 +727,7 @@ function saveCleaningNotice(rowNumber, noticeText) {
       colMap.cleaningNotice = newCol - 1;
     }
     sheet.getRange(rowNumber, colMap.cleaningNotice + 1).setValue(noticeText || '');
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -752,6 +819,7 @@ function updateCleaningStaff(rowNumber, staffName) {
       }
     }
 
+    invalidateInitDataCache_();
     return JSON.stringify({
       success: true,
       message: value ? '清掃担当者を更新しました。' : '清掃担当を削除しました。募集中に変更しました。',
@@ -1675,6 +1743,7 @@ function deleteBooking(rowNumber) {
     var gn = colMap.guestName >= 0 ? String(formSheet.getRange(row, colMap.guestName + 1).getValue() || '').trim() : '';
     formSheet.deleteRow(row);
     addNotification_('予約削除', '予約が削除されました' + (gn ? ': ' + gn : ''));
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -2333,6 +2402,7 @@ function syncFromICal() {
 
     // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）
     try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, added: added, removed: removed, details: details });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), added: 0, removed: 0, details: [] });
@@ -2472,6 +2542,7 @@ function autoSyncFromICal() {
 
     if (added > 0) {
       try { checkAndCreateRecruitments(); } catch (re) {}
+      invalidateInitDataCache_();
     }
     // 既読かつ10日以上経過した通知を自動クリーンアップ
     try { cleanupOldReadNotifications_(); } catch (ce) {}
@@ -2694,6 +2765,7 @@ function importFromSpreadsheet(spreadsheetUrl, skipDuplicates) {
     var nextRow = formSheet.getLastRow() + 1;
     formSheet.getRange(nextRow, 1, rowsToAdd.length, destHeaders.length).setValues(rowsToAdd);
     sortFormResponses_();
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, imported: rowsToAdd.length, skipped: skipped });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), imported: 0, skipped: 0 });
@@ -2753,6 +2825,7 @@ function clearSyncedBookings() {
         cleared++;
       }
     }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, cleared: cleared });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), cleared: 0 });
@@ -2794,6 +2867,7 @@ function addBookingManually(checkIn, checkOut, guestName, bookingSite, guestCoun
     sheet.getRange(nextRow, 1, 1, lastCol).setValues([rowData]);
     sortFormResponses_();
     addNotification_('予約追加', '予約が追加されました' + (guestName ? ' (' + String(guestName).trim() + ')' : '') + '（' + ciStr + '～' + coStr + '）');
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -2971,6 +3045,7 @@ function updateStaffOrder(orderedRowIndices) {
       }
     }
     invalidateStaffCache_();
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -2997,6 +3072,7 @@ function saveStaff(rowIndex, data) {
         propagateStaffNameChange_(ss, oldName, newName);
       }
       invalidateStaffCache_();
+      invalidateInitDataCache_();
       return JSON.stringify({ success: true, rowIndex: rowIndex });
     }
     const nextRow = lastRow + 1;
@@ -3006,6 +3082,7 @@ function saveStaff(rowIndex, data) {
       data.accountNumber || '', data.accountHolder || '', data.active !== 'N' ? 'Y' : 'N'
     ]]);
     invalidateStaffCache_();
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3099,6 +3176,7 @@ function deleteStaff(rowIndex) {
     if (!sheet || rowIndex < 2) return JSON.stringify({ success: false, error: '無効な行' });
     sheet.deleteRow(rowIndex);
     invalidateStaffCache_();
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -4353,6 +4431,7 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
         var colMap = buildColumnMap(headers);
         if (colMap.cleaningStaff >= 0) formSheet.getRange(bookingRowNumber, colMap.cleaningStaff + 1).setValue(staffVal);
       }
+      invalidateInitDataCache_();
       return JSON.stringify({ success: true, rowIndex: recruitRowIndexOrNull });
     }
     var rows = sheet.getRange(2, 1, Math.max(sheet.getLastRow(), 1), 2).getValues();
@@ -4373,6 +4452,7 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
         if (colMap.cleaningStaff >= 0) formSheet.getRange(bookingRowNumber, colMap.cleaningStaff + 1).setValue(staffVal);
       }
     }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -4403,6 +4483,7 @@ function deleteRecruitment(recruitRowIndex) {
       }
     }
     recruitSheet.deleteRow(recruitRowIndex);
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6297,6 +6378,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
         volSheet.getRange(i + 2, 6).setValue(response);
         var checkoutStr = getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss);
         addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr || recruitId) + '）', { recruitRowIndex: recruitRowIndex });
+        invalidateInitDataCache_();
         return JSON.stringify({ success: true, updated: true });
       }
     }
@@ -6307,6 +6389,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
     volSheet.getRange(nextRow, 6).setValue(response);
     var checkoutStr2 = getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss);
     addNotification_('回答', staffName + ' が ' + response + ' と回答' + (staffMemo ? '（' + staffMemo + '）' : '') + '（' + (checkoutStr2 || recruitId) + '）', { recruitRowIndex: recruitRowIndex });
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6340,6 +6423,7 @@ function requestResponseChange(recruitId, staffName, staffEmail, newResponse, me
     var nextRow = crSheet.getLastRow() + 1;
     crSheet.getRange(nextRow, 1, 1, 7).setValues([[recruitId, staffName || '', staffEmail || '', newResponse, memo || '', now, 'pending']]);
     addNotification_('回答変更要請', (staffName || '不明') + ' が回答変更を要請（' + newResponse + '）' + (memo ? '（' + memo + '）' : '') + '（' + (checkoutStr || recruitId) + '）');
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6372,6 +6456,7 @@ function approveResponseChange(changeRequestRow) {
     if (result.success) {
       addNotification_('回答変更承認', staffName + ' の回答変更を承認しました（' + newResponse + '）');
     }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6493,6 +6578,7 @@ function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmai
         break;
       }
     }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true, cancelled: deleted });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -7067,6 +7153,7 @@ function selectStaffForRecruitment(recruitRowIndex, selectedStaffComma) {
         }
       }
     }
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -7086,6 +7173,7 @@ function confirmRecruitment(recruitRowIndex) {
     if (!staff) return JSON.stringify({ success: false, error: 'スタッフが選定されていません。先にスタッフを選定してください。' });
     recruitSheet.getRange(recruitRowIndex, 4).setValue('スタッフ確定済み');
     addNotification_('スタッフ確定', staff + ' をスタッフとして確定しました');
+    invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

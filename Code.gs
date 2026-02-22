@@ -2970,6 +2970,7 @@ function updateStaffOrder(orderedRowIndices) {
         sheet.getRange(rowIdx, orderCol).setValue(j + 1);
       }
     }
+    invalidateStaffCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -2995,6 +2996,7 @@ function saveStaff(rowIndex, data) {
       if (oldName && newName && oldName !== newName) {
         propagateStaffNameChange_(ss, oldName, newName);
       }
+      invalidateStaffCache_();
       return JSON.stringify({ success: true, rowIndex: rowIndex });
     }
     const nextRow = lastRow + 1;
@@ -3003,6 +3005,7 @@ function saveStaff(rowIndex, data) {
       data.bankName || '', data.bankBranch || '', data.accountType || '',
       data.accountNumber || '', data.accountHolder || '', data.active !== 'N' ? 'Y' : 'N'
     ]]);
+    invalidateStaffCache_();
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3095,6 +3098,7 @@ function deleteStaff(rowIndex) {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     if (!sheet || rowIndex < 2) return JSON.stringify({ success: false, error: '無効な行' });
     sheet.deleteRow(rowIndex);
+    invalidateStaffCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6432,14 +6436,19 @@ function normalizeVolStatus_(rawStatus) {
 }
 
 /**
- * 全アクティブスタッフ一覧を取得するヘルパー
+ * 全アクティブスタッフ一覧を取得するヘルパー（CacheService 付き）
  */
 function getAllActiveStaff_(ss) {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('activeStaffList');
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { /* fall through */ }
+  }
   var staffSheet = ss.getSheetByName(SHEET_STAFF);
   if (!staffSheet || staffSheet.getLastRow() < 2) return [];
   var lastCol = Math.max(staffSheet.getLastColumn(), 11);
   var rows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
-  return rows.map(function(row) {
+  var result = rows.map(function(row) {
     var name = String(row[0] || '').trim();
     var email = String(row[2] || '').trim();
     var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
@@ -6447,6 +6456,15 @@ function getAllActiveStaff_(ss) {
     var order = parseInt(row[10], 10) || 9999;
     return { staffName: name || email, email: email, displayOrder: order };
   }).filter(Boolean).sort(function(a, b) { return a.displayOrder - b.displayOrder; });
+  try { cache.put('activeStaffList', JSON.stringify(result), 600); } catch (e) { /* ignore cache write errors */ }
+  return result;
+}
+
+/**
+ * スタッフキャッシュを無効化するヘルパー
+ */
+function invalidateStaffCache_() {
+  try { CacheService.getScriptCache().remove('activeStaffList'); } catch (e) { /* ignore */ }
 }
 
 function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmailFromClient) {

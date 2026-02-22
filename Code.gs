@@ -4784,6 +4784,9 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     // 既に申請済みなら通知・メールも送らない
     if (alreadyExists) return JSON.stringify({ success: true });
 
+    // initDataキャッシュを無効化（オーナー側で最新の取消申請が表示されるように）
+    invalidateInitDataCache_();
+
     // 通知（シート書き込み）
     try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) {}
     // メール送信（最も遅い処理 - 失敗しても成功扱い）
@@ -7923,31 +7926,37 @@ function getCleaningModalData(checkoutDate, rowNumber) {
 }
 
 /**
- * 募集データの補足情報のみ取得（cancelRejected + responseChangeRequests）
+ * 募集データの補足情報のみ取得（cancelRequested + cancelRejected + responseChangeRequests）
  * _recruitFullMap キャッシュにないデータだけを軽量に取得するヘルパー
  * @param {number} bookingRowNumber フォームシートの行番号
- * @return {object} { cancelRejected: [], responseChangeRequests: [] }
+ * @return {object} { cancelRequested: [], cancelRejected: [], responseChangeRequests: [] }
  */
 function getRecruitSupplementary_(bookingRowNumber) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
-    if (!recruitSheet || recruitSheet.getLastRow() < 2) return { cancelRejected: [], responseChangeRequests: [] };
+    if (!recruitSheet || recruitSheet.getLastRow() < 2) return { cancelRequested: [], cancelRejected: [], responseChangeRequests: [] };
     var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 2).getValues();
     var recruitRowIndex = -1;
     for (var i = 0; i < rows.length; i++) {
       if (Number(rows[i][1]) === bookingRowNumber) { recruitRowIndex = i + 2; break; }
     }
-    if (recruitRowIndex < 0) return { cancelRejected: [], responseChangeRequests: [] };
+    if (recruitRowIndex < 0) return { cancelRequested: [], cancelRejected: [], responseChangeRequests: [] };
     var rid = 'r' + recruitRowIndex;
-    // cancelRejected
+    // cancelRequested + cancelRejected
+    var cancelRequested = [];
     var cancelRejected = [];
     var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
     if (crSheet && crSheet.getLastRow() >= 2) {
       var crRows = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, Math.max(crSheet.getLastColumn(), 5)).getValues();
       crRows.forEach(function(cr) {
-        if (String(cr[0] || '').trim() === rid && String(cr[4] || '').trim() === 'rejected') {
-          cancelRejected.push({ staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() });
+        if (String(cr[0] || '').trim() !== rid) return;
+        var crStatus = String(cr[4] || '').trim();
+        var entry = { staffName: String(cr[1] || '').trim(), email: String(cr[2] || '').trim().toLowerCase() };
+        if (crStatus === 'rejected') {
+          cancelRejected.push(entry);
+        } else {
+          cancelRequested.push(entry);
         }
       });
     }
@@ -7964,8 +7973,8 @@ function getRecruitSupplementary_(bookingRowNumber) {
         });
       }
     } catch (e) {}
-    return { cancelRejected: cancelRejected, responseChangeRequests: responseChangeRequests };
-  } catch (e) { return { cancelRejected: [], responseChangeRequests: [] }; }
+    return { cancelRequested: cancelRequested, cancelRejected: cancelRejected, responseChangeRequests: responseChangeRequests };
+  } catch (e) { return { cancelRequested: [], cancelRejected: [], responseChangeRequests: [] }; }
 }
 
 /**

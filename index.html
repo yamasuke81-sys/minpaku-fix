@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0222e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0222f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5201,7 +5201,7 @@
               var html = r.list.map(function(n, idx) {
                 var kindClass = (n.kind === '回答') ? 'primary' : (n.kind === '回答取消') ? 'warning' : (n.kind === '予約追加') ? 'success' : (n.kind === '予約削除') ? 'danger' : (n.kind === '予約キャンセル') ? 'danger' : (n.kind === '予約復活') ? 'success' : (n.kind === '出勤キャンセル要望') ? 'danger' : (n.kind === 'キャンセル承認') ? 'info' : (n.kind === 'キャンセル却下') ? 'secondary' : 'secondary';
                 var actionHtml = '';
-                if (!isStaffMode && n.kind === '出勤キャンセル要望' && n.data && n.data.recruitRowIndex) {
+                if (!window.staffMode && n.kind === '出勤キャンセル要望' && n.data && n.data.recruitRowIndex) {
                   actionHtml = '<div class="mt-1"><button class="btn btn-sm btn-warning me-1 notif-approve" data-idx="' + idx + '">承認</button><button class="btn btn-sm btn-outline-secondary notif-reject" data-idx="' + idx + '">却下</button></div>';
                 }
                 return '<div class="border rounded p-2 mb-2 small" data-notif-idx="' + idx + '"><span class="badge bg-' + kindClass + ' me-2">' + escapeHtml(n.kind) + '</span><span class="text-muted">' + escapeHtml(formatNotificationDate(n.at)) + '</span> ' + escapeHtml(n.message) + actionHtml + '</div>';

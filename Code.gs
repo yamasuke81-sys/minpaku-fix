@@ -3698,11 +3698,11 @@ function saveEmailNotifySettings(settings) {
   }
 }
 
-/** メール通知が有効かチェックするヘルパー（デフォルトfalse） */
+/** メール通知が有効かチェックするヘルパー（キー未設定時はデフォルトON） */
 function isEmailNotifyEnabled_(sheetKey) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
-    if (!sheet || sheet.getLastRow() < 2) return false;
+    if (!sheet || sheet.getLastRow() < 2) return true;
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0] || '').trim() === sheetKey) {
@@ -3710,9 +3710,9 @@ function isEmailNotifyEnabled_(sheetKey) {
         return v === true || String(v).trim() === 'true';
       }
     }
-    return false; // キーが見つからない場合はデフォルトOFF
+    return true; // キーが見つからない場合はデフォルトON（設定画面で明示的にOFFにするまで有効）
   } catch (e) {
-    return false;
+    return true;
   }
 }
 

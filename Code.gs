@@ -2177,9 +2177,13 @@ function parseICal_(icalText, platformName) {
         seenUids[dupKey] = true;
         var sum = (current.summary || '').trim();
         if (/cancel/i.test(sum)) continue;
+        // ブロック日・利用不可日をスキップ（Not available, CLOSED, Blocked など）
+        if (/^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)) continue;
         var guestName = sum.replace(/^Reserved\s*$/i, '').replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         var guestLower = guestName.toLowerCase();
         if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName) || guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten') continue;
+        // ゲスト名が空の場合（ブロック日等の可能性）はスキップ
+        if (!guestName) continue;
         var combinedText = ((current.summary || '') + ' ' + (current.description || '')).trim();
         var icalGuestCount = extractGuestCountFromIcalText_(combinedText);
         events.push({
@@ -7929,9 +7933,10 @@ function getCleaningModalData(checkoutDate, rowNumber) {
  * 募集データの補足情報のみ取得（cancelRequested + cancelRejected + responseChangeRequests）
  * _recruitFullMap キャッシュにないデータだけを軽量に取得するヘルパー
  * @param {number} bookingRowNumber フォームシートの行番号
+ * @param {string} [checkoutDate] チェックアウト日（行番号不一致時のフォールバック検索用）
  * @return {object} { cancelRequested: [], cancelRejected: [], responseChangeRequests: [] }
  */
-function getRecruitSupplementary_(bookingRowNumber) {
+function getRecruitSupplementary_(bookingRowNumber, checkoutDate) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
@@ -7940,6 +7945,19 @@ function getRecruitSupplementary_(bookingRowNumber) {
     var recruitRowIndex = -1;
     for (var i = 0; i < rows.length; i++) {
       if (Number(rows[i][1]) === bookingRowNumber) { recruitRowIndex = i + 2; break; }
+    }
+    // 行番号で見つからなければ、チェックアウト日で検索（ソート後の行番号ずれ対策）
+    if (recruitRowIndex < 0 && checkoutDate) {
+      var allRows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, Math.max(recruitSheet.getLastColumn(), 2)).getValues();
+      for (var j = 0; j < allRows.length; j++) {
+        var rCo = allRows[j][0] ? (allRows[j][0] instanceof Date ? Utilities.formatDate(allRows[j][0], 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(allRows[j][0]) || String(allRows[j][0]).trim())) : '';
+        if (rCo === checkoutDate) {
+          recruitRowIndex = j + 2;
+          // 行番号を自動修復
+          try { recruitSheet.getRange(j + 2, 2).setValue(bookingRowNumber); } catch (e) {}
+          break;
+        }
+      }
     }
     if (recruitRowIndex < 0) return { cancelRequested: [], cancelRejected: [], responseChangeRequests: [] };
     var rid = 'r' + recruitRowIndex;
@@ -7991,7 +8009,7 @@ function getCleaningModalDataLight(checkoutDate, rowNumber) {
     try {
       result.laundry = JSON.parse(getCleaningLaundryStatus(checkoutDate));
     } catch (e) { result.laundry = { success: false }; }
-    result.supplementary = getRecruitSupplementary_(rowNumber);
+    result.supplementary = getRecruitSupplementary_(rowNumber, checkoutDate);
     return JSON.stringify({ success: true, data: result, light: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

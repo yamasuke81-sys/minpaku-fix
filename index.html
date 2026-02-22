@@ -964,7 +964,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0221p</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0222a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1141,7 +1141,9 @@
           <p class="small text-muted mb-1">オーナー用URLを貼り付けると、下のスタッフ用・閲覧専用URLが自動生成されます。</p>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             <input type="url" class="form-control form-control-sm flex-grow-1" id="ownerUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec" style="min-width:200px;">
+            <button type="button" class="btn btn-sm btn-success" id="btnSaveOwnerUrl">保存</button>
           </div>
+          <div id="ownerUrlSaveMsg" class="small text-success mt-1" style="display:none;">保存しました</div>
         </div>
         <div class="mb-3 p-2 border rounded bg-light">
           <label class="form-label small fw-bold">スタッフ用URL</label>
@@ -5680,6 +5682,10 @@
         if (base) {
           if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
+        } else {
+          // オーナーURLが未取得でもパラメータをデフォルト値として表示
+          if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
+          if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
         }
         if (staffInp) {
           // バックエンドから確実に取得（ScriptApp + プロパティ + デプロイID全て試行）
@@ -6460,6 +6466,32 @@
       }
       setupUrlButtons('btnCopyStaffUrl', 'btnOpenStaffUrl', 'staffUrlInput', 'スタッフ用URL');
       setupUrlButtons('btnCopyReadonlyUrl', 'btnOpenReadonlyUrl', 'readonlyUrlInput', '閲覧専用URL');
+      // オーナーURL保存ボタン
+      document.getElementById('btnSaveOwnerUrl').addEventListener('click', function() {
+        var ownerUrl = document.getElementById('ownerUrlInput').value.trim();
+        if (!ownerUrl) { alert('オーナーURLを入力してください。'); return; }
+        var btn = this;
+        btn.disabled = true;
+        btn.textContent = '保存中…';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '保存';
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              var msg = document.getElementById('ownerUrlSaveMsg');
+              if (msg) { msg.style.display = 'block'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
+              generateUrlsFromOwnerUrl(ownerUrl);
+            } else {
+              alert('保存に失敗しました: ' + (r.error || ''));
+            }
+          } catch (e) { alert('保存に失敗しました。'); }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '保存';
+          alert('保存に失敗しました: ' + (err.message || ''));
+        }).saveOwnerUrl(ownerUrl);
+      });
       document.getElementById('btnChangeOwnerEmail').addEventListener('click', function() {
         document.getElementById('ownerEmailNew').value = '';
         document.getElementById('ownerEmailPassword').value = '';

@@ -823,6 +823,22 @@ function getStaffDeployUrl() {
 }
 
 /**
+ * オーナーURLを保存する
+ */
+function saveOwnerUrl(ownerUrl) {
+  try {
+    if (!ownerUrl) return JSON.stringify({ success: false, error: 'URLが空です' });
+    var clean = ownerUrl.replace(/[?&](staff=1|view=readonly)/g, '').replace(/\?$/, '');
+    PropertiesService.getDocumentProperties().setProperty('ownerBaseUrl', clean);
+    // スタッフURLも更新
+    var sep = clean.indexOf('?') >= 0 ? '&' : '?';
+    var staffUrl = clean + sep + 'staff=1';
+    PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', staffUrl);
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
+}
+
+/**
  * テキストコピー/メール用: 常に最新のスタッフURLを返す
  * ScriptApp.getService().getUrl() を優先し、保存値にフォールバック
  */

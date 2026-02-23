@@ -4758,7 +4758,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     lock.waitLock(10000);
     try {
       var crSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CANCEL_REQUESTS);
-      if (!crSheet) { lock.releaseLock(); return JSON.stringify({ success: true }); }
+      if (!crSheet) { lock.releaseLock(); return JSON.stringify({ success: false, error: 'キャンセル申請シートが見つかりません。管理者に連絡してください。' }); }
       // 既に同一スタッフの pending な申請があればスキップ
       var alreadyExists = false;
       if (crSheet.getLastRow() >= 2) {
@@ -4781,7 +4781,6 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
       lock.releaseLock();
     } catch (lockErr) {
       try { lock.releaseLock(); } catch (e2) {}
-      if (lockErr.toString().indexOf('Lock') >= 0) return JSON.stringify({ success: true });
       throw lockErr;
     }
 
@@ -4792,7 +4791,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     invalidateInitDataCache_();
 
     // 通知（シート書き込み）
-    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) {}
+    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) { Logger.log('Cancel request notification failed: ' + ne.toString()); }
     // メール送信（最も遅い処理 - 失敗しても成功扱い）
     try {
       var ownerRes = JSON.parse(getOwnerEmail());
@@ -4802,7 +4801,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
         var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。';
         GmailApp.sendEmail(ownerEmail, subject, body);
       }
-    } catch (mailErr) {}
+    } catch (mailErr) { Logger.log('Cancel request email failed: ' + mailErr.toString()); }
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

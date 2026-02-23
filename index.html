@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0222g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2959,13 +2959,27 @@
                         cancelReqBtn.textContent = '申請中...';
                         cancelReqBtn.className = 'btn btn-sm btn-secondary';
                         google.script.run.withSuccessHandler(function(j) {
-                          var res = JSON.parse(j);
-                          if (res.success) {
-                            bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
-                            loadAndRender();
-                            if (window.staffMode) loadStaffSchedule();
-                          } else { alert(res.error || '失敗'); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger'; }
-                        }).withFailureHandler(function(e) { alert(e.message); cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger'; }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, checkoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                          try {
+                            var res = JSON.parse(j);
+                            if (res.success) {
+                              bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                              loadAndRender();
+                              if (window.staffMode) loadStaffSchedule();
+                            } else {
+                              console.error('Cancel request failed:', res.error);
+                              alert(res.error || '取消申請に失敗しました');
+                              cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger';
+                            }
+                          } catch (parseErr) {
+                            console.error('Cancel request parse error:', parseErr, j);
+                            alert('取消申請の処理中にエラーが発生しました');
+                            cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger';
+                          }
+                        }).withFailureHandler(function(e) {
+                          console.error('Cancel request server error:', e);
+                          alert(e.message || '取消申請に失敗しました');
+                          cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger';
+                        }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, checkoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                       });
                     };
                     cancelBtnArea.appendChild(cancelReqBtn);

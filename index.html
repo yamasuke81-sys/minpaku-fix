@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1919,6 +1919,20 @@
       if (window.readOnly) window.staffMode = true;
       window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
       window.savedOwnerUrl = <?= JSON.stringify(savedOwnerUrl) ?> || '';
+      // テンプレートキャッシュ対策: ページ読み込み時にサーバーからオーナーURLを非同期取得
+      // （設定タブを開く前にwindow.savedOwnerUrlを最新化する）
+      try {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.url) {
+              window.savedOwnerUrl = r.url;
+              try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+              try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+            }
+          } catch(e) {}
+        }).withFailureHandler(function() {}).getOwnerBaseUrl();
+      } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
       // デバッグ: デプロイ確認用
@@ -5748,9 +5762,10 @@
         // loadSettingsはタブ切替のたびに呼ばれるため、毎回userEditedフラグをリセット
         // （ユーザーが実際にinput/pasteした場合のみイベントリスナーで再設定される）
         if (ownerInp) ownerInp.dataset.userEdited = '';
-        // 優先順位: 1.サーバーテンプレート変数 → 2.localStorageキャッシュ → 3.デプロイURL
+        // 優先順位: 1.サーバーテンプレート変数 → 2.localStorageキャッシュ → 3.sessionStorageキャッシュ → 4.デプロイURL
         var cachedOwnerUrl = '';
         try { cachedOwnerUrl = localStorage.getItem('ownerUrlCache') || ''; } catch(e) {}
+        if (!cachedOwnerUrl) { try { cachedOwnerUrl = sessionStorage.getItem('ownerUrlCache') || ''; } catch(e) {} }
         var base = window.savedOwnerUrl || cachedOwnerUrl || window.appBaseUrl || '';
         if (base) {
           if (ownerInp) ownerInp.value = base;
@@ -5759,20 +5774,7 @@
           if (window.savedOwnerUrl) {
             try { localStorage.setItem('ownerUrlCache', window.savedOwnerUrl); } catch(e) {}
           }
-          // appBaseUrlフォールバック時: サーバーにまだ保存されていない場合は自動保存
-          // （デプロイ変更でURLが変わるのを防止）
-          if (!window.savedOwnerUrl && !cachedOwnerUrl && window.appBaseUrl && !window._ownerUrlAutoSaved) {
-            window._ownerUrlAutoSaved = true;
-            google.script.run.withSuccessHandler(function(jsonStr) {
-              try {
-                var r = JSON.parse(jsonStr);
-                if (r.success && r.savedUrl) {
-                  window.savedOwnerUrl = r.savedUrl;
-                  try { localStorage.setItem('ownerUrlCache', r.savedUrl); } catch(e) {}
-                }
-              } catch(e) {}
-            }).withFailureHandler(function() {}).saveOwnerUrl(window.appBaseUrl);
-          }
+          // 自動保存はgetOwnerBaseUrlコールバック内で実施（サーバーに未保存の場合のみ）
         } else {
           // オーナーURLが未取得でもパラメータをデフォルト値として表示
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
@@ -5793,9 +5795,28 @@
                   ownerInp.value = r.url;
                   generateUrlsFromOwnerUrl(r.url);
                   try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+                  try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
                 }
                 // userEdited中でもwindow.savedOwnerUrlとlocalStorageは更新しない
                 // → doSaveOwnerUrlで設定した最新値を保護する
+              } else if (r.success && !r.url && window.appBaseUrl && !window._ownerUrlAutoSaved) {
+                // サーバーにURLが未保存の場合のみ、appBaseUrlを自動保存
+                // （クライアント側キャッシュの有無ではなくサーバー応答で判断するため安全）
+                window._ownerUrlAutoSaved = true;
+                google.script.run.withSuccessHandler(function(saveJsonStr) {
+                  try {
+                    var sr = JSON.parse(saveJsonStr);
+                    if (sr.success && sr.savedUrl) {
+                      window.savedOwnerUrl = sr.savedUrl;
+                      if (ownerInp && !ownerInp.dataset.userEdited) {
+                        ownerInp.value = sr.savedUrl;
+                        generateUrlsFromOwnerUrl(sr.savedUrl);
+                      }
+                      try { localStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
+                      try { sessionStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
+                    }
+                  } catch(e) {}
+                }).withFailureHandler(function() {}).saveOwnerUrl(window.appBaseUrl);
               }
             } catch (e) {}
           }).withFailureHandler(function(err) {
@@ -6588,8 +6609,9 @@
               var msg = document.getElementById('ownerUrlSaveMsg');
               if (msg) { msg.style.display = 'block'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
               generateUrlsFromOwnerUrl(savedUrl);
-              // localStorageにサーバーで保存されたURL（クリーン済み）をキャッシュ
+              // localStorageとsessionStorageにサーバーで保存されたURL（クリーン済み）をキャッシュ
               try { localStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
+              try { sessionStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
             } else {
               alert('保存に失敗しました: ' + (r.error || ''));
             }

@@ -217,6 +217,7 @@ function doGet(e) {
   // オーナーが保存したURLをテンプレートに渡す（リロード時の即座表示用）
   var savedOwnerUrl = '';
   try { savedOwnerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
+  if (!savedOwnerUrl) { try { savedOwnerUrl = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {} }
   template.savedOwnerUrl = savedOwnerUrl;
   var isStaff = (String(params.staff || '') === '1' || String(params.staff || '') === 'true');
   template.isStaffMode = isStaff;
@@ -870,6 +871,7 @@ function getStaffDeployUrl() {
     // 1. 保存済みstaffDeployUrl（deploy-all.jsが保存）
     var stored = '';
     try { stored = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch(e) {}
+    if (!stored) { try { stored = PropertiesService.getScriptProperties().getProperty('staffDeployUrl') || ''; } catch(e) {} }
     if (stored) return JSON.stringify({ success: true, url: stored });
     // 2. ベースURLから生成
     var base = '';
@@ -901,12 +903,25 @@ function saveOwnerUrl(ownerUrl) {
   try {
     if (!ownerUrl) return JSON.stringify({ success: false, error: 'URLが空です' });
     var clean = ownerUrl.replace(/[?&](staff=1|view=readonly)/g, '').replace(/\?$/, '');
-    PropertiesService.getDocumentProperties().setProperty('ownerBaseUrl', clean);
-    // スタッフURLも更新
+    // スタッフURLも生成
     var sep = clean.indexOf('?') >= 0 ? '&' : '?';
     var staffUrl = clean + sep + 'staff=1';
-    PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', staffUrl);
-    return JSON.stringify({ success: true });
+    // DocumentProperties に保存（メイン）
+    try {
+      PropertiesService.getDocumentProperties().setProperty('ownerBaseUrl', clean);
+      PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', staffUrl);
+    } catch (de) { Logger.log('DocumentProperties save failed: ' + de.toString()); }
+    // ScriptProperties にもフォールバック保存（DocumentPropertiesが使えない環境対策）
+    try {
+      PropertiesService.getScriptProperties().setProperty('ownerBaseUrl', clean);
+      PropertiesService.getScriptProperties().setProperty('staffDeployUrl', staffUrl);
+    } catch (se) { Logger.log('ScriptProperties save failed: ' + se.toString()); }
+    // 保存確認（読み戻し検証）
+    var verify = '';
+    try { verify = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch (ve) {}
+    if (!verify) { try { verify = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch (ve) {} }
+    if (!verify) return JSON.stringify({ success: false, error: '保存に失敗しました（プロパティストアへの書き込みができません）' });
+    return JSON.stringify({ success: true, savedUrl: clean });
   } catch (e) { return JSON.stringify({ success: false, error: e.toString() }); }
 }
 

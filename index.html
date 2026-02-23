@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2979,7 +2979,7 @@
                           console.error('Cancel request server error:', e);
                           alert(e.message || '取消申請に失敗しました');
                           cancelReqBtn.disabled = false; cancelReqBtn.textContent = '取消申請'; cancelReqBtn.className = 'btn btn-sm btn-danger';
-                        }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, checkoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
+                        }).submitStaffCancelRequest(r.recruitRowIndex, props.rowNumber, _batchCheckoutDate || r.checkoutDate || '', window.currentUserName || '', window.currentUserEmail || '');
                       });
                     };
                     cancelBtnArea.appendChild(cancelReqBtn);
@@ -6543,33 +6543,46 @@
       }
       setupUrlButtons('btnCopyStaffUrl', 'btnOpenStaffUrl', 'staffUrlInput', 'スタッフ用URL');
       setupUrlButtons('btnCopyReadonlyUrl', 'btnOpenReadonlyUrl', 'readonlyUrlInput', '閲覧専用URL');
-      // オーナーURL保存ボタン
-      document.getElementById('btnSaveOwnerUrl').addEventListener('click', function() {
-        var ownerUrl = document.getElementById('ownerUrlInput').value.trim();
-        if (!ownerUrl) { alert('オーナーURLを入力してください。'); return; }
-        var btn = this;
-        btn.disabled = true;
-        btn.textContent = '保存中…';
+      // オーナーURL保存（共通関数）
+      function doSaveOwnerUrl(ownerUrl, btn) {
+        if (!ownerUrl) { if (btn) { alert('オーナーURLを入力してください。'); } return; }
+        if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
         google.script.run.withSuccessHandler(function(jsonStr) {
-          btn.disabled = false;
-          btn.textContent = '保存';
+          if (btn) { btn.disabled = false; btn.textContent = '保存'; }
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
+              var savedUrl = r.savedUrl || ownerUrl;
+              // window.savedOwnerUrlを即座に更新（リロード不要で反映）
+              window.savedOwnerUrl = savedUrl;
               var msg = document.getElementById('ownerUrlSaveMsg');
               if (msg) { msg.style.display = 'block'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
-              generateUrlsFromOwnerUrl(ownerUrl);
-              // localStorageにもキャッシュ（次回リロード時の即座表示用）
-              try { localStorage.setItem('ownerUrlCache', ownerUrl); } catch(e) {}
+              generateUrlsFromOwnerUrl(savedUrl);
+              // localStorageにサーバーで保存されたURL（クリーン済み）をキャッシュ
+              try { localStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
             } else {
               alert('保存に失敗しました: ' + (r.error || ''));
             }
           } catch (e) { alert('保存に失敗しました。'); }
         }).withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.textContent = '保存';
+          if (btn) { btn.disabled = false; btn.textContent = '保存'; }
           alert('保存に失敗しました: ' + (err.message || ''));
         }).saveOwnerUrl(ownerUrl);
+      }
+      // 保存ボタン
+      document.getElementById('btnSaveOwnerUrl').addEventListener('click', function() {
+        var ownerUrl = document.getElementById('ownerUrlInput').value.trim();
+        doSaveOwnerUrl(ownerUrl, this);
+      });
+      // 貼り付け時の自動保存（500ms debounce）
+      var _ownerUrlSaveTimer = null;
+      document.getElementById('ownerUrlInput').addEventListener('paste', function() {
+        var inp = this;
+        clearTimeout(_ownerUrlSaveTimer);
+        _ownerUrlSaveTimer = setTimeout(function() {
+          var v = inp.value.trim();
+          if (v && v.indexOf('script.google.com') >= 0) doSaveOwnerUrl(v, null);
+        }, 500);
       });
       document.getElementById('btnChangeOwnerEmail').addEventListener('click', function() {
         document.getElementById('ownerEmailNew').value = '';

@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1921,14 +1921,31 @@
       window.savedOwnerUrl = <?= JSON.stringify(savedOwnerUrl) ?> || '';
       // テンプレートキャッシュ対策: ページ読み込み時にサーバーからオーナーURLを非同期取得
       // （設定タブを開く前にwindow.savedOwnerUrlを最新化する）
+      // 【重要】これがgetOwnerBaseUrl()を呼ぶ唯一の場所。loadSettings()からは呼ばない。
+      window._ownerUrlLastSaveTime = 0; // ユーザー保存のタイムスタンプ（レースコンディション防止用）
       try {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.url) {
-              window.savedOwnerUrl = r.url;
-              try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
-              try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+              // ユーザーがページ読み込み後に手動保存していたら、サーバー取得値で上書きしない
+              if (!window._ownerUrlLastSaveTime) {
+                window.savedOwnerUrl = r.url;
+                try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+                try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+              }
+            } else if (r.success && !r.url && window.appBaseUrl) {
+              // サーバーにURLが未保存 → appBaseUrl(デプロイURL)を自動保存
+              google.script.run.withSuccessHandler(function(saveJsonStr) {
+                try {
+                  var sr = JSON.parse(saveJsonStr);
+                  if (sr.success && sr.savedUrl && !window._ownerUrlLastSaveTime) {
+                    window.savedOwnerUrl = sr.savedUrl;
+                    try { localStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
+                    try { sessionStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
+                  }
+                } catch(e) {}
+              }).withFailureHandler(function() {}).saveOwnerUrl(window.appBaseUrl);
             }
           } catch(e) {}
         }).withFailureHandler(function() {}).getOwnerBaseUrl();
@@ -5737,9 +5754,6 @@
         if (readonlyInp) readonlyInp.value = clean + sep + 'view=readonly';
       }
 
-      // 非同期コールバックの競合を防ぐバージョンカウンター
-      window._loadSettingsVer = 0;
-
       function loadSettings() {
         var ownerInp = document.getElementById('ownerUrlInput');
         var staffInp = document.getElementById('staffUrlInput');
@@ -5748,21 +5762,20 @@
         if (ownerInp && !ownerInp.dataset.listenersAttached) {
           ownerInp.dataset.listenersAttached = '1';
           ownerInp.addEventListener('input', function() {
-            ownerInp.dataset.userEdited = '1';
             generateUrlsFromOwnerUrl(ownerInp.value.trim());
           });
           ownerInp.addEventListener('paste', function() {
-            ownerInp.dataset.userEdited = '1';
             setTimeout(function() {
               generateUrlsFromOwnerUrl(ownerInp.value.trim());
             }, 0);
           });
         }
         // --- オーナーURL復元 ---
-        // loadSettingsはタブ切替のたびに呼ばれるため、毎回userEditedフラグをリセット
-        // （ユーザーが実際にinput/pasteした場合のみイベントリスナーで再設定される）
-        if (ownerInp) ownerInp.dataset.userEdited = '';
-        // 優先順位: 1.サーバーテンプレート変数 → 2.localStorageキャッシュ → 3.sessionStorageキャッシュ → 4.デプロイURL
+        // 【重要】ここでは非同期呼び出し(getOwnerBaseUrl)を一切行わない。
+        // 非同期呼び出しはページ読み込み時の1回だけ（line ~1922）で行い、
+        // window.savedOwnerUrlを事前に最新化しておく。
+        // loadSettingsはタブ切替のたびに呼ばれるため、ここで非同期呼び出しすると
+        // レースコンディションでユーザー保存値が上書きされる原因になる。
         var cachedOwnerUrl = '';
         try { cachedOwnerUrl = localStorage.getItem('ownerUrlCache') || ''; } catch(e) {}
         if (!cachedOwnerUrl) { try { cachedOwnerUrl = sessionStorage.getItem('ownerUrlCache') || ''; } catch(e) {} }
@@ -5770,58 +5783,9 @@
         if (base) {
           if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
-          // localStorageをサーバー値で更新
-          if (window.savedOwnerUrl) {
-            try { localStorage.setItem('ownerUrlCache', window.savedOwnerUrl); } catch(e) {}
-          }
-          // 自動保存はgetOwnerBaseUrlコールバック内で実施（サーバーに未保存の場合のみ）
         } else {
-          // オーナーURLが未取得でもパラメータをデフォルト値として表示
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
-        }
-        if (ownerInp) {
-          // バックエンドからownerBaseUrlを直接取得（最も信頼性が高いソース）
-          var thisVer = ++window._loadSettingsVer;
-          google.script.run.withSuccessHandler(function(jsonStr) {
-            // 古いloadSettings呼び出しからのコールバックは無視
-            if (thisVer !== window._loadSettingsVer) return;
-            try {
-              var r = JSON.parse(jsonStr);
-              if (r.success && r.url) {
-                // ユーザーが手動で編集/保存していない場合のみ全て更新
-                if (ownerInp && !ownerInp.dataset.userEdited) {
-                  window.savedOwnerUrl = r.url;
-                  ownerInp.value = r.url;
-                  generateUrlsFromOwnerUrl(r.url);
-                  try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
-                  try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
-                }
-                // userEdited中でもwindow.savedOwnerUrlとlocalStorageは更新しない
-                // → doSaveOwnerUrlで設定した最新値を保護する
-              } else if (r.success && !r.url && window.appBaseUrl && !window._ownerUrlAutoSaved) {
-                // サーバーにURLが未保存の場合のみ、appBaseUrlを自動保存
-                // （クライアント側キャッシュの有無ではなくサーバー応答で判断するため安全）
-                window._ownerUrlAutoSaved = true;
-                google.script.run.withSuccessHandler(function(saveJsonStr) {
-                  try {
-                    var sr = JSON.parse(saveJsonStr);
-                    if (sr.success && sr.savedUrl) {
-                      window.savedOwnerUrl = sr.savedUrl;
-                      if (ownerInp && !ownerInp.dataset.userEdited) {
-                        ownerInp.value = sr.savedUrl;
-                        generateUrlsFromOwnerUrl(sr.savedUrl);
-                      }
-                      try { localStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
-                      try { sessionStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
-                    }
-                  } catch(e) {}
-                }).withFailureHandler(function() {}).saveOwnerUrl(window.appBaseUrl);
-              }
-            } catch (e) {}
-          }).withFailureHandler(function(err) {
-            try { console.log('getOwnerBaseUrl failed:', err); } catch(e) {}
-          }).getOwnerBaseUrl();
         }
         loadInvoiceSettings_();
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -6600,10 +6564,10 @@
               var savedUrl = r.savedUrl || ownerUrl;
               // window.savedOwnerUrlを即座に更新（リロード不要で反映）
               window.savedOwnerUrl = savedUrl;
-              // userEditedフラグを設定して、進行中のgetOwnerBaseUrlコールバックからの上書きを防止
+              // タイムスタンプを記録してページ読み込み時の非同期コールバックからの上書きを防止
+              window._ownerUrlLastSaveTime = Date.now();
               var ownerInpEl = document.getElementById('ownerUrlInput');
               if (ownerInpEl) {
-                ownerInpEl.dataset.userEdited = '1';
                 ownerInpEl.value = savedUrl;
               }
               var msg = document.getElementById('ownerUrlSaveMsg');

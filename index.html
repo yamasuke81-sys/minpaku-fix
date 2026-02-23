@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223d</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5723,6 +5723,9 @@
         if (readonlyInp) readonlyInp.value = clean + sep + 'view=readonly';
       }
 
+      // 非同期コールバックの競合を防ぐバージョンカウンター
+      window._loadSettingsVer = 0;
+
       function loadSettings() {
         var ownerInp = document.getElementById('ownerUrlInput');
         var staffInp = document.getElementById('staffUrlInput');
@@ -5756,6 +5759,20 @@
           if (window.savedOwnerUrl) {
             try { localStorage.setItem('ownerUrlCache', window.savedOwnerUrl); } catch(e) {}
           }
+          // appBaseUrlフォールバック時: サーバーにまだ保存されていない場合は自動保存
+          // （デプロイ変更でURLが変わるのを防止）
+          if (!window.savedOwnerUrl && !cachedOwnerUrl && window.appBaseUrl && !window._ownerUrlAutoSaved) {
+            window._ownerUrlAutoSaved = true;
+            google.script.run.withSuccessHandler(function(jsonStr) {
+              try {
+                var r = JSON.parse(jsonStr);
+                if (r.success && r.savedUrl) {
+                  window.savedOwnerUrl = r.savedUrl;
+                  try { localStorage.setItem('ownerUrlCache', r.savedUrl); } catch(e) {}
+                }
+              } catch(e) {}
+            }).withFailureHandler(function() {}).saveOwnerUrl(window.appBaseUrl);
+          }
         } else {
           // オーナーURLが未取得でもパラメータをデフォルト値として表示
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
@@ -5763,23 +5780,25 @@
         }
         if (ownerInp) {
           // バックエンドからownerBaseUrlを直接取得（最も信頼性が高いソース）
-          // テンプレート変数やlocalStorageが古い場合でも、この非同期コールバックで最新値に更新される
+          var thisVer = ++window._loadSettingsVer;
           google.script.run.withSuccessHandler(function(jsonStr) {
+            // 古いloadSettings呼び出しからのコールバックは無視
+            if (thisVer !== window._loadSettingsVer) return;
             try {
               var r = JSON.parse(jsonStr);
               if (r.success && r.url) {
-                // window.savedOwnerUrlを最新サーバー値で更新（次回loadSettings呼び出し用）
-                window.savedOwnerUrl = r.url;
-                // ユーザーが手動で編集していない場合のみ入力欄を更新
+                // ユーザーが手動で編集/保存していない場合のみ全て更新
                 if (ownerInp && !ownerInp.dataset.userEdited) {
+                  window.savedOwnerUrl = r.url;
                   ownerInp.value = r.url;
                   generateUrlsFromOwnerUrl(r.url);
+                  try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
                 }
-                try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+                // userEdited中でもwindow.savedOwnerUrlとlocalStorageは更新しない
+                // → doSaveOwnerUrlで設定した最新値を保護する
               }
             } catch (e) {}
           }).withFailureHandler(function(err) {
-            // 非同期取得失敗時はログ出力のみ（同期値がフォールバックとして使われる）
             try { console.log('getOwnerBaseUrl failed:', err); } catch(e) {}
           }).getOwnerBaseUrl();
         }
@@ -6560,6 +6579,12 @@
               var savedUrl = r.savedUrl || ownerUrl;
               // window.savedOwnerUrlを即座に更新（リロード不要で反映）
               window.savedOwnerUrl = savedUrl;
+              // userEditedフラグを設定して、進行中のgetOwnerBaseUrlコールバックからの上書きを防止
+              var ownerInpEl = document.getElementById('ownerUrlInput');
+              if (ownerInpEl) {
+                ownerInpEl.dataset.userEdited = '1';
+                ownerInpEl.value = savedUrl;
+              }
               var msg = document.getElementById('ownerUrlSaveMsg');
               if (msg) { msg.style.display = 'block'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
               generateUrlsFromOwnerUrl(savedUrl);

@@ -5975,7 +5975,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
           sendResult = '送信済み：' + ownerEmail;
         }
       } catch (mailErr) {
-        sendResult = 'メール送信スキップ（PDF作成は成功）';
+        sendResult = 'メール送信スキップ（PDF作成は成功）: ' + mailErr;
         Logger.log('メール送信エラー（PDF作成は成功、続行）: ' + mailErr);
       }
     }

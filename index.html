@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -6508,8 +6508,25 @@
             var r = JSON.parse(jsonStr);
             if (r.success) {
               if (resEl) {
-                resEl.textContent = '送信完了（合計: ¥' + (r.total || 0).toLocaleString() + '）';
-                resEl.className = 'small mt-1 text-success';
+                var sr = r.sendResult || '';
+                var emailOk = sr.indexOf('送信済み') === 0;
+                var msg = 'PDF作成完了（合計: ¥' + (r.total || 0).toLocaleString() + '）';
+                if (emailOk) {
+                  msg += ' / メール送信済み';
+                  resEl.className = 'small mt-1 text-success';
+                } else if (sr.indexOf('送信先なし') !== -1) {
+                  msg += ' / ⚠ オーナーのメールアドレスが未設定のためメール未送信';
+                  resEl.className = 'small mt-1 text-warning';
+                } else if (sr.indexOf('メール送信OFF') !== -1) {
+                  msg += ' / ⚠ メール通知設定がOFFのためメール未送信';
+                  resEl.className = 'small mt-1 text-warning';
+                } else if (sr.indexOf('スキップ') !== -1) {
+                  msg += ' / ⚠ メール送信に失敗しました（PDF作成は成功）';
+                  resEl.className = 'small mt-1 text-warning';
+                } else {
+                  resEl.className = 'small mt-1 text-success';
+                }
+                resEl.textContent = msg;
                 resEl.style.display = 'block';
               }
               // 送信後、履歴をサーバーから再取得

@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5748,8 +5748,8 @@
         if (base) {
           if (ownerInp) {
             ownerInp.value = base;
-            // サーバーに保存済みのURLがある場合、非同期コールバックで上書きされないようにフラグを設定
-            if (window.savedOwnerUrl) ownerInp.dataset.userEdited = '1';
+            // サーバー保存URL or localStorageキャッシュからの復元時は非同期コールバックで上書きされないようフラグ設定
+            if (window.savedOwnerUrl || cachedOwnerUrl) ownerInp.dataset.userEdited = '1';
           }
           generateUrlsFromOwnerUrl(base);
           // localStorageをサーバー値で更新
@@ -5761,22 +5761,21 @@
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
         }
-        if (staffInp) {
-          // バックエンドから確実に取得（最終確認用 - 非同期）
+        if (ownerInp) {
+          // バックエンドからownerBaseUrlを直接取得（staffDeployUrlからの逆算をやめ、デプロイによる破損を防止）
           google.script.run.withSuccessHandler(function(jsonStr) {
             try {
               var r = JSON.parse(jsonStr);
               if (r.success && r.url) {
-                var rawBase = r.url.replace(/[?&]staff=1/, '');
                 if (ownerInp && !ownerInp.dataset.userEdited) {
-                  ownerInp.value = rawBase;
-                  generateUrlsFromOwnerUrl(rawBase);
+                  ownerInp.value = r.url;
+                  generateUrlsFromOwnerUrl(r.url);
                 }
-                // 非同期結果もlocalStorageに保存
-                try { localStorage.setItem('ownerUrlCache', rawBase); } catch(e) {}
+                // ownerBaseUrlが直接取得できた場合のみlocalStorageを更新
+                try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
               }
             } catch (e) {}
-          }).getStaffDeployUrl();
+          }).getOwnerBaseUrl();
         }
         loadInvoiceSettings_();
         google.script.run.withSuccessHandler(function(jsonStr) {

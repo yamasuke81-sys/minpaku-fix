@@ -185,6 +185,13 @@ function doGet(e) {
     PropertiesService.getScriptProperties().setProperty('GATEWAY_URL', String(url).trim());
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
+  // オーナーURL取得アクション（deploy-all.jsがデプロイ時にユーザー保存URLを確認するため）
+  if (action === 'getOwnerBaseUrl') {
+    var ownerUrl = '';
+    try { ownerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
+    if (!ownerUrl) { try { ownerUrl = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {} }
+    return ContentService.createTextOutput(JSON.stringify({ url: ownerUrl })).setMimeType(ContentService.MimeType.JSON);
+  }
   // ゲートウェイ対応: どのデプロイメントからアクセスされても正常に動作するよう
   // APP_BASE_URL（最新のメインURL）を優先使用し、古いURLで上書きしない
   const template = HtmlService.createTemplateFromFile('index');
@@ -893,6 +900,19 @@ function getStaffDeployUrl() {
       return JSON.stringify({ success: true, url: url });
     }
     return JSON.stringify({ success: true, url: '' });
+  } catch (e) { return JSON.stringify({ success: false, url: '', error: e.toString() }); }
+}
+
+/**
+ * オーナーURLを直接取得（staffDeployUrlからの逆算ではなく、ownerBaseUrlプロパティを直接読む）
+ * deploy-all.jsがstaffDeployUrlを上書きしてもownerBaseUrlは保持されるため安全
+ */
+function getOwnerBaseUrl() {
+  try {
+    var url = '';
+    try { url = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
+    if (!url) { try { url = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {} }
+    return JSON.stringify({ success: true, url: url });
   } catch (e) { return JSON.stringify({ success: false, url: '', error: e.toString() }); }
 }
 

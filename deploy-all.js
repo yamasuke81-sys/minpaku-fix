@@ -237,9 +237,21 @@ function main() {
     try {
       // ベースURL保存
       execSync('curl -sL "' + baseUrl + '?action=setBaseUrl&url=' + encodeURIComponent(baseUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+      // ユーザーが保存したownerBaseUrlを確認（ゲートウェイURL等を上書きしないため）
+      var ownerCheckResult = '';
+      try {
+        ownerCheckResult = execSync('curl -sL "' + baseUrl + '?action=getOwnerBaseUrl"', { encoding: 'utf8', timeout: 15000 });
+      } catch (e2) {}
+      var savedOwner = '';
+      try { var parsed = JSON.parse(ownerCheckResult); savedOwner = (parsed && parsed.url) || ''; } catch(e3) {}
+      if (savedOwner && savedOwner !== baseUrl) {
+        // ユーザーが別のURL（ゲートウェイ等）を保存済み → そのURLベースでstaffURLを生成
+        staffUrl = savedOwner + (savedOwner.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
+        console.log('  ユーザー保存URL検出: ' + savedOwner);
+      }
       // スタッフURL保存
       execSync('curl -sL "' + baseUrl + '?action=setStaffUrl&url=' + encodeURIComponent(staffUrl) + '"', { encoding: 'utf8', timeout: 15000 });
-      console.log('  OK - オーナー: ' + baseUrl);
+      console.log('  OK - ベース: ' + baseUrl);
       console.log('  OK - スタッフ: ' + staffUrl);
     } catch (e) {
       console.log('  URL保存リクエスト失敗（次回デプロイで自動リトライされます）: ' + e.message);

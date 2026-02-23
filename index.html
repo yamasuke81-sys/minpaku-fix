@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5724,33 +5724,33 @@
       }
 
       function loadSettings() {
-        // オーナーURL入力欄のイベントリスナー設定
         var ownerInp = document.getElementById('ownerUrlInput');
         var staffInp = document.getElementById('staffUrlInput');
         var readonlyInp = document.getElementById('readonlyUrlInput');
-        if (ownerInp) {
+        // イベントリスナーは初回のみ登録（loadSettingsはタブ切替のたびに呼ばれるため重複防止）
+        if (ownerInp && !ownerInp.dataset.listenersAttached) {
+          ownerInp.dataset.listenersAttached = '1';
           ownerInp.addEventListener('input', function() {
+            ownerInp.dataset.userEdited = '1';
             generateUrlsFromOwnerUrl(ownerInp.value.trim());
           });
           ownerInp.addEventListener('paste', function() {
+            ownerInp.dataset.userEdited = '1';
             setTimeout(function() {
               generateUrlsFromOwnerUrl(ownerInp.value.trim());
             }, 0);
           });
         }
-        // --- オーナーURL復元: 優先順位付き3層キャッシュ ---
-        // 1. サーバーテンプレート変数（保存済みownerBaseUrl、最も信頼性が高い）
-        // 2. localStorage キャッシュ（高速表示用）
-        // 3. window.appBaseUrl フォールバック（デプロイURL）
+        // --- オーナーURL復元 ---
+        // loadSettingsはタブ切替のたびに呼ばれるため、毎回userEditedフラグをリセット
+        // （ユーザーが実際にinput/pasteした場合のみイベントリスナーで再設定される）
+        if (ownerInp) ownerInp.dataset.userEdited = '';
+        // 優先順位: 1.サーバーテンプレート変数 → 2.localStorageキャッシュ → 3.デプロイURL
         var cachedOwnerUrl = '';
         try { cachedOwnerUrl = localStorage.getItem('ownerUrlCache') || ''; } catch(e) {}
         var base = window.savedOwnerUrl || cachedOwnerUrl || window.appBaseUrl || '';
         if (base) {
-          if (ownerInp) {
-            ownerInp.value = base;
-            // サーバー保存URL or localStorageキャッシュからの復元時は非同期コールバックで上書きされないようフラグ設定
-            if (window.savedOwnerUrl || cachedOwnerUrl) ownerInp.dataset.userEdited = '1';
-          }
+          if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
           // localStorageをサーバー値で更新
           if (window.savedOwnerUrl) {
@@ -5762,19 +5762,25 @@
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
         }
         if (ownerInp) {
-          // バックエンドからownerBaseUrlを直接取得（staffDeployUrlからの逆算をやめ、デプロイによる破損を防止）
+          // バックエンドからownerBaseUrlを直接取得（最も信頼性が高いソース）
+          // テンプレート変数やlocalStorageが古い場合でも、この非同期コールバックで最新値に更新される
           google.script.run.withSuccessHandler(function(jsonStr) {
             try {
               var r = JSON.parse(jsonStr);
               if (r.success && r.url) {
+                // window.savedOwnerUrlを最新サーバー値で更新（次回loadSettings呼び出し用）
+                window.savedOwnerUrl = r.url;
+                // ユーザーが手動で編集していない場合のみ入力欄を更新
                 if (ownerInp && !ownerInp.dataset.userEdited) {
                   ownerInp.value = r.url;
                   generateUrlsFromOwnerUrl(r.url);
                 }
-                // ownerBaseUrlが直接取得できた場合のみlocalStorageを更新
                 try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
               }
             } catch (e) {}
+          }).withFailureHandler(function(err) {
+            // 非同期取得失敗時はログ出力のみ（同期値がフォールバックとして使われる）
+            try { console.log('getOwnerBaseUrl failed:', err); } catch(e) {}
           }).getOwnerBaseUrl();
         }
         loadInvoiceSettings_();

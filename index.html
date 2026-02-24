@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0224a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0224b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1482,9 +1482,15 @@
         <div class="d-flex gap-2 flex-wrap">
           <button type="button" class="btn btn-sm btn-primary" id="btnSaveInvoiceRequest">設定を保存</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSetupInvoiceRequestTrigger">トリガーをセットアップ</button>
-          <button type="button" class="btn btn-sm btn-outline-info" id="btnSendInvoiceRequestNow">今すぐテスト送信</button>
         </div>
         <p class="small text-muted mt-2">※ 「トリガーをセットアップ」で毎日チェックのトリガーが自動設定されます。配信日に該当した場合のみメールが送信されます。</p>
+        <hr class="my-2">
+        <label class="form-label small fw-bold">テスト送信</label>
+        <div class="d-flex gap-2 flex-wrap align-items-center mb-1">
+          <input type="email" class="form-control form-control-sm" id="invoiceTestRecipient" placeholder="送信先メールアドレス" style="max-width:280px;">
+          <button type="button" class="btn btn-sm btn-outline-info" id="btnSendInvoiceRequestNow">テスト送信</button>
+        </div>
+        <p class="small text-muted mt-1">指定したアドレスにテストメールを1通送信します。空欄の場合は全スタッフに送信されます。</p>
         <div id="invoiceRequestResult" class="small mt-2" style="display:none;"></div>
       </div>
 
@@ -5268,6 +5274,14 @@
         }).withFailureHandler(function() { document.getElementById('syncList').innerHTML = '<p class="text-danger">エラー</p>'; }).getSyncSettings();
       }
 
+      // 通知日時文字列('yyyy-MM-dd HH:mm')を安全にDateに変換（Safari/iOS対応）
+      function parseNotifDate(atStr) {
+        if (!atStr) return null;
+        var m = String(atStr).match(/(\d{4})-(\d{1,2})-(\d{1,2})[T\s]+(\d{1,2}):(\d{1,2})/);
+        if (m) return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10), parseInt(m[4],10), parseInt(m[5],10));
+        var d = new Date(atStr);
+        return isNaN(d.getTime()) ? null : d;
+      }
       function formatNotificationDate(atStr) {
         if (!atStr || typeof atStr !== 'string') return atStr || '';
         var m = atStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})[T\s]+(\d{1,2}):(\d{1,2})/);
@@ -5448,13 +5462,13 @@
                   });
                 }
               }
-              // 期間フィルタ
+              // 期間フィルタ（parseNotifDateでSafari/iOS対応）
               if (_notifFilterDays > 0) {
                 var cutoff = new Date();
                 cutoff.setDate(cutoff.getDate() - _notifFilterDays);
                 notifItems = notifItems.filter(function(n) {
-                  var d = new Date(n.at);
-                  return !isNaN(d.getTime()) && d >= cutoff;
+                  var d = parseNotifDate(n.at);
+                  return d ? d >= cutoff : true; // パース失敗時は表示する
                 });
               }
               if (!notifItems.length) { el.innerHTML = '<p class="text-muted small">この期間の通知はありません。</p>'; return; }
@@ -7475,7 +7489,9 @@
       });
 
       document.getElementById('btnSendInvoiceRequestNow').addEventListener('click', function() {
-        if (!confirm('登録済みの全スタッフに請求書要請メールを今すぐ送信しますか？')) return;
+        var testRecipient = (document.getElementById('invoiceTestRecipient').value || '').trim();
+        var confirmMsg = testRecipient ? testRecipient + ' にテストメールを送信しますか？' : '登録済みの全スタッフに請求書要請メールを今すぐ送信しますか？';
+        if (!confirm(confirmMsg)) return;
         var btn = this;
         if (btn.disabled) return;
         btn.disabled = true;
@@ -7495,7 +7511,7 @@
           btn.disabled = false;
           btn.textContent = origText;
           if (resEl) { resEl.style.display = 'block'; resEl.className = 'small mt-2 text-danger'; resEl.textContent = '通信エラー'; }
-        }).sendInvoiceRequestEmails();
+        }).sendInvoiceRequestEmails(testRecipient);
       });
 
       // リマインド時刻selectに0〜23時のオプションを生成

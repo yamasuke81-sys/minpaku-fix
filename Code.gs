@@ -1767,6 +1767,7 @@ function deleteBooking(rowNumber) {
         if (rn === row) toDelRecruit.push(i + 2);
         else if (rn > row) recruitSheet.getRange(i + 2, 2).setValue(rn - 1);
       }
+      // 下の行から削除（行番号ズレ防止）、削除後にridも更新
       for (var d = toDelRecruit.length - 1; d >= 0; d--) {
         var recruitId = 'r' + toDelRecruit[d];
         if (volSheet && volSheet.getLastRow() >= 2) {
@@ -1776,6 +1777,8 @@ function deleteBooking(rowNumber) {
           }
         }
         recruitSheet.deleteRow(toDelRecruit[d]);
+        // 削除された行より後のridを全て更新
+        updateRidsAfterRecruitDeletion_(ss, toDelRecruit[d]);
       }
     }
     var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
@@ -3833,7 +3836,7 @@ function saveInvoiceRequestSettings(settings) {
 }
 
 /** 請求書要請メールをスタッフ全員に送信 */
-function sendInvoiceRequestEmails() {
+function sendInvoiceRequestEmails(testRecipient) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
@@ -3845,10 +3848,13 @@ function sendInvoiceRequestEmails() {
       var key = String(row[0] || '').trim();
       if (key) map[key] = row[1];
     });
-    // 有効チェック（デフォルトOFF）
-    var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
-    if (!(enabledVal === true || String(enabledVal || '').trim() === 'true')) {
-      return JSON.stringify({ success: true, message: '請求書要請メールは無効に設定されています。', sent: 0 });
+    // テスト送信でない場合のみ有効チェック
+    var testEmail = (testRecipient || '').trim();
+    if (!testEmail) {
+      var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
+      if (!(enabledVal === true || String(enabledVal || '').trim() === 'true')) {
+        return JSON.stringify({ success: true, message: '請求書要請メールは無効に設定されています。', sent: 0 });
+      }
     }
     var subject = String(map[INVOICE_REQ_KEYS_.subject] || '').trim();
     var bodyTpl = String(map[INVOICE_REQ_KEYS_.body] || '').trim();
@@ -3862,7 +3868,24 @@ function sendInvoiceRequestEmails() {
     // 締切日（配信月の末日）
     var deadlineDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     var deadlineText = (deadlineDate.getMonth() + 1) + '/' + deadlineDate.getDate();
-    // スタッフ一覧取得
+    // テスト送信先が指定されている場合は1通だけ送信
+    if (testEmail) {
+      var body = bodyTpl
+        .replace(/\{スタッフ名\}/g, 'テストユーザー')
+        .replace(/\{対象年月\}/g, ymText)
+        .replace(/\{締切日\}/g, deadlineText);
+      var subj = '【テスト】' + subject
+        .replace(/\{対象年月\}/g, ymText)
+        .replace(/\{スタッフ名\}/g, 'テストユーザー')
+        .replace(/\{締切日\}/g, deadlineText);
+      try {
+        MailApp.sendEmail({ to: testEmail, subject: subj, body: body, name: '請求書要請（テスト送信）' });
+        return JSON.stringify({ success: true, message: testEmail + ' にテストメールを送信しました。', sent: 1 });
+      } catch (e) {
+        return JSON.stringify({ success: false, error: '送信失敗: ' + e.toString() });
+      }
+    }
+    // スタッフ一覧取得（全員に送信）
     var staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) {
       return JSON.stringify({ success: true, message: 'スタッフが登録されていません。', sent: 0 });
@@ -4075,15 +4098,16 @@ function checkRosterReminder() {
     var sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) return;
 
-    // ヘッダーからチェックイン列・氏名列（複数対応）・キャンセル列を特定
+    // ヘッダーからチェックイン列・氏名列（複数対応）・キャンセル列・iCal同期列を特定
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var checkInCol = -1, guestNameCols = [], cancelledAtCol = -1;
+    var checkInCol = -1, guestNameCols = [], cancelledAtCol = -1, icalSyncCol = -1;
     for (var h = 0; h < headers.length; h++) {
       var hdr = String(headers[h]).trim();
       if (hdr === HEADERS.CHECK_IN) checkInCol = h;
       // 氏名列は部分一致で全て収集（buildColumnMapと同じ基準）
       if (hdr.indexOf('氏名') > -1 || hdr.indexOf('名前') > -1 || hdr.toLowerCase() === 'full name') guestNameCols.push(h);
       if ((hdr === HEADERS.CANCELLED_AT || hdr === 'キャンセル日時') && cancelledAtCol < 0) cancelledAtCol = h;
+      if ((hdr === HEADERS.ICAL_SYNC || (hdr.indexOf('iCal') >= 0 && hdr.indexOf('同期') >= 0)) && icalSyncCol < 0) icalSyncCol = h;
     }
     if (checkInCol < 0) return;
     if (guestNameCols.length === 0) return; // 氏名列が見つからない場合はスキップ（全予約が誤検知になるため）
@@ -4109,6 +4133,8 @@ function checkRosterReminder() {
       if (checkInDate < today || checkInDate > targetDate) continue;
       // キャンセル済み予約はスキップ
       if (cancelledAtCol >= 0 && String(rows[i][cancelledAtCol] || '').trim()) continue;
+      // iCal同期で取り込まれた行はスキップ（名簿情報がないため誤検知になる）
+      if (icalSyncCol >= 0 && String(rows[i][icalSyncCol] || '').trim()) continue;
       // いずれかの氏名列に値があれば名簿記入済みとみなす
       var hasGuestName = false;
       for (var g = 0; g < guestNameCols.length; g++) {
@@ -4230,6 +4256,40 @@ function getRecruitmentList() {
         respondedAt: String(vr[3] || '').trim()
       };
     });
+    // 有効なridのセットを構築（自己修復用）
+    var validRids = {};
+    list.forEach(function(item) { validRids[item.id] = true; });
+    // 孤立したrid（削除によるズレ）を検出し自動修復
+    var orphanedRids = {};
+    Object.keys(responsesByRid).forEach(function(rid) {
+      if (!validRids[rid]) orphanedRids[rid] = responsesByRid[rid];
+    });
+    if (Object.keys(orphanedRids).length > 0 && volSheet) {
+      // 孤立ridを数値順にソートし、回答がないrecruitに割り当てる
+      var orphanedKeys = Object.keys(orphanedRids).sort(function(a, b) {
+        return parseInt(a.replace('r', ''), 10) - parseInt(b.replace('r', ''), 10);
+      });
+      orphanedKeys.forEach(function(oRid) {
+        var oNum = parseInt(oRid.replace('r', ''), 10);
+        // 最も近い有効なridを探す（孤立ridより小さい方向に検索）
+        for (var tryNum = oNum - 1; tryNum >= 2; tryNum--) {
+          var tryRid = 'r' + tryNum;
+          if (validRids[tryRid] && !responsesByRid[tryRid]) {
+            responsesByRid[tryRid] = orphanedRids[oRid];
+            // シートも修復
+            try {
+              var volRepairData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
+              for (var vr = 0; vr < volRepairData.length; vr++) {
+                if (String(volRepairData[vr][0] || '').trim() === oRid) {
+                  volSheet.getRange(vr + 2, 1).setValue(tryRid);
+                }
+              }
+            } catch (repairErr) {}
+            break;
+          }
+        }
+      });
+    }
     list.forEach(function(item) {
       var ridResponses = responsesByRid[item.id] || {};
       item.volunteers = allStaff.map(function(s) {
@@ -4732,10 +4792,59 @@ function deleteRecruitment(recruitRowIndex) {
       }
     }
     recruitSheet.deleteRow(recruitRowIndex);
+    // 削除された行より後のridを全て更新
+    updateRidsAfterRecruitDeletion_(ss, recruitRowIndex);
     invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 募集行削除後に、関連シートのrid（'rN'形式）を更新する
+ * 削除された行より後の全てのridを1つ減らす
+ */
+function updateRidsAfterRecruitDeletion_(ss, deletedRowIndex) {
+  try {
+    // 募集_立候補シートのrid更新
+    var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
+    if (volSheet && volSheet.getLastRow() >= 2) {
+      var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
+      for (var i = 0; i < volData.length; i++) {
+        var rid = String(volData[i][0] || '').trim();
+        var ridNum = parseInt(rid.replace('r', ''), 10);
+        if (!isNaN(ridNum) && ridNum > deletedRowIndex) {
+          volSheet.getRange(i + 2, 1).setValue('r' + (ridNum - 1));
+        }
+      }
+    }
+    // キャンセル申請シートのrid更新
+    var crSheet = ss.getSheetByName(SHEET_CANCEL_REQUESTS);
+    if (crSheet && crSheet.getLastRow() >= 2) {
+      var crData = crSheet.getRange(2, 1, crSheet.getLastRow() - 1, 1).getValues();
+      for (var j = 0; j < crData.length; j++) {
+        var crid = String(crData[j][0] || '').trim();
+        var cridNum = parseInt(crid.replace('r', ''), 10);
+        if (!isNaN(cridNum) && cridNum > deletedRowIndex) {
+          crSheet.getRange(j + 2, 1).setValue('r' + (cridNum - 1));
+        }
+      }
+    }
+    // 回答変更要請シートのrid更新
+    var rcSheet = ss.getSheetByName('回答変更要請');
+    if (rcSheet && rcSheet.getLastRow() >= 2) {
+      var rcData = rcSheet.getRange(2, 1, rcSheet.getLastRow() - 1, 1).getValues();
+      for (var k = 0; k < rcData.length; k++) {
+        var rcrid = String(rcData[k][0] || '').trim();
+        var rcridNum = parseInt(rcrid.replace('r', ''), 10);
+        if (!isNaN(rcridNum) && rcridNum > deletedRowIndex) {
+          rcSheet.getRange(k + 2, 1).setValue('r' + (rcridNum - 1));
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('updateRidsAfterRecruitDeletion_: ' + e.toString());
   }
 }
 

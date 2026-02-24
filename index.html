@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0223h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0224a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1135,6 +1135,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoice">請求書</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="emailNotify">メール通知</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoiceRequest">請求書要請</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsUrls">
@@ -1440,6 +1441,51 @@
         </div>
 
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveEmailNotify">メール通知設定を保存</button>
+      </div>
+
+      <div id="settingsInvoiceRequest" style="display:none;">
+        <p class="small text-muted mb-2">毎月の請求書提出をスタッフに促すメールを自動配信します。配信日・メール内容を設定できます。</p>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="invoiceRequestEnabled">
+          <label class="form-check-label" for="invoiceRequestEnabled"><strong>請求書要請メールを有効にする</strong></label>
+        </div>
+
+        <hr class="my-3">
+        <label class="form-label small fw-bold">配信日設定</label>
+        <p class="small text-muted mb-1">毎月の配信日を指定します。29〜31を指定した場合、該当日がない月は月末日に送信されます。</p>
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col-auto small">毎月</div>
+          <div class="col-auto">
+            <select class="form-select form-select-sm" id="invoiceRequestDay" style="width:80px;">
+            </select>
+          </div>
+          <div class="col-auto small">日に配信</div>
+          <div class="col-auto ms-3">
+            <select class="form-select form-select-sm" id="invoiceRequestTime" style="width:110px;">
+            </select>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <label class="form-label small fw-bold">メール文面</label>
+        <p class="small text-muted mb-1">プレースホルダー: <code>{スタッフ名}</code> <code>{対象年月}</code> <code>{締切日}</code></p>
+        <div class="mb-2">
+          <label class="form-label small">件名</label>
+          <input type="text" class="form-control form-control-sm" id="invoiceRequestSubject" placeholder="例: 【民泊清掃】{対象年月}分の請求書をご提出ください">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">本文</label>
+          <textarea class="form-control form-control-sm" id="invoiceRequestBody" rows="8" placeholder="例: {スタッフ名} さん&#10;&#10;お疲れ様です。&#10;{対象年月}分の請求書のご提出をお願いいたします。&#10;&#10;締切: {締切日}&#10;&#10;よろしくお願いいたします。"></textarea>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-sm btn-primary" id="btnSaveInvoiceRequest">設定を保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSetupInvoiceRequestTrigger">トリガーをセットアップ</button>
+          <button type="button" class="btn btn-sm btn-outline-info" id="btnSendInvoiceRequestNow">今すぐテスト送信</button>
+        </div>
+        <p class="small text-muted mt-2">※ 「トリガーをセットアップ」で毎日チェックのトリガーが自動設定されます。配信日に該当した場合のみメールが送信されます。</p>
+        <div id="invoiceRequestResult" class="small mt-2" style="display:none;"></div>
       </div>
 
       <div id="settingsMaintenance" style="display:none;">
@@ -7333,6 +7379,125 @@
         }).saveEmailNotifySettings(settings);
       });
 
+      // 請求書要請メール設定（スタッフ宛）
+      (function() {
+        // 配信日select 1〜31
+        var daySel = document.getElementById('invoiceRequestDay');
+        if (daySel) {
+          for (var d = 1; d <= 31; d++) {
+            var opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d + '日';
+            daySel.appendChild(opt);
+          }
+          daySel.value = '25';
+        }
+        // 配信時刻select 0〜23時
+        var timeSel = document.getElementById('invoiceRequestTime');
+        if (timeSel) {
+          for (var h = 0; h <= 23; h++) {
+            var opt = document.createElement('option');
+            opt.value = ('0' + h).slice(-2) + ':00';
+            opt.textContent = h + '時';
+            timeSel.appendChild(opt);
+          }
+          timeSel.value = '09:00';
+        }
+      })();
+
+      function loadInvoiceRequestSettings() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.settings) {
+              var s = r.settings;
+              var en = document.getElementById('invoiceRequestEnabled');
+              if (en) en.checked = s.enabled === true;
+              var daySel = document.getElementById('invoiceRequestDay');
+              if (daySel) daySel.value = String(s.day || 25);
+              var timeSel = document.getElementById('invoiceRequestTime');
+              if (timeSel) timeSel.value = String(s.time || '09:00');
+              var subj = document.getElementById('invoiceRequestSubject');
+              if (subj) subj.value = s.subject || '';
+              var body = document.getElementById('invoiceRequestBody');
+              if (body) body.value = s.body || '';
+            }
+          } catch (e) {}
+        }).getInvoiceRequestSettings();
+      }
+
+      document.getElementById('btnSaveInvoiceRequest').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        var settings = {
+          enabled: document.getElementById('invoiceRequestEnabled').checked,
+          day: parseInt(document.getElementById('invoiceRequestDay').value, 10) || 25,
+          time: document.getElementById('invoiceRequestTime').value || '09:00',
+          subject: document.getElementById('invoiceRequestSubject').value || '',
+          body: document.getElementById('invoiceRequestBody').value || ''
+        };
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '保存中...';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
+          var r = JSON.parse(jsonStr);
+          alert(r.success ? '保存しました。' : (r.error || '失敗'));
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          alert('保存に失敗しました。');
+        }).saveInvoiceRequestSettings(settings);
+      });
+
+      document.getElementById('btnSetupInvoiceRequestTrigger').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = 'セットアップ中...';
+        var resEl = document.getElementById('invoiceRequestResult');
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
+          var r = JSON.parse(jsonStr);
+          if (resEl) {
+            resEl.style.display = 'block';
+            resEl.className = 'small mt-2 ' + (r.success ? 'text-success' : 'text-danger');
+            resEl.textContent = r.success ? r.message : (r.error || '失敗');
+          }
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          if (resEl) { resEl.style.display = 'block'; resEl.className = 'small mt-2 text-danger'; resEl.textContent = '通信エラー'; }
+        }).setupInvoiceRequestTrigger();
+      });
+
+      document.getElementById('btnSendInvoiceRequestNow').addEventListener('click', function() {
+        if (!confirm('登録済みの全スタッフに請求書要請メールを今すぐ送信しますか？')) return;
+        var btn = this;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '送信中...';
+        var resEl = document.getElementById('invoiceRequestResult');
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
+          var r = JSON.parse(jsonStr);
+          if (resEl) {
+            resEl.style.display = 'block';
+            resEl.className = 'small mt-2 ' + (r.success ? 'text-success' : 'text-danger');
+            resEl.textContent = r.success ? r.message : (r.error || '失敗');
+          }
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          if (resEl) { resEl.style.display = 'block'; resEl.className = 'small mt-2 text-danger'; resEl.textContent = '通信エラー'; }
+        }).sendInvoiceRequestEmails();
+      });
+
       // リマインド時刻selectに0〜23時のオプションを生成
       (function() {
         document.querySelectorAll('select.reminder-time').forEach(function(sel) {
@@ -7789,6 +7954,8 @@
           if (invoiceEl) invoiceEl.style.display = t === 'invoice' ? 'block' : 'none';
           var emailNotifyEl = document.getElementById('settingsEmailNotify');
           if (emailNotifyEl) emailNotifyEl.style.display = t === 'emailNotify' ? 'block' : 'none';
+          var invoiceReqEl = document.getElementById('settingsInvoiceRequest');
+          if (invoiceReqEl) invoiceReqEl.style.display = t === 'invoiceRequest' ? 'block' : 'none';
           var maintEl = document.getElementById('settingsMaintenance');
           if (maintEl) maintEl.style.display = t === 'maintenance' ? 'block' : 'none';
           if (t === 'staff') loadStaffList();
@@ -7801,6 +7968,7 @@
           if (t === 'notifications') loadNotificationList();
           if (t === 'invoice') loadInvoiceSettings_();
           if (t === 'emailNotify') loadEmailNotifySettings();
+          if (t === 'invoiceRequest') loadInvoiceRequestSettings();
         });
       });
 

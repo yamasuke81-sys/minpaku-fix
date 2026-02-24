@@ -3756,6 +3756,212 @@ function isEmailNotifyEnabled_(sheetKey) {
 }
 
 /**********************************************
+ * 請求書要請メール設定（スタッフ宛）
+ * デフォルト: 送信無し（enabled=false）
+ **********************************************/
+
+var INVOICE_REQ_KEYS_ = {
+  enabled: '請求書要請メール有効',
+  day: '請求書要請配信日',
+  time: '請求書要請配信時刻',
+  subject: '請求書要請件名',
+  body: '請求書要請本文'
+};
+
+function getInvoiceRequestSettings() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = row[1];
+    });
+    var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
+    return JSON.stringify({
+      success: true,
+      settings: {
+        enabled: enabledVal === true || String(enabledVal || '').trim() === 'true', // デフォルトOFF
+        day: parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25,
+        time: String(map[INVOICE_REQ_KEYS_.time] || '09:00').trim(),
+        subject: String(map[INVOICE_REQ_KEYS_.subject] || ''),
+        body: String(map[INVOICE_REQ_KEYS_.body] || '')
+      }
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function saveInvoiceRequestSettings(settings) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var rowMap = {};
+    rows.forEach(function(r, i) {
+      var k = String(r[0] || '').trim();
+      if (k) rowMap[k] = i + 2;
+    });
+    var pairs = [
+      [INVOICE_REQ_KEYS_.enabled, settings.enabled === true ? 'true' : 'false'],
+      [INVOICE_REQ_KEYS_.day, String(settings.day || 25)],
+      [INVOICE_REQ_KEYS_.time, String(settings.time || '09:00')],
+      [INVOICE_REQ_KEYS_.subject, String(settings.subject || '')],
+      [INVOICE_REQ_KEYS_.body, String(settings.body || '')]
+    ];
+    pairs.forEach(function(p) {
+      var sheetKey = p[0], val = p[1];
+      if (rowMap[sheetKey]) {
+        sheet.getRange(rowMap[sheetKey], 2).setValue(val);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(sheetKey);
+        sheet.getRange(nr, 2).setValue(val);
+        rowMap[sheetKey] = nr;
+      }
+    });
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** 請求書要請メールをスタッフ全員に送信 */
+function sendInvoiceRequestEmails() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet) return JSON.stringify({ success: false, error: '募集設定シートが見つかりません。' });
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = row[1];
+    });
+    // 有効チェック（デフォルトOFF）
+    var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
+    if (!(enabledVal === true || String(enabledVal || '').trim() === 'true')) {
+      return JSON.stringify({ success: true, message: '請求書要請メールは無効に設定されています。', sent: 0 });
+    }
+    var subject = String(map[INVOICE_REQ_KEYS_.subject] || '').trim();
+    var bodyTpl = String(map[INVOICE_REQ_KEYS_.body] || '').trim();
+    if (!subject || !bodyTpl) {
+      return JSON.stringify({ success: false, error: '件名または本文が未設定です。設定画面で入力してください。' });
+    }
+    // 対象年月（翌月分を請求）
+    var now = new Date();
+    var targetMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    var ymText = targetMonth.getFullYear() + '年' + (targetMonth.getMonth() + 1) + '月';
+    // 締切日（配信月の末日）
+    var deadlineDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    var deadlineText = (deadlineDate.getMonth() + 1) + '/' + deadlineDate.getDate();
+    // スタッフ一覧取得
+    var staffSheet = ss.getSheetByName(SHEET_STAFF);
+    if (!staffSheet || staffSheet.getLastRow() < 2) {
+      return JSON.stringify({ success: true, message: 'スタッフが登録されていません。', sent: 0 });
+    }
+    var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 3).getValues();
+    var sentCount = 0;
+    var errors = [];
+    staffRows.forEach(function(row) {
+      var name = String(row[0] || '').trim();
+      var email = String(row[1] || '').trim();
+      if (!email || !/@/.test(email)) return;
+      var body = bodyTpl
+        .replace(/\{スタッフ名\}/g, name || 'スタッフ')
+        .replace(/\{対象年月\}/g, ymText)
+        .replace(/\{締切日\}/g, deadlineText);
+      var subj = subject
+        .replace(/\{対象年月\}/g, ymText)
+        .replace(/\{スタッフ名\}/g, name || 'スタッフ')
+        .replace(/\{締切日\}/g, deadlineText);
+      try {
+        MailApp.sendEmail({ to: email, subject: subj, body: body, name: '請求書要請（自動送信）' });
+        sentCount++;
+      } catch (e) {
+        errors.push(name + ': ' + e.toString());
+      }
+    });
+    var msg = sentCount + '件送信しました。';
+    if (errors.length) msg += ' エラー: ' + errors.join('; ');
+    return JSON.stringify({ success: true, message: msg, sent: sentCount });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** トリガーから毎日呼ばれ、配信日なら送信 */
+function checkAndSendInvoiceRequest() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet) return;
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = row[1];
+    });
+    var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
+    if (!(enabledVal === true || String(enabledVal || '').trim() === 'true')) return;
+    var day = parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25;
+    var now = new Date();
+    var today = now.getDate();
+    // 月末調整: 設定日が今月の日数を超える場合は月末日に送信
+    var lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    var effectiveDay = Math.min(day, lastDayOfMonth);
+    if (today !== effectiveDay) return;
+    sendInvoiceRequestEmails();
+  } catch (e) {
+    Logger.log('請求書要請トリガーエラー: ' + e.toString());
+  }
+}
+
+/** 請求書要請トリガーをセットアップ */
+function setupInvoiceRequestTrigger() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+    // 既存トリガー削除
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction() === 'checkAndSendInvoiceRequest') {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
+    // 時刻取得
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var hour = 9;
+    if (sheet && sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === INVOICE_REQ_KEYS_.time) {
+          var h = parseInt(String(rows[i][1] || '9'), 10);
+          if (!isNaN(h) && h >= 0 && h <= 23) hour = h;
+          break;
+        }
+      }
+    }
+    ScriptApp.newTrigger('checkAndSendInvoiceRequest')
+      .timeBased()
+      .everyDays(1)
+      .atHour(hour)
+      .create();
+    return JSON.stringify({ success: true, message: '毎日' + hour + '時にチェックするトリガーを設定しました。' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**********************************************
  * 名簿リマインダー設定
  **********************************************/
 

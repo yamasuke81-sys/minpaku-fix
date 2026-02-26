@@ -58,25 +58,54 @@ function syncRecruitBookingRowsAfterSort_(ss, formSheet, colMap) {
   if (!colMap || colMap.checkOut < 0) return;
   var formLastRow = formSheet.getLastRow();
   if (formLastRow < 2) return;
-  // フォームシートからチェックアウト日→行番号マップを構築
-  var formData = formSheet.getRange(2, colMap.checkOut + 1, formLastRow - 1, 1).getValues();
-  var coToRow = {};
-  for (var f = 0; f < formData.length; f++) {
-    var co = parseDate(formData[f][0]);
+  // フォームシートからチェックアウト日→行番号リストマップを構築（同日複数予約対応）
+  var formLastCol = formSheet.getLastColumn();
+  var formAllData = formSheet.getRange(2, 1, formLastRow - 1, formLastCol).getValues();
+  var coToRows = {};
+  for (var f = 0; f < formAllData.length; f++) {
+    var co = parseDate(formAllData[f][colMap.checkOut]);
     if (!co) continue;
     var coStr = toDateKeySafe_(co);
-    if (coStr && !coToRow[coStr]) coToRow[coStr] = f + 2;
+    if (coStr) {
+      if (!coToRows[coStr]) coToRows[coStr] = [];
+      coToRows[coStr].push({
+        rowNum: f + 2,
+        checkIn: colMap.checkIn >= 0 ? toDateKeySafe_(parseDate(formAllData[f][colMap.checkIn])) : ''
+      });
+    }
   }
   // 募集シートの各行を確認・更新
   var recruitLastRow = recruitSheet.getLastRow();
   var recruitData = recruitSheet.getRange(2, 1, recruitLastRow - 1, 2).getValues();
+  // 使用済みフォーム行番号を追跡（同日複数予約で同じ行に二重割り当てしない）
+  var usedFormRows = {};
   var updates = [];
   for (var ri = 0; ri < recruitData.length; ri++) {
     var recruitCo = parseDate(recruitData[ri][0]);
     if (!recruitCo) continue;
     var recruitCoStr = toDateKeySafe_(recruitCo);
     var oldRow = recruitData[ri][1] ? Number(recruitData[ri][1]) : 0;
-    var newRow = coToRow[recruitCoStr];
+    var candidates = coToRows[recruitCoStr];
+    if (!candidates || !candidates.length) continue;
+    var newRow = null;
+    if (candidates.length === 1) {
+      // 同日予約が1件のみ → そのまま使用
+      newRow = candidates[0].rowNum;
+    } else {
+      // 同日予約が複数 → 旧行番号に最も近いものを選択（使用済みは除外）
+      var bestDist = Infinity;
+      for (var ci = 0; ci < candidates.length; ci++) {
+        if (usedFormRows[candidates[ci].rowNum]) continue;
+        var dist = Math.abs(candidates[ci].rowNum - oldRow);
+        if (dist < bestDist) {
+          bestDist = dist;
+          newRow = candidates[ci].rowNum;
+        }
+      }
+      // 全て使用済みの場合はフォールバック
+      if (!newRow) newRow = candidates[0].rowNum;
+    }
+    if (newRow) usedFormRows[newRow] = true;
     if (newRow && newRow !== oldRow) {
       updates.push({ row: ri + 2, newVal: newRow });
     }
@@ -1760,7 +1789,7 @@ function deleteBooking(rowNumber) {
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     if (!formSheet || formSheet.getLastRow() < row) return JSON.stringify({ success: false, error: '指定された行が見つかりません。' });
     if (recruitSheet && recruitSheet.getLastRow() >= 2) {
-      var recruitData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), 8).getValues();
+      var recruitData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 8).getValues();
       var toDelRecruit = [];
       for (var i = 0; i < recruitData.length; i++) {
         var rn = parseInt(recruitData[i][1], 10);
@@ -1771,7 +1800,7 @@ function deleteBooking(rowNumber) {
       for (var d = toDelRecruit.length - 1; d >= 0; d--) {
         var recruitId = 'r' + toDelRecruit[d];
         if (volSheet && volSheet.getLastRow() >= 2) {
-          var volData = volSheet.getRange(2, 1, volSheet.getLastRow(), 1).getValues();
+          var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
           for (var v = volData.length - 1; v >= 0; v--) {
             if (String(volData[v][0] || '').trim() === recruitId) volSheet.deleteRow(v + 2);
           }
@@ -4786,7 +4815,7 @@ function deleteRecruitment(recruitRowIndex) {
       if (colMap.cleaningStaff >= 0) formSheet.getRange(bookingRow, colMap.cleaningStaff + 1).setValue('');
     }
     if (volSheet && volSheet.getLastRow() >= 2) {
-      var volData = volSheet.getRange(2, 1, volSheet.getLastRow(), 1).getValues();
+      var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
       for (var v = volData.length - 1; v >= 0; v--) {
         if (String(volData[v][0]).trim() === 'r' + recruitRowIndex) volSheet.deleteRow(v + 2);
       }
@@ -5207,7 +5236,7 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     var sName = (staffName || '').trim();
     var sEmail = (staffEmail || '').trim().toLowerCase();
     if (volSheet && volSheet.getLastRow() >= 2) {
-      var volData = volSheet.getRange(2, 1, volSheet.getLastRow(), 4).getValues();
+      var volData = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 4).getValues();
       for (var i = volData.length - 1; i >= 0; i--) {
         if (String(volData[i][0]).trim() !== rid) continue;
         var matchName = sName && String(volData[i][1] || '').trim() === sName;
@@ -6727,7 +6756,7 @@ function respondToRecruitment(recruitId, staffNameFromClient, staffEmailFromClie
     if (!staffName) staffName = '不明';
     const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     var lastCol = Math.max(volSheet.getLastColumn(), 7);
-    var volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow(), lastCol).getValues() : [];
+    var volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow() - 1, lastCol).getValues() : [];
     // Upsert: 既存回答があれば更新、なければ新規挿入
     for (var i = 0; i < volData.length; i++) {
       if (String(volData[i][0]).trim() !== String(recruitId).trim()) continue;
@@ -6925,7 +6954,7 @@ function cancelVolunteerForRecruitment(recruitId, staffNameFromClient, staffEmai
     var staffEmail = (staffEmailFromClient || '').trim().toLowerCase();
     var staffName = (staffNameFromClient || '').trim();
     if (!staffName) staffName = '不明';
-    const volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow(), 4).getValues() : [];
+    const volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 4).getValues() : [];
     var deleted = false;
     for (var i = volData.length - 1; i >= 0; i--) {
       if (String(volData[i][0]).trim() !== String(recruitId).trim()) continue;
@@ -6976,7 +7005,7 @@ function holdForRecruitment_legacy_(recruitId, staffNameFromClient, staffEmailFr
     }
     if (!staffName) staffName = '不明';
     var lastCol = Math.max(volSheet.getLastColumn(), 7);
-    var volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow(), lastCol).getValues() : [];
+    var volData = volSheet.getLastRow() >= 2 ? volSheet.getRange(2, 1, volSheet.getLastRow() - 1, lastCol).getValues() : [];
     for (var i = 0; i < volData.length; i++) {
       if (String(volData[i][0]).trim() !== String(recruitId).trim()) continue;
       var match = (staffEmail && String(volData[i][2] || '').trim().toLowerCase() === staffEmail.toLowerCase()) || String(volData[i][1] || '').trim() === staffName;
@@ -7014,12 +7043,12 @@ function getRecruitmentStatusMap() {
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return JSON.stringify({ success: true, map: map });
     ensureRecruitDetailColumns_();
     var recruitLastCol = Math.max(recruitSheet.getLastColumn(), 15);
-    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), recruitLastCol).getValues();
+    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, recruitLastCol).getValues();
     var volunteersByRid = {};
     ensureVolunteerStatusColumns_();
     var volLastCol = Math.max(volSheet ? volSheet.getLastColumn() : 4, 7);
     if (volSheet && volSheet.getLastRow() >= 2) {
-      var volRows = volSheet.getRange(2, 1, volSheet.getLastRow(), volLastCol).getValues();
+      var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
       volRows.forEach(function(vr) {
         var rid = String(vr[0] || '').trim();
         if (rid) {
@@ -7166,19 +7195,26 @@ function getRecruitmentStatusMap() {
       return best;
     }
 
-    // チェックアウト日→現在のフォーム行番号のマッピングを構築（ソート後の行番号ずれ対策）
-    var coToCurrentRow = {};
+    // チェックアウト日→現在のフォーム行番号リストのマッピングを構築（同日複数予約対応）
+    var coToCurrentRows = {};
+    var coToCurrentRow = {};  // 後方互換用（repairOrphanedRecruitEntries_向け）
     if (formData && formColMap && formColMap.checkOut >= 0) {
       for (var f = 0; f < formData.length; f++) {
         var fCoRaw = formData[f][formColMap.checkOut];
         var fCoStr = parseDate(fCoRaw) ? toDateKeySafe_(parseDate(fCoRaw)) : toDateKeySafe_(fCoRaw);
-        if (fCoStr && !coToCurrentRow[fCoStr]) coToCurrentRow[fCoStr] = f + 2;
+        if (fCoStr) {
+          if (!coToCurrentRows[fCoStr]) coToCurrentRows[fCoStr] = [];
+          coToCurrentRows[fCoStr].push(f + 2);
+          if (!coToCurrentRow[fCoStr]) coToCurrentRow[fCoStr] = f + 2;
+        }
       }
     }
 
     // 孤立した募集エントリ（日付がフォームシートに存在しない）を自動修復
     try { repairOrphanedRecruitEntries_(recruitSheet, rows, coToCurrentRow, formData, formColMap); } catch (e) {}
 
+    // 使用済みフォーム行番号を追跡（同日複数予約で同じ行に二重割り当てしない）
+    var usedFormRowNums = {};
     for (var i = 0; i < rows.length; i++) {
       var staleRowNum = Number(rows[i][1]);
       var status = String(rows[i][3] || '').trim() || '募集中';
@@ -7209,8 +7245,26 @@ function getRecruitmentStatusMap() {
       var checkoutDate = rawDate ? (rawDate instanceof Date ? Utilities.formatDate(rawDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(rawDate)) : '';
       var normCo = checkoutDate.match(/^\d{4}-\d{2}-\d{2}$/) ? checkoutDate : (toDateKeySafe_(parseDate(checkoutDate) || checkoutDate) || checkoutDate);
 
-      // 現在のフォーム行番号に変換（ソート対策）、見つからなければ元の行番号を使用
-      var currentRowNum = (normCo && coToCurrentRow[normCo]) ? coToCurrentRow[normCo] : staleRowNum;
+      // 現在のフォーム行番号に変換（同日複数予約対応: staleRowNumに最も近い未使用の行番号を選択）
+      var currentRowNum = staleRowNum;
+      if (normCo && coToCurrentRows[normCo]) {
+        var candidates = coToCurrentRows[normCo];
+        if (candidates.length === 1) {
+          currentRowNum = candidates[0];
+        } else {
+          // 同日複数予約: staleRowNumに最も近い未使用の行番号を選択
+          var bestDist = Infinity;
+          for (var ci = 0; ci < candidates.length; ci++) {
+            if (usedFormRowNums[candidates[ci]]) continue;
+            var dist = Math.abs(candidates[ci] - staleRowNum);
+            if (dist < bestDist) {
+              bestDist = dist;
+              currentRowNum = candidates[ci];
+            }
+          }
+        }
+      }
+      if (currentRowNum) usedFormRowNums[currentRowNum] = true;
 
       // coToCurrentRow で正しい行番号が見つかった場合、募集シートの行番号を同期
       if (currentRowNum && currentRowNum !== staleRowNum && staleRowNum) {
@@ -7239,16 +7293,29 @@ function getRecruitmentStatusMap() {
         nextRes = findNextRes_(normDate, currentRowNum);
       }
 
-      if (currentRowNum) map[currentRowNum] = {
-        status: status,
-        staff: staff,
-        volunteers: volunteers,
-        cancelRequested: cancelRequested,
-        recruitRowIndex: i + 2,
-        checkoutDate: checkoutDate,
-        nextReservation: nextRes,
-        selectedStaff: staff
-      };
+      if (currentRowNum) {
+        var newEntry = {
+          status: status,
+          staff: staff,
+          volunteers: volunteers,
+          cancelRequested: cancelRequested,
+          recruitRowIndex: i + 2,
+          checkoutDate: checkoutDate,
+          nextReservation: nextRes,
+          selectedStaff: staff
+        };
+        // 同じ予約行番号に対する重複エントリが存在する場合、回答データが多い方を優先
+        if (map[currentRowNum]) {
+          var existingAnswered = (map[currentRowNum].volunteers || []).filter(function(v) { return v.response && v.response !== '未回答'; }).length;
+          var newAnswered = volunteers.filter(function(v) { return v.response && v.response !== '未回答'; }).length;
+          if (newAnswered > existingAnswered) {
+            map[currentRowNum] = newEntry;
+          }
+          // else: 既存エントリの方が回答データが多いので保持
+        } else {
+          map[currentRowNum] = newEntry;
+        }
+      }
     }
     return JSON.stringify({ success: true, map: map });
   } catch (e) {
@@ -7362,7 +7429,7 @@ function getRecruitmentForBooking(bookingRowNumber) {
     const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return JSON.stringify({ success: true, recruitRowIndex: 0, volunteers: [], status: '', checkoutDate: '' });
-    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow(), 5).getValues();
+    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 5).getValues();
     // まず行番号で一致を試みる
     var matchIdx = -1;
     for (var i = 0; i < rows.length; i++) {
@@ -7404,7 +7471,7 @@ function getRecruitmentForBooking(bookingRowNumber) {
       if (volSheet && volSheet.getLastRow() >= 2) {
         ensureVolunteerStatusColumns_();
         var volLastCol = Math.max(volSheet.getLastColumn(), 7);
-        var volRows = volSheet.getRange(2, 1, volSheet.getLastRow(), volLastCol).getValues();
+        var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
         var rid = 'r' + recruitRowIndex;
         volRows.forEach(function(vr) {
           if (String(vr[0] || '').trim() === rid) {
@@ -7702,12 +7769,22 @@ function checkAndCreateRecruitments() {
     var cutoff = new Date(today);
     cutoff.setDate(cutoff.getDate() - 60);
     const data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
-    // 既存の募集行番号を一括取得（ループ内で毎回読まない）
+    // 既存の募集行番号とチェックアウト日を一括取得（重複防止）
     var existingRowNums = {};
+    var existingCheckoutDates = {};
     if (recruitSheet.getLastRow() >= 2) {
-      var existData = recruitSheet.getRange(2, 2, recruitSheet.getLastRow() - 1, 1).getValues();
+      var existData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 2).getValues();
       for (var ei = 0; ei < existData.length; ei++) {
-        existingRowNums[Number(existData[ei][0])] = true;
+        existingRowNums[Number(existData[ei][1])] = true;
+        // チェックアウト日+行番号の組み合わせで既存エントリを追跡
+        var eCo = parseDate(existData[ei][0]);
+        if (eCo) {
+          var eCoStr = toDateKeySafe_(eCo);
+          if (eCoStr) {
+            if (!existingCheckoutDates[eCoStr]) existingCheckoutDates[eCoStr] = [];
+            existingCheckoutDates[eCoStr].push(Number(existData[ei][1]));
+          }
+        }
       }
     }
     ensureRecruitNotifyMethodColumn_();
@@ -7727,6 +7804,15 @@ function checkAndCreateRecruitments() {
       const checkoutStr = toDateKeySafe_(checkOut);
       const rowNumber = i + 2;
       if (existingRowNums[rowNumber]) continue;
+      // 同じチェックアウト日の募集エントリが既に存在し、同日の予約が1件のみの場合はスキップ（行番号ずれによる重複防止）
+      if (checkoutStr && existingCheckoutDates[checkoutStr]) {
+        var sameCoFormRows = 0;
+        for (var sci = 0; sci < data.length; sci++) {
+          var sciCo = parseDate(data[sci][colMap.checkOut]);
+          if (sciCo && toDateKeySafe_(sciCo) === checkoutStr) sameCoFormRows++;
+        }
+        if (sameCoFormRows <= existingCheckoutDates[checkoutStr].length) continue;
+      }
       // スタッフが既に確定済みか判定
       var assignedStaff = colMap.cleaningStaff >= 0 ? String(data[i][colMap.cleaningStaff] || '').trim() : '';
       var status = assignedStaff ? 'スタッフ確定済み' : '募集中';
@@ -7770,7 +7856,7 @@ function checkAndSendReminders() {
       const rowIndex = i + 2;
       var volCount = 0;
       if (volSheet && volSheet.getLastRow() >= 2) {
-        const volRows = volSheet.getRange(2, 1, volSheet.getLastRow(), 1).getValues();
+        const volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
         volRows.forEach(function(vr) {
           if (String(vr[0]).trim() === 'r' + rowIndex) volCount++;
         });

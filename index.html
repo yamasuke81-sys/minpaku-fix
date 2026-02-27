@@ -966,7 +966,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0226a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0227a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2794,77 +2794,31 @@
           if (_batchLaundryArea) {
             _batchLaundryArea.innerHTML = '<div class="modal-next-res-card" style="margin-top:0.5rem;"><div class="text-muted small text-center"><span class="spinner-border spinner-border-sm me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div>';
           }
-          var _cachedRecruit = (window._recruitFullMap || {})[props.rowNumber];
-          if (_cachedRecruit) {
-            // --- 軽量API: キャッシュにないデータ(laundry + cancelRejected + responseChangeRequests)のみ取得 ---
-            google.script.run
-              .withSuccessHandler(function(batchStr) {
-                if (modalGen !== window._eventModalGen) return;
-                try {
-                  var batch = JSON.parse(batchStr);
-                  if (!batch.success) return;
-                  var bData = batch.data;
-                  // クリーニング状況カード
-                  if (_batchLaundryArea) {
-                    if (bData.laundry && bData.laundry.success) {
-                      buildLaundryCardHtml(_batchLaundryArea, _batchCheckoutDate, bData.laundry.data, isStaffView);
-                    } else {
-                      _batchLaundryArea.innerHTML = '';
-                    }
+          google.script.run
+            .withSuccessHandler(function(batchStr) {
+              if (modalGen !== window._eventModalGen) return;
+              try {
+                var batch = JSON.parse(batchStr);
+                if (!batch.success) return;
+                var bData = batch.data;
+                if (_batchLaundryArea) {
+                  if (bData.laundry && bData.laundry.success) {
+                    buildLaundryCardHtml(_batchLaundryArea, _batchCheckoutDate, bData.laundry.data, isStaffView);
+                  } else {
+                    _batchLaundryArea.innerHTML = '';
                   }
-                  // キャッシュデータ + 補足データをマージしてハンドラに渡す
-                  if (window._batchRecruitHandler) {
-                    var supp = bData.supplementary || {};
-                    var merged = {
-                      success: true,
-                      recruitRowIndex: _cachedRecruit.recruitRowIndex,
-                      volunteers: _cachedRecruit.volunteers,
-                      status: _cachedRecruit.status,
-                      checkoutDate: _cachedRecruit.checkoutDate,
-                      nextReservation: _cachedRecruit.nextReservation,
-                      selectedStaff: _cachedRecruit.selectedStaff || _cachedRecruit.staff,
-                      cancelRequested: supp.cancelRequested || _cachedRecruit.cancelRequested || [],
-                      cancelRejected: supp.cancelRejected || [],
-                      responseChangeRequests: supp.responseChangeRequests || []
-                    };
-                    window._batchRecruitHandler(JSON.stringify(merged));
-                  }
-                } catch (e) { console.error('light modal error:', e); }
-              })
-              .withFailureHandler(function(e) {
-                if (modalGen !== window._eventModalGen) return;
-                if (_batchLaundryArea) _batchLaundryArea.innerHTML = '';
-                if (window._batchRecruitFailHandler) window._batchRecruitFailHandler();
-              })
-              .getCleaningModalDataLight(_batchCheckoutDate, props.rowNumber);
-          } else {
-            // --- 従来API: キャッシュなし時はフル取得 ---
-            google.script.run
-              .withSuccessHandler(function(batchStr) {
-                if (modalGen !== window._eventModalGen) return;
-                try {
-                  var batch = JSON.parse(batchStr);
-                  if (!batch.success) return;
-                  var bData = batch.data;
-                  if (_batchLaundryArea) {
-                    if (bData.laundry && bData.laundry.success) {
-                      buildLaundryCardHtml(_batchLaundryArea, _batchCheckoutDate, bData.laundry.data, isStaffView);
-                    } else {
-                      _batchLaundryArea.innerHTML = '';
-                    }
-                  }
-                  if (window._batchRecruitHandler) {
-                    window._batchRecruitHandler(JSON.stringify(bData.recruitment || {}));
-                  }
-                } catch (e) { console.error('batch modal error:', e); }
-              })
-              .withFailureHandler(function(e) {
-                if (modalGen !== window._eventModalGen) return;
-                if (_batchLaundryArea) _batchLaundryArea.innerHTML = '';
-                if (window._batchRecruitFailHandler) window._batchRecruitFailHandler();
-              })
-              .getCleaningModalData(_batchCheckoutDate, props.rowNumber);
-          }
+                }
+                if (window._batchRecruitHandler) {
+                  window._batchRecruitHandler(JSON.stringify(bData.recruitment || {}));
+                }
+              } catch (e) { console.error('batch modal error:', e); }
+            })
+            .withFailureHandler(function(e) {
+              if (modalGen !== window._eventModalGen) return;
+              if (_batchLaundryArea) _batchLaundryArea.innerHTML = '';
+              if (window._batchRecruitFailHandler) window._batchRecruitFailHandler();
+            })
+            .getCleaningModalData(_batchCheckoutDate, props.rowNumber);
         }
 
         const modal = new bootstrap.Modal(document.getElementById('eventModal'));

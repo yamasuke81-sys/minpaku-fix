@@ -140,7 +140,7 @@ Google スプレッドシート (DB)
 ### 1. メインアプリ（オーナー・スタッフ共通）
 - **ファイル**: `index.html`
 - **場所**: `id="deployVersion"` のバッジテキスト（969行付近）
-- **現在値**: `v0226a`
+- **現在値**: `v0227a`
 
 ### 2. チェックリストアプリ
 - **ファイル**: `checklist-app/checklist.html`
@@ -163,6 +163,20 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 ```
 
 ## 9. 実装ステータス（全セッション履歴）
+
+### セッション 2026-02-27: モーダル軽量化の撤回
+
+| 項目 | ステータス | 詳細 |
+|---|---|---|
+| 清掃詳細モーダル軽量化撤回 | ✅ 完了 | `getCleaningModalDataLight()` のキャッシュパスがデータ欠落の原因。常にフルAPI(`getCleaningModalData()`)を使用するように戻した |
+
+#### 修正内容
+
+- **index.html**: `_recruitFullMap` キャッシュによる軽量パス分岐を削除。常に `getCleaningModalData()` でフルデータ取得に統一
+- **Code.gs**: 不要になった `getRecruitSupplementary_()` と `getCleaningModalDataLight()` を削除
+- **残したもの**: Phase1（スタッフリストキャッシュ）、Phase2-B（getInitDataキャッシュ）は問題なく動作するため維持
+
+---
 
 ### セッション 2026-02-26: スタッフ回答状況バグ修正
 

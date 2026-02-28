@@ -966,11 +966,36 @@
       </div>
     </div>
 <? } ?>
+<? if (staffModeStr === 'yes') { ?>
+    <!-- 請求書タブ パスワード認証モーダル -->
+    <div id="invoicePasswordOverlay" class="position-fixed top-0 start-0 w-100 h-100 align-items-center justify-content-center" style="display:none !important; background:rgba(0,0,0,0.5); z-index:9998;">
+      <div class="bg-white rounded shadow p-4 m-2" style="max-width:360px;">
+        <h6 class="mb-2" id="invoicePwTitle">請求書タブ - パスワード認証</h6>
+        <p class="small text-muted mb-3" id="invoicePwDesc">請求書にはプライバシー情報が含まれるため、パスワードが必要です。</p>
+        <!-- パスワード未設定時: 新規設定 -->
+        <div id="invoicePwSetupArea" style="display:none;">
+          <p class="small text-warning mb-2">パスワードが未設定です。4文字以上で設定してください。</p>
+          <input type="password" class="form-control mb-2" id="invoicePwNew" placeholder="新しいパスワード（4文字以上）">
+          <input type="password" class="form-control mb-2" id="invoicePwNewConfirm" placeholder="パスワード確認">
+          <div id="invoicePwSetupMsg" class="small text-danger mb-2" style="display:none;"></div>
+          <button type="button" class="btn btn-primary w-100 mb-2" id="invoicePwSetupBtn">パスワードを設定して開く</button>
+        </div>
+        <!-- パスワード設定済み時: 入力 -->
+        <div id="invoicePwInputArea" style="display:none;">
+          <input type="password" class="form-control mb-2" id="invoicePwInput" placeholder="パスワードを入力">
+          <div id="invoicePwMsg" class="small text-danger mb-2" style="display:none;"></div>
+          <button type="button" class="btn btn-primary w-100 mb-2" id="invoicePwVerifyBtn">認証して開く</button>
+          <p class="small text-muted text-center mb-0">パスワードを忘れた場合はオーナーに連絡してください</p>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="invoicePwCancelBtn">キャンセル</button>
+      </div>
+    </div>
+<? } ?>
     <div id="staffSelectorBar" style="display:none;"></div>
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1021,9 +1046,10 @@
       <div id="staffScheduleList"></div>
     </div>
     <div id="panelInvoice" style="display:none;">
-      <div class="mb-2 d-flex gap-2 align-items-end">
+      <div class="mb-2 d-flex gap-2 align-items-center flex-wrap">
         <div><label class="form-label small mb-0">対象月</label><input type="month" class="form-control form-control-sm" id="invoiceMonth" style="max-width:160px;"></div>
         <span class="badge bg-secondary align-self-end" id="invoiceYmBadge"></span>
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="invoiceChangePwBtn" title="請求書パスワードを変更">パスワード変更</button>
       </div>
       <div id="invoiceNotReady" class="small text-muted mb-2" style="display:none;">
         <p>請求書機能はオーナーによる設定が必要です（保存先フォルダ・テンプレート）。</p>
@@ -4286,12 +4312,15 @@
             }
           }
           var saved = null;
-          try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
+          try { saved = JSON.parse(localStorage.getItem('staffSelected') || 'null'); } catch (e) {}
+          console.log('[DEBUG staffCache] 起動時キャッシュ:', saved);
           if (saved && (saved.name || saved.email)) {
+            console.log('[DEBUG staffCache] キャッシュから復元: name=' + saved.name + ', email=' + saved.email);
             applyStaffSelection(saved.name, saved.email);
             loadStaffSchedule();
             loadInvoiceData();
           } else {
+            console.log('[DEBUG staffCache] キャッシュなし → スタッフ選択画面を表示');
             showStaffSelectOverlay();
           }
         }
@@ -4421,12 +4450,11 @@
         });
 
         // タブ切り替え
-        document.querySelectorAll('#mainTabs [data-tab]').forEach(function(a) {
-          a.addEventListener('click', function(e) {
-            e.preventDefault();
-            var tab = this.getAttribute('data-tab');
+        window._invoiceAuthenticated = false; // 請求書タブ認証フラグ
+        function switchToTab(tab) {
             document.querySelectorAll('#mainTabs .nav-link').forEach(function(l) { l.classList.remove('active'); });
-            this.classList.add('active');
+            var activeLink = document.querySelector('#mainTabs [data-tab="' + tab + '"]');
+            if (activeLink) activeLink.classList.add('active');
             document.getElementById('panelCalendar').style.display = tab === 'calendar' ? 'block' : 'none';
             document.getElementById('panelRecruit').style.display = tab === 'recruit' ? 'block' : 'none';
             document.getElementById('panelStaffSchedule').style.display = tab === 'staffSchedule' ? 'block' : 'none';
@@ -4435,8 +4463,6 @@
             document.getElementById('panelSettings').style.display = tab === 'settings' ? 'block' : 'none';
             document.getElementById('panelStaffTest').style.display = tab === 'staffTest' ? 'block' : 'none';
             if (tab === 'calendar' && calendar) {
-              // FullCalendar は display:none の間にサイズ計算できないため、
-              // 表示直後と少し遅れての2段階でサイズ再計算を実行
               calendar.updateSize();
               setTimeout(function() { if (calendar) calendar.updateSize(); }, 100);
               setTimeout(function() { if (calendar) calendar.updateSize(); }, 300);
@@ -4446,6 +4472,18 @@
             if (tab === 'invoice') loadInvoiceData();
             if (tab === 'notifications') loadNotificationListMain();
             if (tab === 'settings') loadSettings();
+        }
+        document.querySelectorAll('#mainTabs [data-tab]').forEach(function(a) {
+          a.addEventListener('click', function(e) {
+            e.preventDefault();
+            var tab = this.getAttribute('data-tab');
+            // 請求書タブ: スタッフモードではパスワード認証を要求
+            if (tab === 'invoice' && window.staffMode && !window.isOwnerUser && !window._invoiceAuthenticated) {
+              console.log('[DEBUG invoiceAuth] 請求書タブクリック: 認証チェック開始');
+              showInvoicePasswordModal();
+              return;
+            }
+            switchToTab(tab);
           });
         });
 
@@ -8154,8 +8192,11 @@
         window.currentUserName = (name || '').trim();
         window.currentUserEmail = (email || '').trim();
         try {
-          sessionStorage.setItem('staffSelected', JSON.stringify({ name: window.currentUserName, email: window.currentUserEmail }));
-        } catch (e) {}
+          localStorage.setItem('staffSelected', JSON.stringify({ name: window.currentUserName, email: window.currentUserEmail }));
+          console.log('[DEBUG staffCache] localStorageに保存: name=' + window.currentUserName + ', email=' + window.currentUserEmail);
+        } catch (e) { console.warn('[DEBUG staffCache] localStorage保存失敗:', e); }
+        // スタッフ変更時は請求書認証をリセット
+        window._invoiceAuthenticated = false;
         var disp = document.getElementById('staffDisplayName');
         var badge = document.getElementById('currentAccountBadge');
         if (disp && disp.style.display !== 'none') {
@@ -8212,7 +8253,7 @@
         var changeBtn = document.getElementById('btnStaffChange');
         if (changeBtn) changeBtn.style.display = '';
         var saved = null;
-        try { saved = JSON.parse(sessionStorage.getItem('staffSelected') || 'null'); } catch (e) {}
+        try { saved = JSON.parse(localStorage.getItem('staffSelected') || 'null'); } catch (e) {}
         if (saved && (saved.name || saved.email)) {
           applyStaffSelection(saved.name, saved.email);
         }
@@ -8297,6 +8338,173 @@
           }
         });
       }
+      // === 請求書タブ パスワード認証 ===
+      function showInvoicePasswordModal() {
+        var ov = document.getElementById('invoicePasswordOverlay');
+        if (!ov) { console.warn('[DEBUG invoiceAuth] invoicePasswordOverlay要素が見つかりません'); return; }
+        var setupArea = document.getElementById('invoicePwSetupArea');
+        var inputArea = document.getElementById('invoicePwInputArea');
+        var setupMsg = document.getElementById('invoicePwSetupMsg');
+        var pwMsg = document.getElementById('invoicePwMsg');
+        if (setupMsg) setupMsg.style.display = 'none';
+        if (pwMsg) pwMsg.style.display = 'none';
+        // サーバーにパスワード設定済みか確認
+        console.log('[DEBUG invoiceAuth] パスワード有無チェック: name=' + window.currentUserName + ', email=' + window.currentUserEmail);
+        google.script.run
+          .withSuccessHandler(function(jsonStr) {
+            try {
+              var r = JSON.parse(jsonStr);
+              console.log('[DEBUG invoiceAuth] verifyStaffPassword応答(空PW):', JSON.stringify(r));
+              if (r.success && r.noPassword) {
+                // パスワード未設定 → 新規設定画面
+                console.log('[DEBUG invoiceAuth] パスワード未設定 → セットアップ画面');
+                if (setupArea) setupArea.style.display = 'block';
+                if (inputArea) inputArea.style.display = 'none';
+              } else {
+                // パスワード設定済み → 入力画面
+                console.log('[DEBUG invoiceAuth] パスワード設定済み → 入力画面');
+                if (setupArea) setupArea.style.display = 'none';
+                if (inputArea) inputArea.style.display = 'block';
+              }
+            } catch (e) {
+              console.error('[DEBUG invoiceAuth] パースエラー:', e);
+              if (setupArea) setupArea.style.display = 'none';
+              if (inputArea) inputArea.style.display = 'block';
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.error('[DEBUG invoiceAuth] サーバーエラー:', err);
+            if (setupArea) setupArea.style.display = 'none';
+            if (inputArea) inputArea.style.display = 'block';
+          })
+          .verifyStaffPassword(window.currentUserName || '', window.currentUserEmail || '', '');
+        ov.style.setProperty('display', 'flex', 'important');
+      }
+      function hideInvoicePasswordModal() {
+        var ov = document.getElementById('invoicePasswordOverlay');
+        if (ov) ov.style.setProperty('display', 'none', 'important');
+      }
+      // パスワード新規設定ボタン
+      var invoicePwSetupBtn = document.getElementById('invoicePwSetupBtn');
+      if (invoicePwSetupBtn) {
+        invoicePwSetupBtn.addEventListener('click', function() {
+          var pw1 = document.getElementById('invoicePwNew');
+          var pw2 = document.getElementById('invoicePwNewConfirm');
+          var msg = document.getElementById('invoicePwSetupMsg');
+          var v1 = (pw1 && pw1.value || '').trim();
+          var v2 = (pw2 && pw2.value || '').trim();
+          if (v1.length < 4) { if (msg) { msg.textContent = 'パスワードは4文字以上で設定してください'; msg.style.display = 'block'; } return; }
+          if (v1 !== v2) { if (msg) { msg.textContent = 'パスワードが一致しません'; msg.style.display = 'block'; } return; }
+          console.log('[DEBUG invoiceAuth] パスワード新規設定中...');
+          invoicePwSetupBtn.disabled = true;
+          google.script.run
+            .withSuccessHandler(function(jsonStr) {
+              invoicePwSetupBtn.disabled = false;
+              var r = JSON.parse(jsonStr);
+              console.log('[DEBUG invoiceAuth] setStaffPassword応答:', JSON.stringify(r));
+              if (r.success) {
+                window._invoiceAuthenticated = true;
+                hideInvoicePasswordModal();
+                switchToTab('invoice');
+              } else {
+                if (msg) { msg.textContent = r.error || '設定に失敗しました'; msg.style.display = 'block'; }
+              }
+            })
+            .withFailureHandler(function(err) {
+              invoicePwSetupBtn.disabled = false;
+              console.error('[DEBUG invoiceAuth] パスワード設定エラー:', err);
+              if (msg) { msg.textContent = 'サーバーエラー: ' + (err.message || err); msg.style.display = 'block'; }
+            })
+            .setStaffPassword(window.currentUserName || '', window.currentUserEmail || '', '', v1);
+        });
+      }
+      // パスワード認証ボタン
+      var invoicePwVerifyBtn = document.getElementById('invoicePwVerifyBtn');
+      if (invoicePwVerifyBtn) {
+        invoicePwVerifyBtn.addEventListener('click', function() {
+          var pwInput = document.getElementById('invoicePwInput');
+          var msg = document.getElementById('invoicePwMsg');
+          var pw = (pwInput && pwInput.value || '').trim();
+          if (!pw) { if (msg) { msg.textContent = 'パスワードを入力してください'; msg.style.display = 'block'; } return; }
+          console.log('[DEBUG invoiceAuth] パスワード認証中...');
+          invoicePwVerifyBtn.disabled = true;
+          google.script.run
+            .withSuccessHandler(function(jsonStr) {
+              invoicePwVerifyBtn.disabled = false;
+              var r = JSON.parse(jsonStr);
+              console.log('[DEBUG invoiceAuth] verifyStaffPassword応答:', JSON.stringify(r));
+              if (r.success && r.verified) {
+                window._invoiceAuthenticated = true;
+                hideInvoicePasswordModal();
+                if (pwInput) pwInput.value = '';
+                switchToTab('invoice');
+              } else {
+                if (msg) { msg.textContent = 'パスワードが正しくありません'; msg.style.display = 'block'; }
+              }
+            })
+            .withFailureHandler(function(err) {
+              invoicePwVerifyBtn.disabled = false;
+              console.error('[DEBUG invoiceAuth] 認証エラー:', err);
+              if (msg) { msg.textContent = 'サーバーエラー: ' + (err.message || err); msg.style.display = 'block'; }
+            })
+            .verifyStaffPassword(window.currentUserName || '', window.currentUserEmail || '', pw);
+        });
+      }
+      // キャンセルボタン
+      var invoicePwCancelBtn = document.getElementById('invoicePwCancelBtn');
+      if (invoicePwCancelBtn) {
+        invoicePwCancelBtn.addEventListener('click', function() {
+          hideInvoicePasswordModal();
+          // カレンダータブに戻す
+          switchToTab('calendar');
+        });
+      }
+      // Enterキーでパスワード送信
+      var invoicePwInput = document.getElementById('invoicePwInput');
+      if (invoicePwInput) {
+        invoicePwInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { var btn = document.getElementById('invoicePwVerifyBtn'); if (btn) btn.click(); }
+        });
+      }
+      var invoicePwNewConfirm = document.getElementById('invoicePwNewConfirm');
+      if (invoicePwNewConfirm) {
+        invoicePwNewConfirm.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { var btn = document.getElementById('invoicePwSetupBtn'); if (btn) btn.click(); }
+        });
+      }
+      // 請求書パネル内のパスワード変更ボタン
+      var invoiceChangePwBtn = document.getElementById('invoiceChangePwBtn');
+      if (invoiceChangePwBtn) {
+        invoiceChangePwBtn.addEventListener('click', function() {
+          customPrompt('現在のパスワードを入力してください', '', 'password').then(function(oldPw) {
+            if (oldPw === null) return;
+            customPrompt('新しいパスワードを入力してください（4文字以上）', '', 'password').then(function(newPw) {
+              if (!newPw) return;
+              if (newPw.length < 4) { customAlert('パスワードは4文字以上で設定してください'); return; }
+              customPrompt('新しいパスワードをもう一度入力してください', '', 'password').then(function(newPw2) {
+                if (newPw !== newPw2) { customAlert('パスワードが一致しません'); return; }
+                console.log('[DEBUG invoiceAuth] パスワード変更中...');
+                google.script.run
+                  .withSuccessHandler(function(jsonStr) {
+                    var r = JSON.parse(jsonStr);
+                    console.log('[DEBUG invoiceAuth] setStaffPassword応答:', JSON.stringify(r));
+                    if (r.success) {
+                      customAlert('パスワードを変更しました');
+                    } else {
+                      customAlert(r.error || 'パスワード変更に失敗しました');
+                    }
+                  })
+                  .withFailureHandler(function(err) {
+                    console.error('[DEBUG invoiceAuth] パスワード変更エラー:', err);
+                    customAlert('サーバーエラー: ' + (err.message || err));
+                  })
+                  .setStaffPassword(window.currentUserName || '', window.currentUserEmail || '', oldPw, newPw);
+              });
+            });
+          });
+        });
+      }
+
       google.script.run.withSuccessHandler(function(jsonStr) {
         try {
           var r = JSON.parse(jsonStr);

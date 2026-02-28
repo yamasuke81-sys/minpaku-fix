@@ -281,6 +281,7 @@
       .recruit-status-badge { font-size: 0.9rem; font-weight: 700; display: block; text-align: center; padding: 0.4rem 0.75rem; letter-spacing: 0.05em; margin: -0.75rem -0.75rem 0.5rem -0.75rem; border-radius: 10px 10px 0 0; border-bottom: 1px solid rgba(255,255,255,0.15); }
       .recruit-status-badge.status-undecided { background: rgba(255,255,255,0.08); color: #f5a3ad; }
       .recruit-status-badge.status-recruiting { background: rgba(255,255,255,0.08); color: #ffd866; }
+      .recruit-status-badge.status-selected { background: rgba(255,255,255,0.10); color: #6dd5ed; }
       .recruit-status-badge.status-decided { background: rgba(255,255,255,0.12); color: #ffffff; }
       .recruit-status-badge.status-laundry { background: rgba(255,255,255,0.12); color: #ffffff; }
       .table {
@@ -420,6 +421,7 @@
       }
       .modal-next-res-card:has(.status-undecided) { background: #3d1f24 !important; border-color: #6e2a34 !important; }
       .modal-next-res-card:has(.status-recruiting) { background: #3d3510 !important; border-color: #6e5e1c !important; }
+      .modal-next-res-card:has(.status-selected) { background: #1a2f3d !important; border-color: #2a5a6e !important; }
       .modal-next-res-card:has(.status-decided) { background: #1a3a2a !important; border-color: #2d6a4f !important; }
       .modal-next-res-card:has(.status-laundry) { background: #343a40 !important; border-color: #495057 !important; }
       .modal-next-res-card .card-title-sm {
@@ -495,10 +497,12 @@
     }
     .recruit-status-badge.status-undecided { background: transparent; color: #842029; }
     .recruit-status-badge.status-recruiting { background: transparent; color: #664d03; }
+    .recruit-status-badge.status-selected { background: transparent; color: #055160; }
     .recruit-status-badge.status-decided { background: transparent; color: #0f5132; }
     .recruit-status-badge.status-laundry { background: transparent; color: #41464b; }
     .modal-next-res-card:has(.status-undecided) { background: #f8d7da; border-color: #f1aeb5; }
     .modal-next-res-card:has(.status-recruiting) { background: #fff3cd; border-color: #ffe69c; }
+    .modal-next-res-card:has(.status-selected) { background: #cff4fc; border-color: #9eeaf9; }
     .modal-next-res-card:has(.status-decided) { background: #d1e7dd; border-color: #a3cfbb; }
     .modal-next-res-card:has(.status-laundry) { background: #e2e3e5; border-color: #c4c8cb; }
     /* 清掃セクション: 回答状況 */
@@ -966,7 +970,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0227a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2852,9 +2856,12 @@
             }
             if (statusEl && cachedRec) {
               var cStatus = cachedRec.status || '';
-              var cIsConfirmed = (cStatus === 'スタッフ確定済み' || cStatus === '選定済') || !!((d.cleaningStaff || '').trim());
-              statusEl.textContent = cIsConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
-              statusEl.className = 'recruit-status-badge ' + (cIsConfirmed ? 'status-decided' : 'status-recruiting');
+              // 募集中はスタッフ選定済みでも未確定とみなす（後で確定フロー対応）
+              var cIsConfirmed = (cStatus === 'スタッフ確定済み' || cStatus === '選定済')
+                || (cStatus !== '募集中' && !!((d.cleaningStaff || '').trim()));
+              var cIsSelectedNotConfirmed = !cIsConfirmed && cStatus === '募集中' && !!((d.cleaningStaff || '').trim() || (cachedRec.selectedStaff || '').trim());
+              statusEl.textContent = cIsConfirmed ? 'スタッフ確定済み' : (cIsSelectedNotConfirmed ? 'スタッフ選定済（未確定）' : 'スタッフ募集中');
+              statusEl.className = 'recruit-status-badge ' + (cIsConfirmed ? 'status-decided' : (cIsSelectedNotConfirmed ? 'status-selected' : 'status-recruiting'));
               statusEl.removeAttribute('style');
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
@@ -2908,12 +2915,14 @@
                   staffLabel.classList.add(resolvedStaff ? 'staff-set' : 'staff-unset');
                 }
               }
-              // 募集ステータス or 清掃担当割当済みで確定判定（カレンダー表示と同じロジック）
+              // 募集ステータスで確定判定（募集中はスタッフ選定済みでも未確定とみなす）
               var effectiveStatus = r.status;
-              var isEffConfirmed = (effectiveStatus === 'スタッフ確定済み' || effectiveStatus === '選定済') || !!resolvedStaff;
+              var isEffConfirmed = (effectiveStatus === 'スタッフ確定済み' || effectiveStatus === '選定済')
+                || (effectiveStatus !== '募集中' && !!resolvedStaff);
+              var isEffSelectedNotConfirmed = !isEffConfirmed && effectiveStatus === '募集中' && !!resolvedStaff;
               if (statusEl && r.success) {
-                statusEl.textContent = isEffConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中';
-                statusEl.className = 'recruit-status-badge ' + (isEffConfirmed ? 'status-decided' : 'status-recruiting');
+                statusEl.textContent = isEffConfirmed ? 'スタッフ確定済み' : (isEffSelectedNotConfirmed ? 'スタッフ選定済（未確定）' : 'スタッフ募集中');
+                statusEl.className = 'recruit-status-badge ' + (isEffConfirmed ? 'status-decided' : (isEffSelectedNotConfirmed ? 'status-selected' : 'status-recruiting'));
                 statusEl.removeAttribute('style');
               }
               if (volArea && volList) {
@@ -3205,17 +3214,20 @@
                 }
               }
               var ownerEffectiveStatus = r.status;
-              var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済') || !!ownerResolvedStaff;
+              // 募集中はスタッフ選定済みでも未確定とみなす（後で確定フロー対応）
+              var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済')
+                || (ownerEffectiveStatus !== '募集中' && !!ownerResolvedStaff);
+              var isOwnerSelectedNotConfirmed = !isOwnerConfirmed && ownerEffectiveStatus === '募集中' && !!ownerResolvedStaff;
               // ステータス更新（editBtnAreaを含めてinnerHTMLで再構築）
               if (statusEl && r.success) {
                 var editBtnHtml = '<span id="eventModalEditStaffBtnArea" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);"></span>';
-                statusEl.innerHTML = (isOwnerConfirmed ? 'スタッフ確定済み' : 'スタッフ募集中') + editBtnHtml;
-                statusEl.className = 'recruit-status-badge ' + (isOwnerConfirmed ? 'status-decided' : 'status-recruiting');
+                statusEl.innerHTML = (isOwnerConfirmed ? 'スタッフ確定済み' : (isOwnerSelectedNotConfirmed ? 'スタッフ選定済（未確定）' : 'スタッフ募集中')) + editBtnHtml;
+                statusEl.className = 'recruit-status-badge ' + (isOwnerConfirmed ? 'status-decided' : (isOwnerSelectedNotConfirmed ? 'status-selected' : 'status-recruiting'));
                 statusEl.style.position = 'relative';
               }
-              // 編集ボタンをステータスバッジ内右側に配置（確定済み＋担当者ありの場合のみ）
+              // 編集ボタンをステータスバッジ内右側に配置（確定済みor選定済み＋担当者ありの場合のみ）
               var editBtnArea = document.getElementById('eventModalEditStaffBtnArea');
-              if (editBtnArea && isOwnerConfirmed && (d.cleaningStaff || '').trim()) {
+              if (editBtnArea && (isOwnerConfirmed || isOwnerSelectedNotConfirmed) && (d.cleaningStaff || '').trim()) {
                 var btnEditStaff = document.createElement('button');
                 btnEditStaff.type = 'button';
                 btnEditStaff.className = 'btn btn-sm';
@@ -4461,7 +4473,7 @@
                 html += '<strong>' + escapeHtml(r.checkoutDate) + '</strong>';
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
-                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : '<span class="badge bg-warning">募集中</span>';
+                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : (r.status === '募集中' && (r.selectedStaff || '').trim()) ? '<span class="badge bg-info">選定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : '<span class="badge bg-warning">募集中</span>';
                 html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
@@ -4595,7 +4607,7 @@
                 html += '<strong>' + escapeHtml(r.checkoutDate) + '</strong>';
                 if (isPast) html += ' <span class="badge bg-secondary">経過済</span>';
                 html += ' 予約行' + r.bookingRowNumber + ' ';
-                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : '<span class="badge bg-warning">募集中</span>';
+                html += (r.status === '選定済' || r.status === 'スタッフ確定済み') ? '<span class="badge bg-success">確定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : (r.status === '募集中' && (r.selectedStaff || '').trim()) ? '<span class="badge bg-info">選定済</span> ' + formatStaffDisplayHtml(r.selectedStaff, r.volunteers) : '<span class="badge bg-warning">募集中</span>';
                 html += '<br><small>回答: ' + renderStaffResponses(r.volunteers, true) + '</small>';
                 html += '</div></div>';
               });
@@ -4655,7 +4667,7 @@
         document.getElementById('recruitEditReserveNationality').value = r.reserveNationality || '';
         document.getElementById('recruitEditReserveMemo').value = r.reserveMemo || '';
         window._recruitEditStaffNames = (r.selectedStaff || r.cleaningStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
-        document.getElementById('recruitEditStatus').innerHTML = ((r.status === '選定済' || r.status === 'スタッフ確定済み') ? 'スタッフ確定済み: ' + formatStaffDisplayHtml(r.selectedStaff || '', r.volunteers) : '募集中');
+        document.getElementById('recruitEditStatus').innerHTML = ((r.status === '選定済' || r.status === 'スタッフ確定済み') ? 'スタッフ確定済み: ' + formatStaffDisplayHtml(r.selectedStaff || '', r.volunteers) : (r.status === '募集中' && (r.selectedStaff || '').trim()) ? 'スタッフ選定済（未確定）: ' + formatStaffDisplayHtml(r.selectedStaff || '', r.volunteers) : '募集中');
         document.getElementById('recruitEditVolunteers').innerHTML = '<strong>回答状況:</strong><div class="mt-1">' + renderStaffResponses(r.volunteers) + '</div>';
         document.getElementById('recruitEditError').style.display = 'none';
         var staffBar = document.getElementById('staffSelectorBar');

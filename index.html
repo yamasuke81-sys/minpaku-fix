@@ -1105,7 +1105,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228s</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228t</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1288,6 +1288,11 @@
             <button type="button" class="btn btn-sm btn-success" id="btnSaveOwnerUrl">保存</button>
           </div>
           <div id="ownerUrlSaveMsg" class="small text-success mt-1" style="display:none;">保存しました</div>
+          <!-- [DEBUG] オーナーURL保存デバッグ情報 -->
+          <div id="ownerUrlDebugArea" class="mt-2 p-2 border rounded bg-warning bg-opacity-10" style="font-size:11px;">
+            <strong>[DEBUG] オーナーURL保存状況:</strong>
+            <pre id="ownerUrlDebugPre" class="mb-0 mt-1" style="white-space:pre-wrap;word-break:break-all;font-size:11px;">読み込み中...</pre>
+          </div>
         </div>
         <div class="mb-3 p-2 border rounded bg-light">
           <label class="form-label small fw-bold">スタッフ用URL</label>
@@ -2143,6 +2148,9 @@
       if (window.readOnly) window.staffMode = true;
       window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
       window.savedOwnerUrl = <?= JSON.stringify(savedOwnerUrl) ?> || '';
+      // [DEBUG] テンプレート値の確認
+      console.log('[DEBUG ownerUrl] 1. テンプレート値: savedOwnerUrl=' + JSON.stringify(window.savedOwnerUrl) + ', appBaseUrl=' + JSON.stringify(window.appBaseUrl));
+      window._ownerUrlDebugLog = ['1.テンプレート値: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)')];
       // テンプレートキャッシュ対策: ページ読み込み時にサーバーからオーナーURLを非同期取得
       // （設定タブを開く前にwindow.savedOwnerUrlを最新化する）
       // 【重要】これがgetOwnerBaseUrl()を呼ぶ唯一の場所。loadSettings()からは呼ばない。
@@ -2151,28 +2159,48 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
+            // [DEBUG] 非同期取得結果
+            console.log('[DEBUG ownerUrl] 2. getOwnerBaseUrl結果: ' + jsonStr);
+            window._ownerUrlDebugLog.push('2.getOwnerBaseUrl結果: ' + jsonStr);
             if (r.success && r.url) {
               // ユーザーがページ読み込み後に手動保存していたら、サーバー取得値で上書きしない
               if (!window._ownerUrlLastSaveTime) {
                 window.savedOwnerUrl = r.url;
                 try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
                 try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
+                console.log('[DEBUG ownerUrl] 2a. window.savedOwnerUrl更新: ' + r.url);
+                window._ownerUrlDebugLog.push('2a.savedOwnerUrl更新=' + r.url);
               }
             } else if (r.success && !r.url && window.appBaseUrl) {
+              console.log('[DEBUG ownerUrl] 2b. サーバーにURL未保存→appBaseUrlで自動保存開始');
+              window._ownerUrlDebugLog.push('2b.サーバーURL未保存→appBaseUrlで自動保存: ' + window.appBaseUrl);
               // サーバーにURLが未保存 → appBaseUrl(デプロイURL)を自動保存
               google.script.run.withSuccessHandler(function(saveJsonStr) {
                 try {
                   var sr = JSON.parse(saveJsonStr);
+                  console.log('[DEBUG ownerUrl] 2c. 自動保存結果: ' + saveJsonStr);
+                  window._ownerUrlDebugLog.push('2c.自動保存結果: ' + saveJsonStr);
                   if (sr.success && sr.savedUrl && !window._ownerUrlLastSaveTime) {
                     window.savedOwnerUrl = sr.savedUrl;
                     try { localStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
                     try { sessionStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
                   }
                 } catch(e) {}
-              }).withFailureHandler(function() {}).saveOwnerUrl(window.appBaseUrl);
+              }).withFailureHandler(function(err) {
+                console.log('[DEBUG ownerUrl] 2d. 自動保存失敗: ' + (err.message || err));
+                window._ownerUrlDebugLog.push('2d.自動保存失敗: ' + (err.message || err));
+              }).saveOwnerUrl(window.appBaseUrl);
+            } else {
+              window._ownerUrlDebugLog.push('2e.URL取得なし(success=' + r.success + ', url=' + (r.url || '空') + ')');
             }
-          } catch(e) {}
-        }).withFailureHandler(function() {}).getOwnerBaseUrl();
+          } catch(e) {
+            console.log('[DEBUG ownerUrl] 2f. パースエラー: ' + e);
+            window._ownerUrlDebugLog.push('2f.パースエラー: ' + e);
+          }
+        }).withFailureHandler(function(err) {
+          console.log('[DEBUG ownerUrl] 2g. getOwnerBaseUrl失敗: ' + (err.message || err));
+          window._ownerUrlDebugLog.push('2g.getOwnerBaseUrl失敗: ' + (err.message || err));
+        }).getOwnerBaseUrl();
       } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
@@ -6079,12 +6107,21 @@
         try { cachedOwnerUrl = localStorage.getItem('ownerUrlCache') || ''; } catch(e) {}
         if (!cachedOwnerUrl) { try { cachedOwnerUrl = sessionStorage.getItem('ownerUrlCache') || ''; } catch(e) {} }
         var base = window.savedOwnerUrl || cachedOwnerUrl || window.appBaseUrl || '';
+        // [DEBUG] loadSettings復元値
+        var debugMsg = '3.loadSettings復元: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', localStorage=' + (cachedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)') + ' → base=' + (base || '(空)');
+        console.log('[DEBUG ownerUrl] ' + debugMsg);
+        if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push(debugMsg);
         if (base) {
           if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
         } else {
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
+        }
+        // [DEBUG] デバッグエリアに情報表示
+        var debugPre = document.getElementById('ownerUrlDebugPre');
+        if (debugPre && window._ownerUrlDebugLog) {
+          debugPre.textContent = window._ownerUrlDebugLog.join('\n');
         }
         loadInvoiceSettings_();
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -6878,9 +6915,13 @@
       // オーナーURL保存（共通関数）
       function doSaveOwnerUrl(ownerUrl, btn) {
         if (!ownerUrl) { if (btn) { alert('オーナーURLを入力してください。'); } return; }
+        console.log('[DEBUG ownerUrl] 4. 保存開始: ownerUrl=' + ownerUrl);
+        if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('4.保存開始: ' + ownerUrl);
         if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
         google.script.run.withSuccessHandler(function(jsonStr) {
           if (btn) { btn.disabled = false; btn.textContent = '保存'; }
+          console.log('[DEBUG ownerUrl] 5. 保存結果: ' + jsonStr);
+          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5.保存結果: ' + jsonStr);
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
@@ -6899,13 +6940,25 @@
               // localStorageとsessionStorageにサーバーで保存されたURL（クリーン済み）をキャッシュ
               try { localStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
               try { sessionStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
+              // [DEBUG] デバッグエリア更新
+              var dp = document.getElementById('ownerUrlDebugPre');
+              if (dp && window._ownerUrlDebugLog) { dp.textContent = window._ownerUrlDebugLog.join('\n'); }
             } else {
               alert('保存に失敗しました: ' + (r.error || ''));
+              if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5x.保存失敗: ' + (r.error || ''));
+              var dp2 = document.getElementById('ownerUrlDebugPre');
+              if (dp2 && window._ownerUrlDebugLog) { dp2.textContent = window._ownerUrlDebugLog.join('\n'); }
             }
-          } catch (e) { alert('保存に失敗しました。'); }
+          } catch (e) {
+            alert('保存に失敗しました。');
+            if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5y.パースエラー: ' + e);
+          }
         }).withFailureHandler(function(err) {
           if (btn) { btn.disabled = false; btn.textContent = '保存'; }
           alert('保存に失敗しました: ' + (err.message || ''));
+          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5z.通信エラー: ' + (err.message || err));
+          var dp3 = document.getElementById('ownerUrlDebugPre');
+          if (dp3 && window._ownerUrlDebugLog) { dp3.textContent = window._ownerUrlDebugLog.join('\n'); }
         }).saveOwnerUrl(ownerUrl);
       }
       // 保存ボタン

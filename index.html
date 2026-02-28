@@ -1145,6 +1145,12 @@
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
+      <!-- [DEBUG] 重複排除デバッグパネル -->
+      <div id="dedupDebugPanel" class="mt-2 p-2 border rounded bg-info bg-opacity-10" style="font-size:11px; display:none;">
+        <strong>[DEBUG] 予約重複排除の結果:</strong>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="this.parentElement.style.display='none';">閉じる</button>
+        <pre id="dedupDebugPre" class="mb-0 mt-1" style="white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:300px;overflow-y:auto;"></pre>
+      </div>
     </div>
     <div id="panelRecruit" style="display:none;">
       <div id="recruitList"></div>
@@ -2151,6 +2157,11 @@
       // [DEBUG] テンプレート値の確認
       console.log('[DEBUG ownerUrl] 1. テンプレート値: savedOwnerUrl=' + JSON.stringify(window.savedOwnerUrl) + ', appBaseUrl=' + JSON.stringify(window.appBaseUrl));
       window._ownerUrlDebugLog = ['1.テンプレート値: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)')];
+      // [DEBUG] デバッグエリアを自動更新するヘルパー
+      window._updateOwnerUrlDebugArea = function() {
+        var dp = document.getElementById('ownerUrlDebugPre');
+        if (dp && window._ownerUrlDebugLog) dp.textContent = window._ownerUrlDebugLog.join('\n');
+      };
       // テンプレートキャッシュ対策: ページ読み込み時にサーバーからオーナーURLを非同期取得
       // （設定タブを開く前にwindow.savedOwnerUrlを最新化する）
       // 【重要】これがgetOwnerBaseUrl()を呼ぶ唯一の場所。loadSettings()からは呼ばない。
@@ -2171,9 +2182,11 @@
                 console.log('[DEBUG ownerUrl] 2a. window.savedOwnerUrl更新: ' + r.url);
                 window._ownerUrlDebugLog.push('2a.savedOwnerUrl更新=' + r.url);
               }
+              if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
             } else if (r.success && !r.url && window.appBaseUrl) {
               console.log('[DEBUG ownerUrl] 2b. サーバーにURL未保存→appBaseUrlで自動保存開始');
               window._ownerUrlDebugLog.push('2b.サーバーURL未保存→appBaseUrlで自動保存: ' + window.appBaseUrl);
+              if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
               // サーバーにURLが未保存 → appBaseUrl(デプロイURL)を自動保存
               google.script.run.withSuccessHandler(function(saveJsonStr) {
                 try {
@@ -2192,6 +2205,7 @@
               }).saveOwnerUrl(window.appBaseUrl);
             } else {
               window._ownerUrlDebugLog.push('2e.URL取得なし(success=' + r.success + ', url=' + (r.url || '空') + ')');
+              if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
             }
           } catch(e) {
             console.log('[DEBUG ownerUrl] 2f. パースエラー: ' + e);
@@ -2200,6 +2214,7 @@
         }).withFailureHandler(function(err) {
           console.log('[DEBUG ownerUrl] 2g. getOwnerBaseUrl失敗: ' + (err.message || err));
           window._ownerUrlDebugLog.push('2g.getOwnerBaseUrl失敗: ' + (err.message || err));
+          if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
         }).getOwnerBaseUrl();
       } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
@@ -2447,8 +2462,14 @@
           existing.mergedRowNumbers.push(b.rowNumber);
         }
 
+        // [DEBUG] 重複排除デバッグ
+        var _dedupDebug = { total: data.length, merged: 0, separate: 0, noCheckIn: 0, details: [] };
         data.forEach(function(b) {
-          if (!b.checkInParsed) { merged.push(b); return; }
+          if (!b.checkInParsed) {
+            _dedupDebug.noCheckIn++;
+            merged.push(b);
+            return;
+          }
           var ci = b.checkInParsed;
           var co = b.checkOutParsed || '';
           // 同一チェックイン日の既存エントリを探す
@@ -2458,13 +2479,22 @@
             var existCo = existing.checkOutParsed || '';
             // チェックアウト日が一致、または片方が空ならマージ
             if (!co || !existCo || co === existCo) {
+              _dedupDebug.merged++;
+              _dedupDebug.details.push('[MERGED] row' + b.rowNumber + '→row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + '/' + existCo + ' name=' + (b.guestName||'') + '→' + (existing.guestName||'') + ' site=' + (b.bookingSite||''));
               mergeBookingData(existing, b);
               return;
+            } else {
+              _dedupDebug.details.push('[NOT MERGED co不一致] row' + b.rowNumber + ' vs row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + ' vs ' + existCo + ' name=' + (b.guestName||'') + ' site=' + (b.bookingSite||''));
             }
           }
+          _dedupDebug.separate++;
           ciKeyMap[ci] = merged.length;
           merged.push(b);
         });
+        // [DEBUG] 結果をコンソールとデバッグエリアに出力
+        console.log('[DEBUG dedup] 合計=' + _dedupDebug.total + ' マージ=' + _dedupDebug.merged + ' 分離=' + _dedupDebug.separate + ' CI無し=' + _dedupDebug.noCheckIn);
+        if (_dedupDebug.details.length) console.log('[DEBUG dedup] 詳細:\n' + _dedupDebug.details.join('\n'));
+        window._lastDedupDebug = _dedupDebug;
 
         merged.forEach(function(b) {
           const checkIn = b.checkInParsed;
@@ -4185,6 +4215,37 @@
             calendar.addEventSource(events);
             calendar.render();
           }
+          // [DEBUG] 重複排除デバッグパネル更新
+          try {
+            var _ddPanel = document.getElementById('dedupDebugPanel');
+            var _ddPre = document.getElementById('dedupDebugPre');
+            if (_ddPanel && _ddPre && window._lastDedupDebug) {
+              var dd = window._lastDedupDebug;
+              var lines = ['合計行数: ' + dd.total + '  マージされた行: ' + dd.merged + '  分離(表示)された行: ' + dd.separate + '  CheckIn無し: ' + dd.noCheckIn];
+              if (dd.merged > 0 || dd.details.length > 0) {
+                lines.push('');
+                dd.details.forEach(function(d) { lines.push(d); });
+              }
+              // 同一checkInで分離されたペアを追加表示
+              var ciCount = {};
+              allBookings.forEach(function(b) {
+                if (b.checkInParsed) {
+                  if (!ciCount[b.checkInParsed]) ciCount[b.checkInParsed] = [];
+                  ciCount[b.checkInParsed].push('row' + b.rowNumber + ' co=' + (b.checkOutParsed||'無') + ' name=' + (b.guestName||'') + ' site=' + (b.bookingSite||''));
+                }
+              });
+              var hasDups = false;
+              for (var ciKey in ciCount) {
+                if (ciCount[ciKey].length > 1) {
+                  if (!hasDups) { lines.push(''); lines.push('--- 同一CheckIn日の行一覧 ---'); hasDups = true; }
+                  lines.push('CI=' + ciKey + ' (' + ciCount[ciKey].length + '行):');
+                  ciCount[ciKey].forEach(function(r) { lines.push('  ' + r); });
+                }
+              }
+              _ddPre.textContent = lines.join('\n');
+              _ddPanel.style.display = 'block';
+            }
+          } catch(e) { console.log('[DEBUG dedup panel error] ' + e); }
           updateNotificationBanner();
 
           // 募集エントリのない清掃イベントの次回予約を一括プリロード
@@ -6119,10 +6180,7 @@
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
         }
         // [DEBUG] デバッグエリアに情報表示
-        var debugPre = document.getElementById('ownerUrlDebugPre');
-        if (debugPre && window._ownerUrlDebugLog) {
-          debugPre.textContent = window._ownerUrlDebugLog.join('\n');
-        }
+        if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
         loadInvoiceSettings_();
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {

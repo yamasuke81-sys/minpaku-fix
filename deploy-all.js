@@ -31,6 +31,19 @@ function run(cmd, cwd, timeoutMs) {
   } catch (e) {
     var msg = (e.stdout || '').toString() + (e.stderr || '').toString();
     if (e.killed) msg += '\n(タイムアウトで強制終了)';
+    // EPERM: clasp操作は成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
+    // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
+    // 操作自体は成功しているので、成功パターンを検出して ok=true を返す。
+    if (/EPERM/.test(msg)) {
+      var hasSuccessIndicator =
+        /Pushed \d+ file/i.test(msg) ||       // clasp push 成功
+        /Created version/i.test(msg) ||        // clasp deploy 成功
+        /AKfycb[A-Za-z0-9_-]{20,}/.test(msg); // デプロイID出力あり
+      if (hasSuccessIndicator) {
+        console.log('  (EPERM警告: .clasprc.json書き込み権限エラー。操作自体は成功)');
+        return { ok: true, out: msg };
+      }
+    }
     return { ok: false, out: msg };
   }
 }
@@ -159,12 +172,20 @@ function main() {
   // === メインアプリ ===
   console.log('[1/3] メインアプリ: コードをプッシュ...');
   var mainPush = run(clasp + ' push --force', rootDir);
-  if (!mainPush.ok) {
+  // EPERM: clasp pushは成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
+  // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
+  // 出力に "Pushed" が含まれていればpush自体は成功しているので続行する。
+  var pushActuallySucceeded = mainPush.ok || /Pushed \d+ file/i.test(mainPush.out);
+  if (!pushActuallySucceeded) {
     console.error('  エラー: メインアプリの clasp push に失敗');
     console.error('  ' + mainPush.out.slice(0, 500));
     process.exit(1);
   }
-  console.log('  OK');
+  if (!mainPush.ok && pushActuallySucceeded) {
+    console.log('  OK (EPERM警告あり — push自体は成功)');
+  } else {
+    console.log('  OK');
+  }
 
   console.log('[2/3] メインアプリ: デプロイを更新...');
   var today = new Date().toISOString().slice(0, 10);

@@ -164,6 +164,20 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 
 ## 9. 実装ステータス（全セッション履歴）
 
+### セッション 2026-02-28: デプロイスクリプト EPERM 耐性追加
+
+| 項目 | ステータス | 詳細 |
+|---|---|---|
+| デプロイスクリプト EPERM 耐性 | ✅ 完了 | `deploy-all.js` と `deploy-checklist.js` の両方で、clasp push/deploy 成功後の `.clasprc.json` 書き込み EPERM を警告のみで続行するように修正 |
+
+#### 修正内容
+
+- **deploy-all.js**: `run()` 関数に EPERM 検出＋成功パターン判定を追加。push 個別チェックも追加
+- **checklist-app/deploy-checklist.js**: `runCapture()` 関数に同様の EPERM 耐性を追加。push 判定も修正
+- **CLAUDE.md**: 既知の課題を「対処済」に更新
+
+---
+
 ### セッション 2026-02-27: モーダル軽量化の撤回
 
 | 項目 | ステータス | 詳細 |
@@ -364,7 +378,7 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 |---|---|---|
 | `募集` シートに既存の重複エントリが残っている可能性 | 中 | 2/26の修正で新規作成は防止したが、過去に作られた重複は残存。表示上は修正済み（回答データ優先ロジック）だが、スプシ上のデータクリーンアップは未実施 |
 | 残りの `getLastRow()` off-by-one | 低 | 主要13関数は修正済みだが、補助的な関数にまだ残っている箇所がある（実害は少ない） |
-| `.clasprc.json` の権限エラー | 低 | デプロイ時に `EPERM` エラーが出るが、デプロイ自体は成功する。`icacls` で権限付与すれば解消 |
+| `.clasprc.json` の権限エラー | ✅ 対処済 | デプロイスクリプト(`deploy-all.js`, `deploy-checklist.js`)にEPERM耐性を追加。push/deploy成功時はEPERMを警告表示のみで続行する。根本解消は `icacls "%USERPROFILE%\.clasprc.json" /grant "%USERNAME%:F"` |
 | オーナーURL消え問題（5回修正済み） | 低 | v0223c〜g で根本修正済み。レースコンディションを排除。再発時は非同期コールバック競合を疑う |
 
 ## 11. 次回セッションでやるべきことリスト

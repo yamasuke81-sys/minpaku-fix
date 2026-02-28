@@ -31,7 +31,23 @@ function runCapture(cmd, cwd) {
     const out = execSync(cmd, { encoding: 'utf8', shell: true, cwd: cwd || scriptDir, env: { ...process.env, PATH: envPath } });
     return { success: true, stdout: out || '', stderr: '' };
   } catch (e) {
-    return { success: false, stdout: (e.stdout || '').toString(), stderr: (e.stderr || '').toString() };
+    const stdout = (e.stdout || '').toString();
+    const stderr = (e.stderr || '').toString();
+    const combined = stdout + stderr;
+    // EPERM: clasp操作は成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
+    // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
+    // 操作自体は成功しているので、成功パターンを検出して success=true を返す。
+    if (/EPERM/.test(combined)) {
+      const hasSuccessIndicator =
+        /Pushed \d+ file/i.test(combined) ||
+        /Created version/i.test(combined) ||
+        /AKfycb[A-Za-z0-9_-]{20,}/.test(combined);
+      if (hasSuccessIndicator) {
+        console.log('  (EPERM警告: .clasprc.json書き込み権限エラー。操作自体は成功)');
+        return { success: true, stdout: stdout, stderr: stderr };
+      }
+    }
+    return { success: false, stdout: stdout, stderr: stderr };
   }
 }
 
@@ -122,8 +138,13 @@ async function main() {
   // clasp push（--force で確認プロンプトをスキップ）
   console.log('2. コードをプッシュしています...');
   const pushResult = runCapture(`${clasp} push --force`);
-  if (!pushResult.success) {
-    const errText = (pushResult.stdout + pushResult.stderr);
+  // EPERM: clasp pushは成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
+  // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
+  // 出力に "Pushed" が含まれていればpush自体は成功しているので続行する。
+  const pushOutput = pushResult.stdout + pushResult.stderr;
+  const pushActuallySucceeded = pushResult.success || /Pushed \d+ file/i.test(pushOutput);
+  if (!pushActuallySucceeded) {
+    const errText = pushOutput;
     console.error('   clasp push に失敗しました。');
     console.error('   ' + errText.slice(0, 500));
     console.error('');
@@ -138,7 +159,11 @@ async function main() {
     }
     process.exit(1);
   }
-  console.log('   プッシュ完了');
+  if (!pushResult.success && pushActuallySucceeded) {
+    console.log('   プッシュ完了 (EPERM警告あり — push自体は成功)');
+  } else {
+    console.log('   プッシュ完了');
+  }
 
   // clasp deploy（既存デプロイを更新 or 新規作成）
   if (process.argv.includes('--push-only')) {

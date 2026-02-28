@@ -5,13 +5,16 @@
 ユーザーがWindows PCのターミナルにコピペしてすぐデプロイできるようにする。
 
 ```
-cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <ブランチ名> && git reset --hard origin/<ブランチ名> && node deploy.js
+cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <ブランチ名> && git reset --hard origin/<ブランチ名> && node deploy-all.js
 ```
 
 - `<ブランチ名>` は現在の作業ブランチ名に置き換える
 - 修正の説明の最後に必ずこのコマンドブロックを出力する
 - ユーザーが「デプロイして」と言わなくても、コード変更をプッシュしたら毎回出す
-- `deploy.js` はデプロイ完了後、オーナー用・スタッフ用それぞれのURLを自動的に通常ブラウザで開く
+- `deploy-all.js` は以下を自動実行する:
+  1. メインアプリ: clasp push → デプロイ更新
+  2. チェックリストアプリ: deploy-checklist.js を実行
+  3. デプロイ完了後、オーナー用URLを通常ウィンドウ、スタッフ用URLをシークレットウィンドウで自動的にブラウザで開く
 
 ## プロジェクト概要
 Google Apps Script + スプレッドシート製の民泊予約・清掃管理Webアプリ。

@@ -140,7 +140,7 @@ Google スプレッドシート (DB)
 ### 1. メインアプリ（オーナー・スタッフ共通）
 - **ファイル**: `index.html`
 - **場所**: `id="deployVersion"` のバッジテキスト（969行付近）
-- **現在値**: `v0228b`
+- **現在値**: `v0228c`
 
 ### 2. チェックリストアプリ
 - **ファイル**: `checklist-app/checklist.html`
@@ -163,6 +163,25 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 ```
 
 ## 9. 実装ステータス（全セッション履歴）
+
+### セッション 2026-02-28b: iCal同期 誤キャンセル修正 + HTTP 5xx リトライ
+
+| 項目 | ステータス | 詳細 |
+|---|---|---|
+| Booking.com 予約の誤キャンセル修正 | ✅ 完了 | `parseICal_()` がブロック日やゲスト名なし予約をフィルタアウトし、`validPairs` に含まれず誤キャンセルされていた |
+| `autoSyncFromICal` 未定義関数修正 | ✅ 完了 | `markBookingCancelled_()` が未定義で try-catch で黙殺されていた。`cancelBookingFromICal_()` に置換 |
+| 自動同期にキャンセル解除ロジック追加 | ✅ 完了 | iCalに再出現した予約のキャンセルを自動解除（手動同期と同等のロジック） |
+| HTTP 5xx リトライ追加 | ✅ 完了 | 手動/自動同期の両方で 5xx エラー時に2秒待機後1回リトライ |
+| 同期ステータスのエラー表示修正 | ✅ 完了 | HTTP エラーやエラーメッセージを赤色（text-danger）で表示するように変更 |
+
+#### 修正内容
+
+- **Code.gs `parseICal_()`**: `allDatePairs` を追加。キャンセル以外の全日付ペア（ブロック日・名前なし予約含む）を記録し、戻り値を `{ events, allDatePairs }` に変更
+- **Code.gs `syncFromICal()`**: `validPairs` を `allDatePairs` から構築するように変更。5xx リトライ追加
+- **Code.gs `autoSyncFromICal()`**: 同上 + `markBookingCancelled_` → `cancelBookingFromICal_` + キャンセル解除ロジック追加
+- **index.html `loadSyncList()`**: 同期ステータスにHTTP/エラー文字列が含まれる場合 `text-danger` で表示
+
+---
 
 ### セッション 2026-02-28: デプロイスクリプト EPERM 耐性追加
 

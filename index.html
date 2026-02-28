@@ -970,7 +970,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5217,7 +5217,10 @@
                 var toggleId = 'syncToggle_' + s.rowIndex;
                 html += '<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between align-items-start">';
                 html += '<div><strong>' + escapeHtml(s.platformName) + '</strong><br><small class="text-muted">' + escapeHtml(s.icalUrl || '(未設定)') + '</small>';
-                if (s.lastSync) html += '<br><small class="text-success">' + escapeHtml(s.lastSync) + '</small>';
+                if (s.lastSync) {
+                  var syncColorClass = (s.lastSync.indexOf('HTTP') >= 0 || s.lastSync.indexOf('エラー') >= 0) ? 'text-danger' : 'text-success';
+                  html += '<br><small class="' + syncColorClass + '">' + escapeHtml(s.lastSync) + '</small>';
+                }
                 html += '<div class="form-check form-switch mt-1"><input class="form-check-input syncActiveToggle" type="checkbox" id="' + toggleId + '" data-row="' + s.rowIndex + '" data-name="' + escapeHtml(s.platformName) + '" data-url="' + escapeHtml(s.icalUrl) + '"' + (isActive ? ' checked' : '') + '>';
                 html += '<label class="form-check-label small" for="' + toggleId + '">自動同期</label></div>';
                 html += '</div>';

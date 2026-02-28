@@ -2259,24 +2259,11 @@ function parseICal_(icalText, platformName) {
         allDatePairs[checkIn + '|' + checkOut] = true;
         // ブロック日・利用不可日は予約追加対象外（ただしallDatePairsには含める）
         if (/^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)) { current = null; continue; }
-        var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
-        // "Reserved" のみの場合はDESCRIPTIONからゲスト名を探す、なければプラットフォーム名で登録
-        if (/^reserved$/i.test(sum) || !guestName) {
-          var desc = (current.description || '').trim();
-          // AirbnbのDESCRIPTIONに含まれるゲスト名パターンを試す
-          var nameFromDesc = '';
-          var nameMatch = desc.match(/(?:Guest|ゲスト)[:\s]+([^\n,]+)/i) || desc.match(/(?:Name|名前)[:\s]+([^\n,]+)/i);
-          if (nameMatch) nameFromDesc = nameMatch[1].trim();
-          guestName = nameFromDesc || (platformName || '予約者');
-        }
+        var guestName = sum.replace(/^Reserved\s*$/i, '').replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         var guestLower = guestName.toLowerCase();
-        if (/^(airbnb|booking\.com|rakuten|楽天)$/i.test(guestLower)) {
-          // プラットフォーム名のみ → ゲスト名不明として登録（スキップしない）
-          guestName = platformName + '予約';
-        }
-        if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName)) { current = null; continue; }
-        // ゲスト名が空の場合 → プラットフォーム名で登録（ブロック日は上のフィルタで除外済み）
-        if (!guestName) guestName = platformName ? (platformName + '予約') : '予約者';
+        if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName) || guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten') { current = null; continue; }
+        // ゲスト名が空の場合（ブロック日等の可能性）は予約追加対象外（allDatePairsには既に含む）
+        if (!guestName) { current = null; continue; }
         var combinedText = ((current.summary || '') + ' ' + (current.description || '')).trim();
         var icalGuestCount = extractGuestCountFromIcalText_(combinedText);
         events.push({
@@ -2414,7 +2401,6 @@ function syncFromICal() {
             var exCi = parts[0], exCo = parts[1];
             if (ev.checkIn < exCo && ev.checkOut > exCi) {
               overlaps = true;
-              Logger.log('iCal sync: overlap skip ' + platformName + ' ' + ev.checkIn + '~' + ev.checkOut + ' vs existing ' + exCi + '~' + exCo);
               break;
             }
           }

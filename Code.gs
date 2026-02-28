@@ -2262,11 +2262,26 @@ function parseICal_(icalText, platformName) {
         Logger.log('parseICal ' + platformName + ': SUMMARY="' + sum + '" checkIn=' + checkIn + ' checkOut=' + checkOut);
         // ブロック日・利用不可日は予約追加対象外（ただしallDatePairsには含める）
         if (/^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)) { Logger.log('  → skip: blocked/not-available'); skipReasons.blocked++; current = null; continue; }
-        var guestName = sum.replace(/^Reserved\s*$/i, '').replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
+        // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
+        var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
+        // "Reserved"のみ → ゲスト名不明だがブロック日ではない実予約
+        if (/^reserved$/i.test(guestName)) {
+          guestName = (platformName || '予約') + '予約';
+          Logger.log('  → Reserved → "' + guestName + '"');
+        }
         var guestLower = guestName.toLowerCase();
-        if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName) || guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten') { Logger.log('  → skip: platform-name-only (guestName="' + guestName + '")'); skipReasons.platformName++; current = null; continue; }
-        // ゲスト名が空の場合（ブロック日等の可能性）は予約追加対象外（allDatePairsには既に含む）
-        if (!guestName) { Logger.log('  → skip: empty guestName (original SUMMARY="' + sum + '")'); skipReasons.emptyName++; current = null; continue; }
+        // プラットフォーム名のみ(例: "Airbnb") → ゲスト名不明だが実予約
+        if (guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten' || guestLower === '楽天') {
+          guestName = guestName + '予約';
+          Logger.log('  → platform-name-only → "' + guestName + '"');
+        }
+        // "Airbnb (HM12345)" のような予約管理コードのみの場合はスキップ
+        if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName)) { Logger.log('  → skip: platform+code only (guestName="' + guestName + '")'); skipReasons.platformName++; current = null; continue; }
+        // ゲスト名が空の場合 → プラットフォーム名で補完
+        if (!guestName) {
+          guestName = (platformName || '予約') + '予約';
+          Logger.log('  → empty name → "' + guestName + '"');
+        }
         Logger.log('  → PASS: guestName="' + guestName + '"');
         var combinedText = ((current.summary || '') + ' ' + (current.description || '')).trim();
         var icalGuestCount = extractGuestCountFromIcalText_(combinedText);

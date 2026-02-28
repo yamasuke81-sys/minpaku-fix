@@ -2216,6 +2216,7 @@ function parseICal_(icalText, platformName) {
   var events = [];
   var allDatePairs = {};  // キャンセル以外の全日付ペア（ブロック日含む）→ 誤キャンセル防止用
   var cancelledDatePairs = {};  // 明示的キャンセル（STATUS:CANCELLED or SUMMARYに"cancel"）の日付ペア
+  var skipReasons = { blocked: 0, platformName: 0, emptyName: 0, cancelled: 0 };
   var raw = (icalText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   var unfolded = raw.replace(/\n[ \t]/g, '');
   var lines = unfolded.split('\n');
@@ -2257,13 +2258,16 @@ function parseICal_(icalText, platformName) {
         // キャンセルでないイベントの日付ペアを全て記録（ブロック日・予約名なし含む）
         // これにより、iCalフィードに存在する日付の予約を誤ってキャンセルしない
         allDatePairs[checkIn + '|' + checkOut] = true;
+        // デバッグ: 各VEVENTのSUMMARYとフィルタ結果を記録
+        Logger.log('parseICal ' + platformName + ': SUMMARY="' + sum + '" checkIn=' + checkIn + ' checkOut=' + checkOut);
         // ブロック日・利用不可日は予約追加対象外（ただしallDatePairsには含める）
-        if (/^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)) { current = null; continue; }
+        if (/^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)) { Logger.log('  → skip: blocked/not-available'); skipReasons.blocked++; current = null; continue; }
         var guestName = sum.replace(/^Reserved\s*$/i, '').replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         var guestLower = guestName.toLowerCase();
-        if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName) || guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten') { current = null; continue; }
+        if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName) || guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten') { Logger.log('  → skip: platform-name-only (guestName="' + guestName + '")'); skipReasons.platformName++; current = null; continue; }
         // ゲスト名が空の場合（ブロック日等の可能性）は予約追加対象外（allDatePairsには既に含む）
-        if (!guestName) { current = null; continue; }
+        if (!guestName) { Logger.log('  → skip: empty guestName (original SUMMARY="' + sum + '")'); skipReasons.emptyName++; current = null; continue; }
+        Logger.log('  → PASS: guestName="' + guestName + '"');
         var combinedText = ((current.summary || '') + ' ' + (current.description || '')).trim();
         var icalGuestCount = extractGuestCountFromIcalText_(combinedText);
         events.push({
@@ -2285,7 +2289,8 @@ function parseICal_(icalText, platformName) {
       if (line.indexOf('STATUS') === 0) current.status = line.indexOf(':') >= 0 ? line.substring(line.indexOf(':') + 1).trim() : '';
     }
   }
-  return { events: events, allDatePairs: allDatePairs, cancelledDatePairs: cancelledDatePairs };
+  Logger.log('parseICal ' + platformName + ' summary: events=' + events.length + ' skip: blocked=' + skipReasons.blocked + ' platformName=' + skipReasons.platformName + ' emptyName=' + skipReasons.emptyName + ' cancelled=' + skipReasons.cancelled);
+  return { events: events, allDatePairs: allDatePairs, cancelledDatePairs: cancelledDatePairs, skipReasons: skipReasons };
 }
 
 /**
@@ -2510,7 +2515,7 @@ function syncFromICal() {
         var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
         addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が追加されました（チェックイン: ' + ciList + '）');
       }
-      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length });
+      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length, skipReasons: parseResult.skipReasons });
     }
 
     // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）

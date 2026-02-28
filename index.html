@@ -995,7 +995,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -6657,6 +6657,8 @@
             if (r.success) {
               if (resEl) {
                 var sr = r.sendResult || '';
+                console.log('[DEBUG invoiceSend] sendResult=' + sr);
+                console.log('[DEBUG invoiceSend] debugMailInfo=' + JSON.stringify(r.debugMailInfo || {}));
                 var emailOk = sr.indexOf('送信済み') === 0;
                 var msg = 'PDF作成完了（合計: ¥' + (r.total || 0).toLocaleString() + '）';
                 if (emailOk) {
@@ -6670,10 +6672,15 @@
                   resEl.className = 'small mt-1 text-warning';
                 } else if (sr.indexOf('スキップ') !== -1) {
                   msg += ' / ⚠ メール送信に失敗しました（PDF作成は成功）';
+                  msg += '\n[デバッグ] sendResult: ' + sr;
                   resEl.className = 'small mt-1 text-warning';
                 } else {
                   resEl.className = 'small mt-1 text-success';
                 }
+                if (r.debugMailInfo) {
+                  msg += '\n[デバッグ] ownerEmail=' + (r.debugMailInfo.ownerEmail || '(空)') + ', quota=' + (r.debugMailInfo.quota || '?') + ', notifyEnabled=' + (r.debugMailInfo.notifyEnabled || '?');
+                }
+                resEl.style.whiteSpace = 'pre-wrap';
                 resEl.textContent = msg;
                 resEl.style.display = 'block';
               }

@@ -7608,14 +7608,90 @@ function confirmRecruitment(recruitRowIndex) {
 }
 
 /**
+ * 確定通知テンプレートのデフォルト値
+ */
+var DEFAULT_CONFIRM_TEMPLATE_ = 'スタッフ確定\n\n作業日: {作業日}\n\n{スタッフ一覧}\n\nよろしくお願いします\uD83C\uDF4A\n\n{次回予約}\n\n{アプリURL}';
+
+/**
+ * 確定通知テンプレートを取得
+ */
+function getConfirmationTemplate() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet) return JSON.stringify({ success: true, template: DEFAULT_CONFIRM_TEMPLATE_ });
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var template = '';
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() === 'スタッフ確定通知テンプレート') {
+        template = String(rows[i][1] || '');
+        break;
+      }
+    }
+    return JSON.stringify({ success: true, template: template || DEFAULT_CONFIRM_TEMPLATE_ });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 確定通知テンプレートを保存
+ */
+function saveConfirmationTemplate(template) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet) return JSON.stringify({ success: false, error: '募集設定シートが見つかりません。' });
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var found = false;
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() === 'スタッフ確定通知テンプレート') {
+        sheet.getRange(i + 2, 2).setValue(template || '');
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      var nr = sheet.getLastRow() + 1;
+      sheet.getRange(nr, 1).setValue('スタッフ確定通知テンプレート');
+      sheet.getRange(nr, 2).setValue(template || '');
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 確定通知テンプレートを募集設定シートから読み込む（内部用）
+ */
+function getConfirmationTemplate_() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet) return DEFAULT_CONFIRM_TEMPLATE_;
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() === 'スタッフ確定通知テンプレート') {
+        return String(rows[i][1] || '') || DEFAULT_CONFIRM_TEMPLATE_;
+      }
+    }
+    return DEFAULT_CONFIRM_TEMPLATE_;
+  } catch (e) {
+    return DEFAULT_CONFIRM_TEMPLATE_;
+  }
+}
+
+/**
  * スタッフ確定通知テキストを生成（LINE用/メール用共通）
+ * テンプレートのプレースホルダーを実データに置換する
  */
 function buildConfirmationCopyText_(checkoutDateStr, selectedStaffNames, volunteers, nextReservation, appUrl) {
   var fmtDate = (checkoutDateStr || '－');
   var dm = fmtDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
-
-  var lines = ['スタッフ確定', '', '作業日: ' + fmtDate, ''];
 
   // 確定スタッフ一覧（備考付き）
   var staffNames = (selectedStaffNames || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
@@ -7623,15 +7699,13 @@ function buildConfirmationCopyText_(checkoutDateStr, selectedStaffNames, volunte
   (volunteers || []).forEach(function(v) {
     if (v.staffName) volMap[v.staffName.trim()] = v.memo || '';
   });
+  var staffLines = [];
   staffNames.forEach(function(name) {
     var memo = volMap[name] || '';
-    lines.push(memo ? name + '（' + memo + '）' : name);
+    staffLines.push(memo ? name + '（' + memo + '）' : name);
   });
 
-  lines.push('');
-  lines.push('よろしくお願いします\uD83C\uDF4A');
-
-  // 次回予約（募集時と同じフォーマット）
+  // 次回予約情報を構築
   var nr = nextReservation || {};
   var dateRange = nr.dateRange || '';
   if (!dateRange && nr.date) dateRange = nr.date;
@@ -7646,23 +7720,35 @@ function buildConfirmationCopyText_(checkoutDateStr, selectedStaffNames, volunte
   else if (bbqRaw.indexOf('no') >= 0 || bbqRaw.indexOf('いいえ') >= 0) bbqDisp = 'なし';
   else if (nr.bbq) bbqDisp = nr.bbq;
   var natDisp = nr.nationality || '-';
-
-  lines.push('');
-  lines.push('次回予約（変更の可能性あり）');
-  lines.push('日付:\u3000\u3000' + checkinDisp);
-  lines.push('人数:\u3000\u3000' + guestDisp);
   var bedParts = String(bedDisp).split(/[,、\n]/).map(function(s) { return s.trim(); }).filter(Boolean);
-  lines.push('ベッド:\u3000' + bedParts.join('、'));
-  lines.push('BBQ:\u3000\u3000' + bbqDisp);
-  lines.push('国籍:\u3000\u3000' + natDisp);
-  lines.push('');
-  lines.push('※予約状況次第では変更となる場合があります。');
-  lines.push('');
+  var nextResBlock = '次回予約（変更の可能性あり）\n'
+    + '日付:\u3000\u3000' + checkinDisp + '\n'
+    + '人数:\u3000\u3000' + guestDisp + '\n'
+    + 'ベッド:\u3000' + bedParts.join('、') + '\n'
+    + 'BBQ:\u3000\u3000' + bbqDisp + '\n'
+    + '国籍:\u3000\u3000' + natDisp + '\n\n'
+    + '※予約状況次第では変更となる場合があります。';
+
+  // アプリURL
+  var appUrlText = '';
   if (appUrl) {
     var deepUrl = appUrl + (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + (checkoutDateStr || '');
-    lines.push('Webアプリを確認: ' + deepUrl);
+    appUrlText = 'Webアプリを確認: ' + deepUrl;
   }
-  return lines.join('\n');
+
+  // テンプレートを読み込んでプレースホルダーを置換
+  var template = getConfirmationTemplate_();
+  var result = template
+    .replace(/\{作業日\}/g, fmtDate)
+    .replace(/\{スタッフ一覧\}/g, staffLines.join('\n'))
+    .replace(/\{次回予約\}/g, nextResBlock)
+    .replace(/\{次回予約_日付\}/g, checkinDisp)
+    .replace(/\{次回予約_人数\}/g, guestDisp)
+    .replace(/\{次回予約_ベッド\}/g, bedParts.join('、'))
+    .replace(/\{次回予約_BBQ\}/g, bbqDisp)
+    .replace(/\{次回予約_国籍\}/g, natDisp)
+    .replace(/\{アプリURL\}/g, appUrlText);
+  return result;
 }
 
 /**

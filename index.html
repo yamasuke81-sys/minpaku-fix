@@ -970,7 +970,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1140,6 +1140,7 @@
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoice">請求書</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="emailNotify">メール通知</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoiceRequest">請求書要請</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="confirmTemplate">確定通知</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsUrls">
@@ -1496,6 +1497,37 @@
         </div>
         <p class="small text-muted mt-1">指定したアドレスにテストメールを1通送信します。空欄の場合は全スタッフに送信されます。</p>
         <div id="invoiceRequestResult" class="small mt-2" style="display:none;"></div>
+      </div>
+
+      <div id="settingsConfirmTemplate" style="display:none;">
+        <p class="small text-muted mb-2">スタッフ確定後にLINE/メールで配信するメッセージのテンプレートを編集できます。</p>
+        <div class="mb-2">
+          <label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1">
+            <code>{作業日}</code> 清掃日（例: 2026年03月01日）<br>
+            <code>{スタッフ一覧}</code> 確定スタッフ名（備考付き、改行区切り）<br>
+            <code>{次回予約}</code> 次回予約の詳細ブロック（日付・人数・ベッド・BBQ・国籍）<br>
+            <code>{次回予約_日付}</code> 次回予約の日付のみ<br>
+            <code>{次回予約_人数}</code> 次回予約の人数のみ<br>
+            <code>{次回予約_ベッド}</code> 次回予約のベッド数のみ<br>
+            <code>{次回予約_BBQ}</code> 次回予約のBBQのみ<br>
+            <code>{次回予約_国籍}</code> 次回予約の国籍のみ<br>
+            <code>{アプリURL}</code> スタッフ用WebアプリのURL
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-bold">テンプレート</label>
+          <textarea class="form-control form-control-sm" id="confirmTemplateText" rows="14" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          <button type="button" class="btn btn-sm btn-primary" id="btnSaveConfirmTemplate">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetConfirmTemplate">デフォルトに戻す</button>
+          <span id="confirmTemplateSaveMsg" class="small text-success" style="display:none;">保存しました</span>
+        </div>
+        <div class="mt-3">
+          <label class="form-label small fw-bold">プレビュー</label>
+          <pre class="border rounded p-2 small bg-light" id="confirmTemplatePreview" style="white-space:pre-wrap;max-height:300px;overflow-y:auto;"></pre>
+        </div>
       </div>
 
       <div id="settingsMaintenance" style="display:none;">
@@ -7480,6 +7512,70 @@
         }).sendInvoiceRequestEmails(testRecipient);
       });
 
+      // 確定通知テンプレート
+      var CONFIRM_TEMPLATE_DEFAULT = 'スタッフ確定\n\n作業日: {作業日}\n\n{スタッフ一覧}\n\nよろしくお願いします\uD83C\uDF4A\n\n{次回予約}\n\n{アプリURL}';
+
+      function loadConfirmationTemplate() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              document.getElementById('confirmTemplateText').value = r.template || CONFIRM_TEMPLATE_DEFAULT;
+              updateConfirmTemplatePreview();
+            }
+          } catch (e) {}
+        }).getConfirmationTemplate();
+      }
+
+      function updateConfirmTemplatePreview() {
+        var tpl = document.getElementById('confirmTemplateText').value || '';
+        var preview = tpl
+          .replace(/\{作業日\}/g, '2026年03月01日')
+          .replace(/\{スタッフ一覧\}/g, '田中太郎（10時到着予定）\n鈴木花子')
+          .replace(/\{次回予約\}/g, '次回予約（変更の可能性あり）\n日付:\u3000\u30002026/3/2 〜 2026/3/4\n人数:\u3000\u30004\nベッド:\u3000シングル2、ダブル1\nBBQ:\u3000\u3000あり\n国籍:\u3000\u3000アメリカ\n\n※予約状況次第では変更となる場合があります。')
+          .replace(/\{次回予約_日付\}/g, '2026/3/2 〜 2026/3/4')
+          .replace(/\{次回予約_人数\}/g, '4')
+          .replace(/\{次回予約_ベッド\}/g, 'シングル2、ダブル1')
+          .replace(/\{次回予約_BBQ\}/g, 'あり')
+          .replace(/\{次回予約_国籍\}/g, 'アメリカ')
+          .replace(/\{アプリURL\}/g, 'Webアプリを確認: https://example.com/exec?staff=1&date=2026-03-01');
+        document.getElementById('confirmTemplatePreview').textContent = preview;
+      }
+
+      document.getElementById('confirmTemplateText').addEventListener('input', updateConfirmTemplatePreview);
+
+      document.getElementById('btnSaveConfirmTemplate').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        var template = document.getElementById('confirmTemplateText').value || '';
+        btn.disabled = true;
+        btn.textContent = '保存中...';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '保存';
+          var r = JSON.parse(jsonStr);
+          var msgEl = document.getElementById('confirmTemplateSaveMsg');
+          if (r.success) {
+            msgEl.style.display = 'inline';
+            setTimeout(function() { msgEl.style.display = 'none'; }, 3000);
+          } else {
+            alert(r.error || '保存に失敗しました');
+          }
+        }).withFailureHandler(function(e) {
+          btn.disabled = false;
+          btn.textContent = '保存';
+          alert(e.message || '保存に失敗しました');
+        }).saveConfirmationTemplate(template);
+      });
+
+      document.getElementById('btnResetConfirmTemplate').addEventListener('click', function() {
+        customConfirm('テンプレートをデフォルトに戻しますか？').then(function(ok) {
+          if (!ok) return;
+          document.getElementById('confirmTemplateText').value = CONFIRM_TEMPLATE_DEFAULT;
+          updateConfirmTemplatePreview();
+        });
+      });
+
       // リマインド時刻selectに0〜23時のオプションを生成
       (function() {
         document.querySelectorAll('select.reminder-time').forEach(function(sel) {
@@ -7938,6 +8034,8 @@
           if (emailNotifyEl) emailNotifyEl.style.display = t === 'emailNotify' ? 'block' : 'none';
           var invoiceReqEl = document.getElementById('settingsInvoiceRequest');
           if (invoiceReqEl) invoiceReqEl.style.display = t === 'invoiceRequest' ? 'block' : 'none';
+          var confirmTplEl = document.getElementById('settingsConfirmTemplate');
+          if (confirmTplEl) confirmTplEl.style.display = t === 'confirmTemplate' ? 'block' : 'none';
           var maintEl = document.getElementById('settingsMaintenance');
           if (maintEl) maintEl.style.display = t === 'maintenance' ? 'block' : 'none';
           if (t === 'staff') loadStaffList();
@@ -7951,6 +8049,7 @@
           if (t === 'invoice') loadInvoiceSettings_();
           if (t === 'emailNotify') loadEmailNotifySettings();
           if (t === 'invoiceRequest') loadInvoiceRequestSettings();
+          if (t === 'confirmTemplate') loadConfirmationTemplate();
         });
       });
 

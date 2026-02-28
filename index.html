@@ -970,7 +970,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3459,6 +3459,43 @@
                   btnRow.appendChild(emBtnCancel);
                   statusBtnArea.appendChild(btnRow);
                 }
+              }
+              // スタッフ選定済みだが未確定の場合: 確定ボタン＋選定変更ボタンを表示
+              if (ownerStaffAssigned && statusBtnArea && r.success && isOwnerSelectedNotConfirmed && r.recruitRowIndex) {
+                var confirmBtnRow2 = document.createElement('div');
+                confirmBtnRow2.className = 'd-flex flex-wrap justify-content-center gap-1 mt-2';
+                var emBtnConfirm2 = document.createElement('button');
+                emBtnConfirm2.type = 'button';
+                emBtnConfirm2.className = 'btn btn-sm btn-warning fw-bold';
+                emBtnConfirm2.textContent = '確定（募集締切）';
+                emBtnConfirm2.onclick = function() {
+                  customConfirm('スタッフを確定し、募集を締め切りますか？').then(function(ok) {
+                    if (!ok) return;
+                    emBtnConfirm2.disabled = true;
+                    emBtnConfirm2.textContent = '処理中...';
+                    google.script.run.withSuccessHandler(function(j) {
+                      var res = JSON.parse(j);
+                      if (res.success) {
+                        applyConfirmOptimistic(r.recruitRowIndex, props.rowNumber, ownerResolvedStaff);
+                        loadAndRender(); loadRecruitList();
+                        showConfirmationNotifyUI(ownerCenterArea, r.recruitRowIndex, 'eventModal');
+                      }
+                      else { alert(res.error); emBtnConfirm2.disabled = false; emBtnConfirm2.textContent = '確定（募集締切）'; }
+                    }).withFailureHandler(function(e) { alert(e.message); emBtnConfirm2.disabled = false; emBtnConfirm2.textContent = '確定（募集締切）'; }).confirmRecruitment(r.recruitRowIndex);
+                  });
+                };
+                confirmBtnRow2.appendChild(emBtnConfirm2);
+                var emBtnReselect = document.createElement('button');
+                emBtnReselect.type = 'button';
+                emBtnReselect.className = 'btn btn-sm btn-success';
+                emBtnReselect.textContent = 'スタッフ変更';
+                emBtnReselect.onclick = function() {
+                  bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
+                  var coDate2 = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
+                  openRecruitSelectModal({ rowIndex: r.recruitRowIndex, bookingRowNumber: props.rowNumber, volunteers: r.volunteers || [], checkoutDate: coDate2 || r.checkoutDate, selectedStaff: r.selectedStaff || (d.cleaningStaff || '') });
+                };
+                confirmBtnRow2.appendChild(emBtnReselect);
+                statusBtnArea.appendChild(confirmBtnRow2);
               }
               // 編集ボタンはカード右上（eventModalEditStaffBtnArea）に移動済み
               // 取り消し申請がある場合、承認ボタンを表示

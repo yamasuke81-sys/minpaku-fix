@@ -2215,6 +2215,7 @@ function addDaysToDateKey_(dateKey, days) {
 function parseICal_(icalText, platformName) {
   var events = [];
   var allDatePairs = {};  // キャンセル以外の全日付ペア（ブロック日含む）→ 誤キャンセル防止用
+  var cancelledDatePairs = {};  // 明示的キャンセル（STATUS:CANCELLED or SUMMARYに"cancel"）の日付ペア
   var raw = (icalText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   var unfolded = raw.replace(/\n[ \t]/g, '');
   var lines = unfolded.split('\n');
@@ -2225,15 +2226,18 @@ function parseICal_(icalText, platformName) {
     if (line.indexOf('BEGIN:VEVENT') === 0) {
       current = { dtstart: '', dtend: '', duration: '', summary: '', description: '', uid: '', status: '' };
     } else if (current && line.indexOf('END:VEVENT') === 0) {
-      if (/^CANCELLED$/i.test(String(current.status || '').trim())) {
-        current = null;
-        continue;
-      }
+      // 日付を先に解析（STATUS:CANCELLEDでもcancelledDatePairsに記録するため）
       var checkIn = parseICalDateToKey_(current.dtstart);
       var checkOut = parseICalDateToKey_(current.dtend);
       if (!checkOut && checkIn && current.duration) {
         var days = parseICalDurationToDays_(current.duration);
         if (days > 0) checkOut = addDaysToDateKey_(checkIn, days);
+      }
+      // STATUS:CANCELLED → cancelledDatePairsに記録してスキップ
+      if (/^CANCELLED$/i.test(String(current.status || '').trim())) {
+        if (checkIn && checkOut) cancelledDatePairs[checkIn + '|' + checkOut] = true;
+        current = null;
+        continue;
       }
       if (checkIn && checkOut) {
         var uid = (current.uid || '').trim();
@@ -2244,7 +2248,11 @@ function parseICal_(icalText, platformName) {
         }
         seenUids[dupKey] = true;
         var sum = (current.summary || '').trim();
-        if (/cancel/i.test(sum)) continue;
+        // SUMMARYに"cancel"含む → cancelledDatePairsに記録してスキップ
+        if (/cancel/i.test(sum)) {
+          cancelledDatePairs[checkIn + '|' + checkOut] = true;
+          continue;
+        }
         // キャンセルでないイベントの日付ペアを全て記録（ブロック日・予約名なし含む）
         // これにより、iCalフィードに存在する日付の予約を誤ってキャンセルしない
         allDatePairs[checkIn + '|' + checkOut] = true;
@@ -2276,7 +2284,7 @@ function parseICal_(icalText, platformName) {
       if (line.indexOf('STATUS') === 0) current.status = line.indexOf(':') >= 0 ? line.substring(line.indexOf(':') + 1).trim() : '';
     }
   }
-  return { events: events, allDatePairs: allDatePairs };
+  return { events: events, allDatePairs: allDatePairs, cancelledDatePairs: cancelledDatePairs };
 }
 
 /**
@@ -2301,7 +2309,7 @@ function syncFromICal() {
       syncSheet.insertColumnAfter(3);
       syncSheet.getRange(1, 4).setValue('最終同期');
     }
-    var syncRows = syncSheet.getRange(2, 1, lastRow, 4).getValues();
+    var syncRows = syncSheet.getRange(2, 1, lastRow - 1, 4).getValues();
     var existingPairs = {};
     var existingRowByKey = {};
     var formLastRow = formSheet.getLastRow();
@@ -2310,7 +2318,7 @@ function syncFromICal() {
       var headers = formSheet.getRange(1, 1, 1, formLastCol).getValues()[0];
       var colMap = buildColumnMap(headers);
       if (colMap.checkIn >= 0 && colMap.checkOut >= 0) {
-        var data = formSheet.getRange(2, 1, formLastRow, formLastCol).getValues();
+        var data = formSheet.getRange(2, 1, formLastRow - 1, formLastCol).getValues();
         for (var i = 0; i < data.length; i++) {
           var ciKey = toDateKeySafe_(data[i][colMap.checkIn]);
           var coKey = toDateKeySafe_(data[i][colMap.checkOut]);
@@ -2335,10 +2343,14 @@ function syncFromICal() {
         var fetchOpts = { muteHttpExceptions: true, followRedirects: true,
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CalendarSync/1.0)' } };
         var resp = UrlFetchApp.fetch(url, fetchOpts);
-        // 5xx エラーは1回リトライ（一時的なサーバー障害対策）
+        // 5xx エラーは最大2回リトライ（一時的なサーバー障害対策）
         if (resp.getResponseCode() >= 500) {
           Utilities.sleep(2000);
           resp = UrlFetchApp.fetch(url, fetchOpts);
+          if (resp.getResponseCode() >= 500) {
+            Utilities.sleep(5000);
+            resp = UrlFetchApp.fetch(url, fetchOpts);
+          }
         }
         if (resp.getResponseCode() !== 200) {
           var errMsg = 'HTTP ' + resp.getResponseCode();
@@ -2358,6 +2370,7 @@ function syncFromICal() {
       var events = parseResult.events;
       // allDatePairs: キャンセル以外の全日付（ブロック日含む）→ 既存予約の誤キャンセル防止
       var validPairs = parseResult.allDatePairs;
+      var cancelledPairs = parseResult.cancelledDatePairs;
       var platformAdded = 0;
       var platformCheckIns = [];
       var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
@@ -2435,27 +2448,36 @@ function syncFromICal() {
       // 列マップを再取得（ensureCancelledColumn_で列が追加される可能性があるため）
       ensureCancelledColumn_();
       colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
-      if (colMap.icalSync >= 0) {
-        var formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+      // フィードが空（allDatePairsもcancelledPairsもゼロ）の場合はキャンセル判定をスキップ
+      // （フィード取得の異常やサーバー側の一時的な問題の可能性が高い）
+      var feedHasContent = Object.keys(validPairs).length > 0 || Object.keys(cancelledPairs).length > 0;
+      if (colMap.icalSync >= 0 && feedHasContent) {
+        var formData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
         for (var ri = 0; ri < formData.length; ri++) {
           var icalVal = String(formData[ri][colMap.icalSync] || '').trim();
           if (icalVal.toLowerCase() !== platformName.toLowerCase()) continue;
           var ciKey = toDateKeySafe_(formData[ri][colMap.checkIn]);
           var coKey = toDateKeySafe_(formData[ri][colMap.checkOut]);
           if (!ciKey || !coKey) continue;
+          var pairKey = ciKey + '|' + coKey;
           var cancelledVal = colMap.cancelledAt >= 0 ? String(formData[ri][colMap.cancelledAt] || '').trim() : '';
           // チェックアウト日が過去の予約はキャンセル判定対象外（iCalから消えるのは正常）
           var coDate = coKey ? new Date(coKey) : null;
           var todaySync = new Date(); todaySync.setHours(0,0,0,0);
           var isPast = coDate && coDate < todaySync;
-          if (!validPairs[ciKey + '|' + coKey] && !isPast) {
-            // iCalから消えた（未来の予約のみ） → キャンセルマーク（未キャンセルの場合のみ）
+          // 明示的キャンセル（STATUS:CANCELLEDまたはSUMMARYに"cancel"） → 即キャンセル
+          if (cancelledPairs[pairKey] && !isPast && !cancelledVal) {
+            if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
+              platformCancelled++; removed++;
+            }
+          } else if (!validPairs[pairKey] && !cancelledPairs[pairKey] && !isPast) {
+            // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
             if (!cancelledVal) {
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;
               }
             }
-          } else if (cancelledVal) {
+          } else if (cancelledVal && validPairs[pairKey]) {
             // iCalに再出現 → キャンセル解除
             formSheet.getRange(ri + 2, colMap.cancelledAt + 1).setValue('');
             // 募集ステータスも募集中に戻す
@@ -2511,7 +2533,7 @@ function autoSyncFromICal() {
       syncSheet.insertColumnAfter(3);
       syncSheet.getRange(1, 4).setValue('最終同期');
     }
-    var syncRows = syncSheet.getRange(2, 1, lastRow, 4).getValues();
+    var syncRows = syncSheet.getRange(2, 1, lastRow - 1, 4).getValues();
     var existingPairs = {};
     var existingRowByKey = {};
     var formLastRow = formSheet.getLastRow();
@@ -2520,7 +2542,7 @@ function autoSyncFromICal() {
       var headers = formSheet.getRange(1, 1, 1, formLastCol).getValues()[0];
       var colMap = buildColumnMap(headers);
       if (colMap.checkIn >= 0 && colMap.checkOut >= 0) {
-        var data = formSheet.getRange(2, 1, formLastRow, formLastCol).getValues();
+        var data = formSheet.getRange(2, 1, formLastRow - 1, formLastCol).getValues();
         for (var i = 0; i < data.length; i++) {
           var ciKey = toDateKeySafe_(data[i][colMap.checkIn]);
           var coKey = toDateKeySafe_(data[i][colMap.checkOut]);
@@ -2544,10 +2566,14 @@ function autoSyncFromICal() {
         var fetchOpts = { muteHttpExceptions: true, followRedirects: true,
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CalendarSync/1.0)' } };
         var resp = UrlFetchApp.fetch(url, fetchOpts);
-        // 5xx エラーは1回リトライ（一時的なサーバー障害対策）
+        // 5xx エラーは最大2回リトライ（一時的なサーバー障害対策）
         if (resp.getResponseCode() >= 500) {
           Utilities.sleep(2000);
           resp = UrlFetchApp.fetch(url, fetchOpts);
+          if (resp.getResponseCode() >= 500) {
+            Utilities.sleep(5000);
+            resp = UrlFetchApp.fetch(url, fetchOpts);
+          }
         }
         if (resp.getResponseCode() !== 200) {
           syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' HTTP ' + resp.getResponseCode());
@@ -2559,6 +2585,7 @@ function autoSyncFromICal() {
         var events = parseResult.events;
         // allDatePairs: キャンセル以外の全日付（ブロック日含む）→ 既存予約の誤キャンセル防止
         var validPairs = parseResult.allDatePairs;
+        var cancelledPairs = parseResult.cancelledDatePairs;
         var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
         var nextRow = formSheet.getLastRow() + 1;
         var platformAdded = 0;
@@ -2599,7 +2626,9 @@ function autoSyncFromICal() {
         // iCalから消えた予約のキャンセル処理 + iCalに再出現した予約のキャンセル解除
         ensureCancelledColumn_();
         colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
-        if (formLastRow >= 2) {
+        // フィードが空（allDatePairsもcancelledPairsもゼロ）の場合はキャンセル判定をスキップ
+        var feedHasContentAuto = Object.keys(validPairs).length > 0 || Object.keys(cancelledPairs).length > 0;
+        if (formLastRow >= 2 && feedHasContentAuto) {
           var refreshData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
           for (var ci = 0; ci < refreshData.length; ci++) {
             var icalSrc = colMap.icalSync >= 0 ? String(refreshData[ci][colMap.icalSync] || '').trim().toLowerCase() : '';
@@ -2607,17 +2636,21 @@ function autoSyncFromICal() {
             var cik = toDateKeySafe_(refreshData[ci][colMap.checkIn]);
             var cok = toDateKeySafe_(refreshData[ci][colMap.checkOut]);
             if (!cik || !cok) continue;
+            var autoPairKey = cik + '|' + cok;
             var cancelledValAuto = colMap.cancelledAt >= 0 ? String(refreshData[ci][colMap.cancelledAt] || '').trim() : '';
             // チェックアウト日が過去の予約はキャンセル判定対象外（iCalから消えるのは正常）
             var coDateAuto = cok ? new Date(cok) : null;
             var todayAuto = new Date(); todayAuto.setHours(0,0,0,0);
             var isPastAuto = coDateAuto && coDateAuto < todayAuto;
-            if (!validPairs[cik + '|' + cok] && !isPastAuto) {
-              // iCalから消えた（未来の予約のみ） → キャンセルマーク（未キャンセルの場合のみ）
+            // 明示的キャンセル（STATUS:CANCELLEDまたはSUMMARYに"cancel"） → 即キャンセル
+            if (cancelledPairs[autoPairKey] && !isPastAuto && !cancelledValAuto) {
+              try { cancelBookingFromICal_(formSheet, ci + 2, colMap, platformName); } catch (e) {}
+            } else if (!validPairs[autoPairKey] && !cancelledPairs[autoPairKey] && !isPastAuto) {
+              // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
               if (!cancelledValAuto) {
                 try { cancelBookingFromICal_(formSheet, ci + 2, colMap, platformName); } catch (e) {}
               }
-            } else if (cancelledValAuto && validPairs[cik + '|' + cok]) {
+            } else if (cancelledValAuto && validPairs[autoPairKey]) {
               // iCalに再出現 → キャンセル解除
               formSheet.getRange(ci + 2, colMap.cancelledAt + 1).setValue('');
               var recruitSheet2 = ss.getSheetByName(SHEET_RECRUIT);

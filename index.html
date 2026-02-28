@@ -561,6 +561,17 @@
       border-width: 3px !important;
       background-clip: padding-box !important;
     }
+    .fc-event-cleaning-rejected-by-me {
+      border-color: #999 !important;
+      border-style: solid !important;
+      border-width: 3px !important;
+      background-clip: padding-box !important;
+    }
+    @media (prefers-color-scheme: dark) {
+      .fc-event-cleaning-rejected-by-me {
+        border-color: #6c757d !important;
+      }
+    }
     .fc-event-status-dot {
       border: 1px solid #fff !important;
       box-shadow: 0 0 0 1px rgba(255,255,255,0.9) !important;
@@ -1094,7 +1105,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228r</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228s</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2481,6 +2492,10 @@
               var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
               return isMe && v.response && v.response !== '未回答' && v.response !== '×';
             });
+            var isRejectedByMe = curStaff && volunteers.some(function(v) {
+              var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
+              return isMe && v.response === '×';
+            });
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
             if (window.staffMode && isVolunteeredByMe) {
               if (isSelectedByMe) {
@@ -2488,6 +2503,8 @@
               } else if (!isDecided) {
                 cleaningClasses.push('fc-event-cleaning-volunteered-by-me');
               }
+            } else if (window.staffMode && isRejectedByMe) {
+              cleaningClasses.push('fc-event-cleaning-rejected-by-me');
             }
             var cleaningStatus = isCancelled ? 'cancelled' : (isDecided ? 'cleaning-decided' : (isRecruiting ? 'cleaning-recruiting' : 'cleaning-not-recruiting'));
             events.push({
@@ -4494,6 +4511,8 @@
               arg.el.style.border = '3px solid #dc3545';
             } else if (arg.el.classList.contains('fc-event-cleaning-volunteered-by-me')) {
               arg.el.style.border = '3px dashed #dc3545';
+            } else if (arg.el.classList.contains('fc-event-cleaning-rejected-by-me')) {
+              arg.el.style.border = '3px solid ' + (window.matchMedia('(prefers-color-scheme: dark)').matches ? '#6c757d' : '#999');
             } else {
               arg.el.style.border = 'none';
             }

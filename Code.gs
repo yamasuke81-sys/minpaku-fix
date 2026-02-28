@@ -2367,6 +2367,13 @@ function syncFromICal() {
         continue;
       }
 
+      // デバッグ: フィードの内容を記録
+      var icalLen = (icalText || '').length;
+      var veventCount = ((icalText || '').match(/BEGIN:VEVENT/g) || []).length;
+      Logger.log('iCal ' + platformName + ': fetch OK, length=' + icalLen + ', VEVENTs=' + veventCount);
+      if (veventCount === 0) {
+        Logger.log('iCal ' + platformName + ' feed preview: ' + (icalText || '').substring(0, 500));
+      }
       var parseResult = parseICal_(icalText, platformName);
       var events = parseResult.events;
       // allDatePairs: キャンセル以外の全日付（ブロック日含む）→ 既存予約の誤キャンセル防止
@@ -2503,7 +2510,7 @@ function syncFromICal() {
         var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
         addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が追加されました（チェックイン: ' + ciList + '）');
       }
-      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '' });
+      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length });
     }
 
     // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）

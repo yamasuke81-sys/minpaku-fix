@@ -970,7 +970,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0228g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7820,6 +7820,7 @@
                 if (d.added > 0) s += ', 追加' + d.added;
                 if (d.removed > 0) s += ', 削除' + d.removed;
                 if (d.error) s += ' <span class="text-danger">(' + escapeHtml(d.error) + ')</span>';
+                if (d.veventCount !== undefined) s += ' <span class="text-muted">(フィード: ' + (d.feedLength||0) + '文字, VEVENT: ' + d.veventCount + '件, 有効日付: ' + (d.allDatePairs||0) + ', キャンセル: ' + (d.cancelledPairs||0) + ')</span>';
                 html += '<div>' + s + '</div>';
               });
               html += '</div>';

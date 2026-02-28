@@ -1387,7 +1387,9 @@ function parseICal_(icalText, platformName) {
         }
         seenUids[dupKey] = true;
         var sum = (current.summary || '').trim();
-        if (/cancel/i.test(sum)) continue;
+        // STATUS:CANCELLED は既に上で除外済み。SUMMARYは明確な「Cancelled」のみ除外
+        // （"Non-cancellable" 等の誤除外を防ぐ）
+        if (/^cancel(led)?$/i.test(sum) || /^cancelled?\s*[-:]/i.test(sum)) continue;
         var guestName = sum.replace(/^Reserved\s*$/i, '').replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         var guestLower = guestName.toLowerCase();
         if (/^(airbnb|booking\.com|rakuten|楽天)\s*\([^)]*\)?\s*$/i.test(guestName) || guestLower === 'airbnb' || guestLower === 'booking.com' || guestLower === 'rakuten') continue;
@@ -1475,6 +1477,8 @@ function syncFromICal() {
         });
         if (resp.getResponseCode() !== 200) {
           var errMsg = 'HTTP ' + resp.getResponseCode();
+          if (resp.getResponseCode() >= 500) errMsg += '（サーバーエラー: URLの再取得をお試しください）';
+          else if (resp.getResponseCode() === 403 || resp.getResponseCode() === 401) errMsg += '（認証エラー: URLが無効か期限切れです）';
           details.push({ platform: platformName, fetched: 0, added: 0, removed: 0, error: errMsg });
           syncSheet.getRange(si + 2, 4).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' ' + errMsg);
           continue;
@@ -1540,15 +1544,22 @@ function syncFromICal() {
         platformAdded++;
       }
       var platformRemoved = 0;
-      if (colMap.icalSync >= 0) {
-        var formData = formSheet.getRange(2, 1, formSheet.getLastRow(), formSheet.getLastColumn()).getValues();
+      // 安全チェック: iCalフィードが空 or 極端に少ない場合は削除しない
+      // （フィード取得エラーやプラットフォーム側の一時的な問題で有効な予約を消さないため）
+      var validPairCount = Object.keys(validPairs).length;
+      if (colMap.icalSync >= 0 && validPairCount > 0) {
+        var formDataLen = formSheet.getLastRow() - 1;
+        var formData = formDataLen >= 1 ? formSheet.getRange(2, 1, formDataLen, formSheet.getLastColumn()).getValues() : [];
         var toDel = [];
+        var todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
         for (var ri = 0; ri < formData.length; ri++) {
           var icalVal = String(formData[ri][colMap.icalSync] || '').trim();
           if (icalVal.toLowerCase() !== platformName.toLowerCase()) continue;
           var ciKey = toDateKeySafe_(formData[ri][colMap.checkIn]);
           var coKey = toDateKeySafe_(formData[ri][colMap.checkOut]);
           if (!ciKey || !coKey) continue;
+          // 過去の予約は削除対象外（iCalフィードが過去分を含まない場合があるため）
+          if (coKey < todayStr) continue;
           if (!validPairs[ciKey + '|' + coKey]) toDel.push(ri + 2);
         }
         toDel.sort(function(a, b) { return b - a; });

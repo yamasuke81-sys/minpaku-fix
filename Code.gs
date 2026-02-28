@@ -4001,7 +4001,7 @@ function sendInvoiceRequestEmails(testRecipient) {
         .replace(/\{スタッフ名\}/g, 'テストユーザー')
         .replace(/\{締切日\}/g, deadlineText);
       try {
-        MailApp.sendEmail({ to: testEmail, subject: subj, body: body, name: '請求書要請（テスト送信）' });
+        GmailApp.sendEmail(testEmail, subj, body, { name: '請求書要請（テスト送信）' });
         return JSON.stringify({ success: true, message: testEmail + ' にテストメールを送信しました。', sent: 1 });
       } catch (e) {
         return JSON.stringify({ success: false, error: '送信失敗: ' + e.toString() });
@@ -4028,7 +4028,7 @@ function sendInvoiceRequestEmails(testRecipient) {
         .replace(/\{スタッフ名\}/g, name || 'スタッフ')
         .replace(/\{締切日\}/g, deadlineText);
       try {
-        MailApp.sendEmail({ to: email, subject: subj, body: body, name: '請求書要請（自動送信）' });
+        GmailApp.sendEmail(email, subj, body, { name: '請求書要請（自動送信）' });
         sentCount++;
       } catch (e) {
         errors.push(name + ': ' + e.toString());
@@ -6402,16 +6402,11 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       Logger.log('[DEBUG mail] subject="' + subject + '", pdfBlobSize=' + (pdfBlob ? pdfBlob.getBytes().length : 'null'));
       var emailNotifyEnabled = isEmailNotifyEnabled_('請求書送信通知有効');
       Logger.log('[DEBUG mail] isEmailNotifyEnabled_("請求書送信通知有効")=' + emailNotifyEnabled);
-      var remainingQuota = MailApp.getRemainingDailyQuota();
-      Logger.log('[DEBUG mail] MailApp残り日次クォータ=' + remainingQuota);
       try {
         if (!emailNotifyEnabled) {
           sendResult = 'メール送信OFF（PDF作成は成功）';
         } else {
-          MailApp.sendEmail({
-            to: ownerEmail,
-            subject: subject,
-            body: bodyText,
+          GmailApp.sendEmail(ownerEmail, subject, bodyText, {
             attachments: [pdfBlob],
             name: '請求書（自動送信）'
           });
@@ -6490,8 +6485,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       historyWriteOk: historyWriteOk,
       debugMailInfo: {
         ownerEmail: ownerEmail || '(未設定)',
-        notifyEnabled: isEmailNotifyEnabled_('請求書送信通知有効'),
-        quota: MailApp.getRemainingDailyQuota()
+        notifyEnabled: isEmailNotifyEnabled_('請求書送信通知有効')
       }
     });
   } catch (e) {

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7884,11 +7884,16 @@
           btn.disabled = false;
           btn.textContent = origText;
           var r = JSON.parse(jsonStr);
-          alert(r.success ? 'テストメッセージを送信しました。LINEグループを確認してください。' : (r.error || '送信失敗'));
-        }).withFailureHandler(function() {
+          var debugInfo = r.debug ? '\n\n【デバッグ情報】\n' + JSON.stringify(r.debug, null, 2) : '';
+          if (r.success) {
+            alert('テストメッセージを送信しました。LINEを確認してください。' + debugInfo);
+          } else {
+            alert('送信失敗: ' + (r.error || '不明なエラー') + debugInfo);
+          }
+        }).withFailureHandler(function(e) {
           btn.disabled = false;
           btn.textContent = origText;
-          alert('送信に失敗しました。');
+          alert('送信に失敗しました。\n' + (e ? e.toString() : ''));
         }).sendLineTestMessage();
       });
 

@@ -4014,8 +4014,8 @@ function saveLineNotifySettings(settings) {
 function sendLineTestMessage() {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
-    sendLineMessage_('【テスト】LINE通知の接続テストです。この通知が届いていれば設定は正常です。');
-    return JSON.stringify({ success: true });
+    var debug = sendLineMessage_('【テスト】LINE通知の接続テストです。この通知が届いていれば設定は正常です。', true);
+    return JSON.stringify({ success: debug && debug.ok, debug: debug });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -4025,21 +4025,30 @@ function sendLineTestMessage() {
  * LINEグループにメッセージを送信（内部ヘルパー）
  * LINE通知が無効 or 設定不足の場合は何もしない
  */
-function sendLineMessage_(text) {
+function sendLineMessage_(text, returnDebug) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
-    if (!sheet || sheet.getLastRow() < 2) return;
+    if (!sheet || sheet.getLastRow() < 2) {
+      if (returnDebug) return { ok: false, reason: 'シートなし or 空' };
+      return;
+    }
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
     var map = {};
     rows.forEach(function(row) {
       var key = String(row[0] || '').trim();
       if (key) map[key] = String(row[1] || '').trim();
     });
-    if (map['LINE通知有効'] !== 'true') return;
+    if (map['LINE通知有効'] !== 'true') {
+      if (returnDebug) return { ok: false, reason: 'LINE通知有効がtrue以外: "' + (map['LINE通知有効'] || '') + '"' };
+      return;
+    }
     var token = map['LINEチャネルアクセストークン'] || '';
     var targetMode = map['LINE送信先モード'] || 'group';
     var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
-    if (!token || !targetId) return;
+    if (!token || !targetId) {
+      if (returnDebug) return { ok: false, reason: 'トークンまたはIDが空', targetMode: targetMode, hasToken: !!token, targetId: targetId ? (targetId.substring(0, 5) + '...') : '(空)' };
+      return;
+    }
     var payload = {
       to: targetId,
       messages: [{ type: 'text', text: text }]
@@ -4053,11 +4062,14 @@ function sendLineMessage_(text) {
     };
     var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', options);
     var code = resp.getResponseCode();
+    var body = resp.getContentText();
     if (code !== 200) {
-      Logger.log('LINE送信エラー: HTTP ' + code + ' ' + resp.getContentText());
+      Logger.log('LINE送信エラー: HTTP ' + code + ' ' + body);
     }
+    if (returnDebug) return { ok: code === 200, httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...' };
   } catch (e) {
     Logger.log('sendLineMessage_: ' + e.toString());
+    if (returnDebug) return { ok: false, reason: '例外: ' + e.toString() };
   }
 }
 

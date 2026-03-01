@@ -178,9 +178,44 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 CLAUDE.mdのルールセクション全体を次のセッションでも参照できる状態にすること。
 
 ### ルール5: 新チャットは引き継ぎ確認→質問→回答待ち→作業開始の順を守ること
-1. CLAUDE.mdを読んで内容を確認する
-2. 前のチャットへの質問事項があれば、ユーザーがコピペできるプロンプトを作成する
-3. ユーザーからの返答を待ってから次の作業に取りかかる
+
+**ステップ1: 引き継ぎ資料を読む**
+- CLAUDE.mdを読んで内容を確認する
+- `git fetch origin <作業ブランチ>` + `git log origin/<作業ブランチ> --oneline -10` でコードの状態を確認
+
+**ステップ2: 疑問点を洗い出し、前のチャットへの質問プロンプトを作成**
+
+引き継ぎ資料を読んだ後、不明点や確認事項があれば、以下のような形式で**前のチャットに貼り付けるための質問プロンプト**を作成する。**ユーザーがそのままコピペできる形式**にすること：
+
+```
+前のチャットで以下を確認してください：
+
+1. 「〇〇の実装」について、△△の部分はこの理解で合っていますか？
+2. □□の機能は完了していますか？テスト済みですか？
+3. ××のエラーが出ていましたが、解決済みですか？
+4. この部分を変更しても他に影響はありませんか？
+```
+
+ユーザーはこのプロンプトをコピーして前のチャットに貼り付け、回答を得てから新チャットに戻る。
+
+**ステップ3: ユーザーの返答を待つ**
+
+質問プロンプトを出した場合は、**ユーザーからの返答を待ってから**開発を開始する。
+質問がない場合はその旨を伝え、すぐに開発を開始してOK。
+
+### チャット移行の具体的手順
+
+#### 旧チャット側（移行前）がやること
+1. 作業中のコードをすべてコミット＆プッシュ
+2. CLAUDE.mdを以下の内容で更新：
+   - 「現在のセッション状態」を最新化（ブランチ名・最新コミットハッシュ・進行中タスク）
+   - 日付別修正内容＋コミット履歴テーブルを追記
+   - 「次回やること」を更新
+   - **ルール6の必須5項目を必ず含めること**
+3. 更新をコミット＆プッシュ
+
+#### 新チャット側がやること
+→ ルール5の手順に従う（引き継ぎ確認→質問プロンプト作成→返答待ち→作業開始）
 
 ### ルール6: 引き継ぎ資料に以下の5項目を必ず含めること
 1. **現在取り組んでいるタスク・機能の説明** — 「現在のセッション状態」セクション
@@ -188,3 +223,179 @@ CLAUDE.mdのルールセクション全体を次のセッションでも参照�
 3. **既知のバグや注意点** — 「既知の注意点」セクション
 4. **次のセッションでやるべきこと** — 「次回やること（優先度順）」
 5. **コードの変更箇所のサマリー（コミットハッシュ付き）** — 日付別コミット履歴テーブル
+
+## 技術的な注意点
+
+### 清掃ステータスマークの仕組み
+```
+カレンダーのステータスドット色:
+- 赤(recruiting): 募集中で未確定
+- 緑(decided): スタッフ確定済み or 選定済 or cleaningStaff設定済み
+
+データフロー:
+1. loadAndRender() → getRecruitmentStatusMap() → window._recruitFullMap
+2. buildCalendarEvents() で recruitMap[b.rowNumber].status をチェック
+3. 確定時に applyConfirmOptimistic() で楽観的にキャッシュ更新＋カレンダー再描画
+```
+
+### スタッフ選択の複数端末同期（チェックリストアプリ）
+```
+データフロー:
+1. 端末がページ読込 → getChecklistForDate(date, deviceId) で自分の選択を取得
+2. スタッフ選択/解除 → applyStaffSelection() でローカル反映 + GASにsave
+3. GAS側 getStaffSelectionDetailed_() で全端末の選択をマージ
+4. 60秒ポーリングで他端末の選択も反映（remoteStaffInfo表示）
+
+粘着ユニオン問題の修正:
+- 旧: 全端末の選択をunionして返す → 一度選んだスタッフが外せない
+- 新: deviceId別に選択状態を管理 → 各端末の解除が正しく反映される
+```
+
+### チェックリストアプリのデータフロー
+```
+[checklist.html]
+    ↓ callGAS('getChecklistForDate', [date, deviceId])
+[checklist-app/Code.gs]
+    ↓ getChecklistForDate(date, deviceId)
+[Google Sheets]
+    ├── チェックリストマスタ → items（チェック項目定義）
+    ├── 撮影箇所マスタ → spots（撮影箇所 + exampleFileId）
+    ├── チェックリスト記録 → checked（日付別チェック状態）
+    ├── チェックリスト写真 → photos（日付別撮影写真）
+    ├── チェックリストメモ → memos（日付別メモ）
+    └── スタッフ選択 → staffSelection（端末別スタッフ選択状態）
+```
+
+### カテゴリの区切り文字
+- 全角コロン `：`（U+FF1A）を使用
+- 例: `テラス：次の予約がBBQ利用あり：↓セット内容↓`
+
+### レンダリングの仕組み（チェックリストアプリ）
+- `buildCategoryTree()` が全アイテムをツリー構造に変換
+- `renderCategoryNode()` が再帰的にHTMLを生成
+- レベル0=`.section`（濃紺）、1=`.sub-section`（薄青）、2=`.sub-sub-section`（オレンジ）、3=`.sub-sub-sub-section`（紫）
+
+### callGAS() の仕組み（チェックリストアプリ）
+```javascript
+function callGAS(functionName, args) {
+  return new Promise(function(resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function(jsonStr) { resolve(JSON.parse(jsonStr)); })
+      .withFailureHandler(reject)
+      [functionName].apply(null, args);
+  });
+}
+```
+- GASの `google.script.run` をPromise化。GAS側は全てJSON文字列を返す
+
+### 写真保存構造 (Google Drive)
+```
+写真フォルダ/
+  ├── before/    ← ビフォー写真
+  ├── after/     ← アフター写真
+  ├── example/   ← 見本写真（日付非依存）
+  └── memo/      ← メモ添付写真
+```
+- サムネイルURL: `https://drive.google.com/thumbnail?id={fileId}&sz=w{size}`
+
+## 重要な技術的制約
+
+### GAS グローバルスコープの罠
+- GASプロジェクト内の全 `.gs` ファイルは同一グローバルスコープを共有
+- `const SHEET_NAME = '...'` を2つのファイルで宣言すると **SyntaxError**
+- **対策**: `.claspignore` で互いのファイルを除外 + チェックリストは `CL_` 接頭辞で回避
+
+### チェックリストアプリの変数名ルール
+- `SHEET_NAME` → `CL_BOOKING_SHEET`
+- `SHEET_OWNER` → `CL_OWNER_SHEET`
+- `SHEET_STAFF` → `CL_STAFF_SHEET`
+
+### GASバージョン上限
+- 最大200個。deploy.jsは150超で警告。古いバージョンはGASエディタUIから手動削除
+
+### GAS CSSサニタイザー
+- GASはHTMLサービスで `body` セレクタを書き換える
+- **対策**: `body` の代わりに `#contentArea` セレクタを使用
+
+### FullCalendar の注意点
+- イベントソースの差し替え: 全ソース削除 → `addEventSource` → `render` のパターンが必要
+- `eventSources` の直接操作は避ける
+
+### スプレッドシートの行番号
+- 「募集」シートの `currentRowNum` が予約行番号のマッピングに使われる
+- 行の挿入/削除でずれる可能性あり → `getRecruitmentForBooking()` に自己修復メカニズムあり
+- 行番号は1ベースで、ヘッダー行を含む
+
+### デプロイID管理
+- `deploy-config.json` にデプロイIDを永続保存（**`.gitignore` でgit追跡から除外済み**）
+- deploy.js は3段階でデプロイIDを探す: 1. 保存済みID → 2. `clasp deployments` で検索 → 3. 新規作成（URLが変わる）
+- `npx clasp` ではなく `node_modules/.bin/clasp` を直接実行（JSON5エラー回避）
+
+## よくある問題と対処法
+| 問題 | 原因 | 対処 |
+|------|------|------|
+| URL が毎回変わる | deploy-config.json がリセット | git追跡から除外済み。新規ならsampleコピー |
+| SHEET_NAME SyntaxError | 同名const宣言 | .claspignoreで除外＋CL_接頭辞 |
+| clasp push JSON5 エラー | npx経由のclasp | node_modules/.bin/clasp直接実行（対応済み） |
+| マスタデータ読み込み失敗 | ScriptProperties未設定/OAuth未許可 | GASエディタで `diagChecklistSetup()` 実行 |
+| CSSが適用されない | GAS CSSサニタイザー | bodyセレクタを#contentAreaに変更（対応済み） |
+| スタッフ選択が復活する | 粘着ユニオン問題 | deviceId別管理に修正（対応済み） |
+
+## ファイル構成（詳細）
+```
+minpaku-fix/
+├── Code.gs                      # メインアプリ GAS コード
+├── index.html                   # メインアプリ UI
+├── appsscript.json              # GASマニフェスト
+├── .clasp.json                  # メインアプリのclasp設定
+├── .claspignore                 # メインアプリ push 時の除外ルール
+├── deploy.js                    # メインアプリ デプロイスクリプト
+├── deploy-all.js                # 一括デプロイ（メイン+チェックリスト）
+├── deploy-all.bat               # deploy-all.jsのWindows用ラッパー
+├── deploy-config.json           # デプロイID保存（git追跡対象外！）
+├── deploy-config.sample.json    # deploy-config.json のテンプレート
+├── package.json                 # Node.js依存（@google/clasp）
+│
+├── checklist-app/               # チェックリストアプリ（別GASプロジェクト）
+│   ├── Code.gs                  # チェックリストアプリ GAS コード
+│   ├── checklist.html           # チェックリストアプリ UI
+│   ├── .clasp.json              # チェックリストアプリのclasp設定
+│   ├── .claspignore             # チェックリストアプリ push 時の除外ルール
+│   ├── deploy-checklist.js      # チェックリストアプリ デプロイスクリプト
+│   └── appsscript.json
+│
+├── manual-generator/            # スタッフ操作マニュアル生成ツール
+│   ├── generate-manual.js       # メインマニュアル生成
+│   ├── generate-staff-manual.js # スタッフマニュアル生成
+│   ├── screenshot.js            # スクリーンショット撮影（Puppeteer）
+│   └── package.json
+│
+├── CLAUDE.md                    # 開発引き継ぎ資料（本ファイル）
+└── .gitignore                   # deploy-config.json, node_modules/ を除外
+```
+
+## スプレッドシートの全シート構成
+```
+フォームの回答 1    ... 予約データ本体
+設定_オーナー       ... オーナー設定
+サブオーナー        ... サブオーナー情報
+清掃スタッフ        ... 清掃スタッフ一覧
+仕事内容マスタ      ... 仕事種類
+スタッフ報酬        ... 報酬計算
+特別料金            ... 特別料金設定
+募集設定            ... 募集の設定
+募集                ... 清掃募集レコード
+募集_立候補         ... スタッフの立候補
+キャンセル申請      ... キャンセル申請
+設定_連携           ... iCal URL等の連携設定
+通知履歴            ... 通知ログ
+スタッフ共有用      ... スタッフ画面用
+ベッド数マスタ      ... ベッド設定
+チェックリストマスタ ... チェック項目のマスタデータ
+撮影箇所マスタ      ... 写真撮影箇所（exampleFileIdカラムあり）
+チェックリスト記録   ... チェック実績（日付別）
+チェックリスト写真   ... 撮影写真（日付別）
+チェックリストメモ   ... メモ（日付別）
+スタッフ選択        ... 端末別スタッフ選択状態
+要補充記録          ... 要補充アイテムの記録
+```

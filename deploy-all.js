@@ -94,8 +94,8 @@ function getScriptId(dir) {
   return '';
 }
 
-var DEPLOY_LIMIT = 20;
-var DEPLOY_WARN = 15;
+var DEPLOY_LIMIT = 200;
+var DEPLOY_WARN = 150;
 var VERSION_LIMIT = 200;
 var VERSION_WARN = 150;
 
@@ -110,7 +110,7 @@ function checkDeployCount(label, cwd) {
   var bar = count + '/' + DEPLOY_LIMIT + '件';
   if (count >= DEPLOY_WARN) {
     console.log('  ⚠ ' + label + ': デプロイ数 ' + bar + ' — 古いデプロイの削除が必要です！');
-    console.log('    ※ GASのバージョン付きデプロイは最大20個。自動削除はできないため手動で削除してください。');
+    console.log('    ※ GASのデプロイは最大200個。GASエディタ「デプロイを管理」から古いデプロイを削除してください。');
     var scriptId = getScriptId(cwd);
     if (scriptId) {
       var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
@@ -134,7 +134,7 @@ function checkVersionCount(label, cwd) {
   var bar = count + '/' + VERSION_LIMIT + '件';
   if (count >= VERSION_WARN) {
     console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン履歴の削除が必要です！');
-    console.log('    ※ GASエディタの左サイドバー「プロジェクト履歴」→ ゴミ箱マーク → バージョンの削除');
+    console.log('    ※ GASエディタ左サイドバー「プロジェクトの履歴」→ 右上メニュー「すべてのバージョンを表示」→ 削除したいバージョンを選択して削除');
     var scriptId = getScriptId(cwd);
     if (scriptId) {
       var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
@@ -415,9 +415,9 @@ function main() {
     console.error('  エラー: ' + clDeployScript + ' が見つかりません');
   }
 
-  // === デプロイ数チェック（20件上限） ===
+  // === デプロイ数チェック（200件上限） ===
   console.log('');
-  console.log('[デプロイ数チェック（上限20件）]');
+  console.log('[デプロイ数チェック（上限200件）]');
   checkDeployCount('メインアプリ', rootDir);
   if (fs.existsSync(checklistDir)) {
     checkDeployCount('チェックリスト', checklistDir);

@@ -95,9 +95,9 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 同一日付の予約をマージする際、プレースホルダ名（Not available等）より実名を優先するよう修正。
 
 ## 2026-03-01（後半）修正内容
-1. **deploy-all.js バージョン数チェック**: デプロイ完了後にバージョン数チェック（上限200件）を実行。150件超で警告＋GASエディタを自動起動
-2. **deploy-all.js デプロイ20件上限チェック削除**: GASのデプロイ20件上限は廃止されたため、`checkDeployCount()`・`countDeployments()`・関連定数を削除
-3. **deploy-all.js バージョン削除手順を更新**: 「プロジェクトの履歴」→「バージョンの一括削除」ボタン → 選択して削除 に変更
+1. **deploy-all.js デプロイ数チェック追加**: `countDeployments()`と`checkDeployCount()`を追加。バージョン付きデプロイ（上限20件）が15件超でGASデプロイ管理画面（`/deployments`）を自動起動
+2. **deploy-all.js バージョン数チェックURL修正**: `checkVersionCount()`が開くURLを`/deployments`→`/edit`に変更。プロジェクト履歴→ゴミ箱マーク→バージョンの削除の操作手順メッセージも追加
+3. **deploy-all.js 2段階チェック**: デプロイ完了後にデプロイ数チェック（上限20件）とバージョン数チェック（上限200件）の両方を実行するよう変更
 
 ## 2026-02-28 修正内容
 1. **parseICal_**: SUMMARYの`/cancel/i`部分一致を厳密化（Booking.comの有効予約がキャンセル扱いになるバグ修正）
@@ -349,7 +349,7 @@ function callGAS(functionName, args) {
 - `SHEET_STAFF` → `CL_STAFF_SHEET`
 
 ### GASバージョン上限
-- 最大200個。deploy-all.jsは150超で警告。「プロジェクトの履歴」→「バージョンの一括削除」で手動削除
+- 最大200個。deploy.jsは150超で警告。古いバージョンはGASエディタUIから手動削除
 
 ### GAS CSSサニタイザー
 - GASはHTMLサービスで `body` セレクタを書き換える

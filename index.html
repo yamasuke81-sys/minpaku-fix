@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1282,17 +1282,27 @@
         <li class="nav-item"><a class="nav-link active" href="#" data-subtab="urls">URL一覧</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="staff">清掃スタッフ</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="subOwners">サブオーナー</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="jobs">仕事内容</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="recruitSettings">募集設定</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="reminderEmail">スタッフ未決定リマインド</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="rosterReminder">名簿未入力リマインド</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">予約連携</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="jobs">仕事内容（単価設定）</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="sync">iCal予約連携</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoice">請求書</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="emailNotify">メール通知</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="lineNotify">LINE通知</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="invoiceRequest">請求書要請</a></li>
-        <li class="nav-item"><a class="nav-link" href="#" data-subtab="confirmTemplate">確定通知</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" id="notifyGroupToggle" style="font-weight:bold;">▶ 通知設定</a>
+        </li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="lineId">LINE接続設定</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyRecruit">清掃スタッフ募集</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="recruitSettings">募集リマインド</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="confirmTemplate">スタッフ確定通知</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="reminderEmail">スタッフ未決定リマインド</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyImmediateRemind">直前予約リマインド</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancel">予約キャンセル通知</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelRequest">出勤キャンセル要望</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelApprove">キャンセル承認通知</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelReject">キャンセル却下通知</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="rosterReminder">名簿未入力リマインド</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="invoiceRequest">請求書要請</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyInvoiceSend">請求書送信通知</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCleaningDone">清掃完了通知</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" data-subtab="notifications">通知履歴</a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-subtab="maintenance">メンテナンス</a></li>
       </ul>
       <div id="settingsUrls">
@@ -1339,10 +1349,18 @@
         <div id="jobList"></div>
       </div>
       <div id="settingsRecruitSettings" style="display:none;">
-        <p class="small text-muted mb-2">募集に対する回答が少ない場合にスタッフへリマインドメールを送信します。最大5件設定できます。</p>
+        <p class="small text-muted mb-2">清掃スタッフの立候補が最少回答者数に達していない場合に、<strong>全スタッフ</strong>へリマインドを送信します。「まだ回答が足りません。立候補をお願いします」という内容です。</p>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="recruitReminderEnabled">
           <label class="form-check-label" for="recruitReminderEnabled">募集リマインドを有効にする</label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chRecruitRemind" style="max-width:180px;" data-notify-key="募集リマインド">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
         </div>
         <div class="mb-2"><label class="form-label small">最少回答者数（これ未満でリマインド）</label><input type="number" class="form-control form-control-sm" id="minRespondents" min="1" value="2" style="max-width:100px;"></div>
         <div class="mb-2"><label class="form-label small">選定人数（基本何人選ぶか）</label><input type="number" class="form-control form-control-sm" id="selectCount" min="1" value="2" style="max-width:100px;"></div>
@@ -1368,7 +1386,15 @@
         <p class="small text-muted mt-2">※ リマインド送信にはトリガーの設定が必要です。下の「トリガーをセットアップ」ボタンで自動設定できます。</p>
       </div>
       <div id="settingsReminderEmail" style="display:none;">
-        <p class="small text-muted mb-2">チェックイン前にオーナーへリマインドメールを送信します。清掃スタッフが未確定（「募集中」）の予約が対象です。最大5件設定できます。</p>
+        <p class="small text-muted mb-2">チェックイン日が近づいても清掃スタッフが未確定（「募集中」）の予約がある場合に、<strong>オーナー</strong>へリマインドを送信します。「この予約のスタッフがまだ決まっていません」という内容です。</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chUndecidedRemind" style="max-width:180px;" data-notify-key="スタッフ未決定リマインド">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
         <div class="mb-3">
           <div class="form-check form-switch mb-2">
             <input class="form-check-input" type="checkbox" id="reminderImmediate" checked>
@@ -1441,7 +1467,15 @@
         <p class="small text-muted mt-2">※ 「トリガーをセットアップ」を押すと、リマインド関連のトリガーが自動で設定されます（重複があれば自動整理）。</p>
       </div>
       <div id="settingsRosterReminder" style="display:none;">
-        <p class="small text-muted mb-2">チェックイン日が近い予約について、宿泊者名簿が未記入の場合にリマインドメールを送ります。最大5件設定できます。</p>
+        <p class="small text-muted mb-2">チェックイン日が近い予約で宿泊者名簿が未記入の場合に、<strong>オーナー</strong>へリマインドを送信します。「名簿がまだ記入されていません。宿泊者への催促をお願いします」という内容です。</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chRosterRemind" style="max-width:180px;" data-notify-key="名簿未入力リマインド">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="rosterReminderEnabled">
           <label class="form-check-label" for="rosterReminderEnabled">名簿未入力リマインドを有効にする</label>
@@ -1546,62 +1580,8 @@
           <div id="ownerInvDownloadResult" class="small mt-1" style="display:none;"></div>
         </div>
       </div>
-      <div id="settingsEmailNotify" style="display:none;">
-        <p class="small text-muted mb-2">各メール通知の送信ON/OFFを設定します。OFFにすると該当メールは送信されません。</p>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyRecruitStart">
-          <label class="form-check-label" for="notifyRecruitStart"><strong>募集開始通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">新しい清掃募集を作成した際に、登録済みの全スタッフへ募集案内メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyStaffConfirm">
-          <label class="form-check-label" for="notifyStaffConfirm"><strong>スタッフ確定通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">オーナーが清掃スタッフを確定した際に、全スタッフへ確定結果メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancel">
-          <label class="form-check-label" for="notifyCancel"><strong>予約キャンセル通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">iCal同期で予約キャンセルを検知した際に、担当スタッフとオーナーへ通知メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelRequest">
-          <label class="form-check-label" for="notifyCancelRequest"><strong>辞退申請通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">スタッフが清掃の辞退を申請した際に、オーナーへ通知メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelApprove">
-          <label class="form-check-label" for="notifyCancelApprove"><strong>辞退承認通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">オーナーが辞退申請を承認した際に、申請したスタッフへ承認結果メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCancelReject">
-          <label class="form-check-label" for="notifyCancelReject"><strong>辞退却下通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">オーナーが辞退申請を却下した際に、申請したスタッフへ却下結果メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyCleaningDone">
-          <label class="form-check-label" for="notifyCleaningDone"><strong>清掃完了通知</strong></label>
-          <p class="small text-muted mb-0 ms-4">スタッフがチェックリストを完了した際に、オーナーへ清掃完了報告メールを送信します。</p>
-        </div>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input email-notify-toggle" type="checkbox" id="notifyInvoice">
-          <label class="form-check-label" for="notifyInvoice"><strong>請求書メール送信</strong></label>
-          <p class="small text-muted mb-0 ms-4">請求書を作成した際に、オーナーへPDF添付の請求書メールを送信します。OFFの場合もPDFは生成されます。</p>
-        </div>
-
-        <button type="button" class="btn btn-sm btn-primary" id="btnSaveEmailNotify">メール通知設定を保存</button>
-      </div>
-
-      <div id="settingsLineNotify" style="display:none;">
-        <p class="small text-muted mb-2">メール通知と同じ内容をLINEグループにも送信します。LINE Messaging APIの設定が必要です。</p>
+      <div id="settingsLineId" style="display:none;">
+        <p class="small text-muted mb-2">LINE Messaging APIの接続情報を設定します。各通知のメール/LINE切り替えは個別の通知設定タブで行います。</p>
 
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="lineNotifyEnabled">
@@ -1624,31 +1604,31 @@
             <input type="text" class="form-control form-control-sm" id="lineGroupId" placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
           <div class="mb-2" id="lineTargetPersonalInputs">
-            <label class="form-label small" for="lineUserId">個人ID</label>
+            <label class="form-label small" for="lineUserId">個人ID（テスト用）</label>
             <input type="text" class="form-control form-control-sm" id="lineUserId" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
         </div>
 
-        <div class="d-flex gap-2 mb-4">
-          <button type="button" class="btn btn-sm btn-primary" id="btnSaveLineNotify">LINE通知設定を保存</button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-primary" id="btnSaveLineNotify">LINE接続設定を保存</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnTestLineNotify">テスト送信</button>
         </div>
-
-        <hr>
-        <h6 class="fw-bold mb-2">通知別チャンネル設定</h6>
-        <p class="small text-muted mb-2">各通知をメール・LINE・両方のどれで送信するか選択できます。</p>
-        <div id="notifyChannelList" class="mb-3">
-          <div class="text-muted small">読み込み中...</div>
-        </div>
-        <button type="button" class="btn btn-sm btn-primary" id="btnSaveNotifyChannels">チャンネル設定を保存</button>
       </div>
 
       <div id="settingsInvoiceRequest" style="display:none;">
-        <p class="small text-muted mb-2">毎月の請求書提出をスタッフに促すメールを自動配信します。配信日・メール内容を設定できます。</p>
+        <p class="small text-muted mb-2">毎月の請求書提出を<strong>全スタッフ</strong>に促す通知を自動配信します。「今月分の請求書をご提出ください」という内容です。</p>
 
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="invoiceRequestEnabled">
-          <label class="form-check-label" for="invoiceRequestEnabled"><strong>請求書要請メールを有効にする</strong></label>
+          <label class="form-check-label" for="invoiceRequestEnabled"><strong>請求書要請を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chInvoiceRequest" style="max-width:180px;" data-notify-key="請求書要請">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
         </div>
 
         <hr class="my-3">
@@ -1695,7 +1675,15 @@
       </div>
 
       <div id="settingsConfirmTemplate" style="display:none;">
-        <p class="small text-muted mb-2">スタッフ確定後にLINE/メールで配信するメッセージのテンプレートを編集できます。</p>
+        <p class="small text-muted mb-2">オーナーが清掃スタッフを確定した際に、<strong>全スタッフ</strong>へ確定結果を通知します。「スタッフが確定しました。作業日: ○月○日」という内容です。</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chConfirm" style="max-width:180px;" data-notify-key="スタッフ確定">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
         <div class="mb-2">
           <label class="form-label small fw-bold">利用可能なプレースホルダー</label>
           <div class="small text-muted mb-1">
@@ -1727,6 +1715,139 @@
           <label class="form-label small fw-bold">プレビュー</label>
           <pre class="border rounded p-2 small bg-light" id="confirmTemplatePreview" style="white-space:pre-wrap;max-height:300px;overflow-y:auto;"></pre>
         </div>
+      </div>
+
+      <div id="settingsNotifyRecruit" style="display:none;">
+        <p class="small text-muted mb-2">新しい清掃募集を作成した際に、登録済みの<strong>全スタッフ</strong>へ募集案内を送信します。「清掃スタッフを募集しています。立候補をお願いします」という内容です。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyRecruitStartToggle">
+          <label class="form-check-label" for="notifyRecruitStartToggle"><strong>清掃スタッフ募集通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chRecruit" style="max-width:180px;" data-notify-key="清掃スタッフ募集">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <hr class="my-3">
+        <p class="small text-muted">※ 募集メールの本文は、募集作成時に自動生成されます（次回予約情報・アプリURL含む）。</p>
+      </div>
+
+      <div id="settingsNotifyImmediateRemind" style="display:none;">
+        <p class="small text-muted mb-2">iCal同期で1週間以内にチェックインの予約が新規追加された際に、<strong>オーナー</strong>へ即時通知を送信します。「直前予約が入りました。急いでスタッフを手配してください」という内容です。</p>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chImmediateRemind" style="max-width:180px;" data-notify-key="直前予約リマインド">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知はiCal同期時に自動送信されます。テンプレートは「スタッフ未決定リマインド」タブ内の「即時リマインド」セクションで編集できます。</p>
+      </div>
+
+      <div id="settingsNotifyCancel" style="display:none;">
+        <p class="small text-muted mb-2">iCal同期で予約キャンセルを検知した際に、<strong>担当スタッフ＋オーナー</strong>へ通知を送信します。「予約がキャンセルされました。清掃業務はキャンセルとなります」という内容です。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyCancelToggle">
+          <label class="form-check-label" for="notifyCancelToggle"><strong>予約キャンセル通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chCancel" style="max-width:180px;" data-notify-key="予約キャンセル">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知はiCal同期でキャンセルを検知した際に自動送信されます。</p>
+      </div>
+
+      <div id="settingsNotifyCancelRequest" style="display:none;">
+        <p class="small text-muted mb-2">スタッフが出勤キャンセル（辞退）を申請した際に、<strong>オーナー</strong>へ通知を送信します。「スタッフが出勤キャンセルの要望を提出しました」という内容です。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyCancelRequestToggle">
+          <label class="form-check-label" for="notifyCancelRequestToggle"><strong>出勤キャンセル要望通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chCancelReq" style="max-width:180px;" data-notify-key="出勤キャンセル要望">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知はスタッフがアプリから辞退申請した際に自動送信されます。</p>
+      </div>
+
+      <div id="settingsNotifyCancelApprove" style="display:none;">
+        <p class="small text-muted mb-2">オーナーが辞退申請を承認した際に、申請した<strong>スタッフ</strong>へ通知を送信します。「出勤キャンセルが承認されました。清掃担当は解除されています」という内容です。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyCancelApproveToggle">
+          <label class="form-check-label" for="notifyCancelApproveToggle"><strong>キャンセル承認通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chCancelApprove" style="max-width:180px;" data-notify-key="キャンセル承認">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知はオーナーがキャンセル申請を承認した際に自動送信されます。</p>
+      </div>
+
+      <div id="settingsNotifyCancelReject" style="display:none;">
+        <p class="small text-muted mb-2">オーナーが辞退申請を却下した際に、申請した<strong>スタッフ</strong>へ通知を送信します。「出勤キャンセルは承認されませんでした。予定通りご出勤ください」という内容です。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyCancelRejectToggle">
+          <label class="form-check-label" for="notifyCancelRejectToggle"><strong>キャンセル却下通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chCancelReject" style="max-width:180px;" data-notify-key="キャンセル却下">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知はオーナーがキャンセル申請を却下した際に自動送信されます。</p>
+      </div>
+
+      <div id="settingsNotifyInvoiceSend" style="display:none;">
+        <p class="small text-muted mb-2">請求書PDFを作成した際に、<strong>オーナー</strong>へPDF添付の通知を送信します。OFFの場合もPDF自体は生成されます。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyInvoiceSendToggle">
+          <label class="form-check-label" for="notifyInvoiceSendToggle"><strong>請求書送信通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chInvoiceSend" style="max-width:180px;" data-notify-key="請求書送信">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知は請求書作成時に自動送信されます。LINEの場合はPDF添付なしのテキスト通知のみです。</p>
+      </div>
+
+      <div id="settingsNotifyCleaningDone" style="display:none;">
+        <p class="small text-muted mb-2">スタッフがチェックリストを完了した際に、<strong>オーナー</strong>へ清掃完了報告を送信します。チェック項目数・撮影枚数・特記事項が含まれます。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyCleaningDoneToggle">
+          <label class="form-check-label" for="notifyCleaningDoneToggle"><strong>清掃完了通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chCleaningDone" style="max-width:180px;" data-notify-key="清掃完了">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted">※ この通知はスタッフがチェックリストアプリで「清掃完了報告」ボタンを押した際に自動送信されます。</p>
       </div>
 
       <div id="settingsMaintenance" style="display:none;">
@@ -7769,47 +7890,21 @@
         }).saveRosterReminderSettings(settings);
       });
 
-      // メール通知ON/OFF設定
-      var EMAIL_NOTIFY_KEYS = [
-        'notifyRecruitStart', 'notifyStaffConfirm', 'notifyCancel',
-        'notifyCancelRequest', 'notifyCancelApprove', 'notifyCancelReject',
-        'notifyCleaningDone', 'notifyInvoice'
-      ];
+      // メール通知ON/OFF設定（各個別タブから読み込みで使用）
       function loadEmailNotifySettings() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            if (r.success && r.settings) {
-              EMAIL_NOTIFY_KEYS.forEach(function(key) {
-                var el = document.getElementById(key);
-                if (el) el.checked = r.settings[key] === true;
-              });
-            }
+            if (!r.success || !r.settings) return;
+            // 新規タブのトグルに反映
+            Object.keys(_emailNotifyToggleMap).forEach(function(tabKey) {
+              var cfg = _emailNotifyToggleMap[tabKey];
+              var el = document.getElementById(cfg.id);
+              if (el) el.checked = r.settings[cfg.key] === true;
+            });
           } catch (e) {}
         }).getEmailNotifySettings();
       }
-      document.getElementById('btnSaveEmailNotify').addEventListener('click', function() {
-        var btn = this;
-        if (btn.disabled) return;
-        var settings = {};
-        EMAIL_NOTIFY_KEYS.forEach(function(key) {
-          var el = document.getElementById(key);
-          if (el) settings[key] = el.checked;
-        });
-        btn.disabled = true;
-        var origText = btn.textContent;
-        btn.textContent = '保存中...';
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          btn.disabled = false;
-          btn.textContent = origText;
-          var r = JSON.parse(jsonStr);
-          alert(r.success ? '保存しました。' : (r.error || '失敗'));
-        }).withFailureHandler(function() {
-          btn.disabled = false;
-          btn.textContent = origText;
-          alert('保存に失敗しました。');
-        }).saveEmailNotifySettings(settings);
-      });
 
       // LINE通知設定
       var _lineTargetMode = 'group'; // 'group' or 'personal'
@@ -7903,53 +7998,6 @@
           btn.textContent = origText;
           alert('送信に失敗しました。\n' + (e ? e.toString() : ''));
         }).sendLineTestMessage();
-      });
-
-      // 通知別チャンネル設定
-      var _notifyChannelData = {};
-      function loadNotifyChannelSettings() {
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          try {
-            var r = JSON.parse(jsonStr);
-            if (!r.success) return;
-            _notifyChannelData = r.channels || {};
-            var container = document.getElementById('notifyChannelList');
-            if (!container) return;
-            var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">';
-            html += '<thead><tr><th>通知</th><th style="width:180px;">送信先</th></tr></thead><tbody>';
-            (r.keys || []).forEach(function(item) {
-              var val = _notifyChannelData[item.key] || 'both';
-              html += '<tr><td>' + item.label + '</td><td>';
-              html += '<select class="form-select form-select-sm" data-notify-key="' + item.key + '">';
-              html += '<option value="both"' + (val === 'both' ? ' selected' : '') + '>メール＋LINE</option>';
-              html += '<option value="email"' + (val === 'email' ? ' selected' : '') + '>メールのみ</option>';
-              html += '<option value="line"' + (val === 'line' ? ' selected' : '') + '>LINEのみ</option>';
-              html += '</select></td></tr>';
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-          } catch (e) {}
-        }).getNotifyChannelSettings();
-      }
-      document.getElementById('btnSaveNotifyChannels').addEventListener('click', function() {
-        var btn = this;
-        if (btn.disabled) return;
-        var selects = document.querySelectorAll('#notifyChannelList select[data-notify-key]');
-        var channels = {};
-        selects.forEach(function(sel) { channels[sel.getAttribute('data-notify-key')] = sel.value; });
-        btn.disabled = true;
-        var origText = btn.textContent;
-        btn.textContent = '保存中...';
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          btn.disabled = false;
-          btn.textContent = origText;
-          var r = JSON.parse(jsonStr);
-          alert(r.success ? '保存しました。' : (r.error || '失敗'));
-        }).withFailureHandler(function() {
-          btn.disabled = false;
-          btn.textContent = origText;
-          alert('保存に失敗しました。');
-        }).saveNotifyChannelSettings(channels);
       });
 
       // 請求書要請メール設定（スタッフ宛）
@@ -8601,30 +8649,23 @@
           var t = this.getAttribute('data-subtab');
           document.querySelectorAll('[data-subtab]').forEach(function(l) { l.classList.remove('active'); });
           this.classList.add('active');
-          document.getElementById('settingsUrls').style.display = t === 'urls' ? 'block' : 'none';
-          document.getElementById('settingsStaff').style.display = t === 'staff' ? 'block' : 'none';
-          document.getElementById('settingsSubOwners').style.display = t === 'subOwners' ? 'block' : 'none';
-          document.getElementById('settingsJobs').style.display = t === 'jobs' ? 'block' : 'none';
-          document.getElementById('settingsRecruitSettings').style.display = t === 'recruitSettings' ? 'block' : 'none';
-          var reminderEl = document.getElementById('settingsReminderEmail');
-          if (reminderEl) reminderEl.style.display = t === 'reminderEmail' ? 'block' : 'none';
-          var rrEl = document.getElementById('settingsRosterReminder');
-          if (rrEl) rrEl.style.display = t === 'rosterReminder' ? 'block' : 'none';
-          document.getElementById('settingsSync').style.display = t === 'sync' ? 'block' : 'none';
-          var notifEl = document.getElementById('settingsNotifications');
-          if (notifEl) notifEl.style.display = t === 'notifications' ? 'block' : 'none';
-          var invoiceEl = document.getElementById('settingsInvoice');
-          if (invoiceEl) invoiceEl.style.display = t === 'invoice' ? 'block' : 'none';
-          var emailNotifyEl = document.getElementById('settingsEmailNotify');
-          if (emailNotifyEl) emailNotifyEl.style.display = t === 'emailNotify' ? 'block' : 'none';
-          var lineNotifyEl = document.getElementById('settingsLineNotify');
-          if (lineNotifyEl) lineNotifyEl.style.display = t === 'lineNotify' ? 'block' : 'none';
-          var invoiceReqEl = document.getElementById('settingsInvoiceRequest');
-          if (invoiceReqEl) invoiceReqEl.style.display = t === 'invoiceRequest' ? 'block' : 'none';
-          var confirmTplEl = document.getElementById('settingsConfirmTemplate');
-          if (confirmTplEl) confirmTplEl.style.display = t === 'confirmTemplate' ? 'block' : 'none';
-          var maintEl = document.getElementById('settingsMaintenance');
-          if (maintEl) maintEl.style.display = t === 'maintenance' ? 'block' : 'none';
+          // 全設定パネルのID→subtab値マッピング
+          var _settingsPanels = {
+            urls: 'settingsUrls', staff: 'settingsStaff', subOwners: 'settingsSubOwners',
+            jobs: 'settingsJobs', sync: 'settingsSync', invoice: 'settingsInvoice',
+            lineId: 'settingsLineId', recruitSettings: 'settingsRecruitSettings',
+            reminderEmail: 'settingsReminderEmail', rosterReminder: 'settingsRosterReminder',
+            invoiceRequest: 'settingsInvoiceRequest', confirmTemplate: 'settingsConfirmTemplate',
+            notifications: 'settingsNotifications', maintenance: 'settingsMaintenance',
+            notifyRecruit: 'settingsNotifyRecruit', notifyImmediateRemind: 'settingsNotifyImmediateRemind',
+            notifyCancel: 'settingsNotifyCancel', notifyCancelRequest: 'settingsNotifyCancelRequest',
+            notifyCancelApprove: 'settingsNotifyCancelApprove', notifyCancelReject: 'settingsNotifyCancelReject',
+            notifyInvoiceSend: 'settingsNotifyInvoiceSend', notifyCleaningDone: 'settingsNotifyCleaningDone'
+          };
+          Object.keys(_settingsPanels).forEach(function(key) {
+            var el = document.getElementById(_settingsPanels[key]);
+            if (el) el.style.display = key === t ? 'block' : 'none';
+          });
           if (t === 'staff') loadStaffList();
           if (t === 'jobs') loadJobList();
           if (t === 'recruitSettings') loadRecruitSettingsForm();
@@ -8634,10 +8675,87 @@
           if (t === 'subOwners') loadSubOwnerList();
           if (t === 'notifications') loadNotificationList();
           if (t === 'invoice') loadInvoiceSettings_();
-          if (t === 'emailNotify') loadEmailNotifySettings();
-          if (t === 'lineNotify') { loadLineNotifySettings(); loadNotifyChannelSettings(); }
+          if (t === 'lineId') { loadLineNotifySettings(); }
           if (t === 'invoiceRequest') loadInvoiceRequestSettings();
           if (t === 'confirmTemplate') loadConfirmationTemplate();
+          // 通知タブ表示時にチャンネル設定を読み込み
+          var _notifyTabs = ['notifyRecruit','recruitSettings','confirmTemplate','reminderEmail',
+            'notifyImmediateRemind','notifyCancel','notifyCancelRequest','notifyCancelApprove',
+            'notifyCancelReject','rosterReminder','invoiceRequest','notifyInvoiceSend','notifyCleaningDone'];
+          if (_notifyTabs.indexOf(t) >= 0) loadNotifyChannelForTab_(t);
+          // 新規タブのメール通知設定読み込み
+          var _emailNotifyTabs = ['notifyRecruit','notifyCancel','notifyCancelRequest',
+            'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
+          if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
+        });
+      });
+
+      // 通知グループ折りたたみトグル
+      document.getElementById('notifyGroupToggle').addEventListener('click', function(e) {
+        e.preventDefault();
+        var items = document.querySelectorAll('.notify-sub-item');
+        var isOpen = items[0] && items[0].style.display !== 'none';
+        items.forEach(function(el) { el.style.display = isOpen ? 'none' : ''; });
+        this.textContent = (isOpen ? '▶' : '▼') + ' 通知設定';
+      });
+
+      // 各通知タブ用: チャンネルセレクトの値を読み込む
+      function loadNotifyChannelForTab_(tabKey) {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) return;
+            var channels = r.channels || {};
+            document.querySelectorAll('.notify-channel-select').forEach(function(sel) {
+              var key = sel.getAttribute('data-notify-key');
+              if (key && channels[key]) sel.value = channels[key];
+            });
+          } catch (e) {}
+        }).getNotifyChannelSettings();
+      }
+
+      // チャンネルセレクト変更時に即保存
+      document.querySelectorAll('.notify-channel-select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+          var key = this.getAttribute('data-notify-key');
+          var val = this.value;
+          google.script.run.withSuccessHandler(function() {}).saveNotifyChannelSettings(
+            (function() { var c = {}; c[key] = val; return c; })()
+          );
+        });
+      });
+
+      // 新規タブ用: メール通知ON/OFFの読み込み
+      var _emailNotifyToggleMap = {
+        notifyRecruit: { id: 'notifyRecruitStartToggle', key: '募集開始通知有効' },
+        notifyCancel: { id: 'notifyCancelToggle', key: 'キャンセル通知有効' },
+        notifyCancelRequest: { id: 'notifyCancelRequestToggle', key: '辞退申請通知有効' },
+        notifyCancelApprove: { id: 'notifyCancelApproveToggle', key: '辞退承認通知有効' },
+        notifyCancelReject: { id: 'notifyCancelRejectToggle', key: '辞退却下通知有効' },
+        notifyInvoiceSend: { id: 'notifyInvoiceSendToggle', key: '請求書送信通知有効' },
+        notifyCleaningDone: { id: 'notifyCleaningDoneToggle', key: '清掃完了通知有効' }
+      };
+      function loadEmailNotifyForTab_(tabKey) {
+        var cfg = _emailNotifyToggleMap[tabKey];
+        if (!cfg) return;
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) return;
+            var el = document.getElementById(cfg.id);
+            if (el) el.checked = r.settings[cfg.key] === true;
+          } catch (e) {}
+        }).getEmailNotifySettings();
+      }
+      // 新規タブのトグル変更時に即保存
+      Object.keys(_emailNotifyToggleMap).forEach(function(tabKey) {
+        var cfg = _emailNotifyToggleMap[tabKey];
+        var el = document.getElementById(cfg.id);
+        if (!el) return;
+        el.addEventListener('change', function() {
+          var settings = {};
+          settings[cfg.key] = this.checked;
+          google.script.run.withSuccessHandler(function() {}).saveEmailNotifySettings(JSON.stringify(settings));
         });
       });
 

@@ -3889,7 +3889,9 @@ function getEmailNotifySettings() {
     var settings = {};
     for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
       var val = map[EMAIL_NOTIFY_KEYS_[i]];
-      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = val === true || String(val).trim() === 'true'; // デフォルトOFF
+      var enabled = val === true || String(val).trim() === 'true';
+      settings[EMAIL_NOTIFY_JS_KEYS_[i]] = enabled;
+      settings[EMAIL_NOTIFY_KEYS_[i]] = enabled; // シートキーでもアクセス可能
     }
     return JSON.stringify({ success: true, settings: settings });
   } catch (e) {
@@ -3897,10 +3899,16 @@ function getEmailNotifySettings() {
   }
 }
 
-function saveEmailNotifySettings(settings) {
+function saveEmailNotifySettings(settingsOrJson) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
     ensureSheetsExist();
+    // JSON文字列の場合は部分更新（個別タブから）
+    var settings = settingsOrJson;
+    var isPartial = false;
+    if (typeof settingsOrJson === 'string') {
+      try { settings = JSON.parse(settingsOrJson); isPartial = true; } catch (pe) { settings = settingsOrJson; }
+    }
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
     var lastRow = Math.max(sheet.getLastRow(), 1);
     var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
@@ -3909,17 +3917,32 @@ function saveEmailNotifySettings(settings) {
       var k = String(r[0] || '').trim();
       if (k) rowMap[k] = i + 2;
     });
-    for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
-      var sheetKey = EMAIL_NOTIFY_KEYS_[i];
-      var jsKey = EMAIL_NOTIFY_JS_KEYS_[i];
-      var val = settings[jsKey] !== false ? 'true' : 'false';
-      if (rowMap[sheetKey]) {
-        sheet.getRange(rowMap[sheetKey], 2).setValue(val);
-      } else {
-        var nr = sheet.getLastRow() + 1;
-        sheet.getRange(nr, 1).setValue(sheetKey);
-        sheet.getRange(nr, 2).setValue(val);
-        rowMap[sheetKey] = nr;
+    if (isPartial) {
+      // 部分更新: settings のキーはシートキー（例: '募集開始通知有効'）
+      Object.keys(settings).forEach(function(sheetKey) {
+        var val = settings[sheetKey] ? 'true' : 'false';
+        if (rowMap[sheetKey]) {
+          sheet.getRange(rowMap[sheetKey], 2).setValue(val);
+        } else {
+          var nr = sheet.getLastRow() + 1;
+          sheet.getRange(nr, 1).setValue(sheetKey);
+          sheet.getRange(nr, 2).setValue(val);
+          rowMap[sheetKey] = nr;
+        }
+      });
+    } else {
+      for (var i = 0; i < EMAIL_NOTIFY_KEYS_.length; i++) {
+        var sheetKey = EMAIL_NOTIFY_KEYS_[i];
+        var jsKey = EMAIL_NOTIFY_JS_KEYS_[i];
+        var val = settings[jsKey] !== false ? 'true' : 'false';
+        if (rowMap[sheetKey]) {
+          sheet.getRange(rowMap[sheetKey], 2).setValue(val);
+        } else {
+          var nr = sheet.getLastRow() + 1;
+          sheet.getRange(nr, 1).setValue(sheetKey);
+          sheet.getRange(nr, 2).setValue(val);
+          rowMap[sheetKey] = nr;
+        }
       }
     }
     return JSON.stringify({ success: true });

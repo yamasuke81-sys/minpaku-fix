@@ -4347,14 +4347,19 @@ function checkRosterReminder() {
 
     if (ownerEmail) {
       try {
-        GmailApp.sendEmail(
-          ownerEmail,
-          '【民泊】宿泊者名簿の未記入通知（' + missing.length + '件）',
-          '以下の予約について、宿泊者名簿がまだ記入されていません。\n' +
-          '宿泊者への催促をお願いします。\n\n' +
-          msgLines.join('\n') + '\n\n' +
-          '※ アプリの通知にも同じ内容が届いています。'
-        );
+        var subjTpl = (res.settings.rosterReminderSubject || '').trim();
+        var bodyTpl = (res.settings.rosterReminderBody || '').trim();
+        var listText = msgLines.join('\n');
+        var subj = subjTpl
+          ? subjTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText)
+          : '【民泊】宿泊者名簿の未記入通知（' + missing.length + '件）';
+        var body = bodyTpl
+          ? bodyTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText)
+          : '以下の予約について、宿泊者名簿がまだ記入されていません。\n' +
+            '宿泊者への催促をお願いします。\n\n' +
+            listText + '\n\n' +
+            '※ アプリの通知にも同じ内容が届いています。';
+        GmailApp.sendEmail(ownerEmail, subj, body);
       } catch (e) {
         Logger.log('名簿リマインダーメール送信失敗: ' + e.toString());
       }

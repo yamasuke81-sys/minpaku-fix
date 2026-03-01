@@ -1122,6 +1122,13 @@
       <div id="notificationBannerList" class="mt-1"></div>
       <a href="#" id="notificationBannerLink" class="alert-link mt-1 d-block">すべて見る</a>
     </div>
+    <div id="coMismatchBanner" class="alert alert-warning py-2 mb-2 small" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="fw-bold">⚠ チェックアウト日の不一致:</span>
+        <button type="button" class="btn-close btn-close-sm" onclick="this.parentElement.parentElement.style.display='none';"></button>
+      </div>
+      <div id="coMismatchList" class="mt-1"></div>
+    </div>
     <ul class="nav nav-tabs mb-2" id="mainTabs">
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
       <li class="nav-item" id="navRecruit" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
@@ -2483,6 +2490,8 @@
 
         // [DEBUG] 重複排除デバッグ
         var _dedupDebug = { total: data.length, merged: 0, separate: 0, noCheckIn: 0, details: [] };
+        // CO不一致ワーニング収集（オーナー通知用）
+        var _coMismatchWarnings = [];
         data.forEach(function(b) {
           if (!b.checkInParsed) {
             _dedupDebug.noCheckIn++;
@@ -2496,6 +2505,27 @@
             var existIdx = ciKeyMap[ci];
             var existing = merged[existIdx];
             var existCo = existing.checkOutParsed || '';
+            // CO不一致をチェック（両方にCOがあり、異なる場合 → オーナーに通知）
+            if (co && existCo && co !== existCo) {
+              // iCalエントリ vs フォームエントリを判別
+              var existSite = (existing.bookingSite || '').match(/^(.+?)（(.+?)）$/);
+              var bSite = (b.bookingSite || '').match(/^(.+?)（(.+?)）$/);
+              var existIsIcal = existSite && existSite[1].trim() !== '-' && existSite[2].trim() === '-';
+              var bIsIcal = bSite && bSite[1].trim() !== '-' && bSite[2].trim() === '-';
+              // プレースホルダ同士（iCal vs iCal）のブロック日不一致は除外
+              if (!(isPlaceholderName(existing.guestName) && isPlaceholderName(b.guestName))) {
+                var icalCo = existIsIcal ? existCo : (bIsIcal ? co : existCo);
+                var formCo = existIsIcal ? co : (bIsIcal ? existCo : co);
+                var gName = !isPlaceholderName(existing.guestName) ? existing.guestName : (!isPlaceholderName(b.guestName) ? b.guestName : existing.guestName);
+                _coMismatchWarnings.push({
+                  checkIn: ci,
+                  icalCheckOut: icalCo,
+                  formCheckOut: formCo,
+                  guestName: gName,
+                  rowNumber: existing.rowNumber
+                });
+              }
+            }
             // 同一物件で同日チェックインは1予約のみ → 常にマージ
             _dedupDebug.merged++;
             _dedupDebug.details.push('[MERGED] row' + b.rowNumber + '→row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + '/' + existCo + ' name=' + (b.guestName||'') + '→' + (existing.guestName||'') + ' site=' + (b.bookingSite||''));
@@ -2510,6 +2540,8 @@
         console.log('[DEBUG dedup] 合計=' + _dedupDebug.total + ' マージ=' + _dedupDebug.merged + ' 分離=' + _dedupDebug.separate + ' CI無し=' + _dedupDebug.noCheckIn);
         if (_dedupDebug.details.length) console.log('[DEBUG dedup] 詳細:\n' + _dedupDebug.details.join('\n'));
         window._lastDedupDebug = _dedupDebug;
+        // CO不一致ワーニングをwindowに保存（通知バナー用）
+        window._coMismatchWarnings = _coMismatchWarnings;
 
         merged.forEach(function(b) {
           const checkIn = b.checkInParsed;
@@ -4261,6 +4293,22 @@
               _ddPanel.style.display = 'block';
             }
           } catch(e) { console.log('[DEBUG dedup panel error] ' + e); }
+          // CO不一致通知バナー更新（オーナーのみ）
+          try {
+            var _cmBanner = document.getElementById('coMismatchBanner');
+            var _cmList = document.getElementById('coMismatchList');
+            if (_cmBanner && _cmList && !window.staffMode && window._coMismatchWarnings && window._coMismatchWarnings.length > 0) {
+              var cmHtml = window._coMismatchWarnings.map(function(w) {
+                return '<div class="mb-1">CI: ' + escapeHtml(w.checkIn) + '　' + escapeHtml(w.guestName || '(名前なし)') +
+                  ' — 予約サイトCO: <strong>' + escapeHtml(w.icalCheckOut) + '</strong>　名簿CO: <strong>' + escapeHtml(w.formCheckOut) + '</strong>' +
+                  '<br><span class="text-muted">宿泊者名簿と予約サイトのチェックアウト日が異なります。名簿入力内容が間違いの場合はスプレッドシートを手作業で修正してください。</span></div>';
+              }).join('');
+              _cmList.innerHTML = cmHtml;
+              _cmBanner.style.display = 'block';
+            } else if (_cmBanner) {
+              _cmBanner.style.display = 'none';
+            }
+          } catch(e) { console.log('[CO mismatch banner error] ' + e); }
           updateNotificationBanner();
 
           // 募集エントリのない清掃イベントの次回予約を一括プリロード
@@ -6158,6 +6206,11 @@
       }
 
       function loadSettings() {
+        // [DEBUG] loadSettings開始トレース
+        console.log('[DEBUG ownerUrl] 3a. loadSettings開始');
+        if (window._ownerUrlDebugLog) { window._ownerUrlDebugLog.push('3a.loadSettings開始'); }
+        if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
+
         var ownerInp = document.getElementById('ownerUrlInput');
         var staffInp = document.getElementById('staffUrlInput');
         var readonlyInp = document.getElementById('readonlyUrlInput');
@@ -6184,15 +6237,18 @@
         if (!cachedOwnerUrl) { try { cachedOwnerUrl = sessionStorage.getItem('ownerUrlCache') || ''; } catch(e) {} }
         var base = window.savedOwnerUrl || cachedOwnerUrl || window.appBaseUrl || '';
         // [DEBUG] loadSettings復元値
-        var debugMsg = '3.loadSettings復元: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', localStorage=' + (cachedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)') + ' → base=' + (base || '(空)');
+        var debugMsg = '3b.loadSettings復元: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', localStorage=' + (cachedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)') + ' → base=' + (base || '(空)');
         console.log('[DEBUG ownerUrl] ' + debugMsg);
         if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push(debugMsg);
         if (base) {
           if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
+          // [DEBUG] 設定完了トレース
+          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('3c.ownerInp設定完了: value=' + (ownerInp ? ownerInp.value.substring(0, 60) + '...' : 'inp無し'));
         } else {
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
+          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('3c.base空のためURL未設定');
         }
         // [DEBUG] デバッグエリアに情報表示
         if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();

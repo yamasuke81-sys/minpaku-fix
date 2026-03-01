@@ -7694,8 +7694,17 @@ function confirmRecruitment(recruitRowIndex) {
     if (!recruitSheet || recruitSheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません' });
     var staff = String(recruitSheet.getRange(recruitRowIndex, 5).getValue() || '').trim();
     if (!staff) return JSON.stringify({ success: false, error: 'スタッフが選定されていません。先にスタッフを選定してください。' });
+    var coDateVal = recruitSheet.getRange(recruitRowIndex, 1).getValue();
+    var coDateStr = '';
+    if (coDateVal instanceof Date) {
+      coDateStr = coDateVal.getFullYear() + '/' + (coDateVal.getMonth() + 1) + '/' + coDateVal.getDate();
+    } else if (coDateVal) {
+      coDateStr = String(coDateVal);
+    }
     recruitSheet.getRange(recruitRowIndex, 4).setValue('スタッフ確定済み');
-    addNotification_('スタッフ確定', staff + ' をスタッフとして確定しました');
+    var notifMsg = staff + ' をスタッフとして確定しました';
+    if (coDateStr) notifMsg += '（' + coDateStr + '）';
+    addNotification_('スタッフ確定', notifMsg);
     invalidateInitDataCache_();
     return JSON.stringify({ success: true });
   } catch (e) {

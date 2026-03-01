@@ -38,7 +38,8 @@ function run(cmd, cwd, timeoutMs) {
       var hasSuccessIndicator =
         /Pushed \d+ file/i.test(msg) ||       // clasp push 成功
         /Created version/i.test(msg) ||        // clasp deploy 成功
-        /AKfycb[A-Za-z0-9_-]{20,}/.test(msg); // デプロイID出力あり
+        /AKfycb[A-Za-z0-9_-]{20,}/.test(msg) || // デプロイID出力あり
+        /^\d+\s+-\s+/m.test(msg);              // clasp versions のバージョン一覧出力あり
       if (hasSuccessIndicator) {
         console.log('  (EPERM警告: .clasprc.json書き込み権限エラー。操作自体は成功)');
         return { ok: true, out: msg };
@@ -333,11 +334,19 @@ function main() {
     }
 
     if (!gatewayId) {
-      console.log('  ゲートウェイ: 新規作成中...');
-      var gResult = run(clasp + ' deploy --description "ゲートウェイ ' + today + '"', rootDir);
-      if (gResult.ok) {
-        var gm = gResult.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
-        if (gm) gatewayId = gm[1];
+      // デプロイ数上限チェック: 20件に達していたら新規作成をスキップ
+      var depCheck = run(clasp + ' deployments', rootDir, 30000);
+      var currentDeployCount = depCheck.ok ? countDeployments(depCheck.out) : 0;
+      if (currentDeployCount >= DEPLOY_LIMIT) {
+        console.log('  ゲートウェイ: デプロイ数が上限(' + DEPLOY_LIMIT + '件)に達しているため新規作成をスキップ');
+        console.log('    → GASエディタで古いデプロイを削除してから再デプロイしてください');
+      } else {
+        console.log('  ゲートウェイ: 新規作成中...');
+        var gResult = run(clasp + ' deploy --description "ゲートウェイ ' + today + '"', rootDir);
+        if (gResult.ok) {
+          var gm = gResult.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+          if (gm) gatewayId = gm[1];
+        }
       }
     }
 

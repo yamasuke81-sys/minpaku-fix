@@ -94,6 +94,11 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### フロントエンド重複排除マージ（2026-02-28修正済み）
 同一日付の予約をマージする際、プレースホルダ名（Not available等）より実名を優先するよう修正。
 
+## 2026-03-01（後半）修正内容
+1. **deploy-all.js デプロイ数チェック追加**: `countDeployments()`と`checkDeployCount()`を追加。バージョン付きデプロイ（上限20件）が15件超でGASデプロイ管理画面（`/deployments`）を自動起動
+2. **deploy-all.js バージョン数チェックURL修正**: `checkVersionCount()`が開くURLを`/deployments`→`/edit`に変更。プロジェクト履歴→ゴミ箱マーク→バージョンの削除の操作手順メッセージも追加
+3. **deploy-all.js 2段階チェック**: デプロイ完了後にデプロイ数チェック（上限20件）とバージョン数チェック（上限200件）の両方を実行するよう変更
+
 ## 2026-02-28 修正内容
 1. **parseICal_**: SUMMARYの`/cancel/i`部分一致を厳密化（Booking.comの有効予約がキャンセル扱いになるバグ修正）
 2. **syncFromICal**: iCalフィード空時の削除スキップ、過去予約の削除対象除外、off-by-one修正
@@ -122,9 +127,9 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 
 ## 現在のセッション状態
 - **ブランチ**: `claude/verify-staff-response-display-CggXs`
-- **最新コミット**: `c07fb4d`
-- **進行中タスク**: なし（全修正完了・デバッグコード削除済み・本番クリーンアップ済み）
-- **デプロイ待ち**: あり（請求書パスワードポップアップのローディング表示追加が未デプロイ）
+- **最新コミット**: `e362bdf`
+- **進行中タスク**: なし
+- **デプロイ待ち**: あり（deploy-all.jsのデプロイ数＆バージョン数チェック追加が未デプロイ）
 
 ## 2026-03-01 コミット履歴（コミットハッシュ付き）
 | コミット | 内容 |
@@ -135,10 +140,13 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 | `b856f0d` | デバッグコードを全削除（本番クリーンアップ） |
 | `b589802` | 請求書パスワードポップアップに読み込み中表示を追加 |
 | `c07fb4d` | docs: CLAUDE.md にローディング表示追加の修正履歴を追記 |
+| `4d92b1b` | fix: deploy-all.js にデプロイ数チェック（上限20件）を追加 |
+| `e362bdf` | fix: バージョン数チェックで開くURLをGASエディタ(/edit)に修正 |
 
 ### 変更ファイルと箇所
 - **index.html**: `buildCalendarEvents`（重複排除ロジック）、`mergeBookingData`（CO不一致解決）、`isPlaceholderName`（拡張）、CO不一致バナー表示、オーナーURL直接設定、請求書パスワードローディングUI、デバッグコード全削除
 - **Code.gs**: `debugMailInfo`レスポンスフィールド削除
+- **deploy-all.js**: `countDeployments()`追加、`checkDeployCount()`追加（デプロイ数15件超で警告＋GASデプロイ管理画面を自動起動）、`checkVersionCount()`のURLを`/edit`に修正（プロジェクト履歴からバージョン削除する画面）
 - **CLAUDE.md**: 修正履歴追記
 
 ## 2026-02-28 コミット履歴（コミットハッシュ付き）

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1292,8 +1292,7 @@
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyRecruit">清掃スタッフ募集</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="recruitSettings">募集リマインド</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="confirmTemplate">スタッフ確定通知</a></li>
-        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="reminderEmail">スタッフ未決定リマインド</a></li>
-        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyImmediateRemind">直前予約リマインド</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="reminderEmail">未決定・直前リマインド</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancel">予約キャンセル通知</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelRequest">出勤キャンセル要望</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelApprove">キャンセル承認通知</a></li>
@@ -1386,7 +1385,13 @@
         <p class="small text-muted mt-2">※ リマインド送信にはトリガーの設定が必要です。下の「トリガーをセットアップ」ボタンで自動設定できます。</p>
       </div>
       <div id="settingsReminderEmail" style="display:none;">
-        <p class="small text-muted mb-2">チェックイン日が近づいても清掃スタッフが未確定（「募集中」）の予約がある場合に、<strong>オーナー</strong>へリマインドを送信します。「この予約のスタッフがまだ決まっていません」という内容です。</p>
+        <p class="small text-muted mb-2">清掃スタッフが未確定の予約について、<strong>オーナー</strong>へリマインドを送信します。2種類あります：</p>
+        <ul class="small text-muted mb-2" style="padding-left:1.2rem;">
+          <li><strong>定期リマインド</strong> — チェックイン○日前に「スタッフがまだ決まっていません」と定期送信</li>
+          <li><strong>直前予約リマインド</strong> — iCal同期で1週間以内のチェックイン予約が入った時に即時送信</li>
+        </ul>
+
+        <h6 class="fw-bold mt-3 mb-2" style="font-size:0.9rem;">定期リマインド</h6>
         <div class="mb-3">
           <label class="form-label small fw-bold">送信チャンネル</label>
           <select class="form-select form-select-sm notify-channel-select" id="chUndecidedRemind" style="max-width:180px;" data-notify-key="スタッフ未決定リマインド">
@@ -1394,12 +1399,6 @@
             <option value="email">メールのみ</option>
             <option value="line">LINEのみ</option>
           </select>
-        </div>
-        <div class="mb-3">
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="reminderImmediate" checked>
-            <label class="form-check-label small" for="reminderImmediate">iCal取り込み時に1週間以内の予約があれば即時メール送信</label>
-          </div>
         </div>
         <div class="mb-3">
           <label class="form-label small fw-bold">リマインドスケジュール</label>
@@ -1451,6 +1450,22 @@
         <div class="mb-3">
           <label class="form-label small">本文</label>
           <textarea class="form-control form-control-sm" id="reminderBody" rows="5" placeholder="例: 清掃スタッフがまだ確定していません。&#10;チェックイン: {チェックイン}&#10;残り日数: {残り日数}日&#10;詳細: {清掃詳細リンク}"></textarea>
+        </div>
+        <hr class="my-3">
+        <h6 class="fw-bold mb-2" style="font-size:0.9rem;">直前予約リマインド（即時）</h6>
+        <div class="mb-3">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="reminderImmediate" checked>
+            <label class="form-check-label small" for="reminderImmediate">iCal取り込み時に1週間以内の予約があれば即時送信</label>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chImmediateRemind" style="max-width:180px;" data-notify-key="直前予約リマインド">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
         </div>
         <label class="form-label small fw-bold">メール文面テンプレート（即時リマインド）</label>
         <p class="small text-muted mb-1">iCal取り込み時の直前予約通知用。プレースホルダー: <code>{チェックイン}</code> <code>{チェックアウト}</code> <code>{プラットフォーム}</code> <code>{残り日数}</code> <code>{清掃詳細リンク}</code></p>
@@ -1739,18 +1754,6 @@
         <p class="small text-muted">※ 募集メールの本文は、募集作成時に自動生成されます（次回予約情報・アプリURL含む）。</p>
       </div>
 
-      <div id="settingsNotifyImmediateRemind" style="display:none;">
-        <p class="small text-muted mb-2">iCal同期で1週間以内にチェックインの予約が新規追加された際に、<strong>オーナー</strong>へ即時通知を送信します。「直前予約が入りました。急いでスタッフを手配してください」という内容です。</p>
-        <div class="mb-3">
-          <label class="form-label small fw-bold">送信チャンネル</label>
-          <select class="form-select form-select-sm notify-channel-select" id="chImmediateRemind" style="max-width:180px;" data-notify-key="直前予約リマインド">
-            <option value="both">メール＋LINE</option>
-            <option value="email">メールのみ</option>
-            <option value="line">LINEのみ</option>
-          </select>
-        </div>
-        <p class="small text-muted">※ この通知はiCal同期時に自動送信されます。テンプレートは「スタッフ未決定リマインド」タブ内の「即時リマインド」セクションで編集できます。</p>
-      </div>
 
       <div id="settingsNotifyCancel" style="display:none;">
         <p class="small text-muted mb-2">iCal同期で予約キャンセルを検知した際に、<strong>担当スタッフ＋オーナー</strong>へ通知を送信します。「予約がキャンセルされました。清掃業務はキャンセルとなります」という内容です。</p>
@@ -8661,7 +8664,7 @@
             reminderEmail: 'settingsReminderEmail', rosterReminder: 'settingsRosterReminder',
             invoiceRequest: 'settingsInvoiceRequest', confirmTemplate: 'settingsConfirmTemplate',
             notifications: 'settingsNotifications', maintenance: 'settingsMaintenance',
-            notifyRecruit: 'settingsNotifyRecruit', notifyImmediateRemind: 'settingsNotifyImmediateRemind',
+            notifyRecruit: 'settingsNotifyRecruit',
             notifyCancel: 'settingsNotifyCancel', notifyCancelRequest: 'settingsNotifyCancelRequest',
             notifyCancelApprove: 'settingsNotifyCancelApprove', notifyCancelReject: 'settingsNotifyCancelReject',
             notifyInvoiceSend: 'settingsNotifyInvoiceSend', notifyCleaningDone: 'settingsNotifyCleaningDone'
@@ -8684,7 +8687,7 @@
           if (t === 'confirmTemplate') loadConfirmationTemplate();
           // 通知タブ表示時にチャンネル設定を読み込み
           var _notifyTabs = ['notifyRecruit','recruitSettings','confirmTemplate','reminderEmail',
-            'notifyImmediateRemind','notifyCancel','notifyCancelRequest','notifyCancelApprove',
+            'notifyCancel','notifyCancelRequest','notifyCancelApprove',
             'notifyCancelReject','rosterReminder','invoiceRequest','notifyInvoiceSend','notifyCleaningDone'];
           if (_notifyTabs.indexOf(t) >= 0) loadNotifyChannelForTab_(t);
           // 新規タブのメール通知設定読み込み

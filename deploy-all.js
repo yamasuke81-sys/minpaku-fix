@@ -1,0 +1,448 @@
+/**
+ * 全アプリ一括デプロイ＆ブラウザ自動オープン
+ * 使い方: node deploy-all.js
+ *
+ * 1. メインアプリ: clasp push → clasp deploy
+ * 2. チェックリストアプリ: deploy-checklist.js を呼び出し（push → deploy）
+ * 3. ブラウザでメインアプリを自動オープン（オーナー用=通常、スタッフ用=シークレット）
+ */
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const rootDir = __dirname;
+const checklistDir = path.join(rootDir, 'checklist-app');
+
+// clasp コマンドのパスを解決
+const binDir = path.join(rootDir, 'node_modules', '.bin');
+const claspCmd = process.platform === 'win32'
+  ? path.join(binDir, 'clasp.cmd')
+  : path.join(binDir, 'clasp');
+const clasp = fs.existsSync(claspCmd) ? '"' + claspCmd + '"' : 'npx clasp';
+
+function run(cmd, cwd, timeoutMs) {
+  var sep = process.platform === 'win32' ? ';' : ':';
+  var envPath = binDir + sep + (process.env.PATH || '');
+  var opts = { encoding: 'utf8', shell: true, cwd: cwd, env: Object.assign({}, process.env, { PATH: envPath }) };
+  if (timeoutMs) opts.timeout = timeoutMs;
+  try {
+    var out = execSync(cmd, opts);
+    return { ok: true, out: out || '' };
+  } catch (e) {
+    var msg = (e.stdout || '').toString() + (e.stderr || '').toString();
+    if (e.killed) msg += '\n(タイムアウトで強制終了)';
+    // EPERM: clasp操作は成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
+    // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
+    // 操作自体は成功しているので、成功パターンを検出して ok=true を返す。
+    if (/EPERM/.test(msg)) {
+      var hasSuccessIndicator =
+        /Pushed \d+ file/i.test(msg) ||       // clasp push 成功
+        /Created version/i.test(msg) ||        // clasp deploy 成功
+        /AKfycb[A-Za-z0-9_-]{20,}/.test(msg); // デプロイID出力あり
+      if (hasSuccessIndicator) {
+        console.log('  (EPERM警告: .clasprc.json書き込み権限エラー。操作自体は成功)');
+        return { ok: true, out: msg };
+      }
+    }
+    return { ok: false, out: msg };
+  }
+}
+
+/** clasp deployments からデプロイIDを1つ取得（@HEAD除外） */
+function getDeployId(text) {
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].includes('@HEAD')) continue;
+    var m = lines[i].match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/** clasp versions の出力からバージョン数をカウント */
+function countVersions(text) {
+  var count = 0;
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    // "1 - " や "42 - " のような行をカウント
+    if (/^\d+\s+-\s+/.test(lines[i].trim())) count++;
+  }
+  return count;
+}
+
+/** clasp deployments の出力からデプロイ数をカウント（@HEAD除外） */
+function countDeployments(text) {
+  var count = 0;
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].includes('@HEAD')) continue;
+    if (/(AKfycb[A-Za-z0-9_-]{20,})/.test(lines[i])) count++;
+  }
+  return count;
+}
+
+/** .clasp.json からスクリプトIDを読み取る */
+function getScriptId(dir) {
+  var claspJsonPath = path.join(dir, '.clasp.json');
+  if (fs.existsSync(claspJsonPath)) {
+    try {
+      var json = JSON.parse(fs.readFileSync(claspJsonPath, 'utf8'));
+      return json.scriptId || '';
+    } catch (e) {}
+  }
+  return '';
+}
+
+var DEPLOY_LIMIT = 20;
+var DEPLOY_WARN = 15;
+var VERSION_LIMIT = 200;
+var VERSION_WARN = 150;
+
+/** デプロイ数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
+function checkDeployCount(label, cwd) {
+  var r = run(clasp + ' deployments', cwd, 30000);
+  if (!r.ok) {
+    console.log('  ' + label + ': デプロイ数の取得に失敗');
+    return;
+  }
+  var count = countDeployments(r.out);
+  var bar = count + '/' + DEPLOY_LIMIT + '件';
+  if (count >= DEPLOY_WARN) {
+    console.log('  ⚠ ' + label + ': デプロイ数 ' + bar + ' — 古いデプロイの削除が必要です！');
+    console.log('    ※ GASのバージョン付きデプロイは最大20個。自動削除はできないため手動で削除してください。');
+    var scriptId = getScriptId(cwd);
+    if (scriptId) {
+      var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
+      console.log('    GASエディタのデプロイ管理画面を開きます:');
+      console.log('    ' + editorUrl);
+      openBrowser(editorUrl);
+    }
+  } else {
+    console.log('  ' + label + ': デプロイ数 ' + bar);
+  }
+}
+
+/** バージョン数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
+function checkVersionCount(label, cwd) {
+  var r = run(clasp + ' versions', cwd, 30000);
+  if (!r.ok) {
+    console.log('  ' + label + ': バージョン数の取得に失敗');
+    return;
+  }
+  var count = countVersions(r.out);
+  var bar = count + '/' + VERSION_LIMIT + '件';
+  if (count >= VERSION_WARN) {
+    console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン履歴の削除が必要です！');
+    console.log('    ※ GASエディタの左サイドバー「プロジェクト履歴」→ ゴミ箱マーク → バージョンの削除');
+    var scriptId = getScriptId(cwd);
+    if (scriptId) {
+      var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
+      console.log('    GASエディタを開きます:');
+      console.log('    ' + editorUrl);
+      openBrowser(editorUrl);
+    }
+  } else {
+    console.log('  ' + label + ': バージョン数 ' + bar);
+  }
+}
+
+/** ブラウザを通常ウィンドウで開く */
+function openBrowser(url) {
+  try {
+    if (process.platform === 'win32') {
+      execSync('start "" "' + url + '"', { shell: true });
+    } else if (process.platform === 'darwin') {
+      execSync('open "' + url + '"');
+    } else {
+      execSync('xdg-open "' + url + '"');
+    }
+  } catch (e) {
+    console.log('  ブラウザを開けませんでした: ' + url);
+  }
+}
+
+/** ブラウザをシークレットウィンドウで開く（Windows: Brave→Edge→Chrome→通常 の順で試行） */
+function openBrowserIncognito(url) {
+  if (process.platform !== 'win32') { openBrowser(url); return; }
+  // startコマンドは非同期で起動するため、存在しないコマンドでもエラーをスローしない
+  // そのため、ブラウザの実行ファイルが実際に存在するかチェックしてから起動する
+  var localAppData = process.env.LOCALAPPDATA || '';
+  var programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+  var programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  var browsers = [
+    { name: 'Brave', flag: '--incognito', paths: [
+      localAppData + '\\BraveSoftware\\Brave-Browser\\Application\\brave.exe',
+      programFiles + '\\BraveSoftware\\Brave-Browser\\Application\\brave.exe'
+    ]},
+    { name: 'Edge', flag: '--inprivate', paths: [
+      programFilesX86 + '\\Microsoft\\Edge\\Application\\msedge.exe',
+      programFiles + '\\Microsoft\\Edge\\Application\\msedge.exe'
+    ]},
+    { name: 'Chrome', flag: '--incognito', paths: [
+      localAppData + '\\Google\\Chrome\\Application\\chrome.exe',
+      programFiles + '\\Google\\Chrome\\Application\\chrome.exe',
+      programFilesX86 + '\\Google\\Chrome\\Application\\chrome.exe'
+    ]}
+  ];
+  for (var i = 0; i < browsers.length; i++) {
+    var b = browsers[i];
+    for (var j = 0; j < b.paths.length; j++) {
+      if (fs.existsSync(b.paths[j])) {
+        try {
+          execSync('start "" "' + b.paths[j] + '" ' + b.flag + ' "' + url + '"', { shell: true });
+          return;
+        } catch (e) {}
+      }
+    }
+  }
+  // どのブラウザも見つからなかった場合、通常ウィンドウで開く
+  openBrowser(url);
+}
+
+function main() {
+  console.log('========================================');
+  console.log('  全アプリ一括デプロイ');
+  console.log('========================================');
+  console.log('');
+
+  var urls = [];
+
+  // === メインアプリ ===
+  console.log('[1/3] メインアプリ: コードをプッシュ...');
+  var mainPush = run(clasp + ' push --force', rootDir);
+  // EPERM: clasp pushは成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
+  // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
+  // 出力に "Pushed" が含まれていればpush自体は成功しているので続行する。
+  var pushActuallySucceeded = mainPush.ok || /Pushed \d+ file/i.test(mainPush.out);
+  if (!pushActuallySucceeded) {
+    console.error('  エラー: メインアプリの clasp push に失敗');
+    console.error('  ' + mainPush.out.slice(0, 500));
+    process.exit(1);
+  }
+  if (!mainPush.ok && pushActuallySucceeded) {
+    console.log('  OK (EPERM警告あり — push自体は成功)');
+  } else {
+    console.log('  OK');
+  }
+
+  console.log('[2/3] メインアプリ: デプロイを更新...');
+  var today = new Date().toISOString().slice(0, 10);
+
+  // deploy-config.json から保存済みIDを読み込む（URL固定のため最優先）
+  var configPath = path.join(rootDir, 'deploy-config.json');
+  var config = {};
+  if (fs.existsSync(configPath)) {
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (e) {}
+  }
+  var savedMainId = (config.ownerDeploymentId || '').trim();
+
+  var mainId = null;
+
+  // 優先順位1: deploy-config.json の保存済みID
+  if (savedMainId) {
+    console.log('  保存済みデプロイIDで更新: ' + savedMainId.substring(0, 30) + '...');
+    var r = run(clasp + ' deploy --deploymentId "' + savedMainId + '" --description "メインアプリ ' + today + '"', rootDir);
+    if (r.ok) {
+      mainId = savedMainId;
+    } else {
+      console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
+    }
+  }
+
+  // 優先順位2: clasp deployments から探す
+  if (!mainId) {
+    var mainDeps = run(clasp + ' deployments', rootDir);
+    var foundId = mainDeps.ok ? getDeployId(mainDeps.out) : null;
+    if (foundId) {
+      console.log('  既存デプロイを発見。更新: ' + foundId.substring(0, 30) + '...');
+      var r = run(clasp + ' deploy --deploymentId "' + foundId + '" --description "メインアプリ ' + today + '"', rootDir);
+      if (r.ok) {
+        mainId = foundId;
+      }
+    }
+  }
+
+  // 優先順位3: 新規作成（最終手段）
+  if (!mainId) {
+    console.log('  既存デプロイが見つかりません。新規作成...');
+    var r = run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);
+    if (r.ok) {
+      var m = r.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+      if (m) mainId = m[1];
+    }
+  }
+
+  if (mainId) {
+    console.log('  デプロイ: OK');
+    var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
+    urls.push({ label: 'オーナー用', url: baseUrl });
+    urls.push({ label: 'スタッフ用', url: baseUrl + '?staff=1' });
+
+    // deploy-config.json にIDを保存（次回以降URLが変わらない）
+    if (mainId !== savedMainId) {
+      config.ownerDeploymentId = mainId;
+      config.staffDeploymentId = mainId;
+      try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
+    }
+  } else {
+    console.error('  デプロイに失敗しました。');
+  }
+
+  // === オーナーURL・スタッフ用URLをGASに保存 ===
+  if (mainId) {
+    var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
+    var staffUrl = baseUrl + '?staff=1';
+    console.log('  URLをGASに保存中...');
+    try {
+      // ベースURL保存
+      execSync('curl -sL "' + baseUrl + '?action=setBaseUrl&url=' + encodeURIComponent(baseUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+      // ユーザーが保存したownerBaseUrlを確認（ゲートウェイURL等を上書きしないため）
+      var ownerCheckResult = '';
+      try {
+        ownerCheckResult = execSync('curl -sL "' + baseUrl + '?action=getOwnerBaseUrl"', { encoding: 'utf8', timeout: 15000 });
+      } catch (e2) {}
+      var savedOwner = '';
+      try { var parsed = JSON.parse(ownerCheckResult); savedOwner = (parsed && parsed.url) || ''; } catch(e3) {}
+      if (savedOwner && savedOwner !== baseUrl) {
+        // ユーザーが別のURL（ゲートウェイ等）を保存済み → そのURLベースでstaffURLを生成
+        staffUrl = savedOwner + (savedOwner.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
+        console.log('  ユーザー保存URL検出: ' + savedOwner);
+      }
+      // スタッフURL保存
+      execSync('curl -sL "' + baseUrl + '?action=setStaffUrl&url=' + encodeURIComponent(staffUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+      console.log('  OK - ベース: ' + baseUrl);
+      console.log('  OK - スタッフ: ' + staffUrl);
+    } catch (e) {
+      console.log('  URL保存リクエスト失敗（次回デプロイで自動リトライされます）: ' + e.message);
+    }
+  }
+
+  // === ゲートウェイデプロイメント（永続URL用） ===
+  if (mainId) {
+    var savedGatewayId = (config.gatewayDeploymentId || '').trim();
+    var gatewayId = null;
+
+    if (savedGatewayId) {
+      console.log('  ゲートウェイ: 保存済みIDで更新中...');
+      var gResult = run(clasp + ' deploy --deploymentId "' + savedGatewayId + '" --description "ゲートウェイ ' + today + '"', rootDir);
+      if (gResult.ok) {
+        gatewayId = savedGatewayId;
+      } else {
+        console.log('  ゲートウェイ: 保存済みIDでの更新に失敗。新規作成...');
+      }
+    }
+
+    if (!gatewayId) {
+      console.log('  ゲートウェイ: 新規作成中...');
+      var gResult = run(clasp + ' deploy --description "ゲートウェイ ' + today + '"', rootDir);
+      if (gResult.ok) {
+        var gm = gResult.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+        if (gm) gatewayId = gm[1];
+      }
+    }
+
+    if (gatewayId) {
+      var gatewayUrl = 'https://script.google.com/macros/s/' + gatewayId + '/exec';
+      console.log('  ゲートウェイ: OK');
+      urls.push({ label: 'ゲートウェイ（ブックマーク用）', url: gatewayUrl });
+      urls.push({ label: 'ゲートウェイ＋スタッフ', url: gatewayUrl + '?staff=1' });
+
+      if (gatewayId !== savedGatewayId) {
+        config.gatewayDeploymentId = gatewayId;
+        try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
+      }
+
+      // ゲートウェイURLをGASに保存
+      try {
+        var baseUrl = 'https://script.google.com/macros/s/' + mainId + '/exec';
+        execSync('curl -sL "' + baseUrl + '?action=setGatewayUrl&url=' + encodeURIComponent(gatewayUrl) + '"', { encoding: 'utf8', timeout: 15000 });
+        console.log('  ゲートウェイURL保存: OK');
+      } catch (e) {
+        console.log('  ゲートウェイURL保存失敗（次回リトライ）: ' + e.message);
+      }
+    } else {
+      console.log('  ゲートウェイ: 作成に失敗（メインURLは引き続き有効）');
+    }
+  }
+
+  // === チェックリストアプリ（deploy-checklist.js に委譲） ===
+  console.log('[3/3] チェックリストアプリ: deploy-checklist.js を実行...');
+  console.log('');
+  var clDeployScript = path.join(checklistDir, 'deploy-checklist.js');
+  if (fs.existsSync(clDeployScript)) {
+    try {
+      // stdio: 'inherit' で子プロセスの出力をリアルタイム表示
+      var sep = process.platform === 'win32' ? ';' : ':';
+      var envPath = binDir + sep + (process.env.PATH || '');
+      execSync('node "' + clDeployScript + '"', {
+        shell: true,
+        cwd: checklistDir,
+        stdio: 'inherit',
+        timeout: 120000,
+        env: Object.assign({}, process.env, { PATH: envPath })
+      });
+      console.log('');
+      console.log('  チェックリストアプリ: デプロイ完了');
+      // deploy-config.json からチェックリストURLを取得
+      try {
+        var configPath = path.join(rootDir, 'deploy-config.json');
+        if (fs.existsSync(configPath)) {
+          var cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (cfg.checklistDeploymentId) {
+            urls.push({ label: 'チェックリスト', url: 'https://script.google.com/macros/s/' + cfg.checklistDeploymentId + '/exec' });
+          }
+        }
+      } catch (cfgErr) {}
+    } catch (clErr) {
+      console.log('');
+      if (clErr.killed) {
+        console.error('  チェックリストアプリ: タイムアウト（120秒）で強制終了');
+        console.error('  デプロイ自体は成功している可能性があります。');
+      } else {
+        console.error('  チェックリストアプリのデプロイに失敗');
+      }
+    }
+  } else {
+    console.error('  エラー: ' + clDeployScript + ' が見つかりません');
+  }
+
+  // === デプロイ数チェック（20件上限） ===
+  console.log('');
+  console.log('[デプロイ数チェック（上限20件）]');
+  checkDeployCount('メインアプリ', rootDir);
+  if (fs.existsSync(checklistDir)) {
+    checkDeployCount('チェックリスト', checklistDir);
+  }
+
+  // === バージョン数チェック（200件上限） ===
+  console.log('[バージョン数チェック（上限200件）]');
+  checkVersionCount('メインアプリ', rootDir);
+  if (fs.existsSync(checklistDir)) {
+    checkVersionCount('チェックリスト', checklistDir);
+  }
+
+  console.log('');
+  console.log('========================================');
+  console.log('  デプロイ完了 - ブラウザを開いています...');
+  console.log('========================================');
+  console.log('');
+
+  // URLを表示
+  urls.forEach(function(u) {
+    console.log('  ' + u.label + ': ' + u.url);
+  });
+  console.log('');
+
+  // ブラウザで2つだけ開く: オーナー(通常)、スタッフ(シークレット)
+  urls.forEach(function(u) {
+    if (u.label === 'オーナー用') {
+      console.log('  通常ウィンドウで開く: ' + u.label);
+      openBrowser(u.url);
+    } else if (u.label === 'スタッフ用') {
+      console.log('  シークレットウィンドウで開く: ' + u.label);
+      openBrowserIncognito(u.url);
+    }
+  });
+}
+
+main();

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1676,6 +1676,10 @@
 
       <div id="settingsConfirmTemplate" style="display:none;">
         <p class="small text-muted mb-2">オーナーが清掃スタッフを確定した際に、<strong>全スタッフ</strong>へ確定結果を通知します。「スタッフが確定しました。作業日: ○月○日」という内容です。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyStaffConfirmToggle">
+          <label class="form-check-label" for="notifyStaffConfirmToggle"><strong>スタッフ確定通知を有効にする</strong></label>
+        </div>
         <div class="mb-3">
           <label class="form-label small fw-bold">送信チャンネル</label>
           <select class="form-select form-select-sm notify-channel-select" id="chConfirm" style="max-width:180px;" data-notify-key="スタッフ確定">
@@ -8684,7 +8688,7 @@
             'notifyCancelReject','rosterReminder','invoiceRequest','notifyInvoiceSend','notifyCleaningDone'];
           if (_notifyTabs.indexOf(t) >= 0) loadNotifyChannelForTab_(t);
           // 新規タブのメール通知設定読み込み
-          var _emailNotifyTabs = ['notifyRecruit','notifyCancel','notifyCancelRequest',
+          var _emailNotifyTabs = ['notifyRecruit','confirmTemplate','notifyCancel','notifyCancelRequest',
             'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
         });
@@ -8728,6 +8732,7 @@
       // 新規タブ用: メール通知ON/OFFの読み込み
       var _emailNotifyToggleMap = {
         notifyRecruit: { id: 'notifyRecruitStartToggle', key: '募集開始通知有効' },
+        confirmTemplate: { id: 'notifyStaffConfirmToggle', key: 'スタッフ確定通知有効' },
         notifyCancel: { id: 'notifyCancelToggle', key: 'キャンセル通知有効' },
         notifyCancelRequest: { id: 'notifyCancelRequestToggle', key: '辞退申請通知有効' },
         notifyCancelApprove: { id: 'notifyCancelApproveToggle', key: '辞退承認通知有効' },

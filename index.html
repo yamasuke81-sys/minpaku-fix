@@ -2188,6 +2188,13 @@
                 try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
                 console.log('[DEBUG ownerUrl] 2a. window.savedOwnerUrl更新: ' + r.url);
                 window._ownerUrlDebugLog.push('2a.savedOwnerUrl更新=' + r.url);
+                // loadSettingsに依存せず、入力欄を直接設定（loadSettingsが呼ばれない場合の対策）
+                var _ownerInp = document.getElementById('ownerUrlInput');
+                if (_ownerInp && !_ownerInp.value) {
+                  _ownerInp.value = r.url;
+                  if (typeof generateUrlsFromOwnerUrl === 'function') generateUrlsFromOwnerUrl(r.url);
+                  window._ownerUrlDebugLog.push('2a2.入力欄に直接設定=' + r.url.substring(0, 60) + '...');
+                }
               }
               if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
             } else if (r.success && !r.url && window.appBaseUrl) {
@@ -4750,7 +4757,11 @@
             if (tab === 'staffSchedule') loadStaffSchedule();
             if (tab === 'invoice') loadInvoiceData();
             if (tab === 'notifications') loadNotificationListMain();
-            if (tab === 'settings') loadSettings();
+            if (tab === 'settings') {
+              console.log('[DEBUG ownerUrl] TAB: settings タブ切替 → loadSettings呼び出し');
+              if (window._ownerUrlDebugLog) { window._ownerUrlDebugLog.push('TAB.settingsタブ切替→loadSettings呼び出し'); }
+              loadSettings();
+            }
         }
         document.querySelectorAll('#mainTabs [data-tab]').forEach(function(a) {
           a.addEventListener('click', function(e) {

@@ -1152,12 +1152,6 @@
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
-      <!-- [DEBUG] 重複排除デバッグパネル -->
-      <div id="dedupDebugPanel" class="mt-2 p-2 border rounded bg-info bg-opacity-10" style="font-size:11px; display:none;">
-        <strong>[DEBUG] 予約重複排除の結果:</strong>
-        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="this.parentElement.style.display='none';">閉じる</button>
-        <pre id="dedupDebugPre" class="mb-0 mt-1" style="white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:300px;overflow-y:auto;"></pre>
-      </div>
     </div>
     <div id="panelRecruit" style="display:none;">
       <div id="recruitList"></div>
@@ -1301,11 +1295,6 @@
             <button type="button" class="btn btn-sm btn-success" id="btnSaveOwnerUrl">保存</button>
           </div>
           <div id="ownerUrlSaveMsg" class="small text-success mt-1" style="display:none;">保存しました</div>
-          <!-- [DEBUG] オーナーURL保存デバッグ情報 -->
-          <div id="ownerUrlDebugArea" class="mt-2 p-2 border rounded bg-warning bg-opacity-10" style="font-size:11px;">
-            <strong>[DEBUG] オーナーURL保存状況:</strong>
-            <pre id="ownerUrlDebugPre" class="mb-0 mt-1" style="white-space:pre-wrap;word-break:break-all;font-size:11px;">読み込み中...</pre>
-          </div>
         </div>
         <div class="mb-3 p-2 border rounded bg-light">
           <label class="form-label small fw-bold">スタッフ用URL</label>
@@ -2161,14 +2150,6 @@
       if (window.readOnly) window.staffMode = true;
       window.appBaseUrl = <?= JSON.stringify(baseUrl) ?> || '';
       window.savedOwnerUrl = <?= JSON.stringify(savedOwnerUrl) ?> || '';
-      // [DEBUG] テンプレート値の確認
-      console.log('[DEBUG ownerUrl] 1. テンプレート値: savedOwnerUrl=' + JSON.stringify(window.savedOwnerUrl) + ', appBaseUrl=' + JSON.stringify(window.appBaseUrl));
-      window._ownerUrlDebugLog = ['1.テンプレート値: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)')];
-      // [DEBUG] デバッグエリアを自動更新するヘルパー
-      window._updateOwnerUrlDebugArea = function() {
-        var dp = document.getElementById('ownerUrlDebugPre');
-        if (dp && window._ownerUrlDebugLog) dp.textContent = window._ownerUrlDebugLog.join('\n');
-      };
       // テンプレートキャッシュ対策: ページ読み込み時にサーバーからオーナーURLを非同期取得
       // （設定タブを開く前にwindow.savedOwnerUrlを最新化する）
       // 【重要】これがgetOwnerBaseUrl()を呼ぶ唯一の場所。loadSettings()からは呼ばない。
@@ -2177,70 +2158,40 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            // [DEBUG] 非同期取得結果
-            console.log('[DEBUG ownerUrl] 2. getOwnerBaseUrl結果: ' + jsonStr);
-            window._ownerUrlDebugLog.push('2.getOwnerBaseUrl結果: ' + jsonStr);
             if (r.success && r.url) {
               // ユーザーがページ読み込み後に手動保存していたら、サーバー取得値で上書きしない
               if (!window._ownerUrlLastSaveTime) {
                 window.savedOwnerUrl = r.url;
                 try { localStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
                 try { sessionStorage.setItem('ownerUrlCache', r.url); } catch(e) {}
-                console.log('[DEBUG ownerUrl] 2a. window.savedOwnerUrl更新: ' + r.url);
-                window._ownerUrlDebugLog.push('2a.savedOwnerUrl更新=' + r.url);
-                // loadSettingsに依存せず、入力欄を直接設定（loadSettingsが呼ばれない場合の対策）
+                // loadSettingsに依存せず、入力欄を直接設定
                 var _ownerInp = document.getElementById('ownerUrlInput');
                 if (_ownerInp && !_ownerInp.value) {
                   _ownerInp.value = r.url;
                   if (typeof generateUrlsFromOwnerUrl === 'function') generateUrlsFromOwnerUrl(r.url);
-                  window._ownerUrlDebugLog.push('2a2.入力欄に直接設定=' + r.url.substring(0, 60) + '...');
                 }
               }
-              if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
             } else if (r.success && !r.url && window.appBaseUrl) {
-              console.log('[DEBUG ownerUrl] 2b. サーバーにURL未保存→appBaseUrlで自動保存開始');
-              window._ownerUrlDebugLog.push('2b.サーバーURL未保存→appBaseUrlで自動保存: ' + window.appBaseUrl);
-              if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
               // サーバーにURLが未保存 → appBaseUrl(デプロイURL)を自動保存
               google.script.run.withSuccessHandler(function(saveJsonStr) {
                 try {
                   var sr = JSON.parse(saveJsonStr);
-                  console.log('[DEBUG ownerUrl] 2c. 自動保存結果: ' + saveJsonStr);
-                  window._ownerUrlDebugLog.push('2c.自動保存結果: ' + saveJsonStr);
                   if (sr.success && sr.savedUrl && !window._ownerUrlLastSaveTime) {
                     window.savedOwnerUrl = sr.savedUrl;
                     try { localStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
                     try { sessionStorage.setItem('ownerUrlCache', sr.savedUrl); } catch(e) {}
                   }
                 } catch(e) {}
-              }).withFailureHandler(function(err) {
-                console.log('[DEBUG ownerUrl] 2d. 自動保存失敗: ' + (err.message || err));
-                window._ownerUrlDebugLog.push('2d.自動保存失敗: ' + (err.message || err));
-              }).saveOwnerUrl(window.appBaseUrl);
-            } else {
-              window._ownerUrlDebugLog.push('2e.URL取得なし(success=' + r.success + ', url=' + (r.url || '空') + ')');
-              if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
+              }).withFailureHandler(function(err) {}).saveOwnerUrl(window.appBaseUrl);
             }
-          } catch(e) {
-            console.log('[DEBUG ownerUrl] 2f. パースエラー: ' + e);
-            window._ownerUrlDebugLog.push('2f.パースエラー: ' + e);
-          }
-        }).withFailureHandler(function(err) {
-          console.log('[DEBUG ownerUrl] 2g. getOwnerBaseUrl失敗: ' + (err.message || err));
-          window._ownerUrlDebugLog.push('2g.getOwnerBaseUrl失敗: ' + (err.message || err));
-          if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
-        }).getOwnerBaseUrl();
+          } catch(e) {}
+        }).withFailureHandler(function(err) {}).getOwnerBaseUrl();
       } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
-      // デバッグ: デプロイ確認用
+      // バージョン表示（オーナー・スタッフ共通）
       try {
         var dv = document.getElementById('deployVersion');
-        var dbgQs = '<?= debugQueryString ?>';
-        var dbgSp = '<?= debugStaffParam ?>';
-        var dbgRaw = '<?= isStaffMode ?>';
-        var dbgStr = '<?= staffModeStr ?>';
-        // バージョン表示（オーナー・スタッフ共通）
         if (dv) dv.style.display = '';
       } catch(e) {}
 
@@ -2282,8 +2233,6 @@
         if (lower === 'airbnb' || lower === 'booking.com') return false;
         // iCal同期で追加されたプレースホルダ名（例: "Airbnb予約", "Booking.com予約", "予約者"）
         if (/^(airbnb|booking\.com|rakuten|楽天)?予約[者]?$/i.test(name)) return false;
-        // デバッグ: 判定結果をコンソールに出力
-        if (window._debugRoster) console.log('isRosterAnswered: name="' + name + '" → true');
         return name.length > 0;
       }
 
@@ -2495,13 +2444,10 @@
           existing.mergedRowNumbers.push(b.rowNumber);
         }
 
-        // [DEBUG] 重複排除デバッグ
-        var _dedupDebug = { total: data.length, merged: 0, separate: 0, noCheckIn: 0, details: [] };
         // CO不一致ワーニング収集（オーナー通知用）
         var _coMismatchWarnings = [];
         data.forEach(function(b) {
           if (!b.checkInParsed) {
-            _dedupDebug.noCheckIn++;
             merged.push(b);
             return;
           }
@@ -2534,19 +2480,12 @@
               }
             }
             // 同一物件で同日チェックインは1予約のみ → 常にマージ
-            _dedupDebug.merged++;
-            _dedupDebug.details.push('[MERGED] row' + b.rowNumber + '→row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + '/' + existCo + ' name=' + (b.guestName||'') + '→' + (existing.guestName||'') + ' site=' + (b.bookingSite||''));
             mergeBookingData(existing, b);
             return;
           }
-          _dedupDebug.separate++;
           ciKeyMap[ci] = merged.length;
           merged.push(b);
         });
-        // [DEBUG] 結果をコンソールとデバッグエリアに出力
-        console.log('[DEBUG dedup] 合計=' + _dedupDebug.total + ' マージ=' + _dedupDebug.merged + ' 分離=' + _dedupDebug.separate + ' CI無し=' + _dedupDebug.noCheckIn);
-        if (_dedupDebug.details.length) console.log('[DEBUG dedup] 詳細:\n' + _dedupDebug.details.join('\n'));
-        window._lastDedupDebug = _dedupDebug;
         // CO不一致ワーニングをwindowに保存（通知バナー用）
         window._coMismatchWarnings = _coMismatchWarnings;
 
@@ -4269,37 +4208,6 @@
             calendar.addEventSource(events);
             calendar.render();
           }
-          // [DEBUG] 重複排除デバッグパネル更新
-          try {
-            var _ddPanel = document.getElementById('dedupDebugPanel');
-            var _ddPre = document.getElementById('dedupDebugPre');
-            if (_ddPanel && _ddPre && window._lastDedupDebug) {
-              var dd = window._lastDedupDebug;
-              var lines = ['合計行数: ' + dd.total + '  マージされた行: ' + dd.merged + '  分離(表示)された行: ' + dd.separate + '  CheckIn無し: ' + dd.noCheckIn];
-              if (dd.merged > 0 || dd.details.length > 0) {
-                lines.push('');
-                dd.details.forEach(function(d) { lines.push(d); });
-              }
-              // 同一checkInで分離されたペアを追加表示
-              var ciCount = {};
-              allBookings.forEach(function(b) {
-                if (b.checkInParsed) {
-                  if (!ciCount[b.checkInParsed]) ciCount[b.checkInParsed] = [];
-                  ciCount[b.checkInParsed].push('row' + b.rowNumber + ' co=' + (b.checkOutParsed||'無') + ' name=' + (b.guestName||'') + ' site=' + (b.bookingSite||''));
-                }
-              });
-              var hasDups = false;
-              for (var ciKey in ciCount) {
-                if (ciCount[ciKey].length > 1) {
-                  if (!hasDups) { lines.push(''); lines.push('--- 同一CheckIn日の行一覧 ---'); hasDups = true; }
-                  lines.push('CI=' + ciKey + ' (' + ciCount[ciKey].length + '行):');
-                  ciCount[ciKey].forEach(function(r) { lines.push('  ' + r); });
-                }
-              }
-              _ddPre.textContent = lines.join('\n');
-              _ddPanel.style.display = 'block';
-            }
-          } catch(e) { console.log('[DEBUG dedup panel error] ' + e); }
           // CO不一致通知バナー更新（オーナーのみ）
           try {
             var _cmBanner = document.getElementById('coMismatchBanner');
@@ -4595,14 +4503,11 @@
           }
           var saved = null;
           try { saved = JSON.parse(localStorage.getItem('staffSelected') || 'null'); } catch (e) {}
-          console.log('[DEBUG staffCache] 起動時キャッシュ:', saved);
           if (saved && (saved.name || saved.email)) {
-            console.log('[DEBUG staffCache] キャッシュから復元: name=' + saved.name + ', email=' + saved.email);
             applyStaffSelection(saved.name, saved.email);
             loadStaffSchedule();
             loadInvoiceData();
           } else {
-            console.log('[DEBUG staffCache] キャッシュなし → スタッフ選択画面を表示');
             showStaffSelectOverlay();
           }
         }
@@ -4758,8 +4663,6 @@
             if (tab === 'invoice') loadInvoiceData();
             if (tab === 'notifications') loadNotificationListMain();
             if (tab === 'settings') {
-              console.log('[DEBUG ownerUrl] TAB: settings タブ切替 → loadSettings呼び出し');
-              if (window._ownerUrlDebugLog) { window._ownerUrlDebugLog.push('TAB.settingsタブ切替→loadSettings呼び出し'); }
               loadSettings();
             }
         }
@@ -4769,7 +4672,6 @@
             var tab = this.getAttribute('data-tab');
             // 請求書タブ: スタッフモードではパスワード認証を要求
             if (tab === 'invoice' && window.staffMode && !window.isOwnerUser && !window._invoiceAuthenticated) {
-              console.log('[DEBUG invoiceAuth] 請求書タブクリック: 認証チェック開始');
               showInvoicePasswordModal();
               return;
             }
@@ -6217,11 +6119,6 @@
       }
 
       function loadSettings() {
-        // [DEBUG] loadSettings開始トレース
-        console.log('[DEBUG ownerUrl] 3a. loadSettings開始');
-        if (window._ownerUrlDebugLog) { window._ownerUrlDebugLog.push('3a.loadSettings開始'); }
-        if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
-
         var ownerInp = document.getElementById('ownerUrlInput');
         var staffInp = document.getElementById('staffUrlInput');
         var readonlyInp = document.getElementById('readonlyUrlInput');
@@ -6247,22 +6144,13 @@
         try { cachedOwnerUrl = localStorage.getItem('ownerUrlCache') || ''; } catch(e) {}
         if (!cachedOwnerUrl) { try { cachedOwnerUrl = sessionStorage.getItem('ownerUrlCache') || ''; } catch(e) {} }
         var base = window.savedOwnerUrl || cachedOwnerUrl || window.appBaseUrl || '';
-        // [DEBUG] loadSettings復元値
-        var debugMsg = '3b.loadSettings復元: savedOwnerUrl=' + (window.savedOwnerUrl || '(空)') + ', localStorage=' + (cachedOwnerUrl || '(空)') + ', appBaseUrl=' + (window.appBaseUrl || '(空)') + ' → base=' + (base || '(空)');
-        console.log('[DEBUG ownerUrl] ' + debugMsg);
-        if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push(debugMsg);
         if (base) {
           if (ownerInp) ownerInp.value = base;
           generateUrlsFromOwnerUrl(base);
-          // [DEBUG] 設定完了トレース
-          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('3c.ownerInp設定完了: value=' + (ownerInp ? ownerInp.value.substring(0, 60) + '...' : 'inp無し'));
         } else {
           if (staffInp && !staffInp.value) staffInp.value = '?staff=1';
           if (readonlyInp && !readonlyInp.value) readonlyInp.value = '?view=readonly';
-          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('3c.base空のためURL未設定');
         }
-        // [DEBUG] デバッグエリアに情報表示
-        if (window._updateOwnerUrlDebugArea) window._updateOwnerUrlDebugArea();
         loadInvoiceSettings_();
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -6985,8 +6873,6 @@
             if (r.success) {
               if (resEl) {
                 var sr = r.sendResult || '';
-                console.log('[DEBUG invoiceSend] sendResult=' + sr);
-                console.log('[DEBUG invoiceSend] debugMailInfo=' + JSON.stringify(r.debugMailInfo || {}));
                 var emailOk = sr.indexOf('送信済み') === 0;
                 var msg = 'PDF作成完了（合計: ¥' + (r.total || 0).toLocaleString() + '）';
                 if (emailOk) {
@@ -7000,15 +6886,10 @@
                   resEl.className = 'small mt-1 text-warning';
                 } else if (sr.indexOf('スキップ') !== -1) {
                   msg += ' / ⚠ メール送信に失敗しました（PDF作成は成功）';
-                  msg += '\n[デバッグ] sendResult: ' + sr;
                   resEl.className = 'small mt-1 text-warning';
                 } else {
                   resEl.className = 'small mt-1 text-success';
                 }
-                if (r.debugMailInfo) {
-                  msg += '\n[デバッグ] ownerEmail=' + (r.debugMailInfo.ownerEmail || '(空)') + ', quota=' + (r.debugMailInfo.quota || '?') + ', notifyEnabled=' + (r.debugMailInfo.notifyEnabled || '?');
-                }
-                resEl.style.whiteSpace = 'pre-wrap';
                 resEl.textContent = msg;
                 resEl.style.display = 'block';
               }
@@ -7055,13 +6936,9 @@
       // オーナーURL保存（共通関数）
       function doSaveOwnerUrl(ownerUrl, btn) {
         if (!ownerUrl) { if (btn) { alert('オーナーURLを入力してください。'); } return; }
-        console.log('[DEBUG ownerUrl] 4. 保存開始: ownerUrl=' + ownerUrl);
-        if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('4.保存開始: ' + ownerUrl);
         if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
         google.script.run.withSuccessHandler(function(jsonStr) {
           if (btn) { btn.disabled = false; btn.textContent = '保存'; }
-          console.log('[DEBUG ownerUrl] 5. 保存結果: ' + jsonStr);
-          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5.保存結果: ' + jsonStr);
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
@@ -7080,25 +6957,15 @@
               // localStorageとsessionStorageにサーバーで保存されたURL（クリーン済み）をキャッシュ
               try { localStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
               try { sessionStorage.setItem('ownerUrlCache', savedUrl); } catch(e) {}
-              // [DEBUG] デバッグエリア更新
-              var dp = document.getElementById('ownerUrlDebugPre');
-              if (dp && window._ownerUrlDebugLog) { dp.textContent = window._ownerUrlDebugLog.join('\n'); }
             } else {
               alert('保存に失敗しました: ' + (r.error || ''));
-              if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5x.保存失敗: ' + (r.error || ''));
-              var dp2 = document.getElementById('ownerUrlDebugPre');
-              if (dp2 && window._ownerUrlDebugLog) { dp2.textContent = window._ownerUrlDebugLog.join('\n'); }
             }
           } catch (e) {
             alert('保存に失敗しました。');
-            if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5y.パースエラー: ' + e);
           }
         }).withFailureHandler(function(err) {
           if (btn) { btn.disabled = false; btn.textContent = '保存'; }
           alert('保存に失敗しました: ' + (err.message || ''));
-          if (window._ownerUrlDebugLog) window._ownerUrlDebugLog.push('5z.通信エラー: ' + (err.message || err));
-          var dp3 = document.getElementById('ownerUrlDebugPre');
-          if (dp3 && window._ownerUrlDebugLog) { dp3.textContent = window._ownerUrlDebugLog.join('\n'); }
         }).saveOwnerUrl(ownerUrl);
       }
       // 保存ボタン
@@ -8544,8 +8411,7 @@
         window.currentUserEmail = (email || '').trim();
         try {
           localStorage.setItem('staffSelected', JSON.stringify({ name: window.currentUserName, email: window.currentUserEmail }));
-          console.log('[DEBUG staffCache] localStorageに保存: name=' + window.currentUserName + ', email=' + window.currentUserEmail);
-        } catch (e) { console.warn('[DEBUG staffCache] localStorage保存失敗:', e); }
+        } catch (e) {}
         // スタッフ変更時は請求書認証をリセット
         window._invoiceAuthenticated = false;
         var disp = document.getElementById('staffDisplayName');
@@ -8696,7 +8562,7 @@
       // === 請求書タブ パスワード認証 ===
       function showInvoicePasswordModal() {
         var ov = document.getElementById('invoicePasswordOverlay');
-        if (!ov) { console.warn('[DEBUG invoiceAuth] invoicePasswordOverlay要素が見つかりません'); return; }
+        if (!ov) return;
         var setupArea = document.getElementById('invoicePwSetupArea');
         var inputArea = document.getElementById('invoicePwInputArea');
         var setupMsg = document.getElementById('invoicePwSetupMsg');
@@ -8704,31 +8570,25 @@
         if (setupMsg) setupMsg.style.display = 'none';
         if (pwMsg) pwMsg.style.display = 'none';
         // サーバーにパスワード設定済みか確認
-        console.log('[DEBUG invoiceAuth] パスワード有無チェック: name=' + window.currentUserName + ', email=' + window.currentUserEmail);
         google.script.run
           .withSuccessHandler(function(jsonStr) {
             try {
               var r = JSON.parse(jsonStr);
-              console.log('[DEBUG invoiceAuth] verifyStaffPassword応答(空PW):', JSON.stringify(r));
               if (r.success && r.noPassword) {
                 // パスワード未設定 → 新規設定画面
-                console.log('[DEBUG invoiceAuth] パスワード未設定 → セットアップ画面');
                 if (setupArea) setupArea.style.display = 'block';
                 if (inputArea) inputArea.style.display = 'none';
               } else {
                 // パスワード設定済み → 入力画面
-                console.log('[DEBUG invoiceAuth] パスワード設定済み → 入力画面');
                 if (setupArea) setupArea.style.display = 'none';
                 if (inputArea) inputArea.style.display = 'block';
               }
             } catch (e) {
-              console.error('[DEBUG invoiceAuth] パースエラー:', e);
               if (setupArea) setupArea.style.display = 'none';
               if (inputArea) inputArea.style.display = 'block';
             }
           })
           .withFailureHandler(function(err) {
-            console.error('[DEBUG invoiceAuth] サーバーエラー:', err);
             if (setupArea) setupArea.style.display = 'none';
             if (inputArea) inputArea.style.display = 'block';
           })
@@ -8750,13 +8610,11 @@
           var v2 = (pw2 && pw2.value || '').trim();
           if (v1.length < 4) { if (msg) { msg.textContent = 'パスワードは4文字以上で設定してください'; msg.style.display = 'block'; } return; }
           if (v1 !== v2) { if (msg) { msg.textContent = 'パスワードが一致しません'; msg.style.display = 'block'; } return; }
-          console.log('[DEBUG invoiceAuth] パスワード新規設定中...');
           invoicePwSetupBtn.disabled = true;
           google.script.run
             .withSuccessHandler(function(jsonStr) {
               invoicePwSetupBtn.disabled = false;
               var r = JSON.parse(jsonStr);
-              console.log('[DEBUG invoiceAuth] setStaffPassword応答:', JSON.stringify(r));
               if (r.success) {
                 window._invoiceAuthenticated = true;
                 hideInvoicePasswordModal();
@@ -8767,7 +8625,6 @@
             })
             .withFailureHandler(function(err) {
               invoicePwSetupBtn.disabled = false;
-              console.error('[DEBUG invoiceAuth] パスワード設定エラー:', err);
               if (msg) { msg.textContent = 'サーバーエラー: ' + (err.message || err); msg.style.display = 'block'; }
             })
             .setStaffPassword(window.currentUserName || '', window.currentUserEmail || '', '', v1);
@@ -8781,13 +8638,11 @@
           var msg = document.getElementById('invoicePwMsg');
           var pw = (pwInput && pwInput.value || '').trim();
           if (!pw) { if (msg) { msg.textContent = 'パスワードを入力してください'; msg.style.display = 'block'; } return; }
-          console.log('[DEBUG invoiceAuth] パスワード認証中...');
           invoicePwVerifyBtn.disabled = true;
           google.script.run
             .withSuccessHandler(function(jsonStr) {
               invoicePwVerifyBtn.disabled = false;
               var r = JSON.parse(jsonStr);
-              console.log('[DEBUG invoiceAuth] verifyStaffPassword応答:', JSON.stringify(r));
               if (r.success && r.verified) {
                 window._invoiceAuthenticated = true;
                 hideInvoicePasswordModal();
@@ -8799,7 +8654,6 @@
             })
             .withFailureHandler(function(err) {
               invoicePwVerifyBtn.disabled = false;
-              console.error('[DEBUG invoiceAuth] 認証エラー:', err);
               if (msg) { msg.textContent = 'サーバーエラー: ' + (err.message || err); msg.style.display = 'block'; }
             })
             .verifyStaffPassword(window.currentUserName || '', window.currentUserEmail || '', pw);
@@ -8838,11 +8692,9 @@
               if (newPw.length < 4) { customAlert('パスワードは4文字以上で設定してください'); return; }
               customPrompt('新しいパスワードをもう一度入力してください', '', 'password').then(function(newPw2) {
                 if (newPw !== newPw2) { customAlert('パスワードが一致しません'); return; }
-                console.log('[DEBUG invoiceAuth] パスワード変更中...');
                 google.script.run
                   .withSuccessHandler(function(jsonStr) {
                     var r = JSON.parse(jsonStr);
-                    console.log('[DEBUG invoiceAuth] setStaffPassword応答:', JSON.stringify(r));
                     if (r.success) {
                       customAlert('パスワードを変更しました');
                     } else {
@@ -8850,7 +8702,6 @@
                     }
                   })
                   .withFailureHandler(function(err) {
-                    console.error('[DEBUG invoiceAuth] パスワード変更エラー:', err);
                     customAlert('サーバーエラー: ' + (err.message || err));
                   })
                   .setStaffPassword(window.currentUserName || '', window.currentUserEmail || '', oldPw, newPw);

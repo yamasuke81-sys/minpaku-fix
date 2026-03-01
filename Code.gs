@@ -6482,11 +6482,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       itemCount: allItems.length,
       sendResult: sendResult,
       history: updatedHistory,
-      historyWriteOk: historyWriteOk,
-      debugMailInfo: {
-        ownerEmail: ownerEmail || '(未設定)',
-        notifyEnabled: isEmailNotifyEnabled_('請求書送信通知有効')
-      }
+      historyWriteOk: historyWriteOk
     });
   } catch (e) {
     var errMsg = e.toString();

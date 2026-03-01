@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1629,16 +1629,18 @@
           </div>
         </div>
 
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input" type="checkbox" id="lineMuteEnabled">
-          <label class="form-check-label" for="lineMuteEnabled"><strong>ミュート送信</strong></label>
-          <div class="form-text small">ONにすると、受信者のスマホにプッシュ通知を出さずに送信します（LINEを開いたときに確認できます）</div>
-        </div>
-
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 mb-4">
           <button type="button" class="btn btn-sm btn-primary" id="btnSaveLineNotify">LINE通知設定を保存</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnTestLineNotify">テスト送信</button>
         </div>
+
+        <hr>
+        <h6 class="fw-bold mb-2">通知別チャンネル設定</h6>
+        <p class="small text-muted mb-2">各通知をメール・LINE・両方のどれで送信するか選択できます。</p>
+        <div id="notifyChannelList" class="mb-3">
+          <div class="text-muted small">読み込み中...</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="btnSaveNotifyChannels">チャンネル設定を保存</button>
       </div>
 
       <div id="settingsInvoiceRequest" style="display:none;">
@@ -7845,8 +7847,6 @@
               var uid = document.getElementById('lineUserId');
               if (uid) uid.value = r.settings.lineUserId || '';
               setLineTargetMode(r.settings.lineTargetMode === 'personal' ? 'personal' : 'group');
-              var mute = document.getElementById('lineMuteEnabled');
-              if (mute) mute.checked = r.settings.lineMuteEnabled === true;
             }
           } catch (e) {}
         }).getLineNotifySettings();
@@ -7862,8 +7862,7 @@
           lineChannelToken: (document.getElementById('lineChannelToken').value || '').trim(),
           lineGroupId: (document.getElementById('lineGroupId').value || '').trim(),
           lineUserId: (document.getElementById('lineUserId').value || '').trim(),
-          lineTargetMode: _lineTargetMode,
-          lineMuteEnabled: document.getElementById('lineMuteEnabled').checked
+          lineTargetMode: _lineTargetMode
         };
         if (settings.lineNotifyEnabled && (!settings.lineChannelToken || !targetId)) {
           alert('LINE通知を有効にするには、チャネルアクセストークンと送信先IDを入力してください。');
@@ -7904,6 +7903,53 @@
           btn.textContent = origText;
           alert('送信に失敗しました。\n' + (e ? e.toString() : ''));
         }).sendLineTestMessage();
+      });
+
+      // 通知別チャンネル設定
+      var _notifyChannelData = {};
+      function loadNotifyChannelSettings() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success) return;
+            _notifyChannelData = r.channels || {};
+            var container = document.getElementById('notifyChannelList');
+            if (!container) return;
+            var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">';
+            html += '<thead><tr><th>通知</th><th style="width:180px;">送信先</th></tr></thead><tbody>';
+            (r.keys || []).forEach(function(item) {
+              var val = _notifyChannelData[item.key] || 'both';
+              html += '<tr><td>' + item.label + '</td><td>';
+              html += '<select class="form-select form-select-sm" data-notify-key="' + item.key + '">';
+              html += '<option value="both"' + (val === 'both' ? ' selected' : '') + '>メール＋LINE</option>';
+              html += '<option value="email"' + (val === 'email' ? ' selected' : '') + '>メールのみ</option>';
+              html += '<option value="line"' + (val === 'line' ? ' selected' : '') + '>LINEのみ</option>';
+              html += '</select></td></tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+          } catch (e) {}
+        }).getNotifyChannelSettings();
+      }
+      document.getElementById('btnSaveNotifyChannels').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        var selects = document.querySelectorAll('#notifyChannelList select[data-notify-key]');
+        var channels = {};
+        selects.forEach(function(sel) { channels[sel.getAttribute('data-notify-key')] = sel.value; });
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '保存中...';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
+          var r = JSON.parse(jsonStr);
+          alert(r.success ? '保存しました。' : (r.error || '失敗'));
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          alert('保存に失敗しました。');
+        }).saveNotifyChannelSettings(channels);
       });
 
       // 請求書要請メール設定（スタッフ宛）
@@ -8589,7 +8635,7 @@
           if (t === 'notifications') loadNotificationList();
           if (t === 'invoice') loadInvoiceSettings_();
           if (t === 'emailNotify') loadEmailNotifySettings();
-          if (t === 'lineNotify') loadLineNotifySettings();
+          if (t === 'lineNotify') { loadLineNotifySettings(); loadNotifyChannelSettings(); }
           if (t === 'invoiceRequest') loadInvoiceRequestSettings();
           if (t === 'confirmTemplate') loadConfirmationTemplate();
         });

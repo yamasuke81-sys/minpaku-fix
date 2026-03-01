@@ -4089,6 +4089,7 @@ function saveNotifyChannelSettings(channels) {
       if (k) rowMap[k] = i + 2;
     });
     NOTIFY_CHANNEL_KEYS_.forEach(function(item) {
+      if (!(item.key in channels)) return; // 渡されたキーだけ更新
       var sheetKey = '通知CH_' + item.key;
       var val = channels[item.key] || 'both';
       if (rowMap[sheetKey]) {

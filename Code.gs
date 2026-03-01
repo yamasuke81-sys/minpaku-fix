@@ -4014,8 +4014,30 @@ function saveLineNotifySettings(settings) {
 function sendLineTestMessage() {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
-    var debug = sendLineMessage_('【テスト】LINE通知の接続テストです。この通知が届いていれば設定は正常です。', true);
-    return JSON.stringify({ success: debug && debug.ok, debug: debug });
+    // テスト送信はLINE通知有効フラグに関係なく送信する
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: false, error: '募集設定シートが見つかりません', debug: {} });
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = String(row[1] || '').trim();
+    });
+    var token = map['LINEチャネルアクセストークン'] || '';
+    var targetMode = map['LINE送信先モード'] || 'group';
+    var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
+    if (!token) return JSON.stringify({ success: false, error: 'チャネルアクセストークンが未設定です', debug: { targetMode: targetMode } });
+    if (!targetId) return JSON.stringify({ success: false, error: (targetMode === 'personal' ? '個人ID' : 'グループID') + 'が未設定です', debug: { targetMode: targetMode } });
+    var payload = { to: targetId, messages: [{ type: 'text', text: '【テスト】LINE通知の接続テストです。この通知が届いていれば設定は正常です。' }] };
+    var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post', contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + token },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    var body = resp.getContentText();
+    var debug = { httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...' };
+    return JSON.stringify({ success: code === 200, debug: debug, error: code !== 200 ? 'HTTP ' + code : '' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

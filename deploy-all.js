@@ -70,6 +70,17 @@ function countVersions(text) {
   return count;
 }
 
+/** clasp deployments の出力からデプロイ数をカウント（@HEAD除外） */
+function countDeployments(text) {
+  var count = 0;
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].includes('@HEAD')) continue;
+    if (/(AKfycb[A-Za-z0-9_-]{20,})/.test(lines[i])) count++;
+  }
+  return count;
+}
+
 /** .clasp.json からスクリプトIDを読み取る */
 function getScriptId(dir) {
   var claspJsonPath = path.join(dir, '.clasp.json');
@@ -82,8 +93,34 @@ function getScriptId(dir) {
   return '';
 }
 
+var DEPLOY_LIMIT = 20;
+var DEPLOY_WARN = 15;
 var VERSION_LIMIT = 200;
 var VERSION_WARN = 150;
+
+/** デプロイ数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
+function checkDeployCount(label, cwd) {
+  var r = run(clasp + ' deployments', cwd, 30000);
+  if (!r.ok) {
+    console.log('  ' + label + ': デプロイ数の取得に失敗');
+    return;
+  }
+  var count = countDeployments(r.out);
+  var bar = count + '/' + DEPLOY_LIMIT + '件';
+  if (count >= DEPLOY_WARN) {
+    console.log('  ⚠ ' + label + ': デプロイ数 ' + bar + ' — 古いデプロイの削除が必要です！');
+    console.log('    ※ GASのバージョン付きデプロイは最大20個。自動削除はできないため手動で削除してください。');
+    var scriptId = getScriptId(cwd);
+    if (scriptId) {
+      var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
+      console.log('    GASエディタのデプロイ管理画面を開きます:');
+      console.log('    ' + editorUrl);
+      openBrowser(editorUrl);
+    }
+  } else {
+    console.log('  ' + label + ': デプロイ数 ' + bar);
+  }
+}
 
 /** バージョン数を表示し、上限に近い場合は警告+ブラウザで管理画面を開く */
 function checkVersionCount(label, cwd) {
@@ -95,7 +132,7 @@ function checkVersionCount(label, cwd) {
   var count = countVersions(r.out);
   var bar = count + '/' + VERSION_LIMIT + '件';
   if (count >= VERSION_WARN) {
-    console.log('  ⚠ ' + label + ': ' + bar + ' — バージョン削除が必要です！');
+    console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン削除が必要です！');
     var scriptId = getScriptId(cwd);
     if (scriptId) {
       var versionsUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
@@ -104,7 +141,7 @@ function checkVersionCount(label, cwd) {
       openBrowser(versionsUrl);
     }
   } else {
-    console.log('  ' + label + ': ' + bar);
+    console.log('  ' + label + ': バージョン数 ' + bar);
   }
 }
 
@@ -368,9 +405,16 @@ function main() {
     console.error('  エラー: ' + clDeployScript + ' が見つかりません');
   }
 
-  // === バージョン数チェック（200件上限） ===
+  // === デプロイ数チェック（20件上限） ===
   console.log('');
-  console.log('[バージョン数チェック]');
+  console.log('[デプロイ数チェック（上限20件）]');
+  checkDeployCount('メインアプリ', rootDir);
+  if (fs.existsSync(checklistDir)) {
+    checkDeployCount('チェックリスト', checklistDir);
+  }
+
+  // === バージョン数チェック（200件上限） ===
+  console.log('[バージョン数チェック（上限200件）]');
   checkVersionCount('メインアプリ', rootDir);
   if (fs.existsSync(checklistDir)) {
     checkVersionCount('チェックリスト', checklistDir);

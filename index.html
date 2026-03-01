@@ -1082,6 +1082,11 @@
       <div class="bg-white rounded shadow p-4 m-2" style="max-width:360px;">
         <h6 class="mb-2" id="invoicePwTitle">請求書タブ - パスワード認証</h6>
         <p class="small text-muted mb-3" id="invoicePwDesc">請求書にはプライバシー情報が含まれるため、パスワードが必要です。</p>
+        <!-- 読み込み中表示 -->
+        <div id="invoicePwLoading" class="text-center py-3">
+          <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+          <span class="small text-muted ms-2">読み込み中...</span>
+        </div>
         <!-- パスワード未設定時: 新規設定 -->
         <div id="invoicePwSetupArea" style="display:none;">
           <p class="small text-warning mb-2">パスワードが未設定です。4文字以上で設定してください。</p>
@@ -8565,13 +8570,20 @@
         if (!ov) return;
         var setupArea = document.getElementById('invoicePwSetupArea');
         var inputArea = document.getElementById('invoicePwInputArea');
+        var loadingArea = document.getElementById('invoicePwLoading');
         var setupMsg = document.getElementById('invoicePwSetupMsg');
         var pwMsg = document.getElementById('invoicePwMsg');
         if (setupMsg) setupMsg.style.display = 'none';
         if (pwMsg) pwMsg.style.display = 'none';
+        // 読み込み中表示、入力エリアは非表示
+        if (loadingArea) loadingArea.style.display = 'block';
+        if (setupArea) setupArea.style.display = 'none';
+        if (inputArea) inputArea.style.display = 'none';
+        ov.style.setProperty('display', 'flex', 'important');
         // サーバーにパスワード設定済みか確認
         google.script.run
           .withSuccessHandler(function(jsonStr) {
+            if (loadingArea) loadingArea.style.display = 'none';
             try {
               var r = JSON.parse(jsonStr);
               if (r.success && r.noPassword) {
@@ -8589,11 +8601,11 @@
             }
           })
           .withFailureHandler(function(err) {
+            if (loadingArea) loadingArea.style.display = 'none';
             if (setupArea) setupArea.style.display = 'none';
             if (inputArea) inputArea.style.display = 'block';
           })
           .verifyStaffPassword(window.currentUserName || '', window.currentUserEmail || '', '');
-        ov.style.setProperty('display', 'flex', 'important');
       }
       function hideInvoicePasswordModal() {
         var ov = document.getElementById('invoicePasswordOverlay');

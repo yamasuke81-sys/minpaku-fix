@@ -71,16 +71,6 @@ function countVersions(text) {
   return count;
 }
 
-/** clasp deployments の出力からデプロイ数をカウント（@HEAD除外） */
-function countDeployments(text) {
-  var count = 0;
-  var lines = text.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    if (lines[i].includes('@HEAD')) continue;
-    if (/(AKfycb[A-Za-z0-9_-]{20,})/.test(lines[i])) count++;
-  }
-  return count;
-}
 
 /** .clasp.json からスクリプトIDを読み取る */
 function getScriptId(dir) {
@@ -94,34 +84,8 @@ function getScriptId(dir) {
   return '';
 }
 
-var DEPLOY_LIMIT = 20;
-var DEPLOY_WARN = 15;
 var VERSION_LIMIT = 200;
 var VERSION_WARN = 150;
-
-/** デプロイ数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
-function checkDeployCount(label, cwd) {
-  var r = run(clasp + ' deployments', cwd, 30000);
-  if (!r.ok) {
-    console.log('  ' + label + ': デプロイ数の取得に失敗');
-    return;
-  }
-  var count = countDeployments(r.out);
-  var bar = count + '/' + DEPLOY_LIMIT + '件';
-  if (count >= DEPLOY_WARN) {
-    console.log('  ⚠ ' + label + ': デプロイ数 ' + bar + ' — 古いデプロイの削除が必要です！');
-    console.log('    ※ GASのバージョン付きデプロイは最大20個。自動削除はできないため手動で削除してください。');
-    var scriptId = getScriptId(cwd);
-    if (scriptId) {
-      var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
-      console.log('    GASエディタのデプロイ管理画面を開きます:');
-      console.log('    ' + editorUrl);
-      openBrowser(editorUrl);
-    }
-  } else {
-    console.log('  ' + label + ': デプロイ数 ' + bar);
-  }
-}
 
 /** バージョン数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
 function checkVersionCount(label, cwd) {
@@ -134,7 +98,7 @@ function checkVersionCount(label, cwd) {
   var bar = count + '/' + VERSION_LIMIT + '件';
   if (count >= VERSION_WARN) {
     console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン履歴の削除が必要です！');
-    console.log('    ※ GASエディタの左サイドバー「プロジェクト履歴」→ ゴミ箱マーク → バージョンの削除');
+    console.log('    ※ GASエディタ左サイドバー「プロジェクトの履歴」→「バージョンの一括削除」ボタン → 選択して削除');
     var scriptId = getScriptId(cwd);
     if (scriptId) {
       var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
@@ -334,19 +298,11 @@ function main() {
     }
 
     if (!gatewayId) {
-      // デプロイ数上限チェック: 20件に達していたら新規作成をスキップ
-      var depCheck = run(clasp + ' deployments', rootDir, 30000);
-      var currentDeployCount = depCheck.ok ? countDeployments(depCheck.out) : 0;
-      if (currentDeployCount >= DEPLOY_LIMIT) {
-        console.log('  ゲートウェイ: デプロイ数が上限(' + DEPLOY_LIMIT + '件)に達しているため新規作成をスキップ');
-        console.log('    → GASエディタで古いデプロイを削除してから再デプロイしてください');
-      } else {
-        console.log('  ゲートウェイ: 新規作成中...');
-        var gResult = run(clasp + ' deploy --description "ゲートウェイ ' + today + '"', rootDir);
-        if (gResult.ok) {
-          var gm = gResult.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
-          if (gm) gatewayId = gm[1];
-        }
+      console.log('  ゲートウェイ: 新規作成中...');
+      var gResult = run(clasp + ' deploy --description "ゲートウェイ ' + today + '"', rootDir);
+      if (gResult.ok) {
+        var gm = gResult.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
+        if (gm) gatewayId = gm[1];
       }
     }
 
@@ -415,15 +371,8 @@ function main() {
     console.error('  エラー: ' + clDeployScript + ' が見つかりません');
   }
 
-  // === デプロイ数チェック（20件上限） ===
-  console.log('');
-  console.log('[デプロイ数チェック（上限20件）]');
-  checkDeployCount('メインアプリ', rootDir);
-  if (fs.existsSync(checklistDir)) {
-    checkDeployCount('チェックリスト', checklistDir);
-  }
-
   // === バージョン数チェック（200件上限） ===
+  console.log('');
   console.log('[バージョン数チェック（上限200件）]');
   checkVersionCount('メインアプリ', rootDir);
   if (fs.existsSync(checklistDir)) {

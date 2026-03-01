@@ -3968,7 +3968,8 @@ function getLineNotifySettings() {
         lineChannelToken: map['LINEチャネルアクセストークン'] || '',
         lineGroupId: map['LINEグループID'] || '',
         lineUserId: map['LINEユーザーID'] || '',
-        lineTargetMode: map['LINE送信先モード'] || 'group'
+        lineTargetMode: map['LINE送信先モード'] || 'group',
+        lineMuteEnabled: map['LINEミュート送信'] === 'true'
       }
     });
   } catch (e) {
@@ -3993,7 +3994,8 @@ function saveLineNotifySettings(settings) {
       ['LINEチャネルアクセストークン', settings.lineChannelToken || ''],
       ['LINEグループID', settings.lineGroupId || ''],
       ['LINEユーザーID', settings.lineUserId || ''],
-      ['LINE送信先モード', settings.lineTargetMode || 'group']
+      ['LINE送信先モード', settings.lineTargetMode || 'group'],
+      ['LINEミュート送信', settings.lineMuteEnabled ? 'true' : 'false']
     ];
     items.forEach(function(item) {
       if (rowMap[item[0]]) {
@@ -4028,7 +4030,8 @@ function sendLineTestMessage() {
     var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
     if (!token) return JSON.stringify({ success: false, error: 'チャネルアクセストークンが未設定です', debug: { targetMode: targetMode } });
     if (!targetId) return JSON.stringify({ success: false, error: (targetMode === 'personal' ? '個人ID' : 'グループID') + 'が未設定です', debug: { targetMode: targetMode } });
-    var payload = { to: targetId, messages: [{ type: 'text', text: '【テスト】LINE通知の接続テストです。この通知が届いていれば設定は正常です。' }] };
+    var muteEnabled = map['LINEミュート送信'] === 'true';
+    var payload = { to: targetId, messages: [{ type: 'text', text: '【テスト】LINE通知の接続テストです。この通知が届いていれば設定は正常です。' }], notificationDisabled: muteEnabled };
     var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
       method: 'post', contentType: 'application/json',
       headers: { 'Authorization': 'Bearer ' + token },
@@ -4036,7 +4039,7 @@ function sendLineTestMessage() {
     });
     var code = resp.getResponseCode();
     var body = resp.getContentText();
-    var debug = { httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...' };
+    var debug = { httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...', mute: muteEnabled };
     return JSON.stringify({ success: code === 200, debug: debug, error: code !== 200 ? 'HTTP ' + code : '' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -4071,9 +4074,11 @@ function sendLineMessage_(text, returnDebug) {
       if (returnDebug) return { ok: false, reason: 'トークンまたはIDが空', targetMode: targetMode, hasToken: !!token, targetId: targetId ? (targetId.substring(0, 5) + '...') : '(空)' };
       return;
     }
+    var muteEnabled = map['LINEミュート送信'] === 'true';
     var payload = {
       to: targetId,
-      messages: [{ type: 'text', text: text }]
+      messages: [{ type: 'text', text: text }],
+      notificationDisabled: muteEnabled
     };
     var options = {
       method: 'post',
@@ -4088,7 +4093,7 @@ function sendLineMessage_(text, returnDebug) {
     if (code !== 200) {
       Logger.log('LINE送信エラー: HTTP ' + code + ' ' + body);
     }
-    if (returnDebug) return { ok: code === 200, httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...' };
+    if (returnDebug) return { ok: code === 200, httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...', mute: muteEnabled };
   } catch (e) {
     Logger.log('sendLineMessage_: ' + e.toString());
     if (returnDebug) return { ok: false, reason: '例外: ' + e.toString() };

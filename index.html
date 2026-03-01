@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301i</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301j</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1627,6 +1627,12 @@
             <label class="form-label small" for="lineUserId">個人ID</label>
             <input type="text" class="form-control form-control-sm" id="lineUserId" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="lineMuteEnabled">
+          <label class="form-check-label" for="lineMuteEnabled"><strong>ミュート送信</strong></label>
+          <div class="form-text small">ONにすると、受信者のスマホにプッシュ通知を出さずに送信します（LINEを開いたときに確認できます）</div>
         </div>
 
         <div class="d-flex gap-2">
@@ -7839,6 +7845,8 @@
               var uid = document.getElementById('lineUserId');
               if (uid) uid.value = r.settings.lineUserId || '';
               setLineTargetMode(r.settings.lineTargetMode === 'personal' ? 'personal' : 'group');
+              var mute = document.getElementById('lineMuteEnabled');
+              if (mute) mute.checked = r.settings.lineMuteEnabled === true;
             }
           } catch (e) {}
         }).getLineNotifySettings();
@@ -7854,7 +7862,8 @@
           lineChannelToken: (document.getElementById('lineChannelToken').value || '').trim(),
           lineGroupId: (document.getElementById('lineGroupId').value || '').trim(),
           lineUserId: (document.getElementById('lineUserId').value || '').trim(),
-          lineTargetMode: _lineTargetMode
+          lineTargetMode: _lineTargetMode,
+          lineMuteEnabled: document.getElementById('lineMuteEnabled').checked
         };
         if (settings.lineNotifyEnabled && (!settings.lineChannelToken || !targetId)) {
           alert('LINE通知を有効にするには、チャネルアクセストークンと送信先IDを入力してください。');

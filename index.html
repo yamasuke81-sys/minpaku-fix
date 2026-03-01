@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301o</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301p</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1289,8 +1289,7 @@
           <a class="nav-link" href="#" id="notifyGroupToggle" style="font-weight:bold;">▶ 通知設定</a>
         </li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="lineId">LINE接続設定</a></li>
-        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyRecruit">清掃スタッフ募集</a></li>
-        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="recruitSettings">募集リマインド</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="recruitSettings">募集・リマインド</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="confirmTemplate">スタッフ確定通知</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="reminderEmail">未決定・直前リマインド</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancel">予約キャンセル通知</a></li>
@@ -1348,7 +1347,29 @@
         <div id="jobList"></div>
       </div>
       <div id="settingsRecruitSettings" style="display:none;">
-        <p class="small text-muted mb-2">清掃スタッフの立候補が最少回答者数に達していない場合に、<strong>全スタッフ</strong>へリマインドを送信します。「まだ回答が足りません。立候補をお願いします」という内容です。</p>
+        <p class="small text-muted mb-2"><strong>全スタッフ</strong>向けの募集通知です。2種類あります：</p>
+        <ul class="small text-muted mb-2" style="padding-left:1.2rem;">
+          <li><strong>募集開始通知</strong> — 新しい清掃募集を作成した際に全スタッフへ案内を送信</li>
+          <li><strong>募集リマインド</strong> — 立候補が最少回答者数に達していない場合に定期的にリマインド送信</li>
+        </ul>
+
+        <h6 class="fw-bold mt-3 mb-2" style="font-size:0.9rem;">募集開始通知</h6>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyRecruitStartToggle">
+          <label class="form-check-label" for="notifyRecruitStartToggle"><strong>募集開始通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信チャンネル</label>
+          <select class="form-select form-select-sm notify-channel-select" id="chRecruit" style="max-width:180px;" data-notify-key="清掃スタッフ募集">
+            <option value="both">メール＋LINE</option>
+            <option value="email">メールのみ</option>
+            <option value="line">LINEのみ</option>
+          </select>
+        </div>
+        <p class="small text-muted mb-1">※ 募集メールの本文は、募集作成時に自動生成されます（次回予約情報・アプリURL含む）。</p>
+
+        <hr class="my-3">
+        <h6 class="fw-bold mb-2" style="font-size:0.9rem;">募集リマインド</h6>
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="recruitReminderEnabled">
           <label class="form-check-label" for="recruitReminderEnabled">募集リマインドを有効にする</label>
@@ -1736,23 +1757,7 @@
         </div>
       </div>
 
-      <div id="settingsNotifyRecruit" style="display:none;">
-        <p class="small text-muted mb-2">新しい清掃募集を作成した際に、登録済みの<strong>全スタッフ</strong>へ募集案内を送信します。「清掃スタッフを募集しています。立候補をお願いします」という内容です。</p>
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input" type="checkbox" id="notifyRecruitStartToggle">
-          <label class="form-check-label" for="notifyRecruitStartToggle"><strong>清掃スタッフ募集通知を有効にする</strong></label>
-        </div>
-        <div class="mb-3">
-          <label class="form-label small fw-bold">送信チャンネル</label>
-          <select class="form-select form-select-sm notify-channel-select" id="chRecruit" style="max-width:180px;" data-notify-key="清掃スタッフ募集">
-            <option value="both">メール＋LINE</option>
-            <option value="email">メールのみ</option>
-            <option value="line">LINEのみ</option>
-          </select>
-        </div>
-        <hr class="my-3">
-        <p class="small text-muted">※ 募集メールの本文は、募集作成時に自動生成されます（次回予約情報・アプリURL含む）。</p>
-      </div>
+
 
 
       <div id="settingsNotifyCancel" style="display:none;">
@@ -8664,7 +8669,6 @@
             reminderEmail: 'settingsReminderEmail', rosterReminder: 'settingsRosterReminder',
             invoiceRequest: 'settingsInvoiceRequest', confirmTemplate: 'settingsConfirmTemplate',
             notifications: 'settingsNotifications', maintenance: 'settingsMaintenance',
-            notifyRecruit: 'settingsNotifyRecruit',
             notifyCancel: 'settingsNotifyCancel', notifyCancelRequest: 'settingsNotifyCancelRequest',
             notifyCancelApprove: 'settingsNotifyCancelApprove', notifyCancelReject: 'settingsNotifyCancelReject',
             notifyInvoiceSend: 'settingsNotifyInvoiceSend', notifyCleaningDone: 'settingsNotifyCleaningDone'
@@ -8686,12 +8690,12 @@
           if (t === 'invoiceRequest') loadInvoiceRequestSettings();
           if (t === 'confirmTemplate') loadConfirmationTemplate();
           // 通知タブ表示時にチャンネル設定を読み込み
-          var _notifyTabs = ['notifyRecruit','recruitSettings','confirmTemplate','reminderEmail',
+          var _notifyTabs = ['recruitSettings','confirmTemplate','reminderEmail',
             'notifyCancel','notifyCancelRequest','notifyCancelApprove',
             'notifyCancelReject','rosterReminder','invoiceRequest','notifyInvoiceSend','notifyCleaningDone'];
           if (_notifyTabs.indexOf(t) >= 0) loadNotifyChannelForTab_(t);
           // 新規タブのメール通知設定読み込み
-          var _emailNotifyTabs = ['notifyRecruit','confirmTemplate','notifyCancel','notifyCancelRequest',
+          var _emailNotifyTabs = ['recruitSettings','confirmTemplate','notifyCancel','notifyCancelRequest',
             'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
         });
@@ -8734,7 +8738,7 @@
 
       // 新規タブ用: メール通知ON/OFFの読み込み
       var _emailNotifyToggleMap = {
-        notifyRecruit: { id: 'notifyRecruitStartToggle', key: '募集開始通知有効' },
+        recruitSettings: { id: 'notifyRecruitStartToggle', key: '募集開始通知有効' },
         confirmTemplate: { id: 'notifyStaffConfirmToggle', key: 'スタッフ確定通知有効' },
         notifyCancel: { id: 'notifyCancelToggle', key: 'キャンセル通知有効' },
         notifyCancelRequest: { id: 'notifyCancelRequestToggle', key: '辞退申請通知有効' },

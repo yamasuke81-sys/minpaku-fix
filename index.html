@@ -2416,13 +2416,13 @@
         if (!data || !Array.isArray(data)) return events;
 
         // 同一予約の重複排除マージ（iCal行 + Googleフォーム行）
-        // マッチ条件: チェックイン日が同じ、かつチェックアウト日が同じ or 片方が空
+        // マッチ条件: チェックイン日が同じなら常にマージ（同一物件で同日CIは1予約のみ）
         var merged = [];
         var ciKeyMap = {}; // checkInParsed → merged配列のindex
 
         function isPlaceholderName(name) {
           if (!name) return true;
-          return /^(Not available|Reserved|CLOSED|Blocked|Airbnb|Booking\.com|Rakuten|楽天)$/i.test(name.trim());
+          return /^(Not available|Reserved|CLOSED|Blocked|Airbnb(予約)?|Booking\.com(予約)?|Rakuten|楽天)$/i.test(name.trim());
         }
         function mergeBookingData(existing, b) {
           var fields = ['guestName','bbq','guestCountAdults','guestCountInfants','cleaningStaff','parking','bedChoice','tel1','tel2','email','email2','passportUrls','carDisplay','nationality','purpose','memo','cleaningNotice'];
@@ -2433,12 +2433,31 @@
           fields.forEach(function(f) {
             if (!existing[f] && b[f]) existing[f] = b[f];
           });
-          // checkOutが片方だけある場合は補完
+          // checkOut補完・不一致時の解決
           if (!existing.checkOutParsed && b.checkOutParsed) {
+            // 片方だけある場合は補完
             existing.checkOut = b.checkOut;
             existing.checkOutParsed = b.checkOutParsed;
             existing.isValidDates = true;
             existing.nights = b.nights;
+          } else if (existing.checkOutParsed && b.checkOutParsed && existing.checkOutParsed !== b.checkOutParsed) {
+            // 両方にCOがあるが異なる場合: より正確な方を採用
+            var eCi = existing.checkInParsed || '';
+            var eCoValid = existing.checkOutParsed > eCi; // CO > CI で有効な宿泊
+            var bCoValid = b.checkOutParsed > eCi;
+            if (!eCoValid && bCoValid) {
+              // existingのCOが無効（CO<=CI）→ bのCOを使う
+              existing.checkOut = b.checkOut;
+              existing.checkOutParsed = b.checkOutParsed;
+              existing.isValidDates = true;
+              existing.nights = b.nights;
+            } else if (eCoValid && bCoValid && b.checkOutParsed > existing.checkOutParsed) {
+              // 両方有効だが日付が異なる → 後の日付（長い宿泊）を採用
+              existing.checkOut = b.checkOut;
+              existing.checkOutParsed = b.checkOutParsed;
+              existing.isValidDates = true;
+              existing.nights = Math.ceil((new Date(b.checkOutParsed) - new Date(eCi)) / (1000 * 60 * 60 * 24));
+            }
           }
           // guestCountDisplayをマージ（非空の値を優先）
           if (b.guestCountDisplay && (!existing.guestCountDisplay || existing.guestCountDisplay === '-')) {
@@ -2477,15 +2496,11 @@
             var existIdx = ciKeyMap[ci];
             var existing = merged[existIdx];
             var existCo = existing.checkOutParsed || '';
-            // チェックアウト日が一致、または片方が空ならマージ
-            if (!co || !existCo || co === existCo) {
-              _dedupDebug.merged++;
-              _dedupDebug.details.push('[MERGED] row' + b.rowNumber + '→row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + '/' + existCo + ' name=' + (b.guestName||'') + '→' + (existing.guestName||'') + ' site=' + (b.bookingSite||''));
-              mergeBookingData(existing, b);
-              return;
-            } else {
-              _dedupDebug.details.push('[NOT MERGED co不一致] row' + b.rowNumber + ' vs row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + ' vs ' + existCo + ' name=' + (b.guestName||'') + ' site=' + (b.bookingSite||''));
-            }
+            // 同一物件で同日チェックインは1予約のみ → 常にマージ
+            _dedupDebug.merged++;
+            _dedupDebug.details.push('[MERGED] row' + b.rowNumber + '→row' + existing.rowNumber + ' ci=' + ci + ' co=' + co + '/' + existCo + ' name=' + (b.guestName||'') + '→' + (existing.guestName||'') + ' site=' + (b.bookingSite||''));
+            mergeBookingData(existing, b);
+            return;
           }
           _dedupDebug.separate++;
           ciKeyMap[ci] = merged.length;

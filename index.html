@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1667,7 +1667,11 @@
           </div>
         </div>
         <div class="mb-2">
-          <label class="form-label small fw-bold">テンプレート</label>
+          <label class="form-label small fw-bold">メール件名</label>
+          <input type="text" class="form-control form-control-sm" id="confirmEmailSubject" placeholder="例: 【民泊】スタッフ確定: {作業日}">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-bold">テンプレート（メール本文 / テキストコピー共通）</label>
           <textarea class="form-control form-control-sm" id="confirmTemplateText" rows="14" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea>
         </div>
         <div class="d-flex gap-2 align-items-center">
@@ -7891,12 +7895,14 @@
 
       // 確定通知テンプレート
       var CONFIRM_TEMPLATE_DEFAULT = 'スタッフ確定\n\n作業日: {作業日}\n\n{スタッフ一覧}\n\nよろしくお願いします\uD83C\uDF4A\n\n{次回予約}\n\n{アプリURL}';
+      var CONFIRM_SUBJECT_DEFAULT = '【民泊】スタッフ確定: {作業日}';
 
       function loadConfirmationTemplate() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
+              document.getElementById('confirmEmailSubject').value = r.emailSubject || CONFIRM_SUBJECT_DEFAULT;
               document.getElementById('confirmTemplateText').value = r.template || CONFIRM_TEMPLATE_DEFAULT;
               updateConfirmTemplatePreview();
             }
@@ -7925,6 +7931,7 @@
         var btn = this;
         if (btn.disabled) return;
         var template = document.getElementById('confirmTemplateText').value || '';
+        var emailSubject = document.getElementById('confirmEmailSubject').value || '';
         btn.disabled = true;
         btn.textContent = '保存中...';
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -7942,12 +7949,13 @@
           btn.disabled = false;
           btn.textContent = '保存';
           alert(e.message || '保存に失敗しました');
-        }).saveConfirmationTemplate(template);
+        }).saveConfirmationTemplate(template, emailSubject);
       });
 
       document.getElementById('btnResetConfirmTemplate').addEventListener('click', function() {
         customConfirm('テンプレートをデフォルトに戻しますか？').then(function(ok) {
           if (!ok) return;
+          document.getElementById('confirmEmailSubject').value = CONFIRM_SUBJECT_DEFAULT;
           document.getElementById('confirmTemplateText').value = CONFIRM_TEMPLATE_DEFAULT;
           updateConfirmTemplatePreview();
         });

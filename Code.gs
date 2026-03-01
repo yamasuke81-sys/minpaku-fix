@@ -7788,6 +7788,7 @@ function confirmRecruitment(recruitRowIndex) {
  * 確定通知テンプレートのデフォルト値
  */
 var DEFAULT_CONFIRM_TEMPLATE_ = 'スタッフ確定\n\n作業日: {作業日}\n\n{スタッフ一覧}\n\nよろしくお願いします\uD83C\uDF4A\n\n{次回予約}\n\n{アプリURL}';
+var DEFAULT_CONFIRM_SUBJECT_ = '【民泊】スタッフ確定: {作業日}';
 
 /**
  * 確定通知テンプレートを取得
@@ -7800,13 +7801,13 @@ function getConfirmationTemplate() {
     var lastRow = Math.max(sheet.getLastRow(), 1);
     var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
     var template = '';
+    var emailSubject = '';
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0] || '').trim() === 'スタッフ確定通知テンプレート') {
-        template = String(rows[i][1] || '');
-        break;
-      }
+      var k = String(rows[i][0] || '').trim();
+      if (k === 'スタッフ確定通知テンプレート') template = String(rows[i][1] || '');
+      if (k === 'スタッフ確定メール件名') emailSubject = String(rows[i][1] || '');
     }
-    return JSON.stringify({ success: true, template: template || DEFAULT_CONFIRM_TEMPLATE_ });
+    return JSON.stringify({ success: true, template: template || DEFAULT_CONFIRM_TEMPLATE_, emailSubject: emailSubject || DEFAULT_CONFIRM_SUBJECT_ });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -7815,26 +7816,31 @@ function getConfirmationTemplate() {
 /**
  * 確定通知テンプレートを保存
  */
-function saveConfirmationTemplate(template) {
+function saveConfirmationTemplate(template, emailSubject) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
     if (!sheet) return JSON.stringify({ success: false, error: '募集設定シートが見つかりません。' });
     var lastRow = Math.max(sheet.getLastRow(), 1);
     var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
-    var found = false;
+    var rowMap = {};
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0] || '').trim() === 'スタッフ確定通知テンプレート') {
-        sheet.getRange(i + 2, 2).setValue(template || '');
-        found = true;
-        break;
+      var k = String(rows[i][0] || '').trim();
+      if (k) rowMap[k] = i + 2;
+    }
+    var entries = [
+      ['スタッフ確定通知テンプレート', template || ''],
+      ['スタッフ確定メール件名', emailSubject || '']
+    ];
+    entries.forEach(function(e) {
+      if (rowMap[e[0]]) {
+        sheet.getRange(rowMap[e[0]], 2).setValue(e[1]);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(e[0]);
+        sheet.getRange(nr, 2).setValue(e[1]);
       }
-    }
-    if (!found) {
-      var nr = sheet.getLastRow() + 1;
-      sheet.getRange(nr, 1).setValue('スタッフ確定通知テンプレート');
-      sheet.getRange(nr, 2).setValue(template || '');
-    }
+    });
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -8008,7 +8014,24 @@ function notifyStaffConfirmation(recruitRowIndex) {
     var body = buildConfirmationCopyText_(checkoutDateStr, selectedStaff, volunteers, nextRes, appUrl);
     var dm = (checkoutDateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     var fmtDate = dm ? dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日' : checkoutDateStr;
-    var subject = '【民泊】スタッフ確定: ' + fmtDate;
+    // メール件名テンプレートを取得
+    var subjTpl = DEFAULT_CONFIRM_SUBJECT_;
+    try {
+      var settingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+      if (settingsSheet && settingsSheet.getLastRow() >= 2) {
+        var sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
+        for (var si = 0; si < sRows.length; si++) {
+          if (String(sRows[si][0] || '').trim() === 'スタッフ確定メール件名') {
+            var saved = String(sRows[si][1] || '').trim();
+            if (saved) subjTpl = saved;
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+    var subject = subjTpl
+      .replace(/\{作業日\}/g, fmtDate)
+      .replace(/\{スタッフ一覧\}/g, selectedStaff);
     GmailApp.sendEmail(emails.join(','), subject, body);
     return JSON.stringify({ success: true });
   } catch (e) {

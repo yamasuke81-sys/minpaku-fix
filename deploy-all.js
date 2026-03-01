@@ -122,7 +122,7 @@ function checkDeployCount(label, cwd) {
   }
 }
 
-/** バージョン数を表示し、上限に近い場合は警告+ブラウザで管理画面を開く */
+/** バージョン数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
 function checkVersionCount(label, cwd) {
   var r = run(clasp + ' versions', cwd, 30000);
   if (!r.ok) {
@@ -132,13 +132,14 @@ function checkVersionCount(label, cwd) {
   var count = countVersions(r.out);
   var bar = count + '/' + VERSION_LIMIT + '件';
   if (count >= VERSION_WARN) {
-    console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン削除が必要です！');
+    console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン履歴の削除が必要です！');
+    console.log('    ※ GASエディタの左サイドバー「プロジェクト履歴」→ ゴミ箱マーク → バージョンの削除');
     var scriptId = getScriptId(cwd);
     if (scriptId) {
-      var versionsUrl = 'https://script.google.com/home/projects/' + scriptId + '/deployments';
-      console.log('    GAS管理画面で手動削除してください:');
-      console.log('    ' + versionsUrl);
-      openBrowser(versionsUrl);
+      var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
+      console.log('    GASエディタを開きます:');
+      console.log('    ' + editorUrl);
+      openBrowser(editorUrl);
     }
   } else {
     console.log('  ' + label + ': バージョン数 ' + bar);

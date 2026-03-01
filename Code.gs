@@ -8144,7 +8144,11 @@ function checkAndSendReminders() {
           emails.forEach(function(r) { var e = String(r[0] || '').trim().toLowerCase(); if (e) toSet[e] = 1; });
           var to = Object.keys(toSet);
           if (to.length) {
-            GmailApp.sendEmail(to.join(','), '【民泊】清掃スタッフ募集のリマインド: ' + rows[i][0], 'まだ回答が少ないため、再度ご案内します。チェックアウト日: ' + rows[i][0]);
+            var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}';
+            var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名';
+            var subj = subjTpl.replace(/\{チェックアウト\}/g, rows[i][0]).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp));
+            var body = bodyTpl.replace(/\{チェックアウト\}/g, rows[i][0]).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp));
+            GmailApp.sendEmail(to.join(','), subj, body);
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7574,6 +7574,11 @@
         }).withFailureHandler(function() { btn.disabled = false; btn.textContent = origText; }).saveJobType(rowIndex ? parseInt(rowIndex, 10) : null, name, parseInt(sortOrder, 10) || 99);
       });
 
+      var RECRUIT_REMINDER_DEFAULTS = {
+        subject: '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}',
+        body: 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名'
+      };
+
       function loadRecruitSettingsForm() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -7596,8 +7601,8 @@
               // 送信先
               document.getElementById('recruitReminderRecipients').value = r.settings.recipients || '';
               // テンプレート
-              document.getElementById('recruitReminderSubject').value = r.settings.recruitReminderSubject || '';
-              document.getElementById('recruitReminderBody').value = r.settings.recruitReminderBody || '';
+              document.getElementById('recruitReminderSubject').value = r.settings.recruitReminderSubject || RECRUIT_REMINDER_DEFAULTS.subject;
+              document.getElementById('recruitReminderBody').value = r.settings.recruitReminderBody || RECRUIT_REMINDER_DEFAULTS.body;
             }
           } catch (e) {}
         }).getRecruitmentSettings();

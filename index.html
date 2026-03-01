@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1619,12 +1619,12 @@
             <button type="button" class="btn btn-sm" id="btnLineTargetGroup">グループ</button>
             <button type="button" class="btn btn-sm" id="btnLineTargetPersonal">個人（テスト用）</button>
           </div>
-          <div id="lineTargetGroupInputs">
+          <div class="mb-2" id="lineTargetGroupInputs">
             <label class="form-label small" for="lineGroupId">グループID</label>
             <input type="text" class="form-control form-control-sm" id="lineGroupId" placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
-          <div id="lineTargetPersonalInputs" style="display:none;">
-            <label class="form-label small" for="lineUserId">ユーザーID</label>
+          <div class="mb-2" id="lineTargetPersonalInputs">
+            <label class="form-label small" for="lineUserId">個人ID</label>
             <input type="text" class="form-control form-control-sm" id="lineUserId" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
         </div>
@@ -7814,13 +7814,13 @@
         if (mode === 'personal') {
           grpBtn.className = 'btn btn-sm btn-outline-secondary';
           prsBtn.className = 'btn btn-sm btn-primary';
-          grpDiv.style.display = 'none';
-          prsDiv.style.display = 'block';
+          grpDiv.style.opacity = '0.4';
+          prsDiv.style.opacity = '1';
         } else {
           grpBtn.className = 'btn btn-sm btn-primary';
           prsBtn.className = 'btn btn-sm btn-outline-secondary';
-          grpDiv.style.display = 'block';
-          prsDiv.style.display = 'none';
+          grpDiv.style.opacity = '1';
+          prsDiv.style.opacity = '0.4';
         }
       }
       document.getElementById('btnLineTargetGroup').addEventListener('click', function() { setLineTargetMode('group'); });

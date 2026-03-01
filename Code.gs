@@ -3966,7 +3966,9 @@ function getLineNotifySettings() {
       settings: {
         lineNotifyEnabled: map['LINE通知有効'] === 'true',
         lineChannelToken: map['LINEチャネルアクセストークン'] || '',
-        lineGroupId: map['LINEグループID'] || ''
+        lineGroupId: map['LINEグループID'] || '',
+        lineUserId: map['LINEユーザーID'] || '',
+        lineTargetMode: map['LINE送信先モード'] || 'group'
       }
     });
   } catch (e) {
@@ -3989,7 +3991,9 @@ function saveLineNotifySettings(settings) {
     var items = [
       ['LINE通知有効', settings.lineNotifyEnabled ? 'true' : 'false'],
       ['LINEチャネルアクセストークン', settings.lineChannelToken || ''],
-      ['LINEグループID', settings.lineGroupId || '']
+      ['LINEグループID', settings.lineGroupId || ''],
+      ['LINEユーザーID', settings.lineUserId || ''],
+      ['LINE送信先モード', settings.lineTargetMode || 'group']
     ];
     items.forEach(function(item) {
       if (rowMap[item[0]]) {
@@ -4033,10 +4037,11 @@ function sendLineMessage_(text) {
     });
     if (map['LINE通知有効'] !== 'true') return;
     var token = map['LINEチャネルアクセストークン'] || '';
-    var groupId = map['LINEグループID'] || '';
-    if (!token || !groupId) return;
+    var targetMode = map['LINE送信先モード'] || 'group';
+    var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
+    if (!token || !targetId) return;
     var payload = {
-      to: groupId,
+      to: targetId,
       messages: [{ type: 'text', text: text }]
     };
     var options = {

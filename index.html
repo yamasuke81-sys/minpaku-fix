@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1614,8 +1614,19 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label small fw-bold" for="lineGroupId">グループID</label>
-          <input type="text" class="form-control form-control-sm" id="lineGroupId" placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          <label class="form-label small fw-bold">送信先</label>
+          <div class="d-flex gap-2 mb-2">
+            <button type="button" class="btn btn-sm" id="btnLineTargetGroup">グループ</button>
+            <button type="button" class="btn btn-sm" id="btnLineTargetPersonal">個人（テスト用）</button>
+          </div>
+          <div id="lineTargetGroupInputs">
+            <label class="form-label small" for="lineGroupId">グループID</label>
+            <input type="text" class="form-control form-control-sm" id="lineGroupId" placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          </div>
+          <div id="lineTargetPersonalInputs" style="display:none;">
+            <label class="form-label small" for="lineUserId">ユーザーID</label>
+            <input type="text" class="form-control form-control-sm" id="lineUserId" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          </div>
         </div>
 
         <div class="d-flex gap-2">
@@ -7793,6 +7804,27 @@
       });
 
       // LINE通知設定
+      var _lineTargetMode = 'group'; // 'group' or 'personal'
+      function setLineTargetMode(mode) {
+        _lineTargetMode = mode;
+        var grpBtn = document.getElementById('btnLineTargetGroup');
+        var prsBtn = document.getElementById('btnLineTargetPersonal');
+        var grpDiv = document.getElementById('lineTargetGroupInputs');
+        var prsDiv = document.getElementById('lineTargetPersonalInputs');
+        if (mode === 'personal') {
+          grpBtn.className = 'btn btn-sm btn-outline-secondary';
+          prsBtn.className = 'btn btn-sm btn-primary';
+          grpDiv.style.display = 'none';
+          prsDiv.style.display = 'block';
+        } else {
+          grpBtn.className = 'btn btn-sm btn-primary';
+          prsBtn.className = 'btn btn-sm btn-outline-secondary';
+          grpDiv.style.display = 'block';
+          prsDiv.style.display = 'none';
+        }
+      }
+      document.getElementById('btnLineTargetGroup').addEventListener('click', function() { setLineTargetMode('group'); });
+      document.getElementById('btnLineTargetPersonal').addEventListener('click', function() { setLineTargetMode('personal'); });
       function loadLineNotifySettings() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -7804,6 +7836,9 @@
               if (tk) tk.value = r.settings.lineChannelToken || '';
               var gid = document.getElementById('lineGroupId');
               if (gid) gid.value = r.settings.lineGroupId || '';
+              var uid = document.getElementById('lineUserId');
+              if (uid) uid.value = r.settings.lineUserId || '';
+              setLineTargetMode(r.settings.lineTargetMode === 'personal' ? 'personal' : 'group');
             }
           } catch (e) {}
         }).getLineNotifySettings();
@@ -7811,13 +7846,18 @@
       document.getElementById('btnSaveLineNotify').addEventListener('click', function() {
         var btn = this;
         if (btn.disabled) return;
+        var targetId = _lineTargetMode === 'personal'
+          ? (document.getElementById('lineUserId').value || '').trim()
+          : (document.getElementById('lineGroupId').value || '').trim();
         var settings = {
           lineNotifyEnabled: document.getElementById('lineNotifyEnabled').checked,
           lineChannelToken: (document.getElementById('lineChannelToken').value || '').trim(),
-          lineGroupId: (document.getElementById('lineGroupId').value || '').trim()
+          lineGroupId: (document.getElementById('lineGroupId').value || '').trim(),
+          lineUserId: (document.getElementById('lineUserId').value || '').trim(),
+          lineTargetMode: _lineTargetMode
         };
-        if (settings.lineNotifyEnabled && (!settings.lineChannelToken || !settings.lineGroupId)) {
-          alert('LINE通知を有効にするには、チャネルアクセストークンとグループIDの両方を入力してください。');
+        if (settings.lineNotifyEnabled && (!settings.lineChannelToken || !targetId)) {
+          alert('LINE通知を有効にするには、チャネルアクセストークンと送信先IDを入力してください。');
           return;
         }
         btn.disabled = true;

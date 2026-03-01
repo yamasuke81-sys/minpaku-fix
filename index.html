@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7651,6 +7651,11 @@
         });
       })();
 
+      var ROSTER_REMINDER_DEFAULTS = {
+        subject: '【民泊】宿泊者名簿の未記入通知（{件数}件）',
+        body: '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n{未記入一覧}\n\n※ アプリの通知にも同じ内容が届いています。'
+      };
+
       function loadRosterReminderSettings() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -7671,8 +7676,8 @@
               // 送信先
               document.getElementById('rosterReminderRecipients').value = r.settings.recipients || '';
               // テンプレート
-              document.getElementById('rosterReminderSubject').value = r.settings.rosterReminderSubject || '';
-              document.getElementById('rosterReminderBody').value = r.settings.rosterReminderBody || '';
+              document.getElementById('rosterReminderSubject').value = r.settings.rosterReminderSubject || ROSTER_REMINDER_DEFAULTS.subject;
+              document.getElementById('rosterReminderBody').value = r.settings.rosterReminderBody || ROSTER_REMINDER_DEFAULTS.body;
             }
           } catch (e) {}
         }).getRosterReminderSettings();
@@ -7779,6 +7784,11 @@
         }
       })();
 
+      var INVOICE_REQUEST_DEFAULTS = {
+        subject: '【民泊清掃】{対象年月}分の請求書をご提出ください',
+        body: '{スタッフ名} さん\n\nお疲れ様です。\n{対象年月}分の請求書のご提出をお願いいたします。\n\n締切: {締切日}\n\nよろしくお願いいたします。'
+      };
+
       function loadInvoiceRequestSettings() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -7792,9 +7802,9 @@
               var timeSel = document.getElementById('invoiceRequestTime');
               if (timeSel) timeSel.value = String(s.time || '09:00');
               var subj = document.getElementById('invoiceRequestSubject');
-              if (subj) subj.value = s.subject || '';
+              if (subj) subj.value = s.subject || INVOICE_REQUEST_DEFAULTS.subject;
               var body = document.getElementById('invoiceRequestBody');
-              if (body) body.value = s.body || '';
+              if (body) body.value = s.body || INVOICE_REQUEST_DEFAULTS.body;
             }
           } catch (e) {}
         }).getInvoiceRequestSettings();
@@ -7951,6 +7961,13 @@
         });
       })();
 
+      var REMINDER_EMAIL_DEFAULTS = {
+        subject: '【民泊】清掃スタッフ未確定のリマインド: {チェックイン}',
+        body: '以下の予約について、清掃スタッフがまだ確定していません。\n\nチェックイン: {チェックイン}\nチェックアウト: {チェックアウト}\n残り日数: {残り日数}日\n\n清掃詳細: {清掃詳細リンク}\n\n早めに清掃スタッフの手配をお願いします。',
+        immediateSubject: '【民泊】直前予約 - 清掃スタッフ手配が必要です: {チェックイン}',
+        immediateBody: '1週間以内にチェックインの予約が新たに追加されました。\n\nチェックイン: {チェックイン}\nチェックアウト: {チェックアウト}\nプラットフォーム: {プラットフォーム}\n残り日数: {残り日数}日\n\n清掃詳細: {清掃詳細リンク}\n\n早急に清掃スタッフの手配をお願いします。'
+      };
+
       function loadReminderEmailSettings() {
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
@@ -7970,10 +7987,10 @@
                 entry.querySelector('.reminder-time').value = hour + ':00';
               });
               // テンプレートフィールド
-              document.getElementById('reminderSubject').value = r.reminderSubject || '';
-              document.getElementById('reminderBody').value = r.reminderBody || '';
-              document.getElementById('immediateSubject').value = r.immediateSubject || '';
-              document.getElementById('immediateBody').value = r.immediateBody || '';
+              document.getElementById('reminderSubject').value = r.reminderSubject || REMINDER_EMAIL_DEFAULTS.subject;
+              document.getElementById('reminderBody').value = r.reminderBody || REMINDER_EMAIL_DEFAULTS.body;
+              document.getElementById('immediateSubject').value = r.immediateSubject || REMINDER_EMAIL_DEFAULTS.immediateSubject;
+              document.getElementById('immediateBody').value = r.immediateBody || REMINDER_EMAIL_DEFAULTS.immediateBody;
             }
           } catch (e) {}
         }).getReminderEmailSettings();

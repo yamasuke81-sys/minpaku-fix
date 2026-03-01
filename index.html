@@ -1123,6 +1123,7 @@
     <div id="notificationBanner" class="alert alert-info py-2 mb-2 small" style="display:none;">
       <div class="d-flex justify-content-between align-items-center">
         <span class="fw-bold">新着通知:</span>
+        <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnBannerMarkAllRead">すべて既読</button>
       </div>
       <div id="notificationBannerList" class="mt-1"></div>
       <a href="#" id="notificationBannerLink" class="alert-link mt-1 d-block">すべて見る</a>
@@ -1244,6 +1245,8 @@
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-filter active" data-days="7">7日</button>
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-filter" data-days="30">30日</button>
           <button type="button" class="btn btn-sm btn-outline-secondary py-0 btn-notif-filter" data-days="0">全期間</button>
+          <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnMarkAllNotifRead">すべて既読</button>
+          <button type="button" class="btn btn-sm btn-outline-danger py-0" id="btnClearAllNotif">すべて削除</button>
         </div>
       </div>
       <div id="notificationListMain"></div>
@@ -5752,6 +5755,37 @@
             loadNotificationListMain();
           });
         });
+        // すべて既読ボタン（通知タブ）
+        document.getElementById('btnMarkAllNotifRead').addEventListener('click', function() {
+          var btn = this; btn.disabled = true; btn.textContent = '処理中...';
+          google.script.run.withSuccessHandler(function(j) {
+            var r = JSON.parse(j);
+            btn.disabled = false; btn.textContent = 'すべて既読';
+            if (r.success) { loadNotificationListMain(); updateNotificationBanner(); }
+          }).withFailureHandler(function() { btn.disabled = false; btn.textContent = 'すべて既読'; }).markAllNotificationsAsRead();
+        });
+        // すべて削除ボタン（通知タブ）
+        document.getElementById('btnClearAllNotif').addEventListener('click', function() {
+          customConfirm('通知をすべて削除しますか？この操作は元に戻せません。').then(function(ok) {
+            if (!ok) return;
+            var btn = document.getElementById('btnClearAllNotif');
+            btn.disabled = true; btn.textContent = '処理中...';
+            google.script.run.withSuccessHandler(function(j) {
+              var r = JSON.parse(j);
+              btn.disabled = false; btn.textContent = 'すべて削除';
+              if (r.success) { loadNotificationListMain(); updateNotificationBanner(); }
+            }).withFailureHandler(function() { btn.disabled = false; btn.textContent = 'すべて削除'; }).clearAllNotifications();
+          });
+        });
+        // すべて既読ボタン（バナー）
+        document.getElementById('btnBannerMarkAllRead').addEventListener('click', function() {
+          var btn = this; btn.disabled = true; btn.textContent = '処理中...';
+          google.script.run.withSuccessHandler(function(j) {
+            var r = JSON.parse(j);
+            btn.disabled = false; btn.textContent = 'すべて既読';
+            if (r.success) { updateNotificationBanner(); loadNotificationListMain(); }
+          }).withFailureHandler(function() { btn.disabled = false; btn.textContent = 'すべて既読'; }).markAllNotificationsAsRead();
+        });
       })();
       function loadNotificationListMain() {
         var el = document.getElementById('notificationListMain');
@@ -7028,6 +7062,8 @@
                 html += ' <button type="button" class="btn btn-sm btn-outline-secondary btnEditStaff" data-row="' + s.rowIndex + '" data-name="' + escapeHtml(s.name) + '" data-address="' + escapeHtml(s.address) + '" data-email="' + escapeHtml(s.email) + '" data-bank="' + escapeHtml(s.bankName) + '" data-branch="' + escapeHtml(s.bankBranch) + '" data-atype="' + escapeHtml(s.accountType) + '" data-anum="' + escapeHtml(s.accountNumber) + '" data-holder="' + escapeHtml(s.accountHolder) + '">編集</button>';
                 html += ' <button type="button" class="btn btn-sm btn-outline-danger btnDelStaff" data-row="' + s.rowIndex + '">削除</button>';
                 if (s.hasPassword) html += ' <button type="button" class="btn btn-sm btn-outline-warning btnResetPw" data-name="' + escapeHtml(s.name) + '">PW\u30EA\u30BB\u30C3\u30C8</button>';
+                html += ' <button type="button" class="btn btn-sm ' + (s.hidden ? 'btn-secondary' : 'btn-outline-secondary') + ' btnToggleHidden" data-row="' + s.rowIndex + '">' + (s.hidden ? '非表示中' : '非表示') + '</button>';
+                if (s.hidden) html += ' <span class="badge bg-secondary ms-1">非表示</span>';
                 html += '</div></div>';
               });
               // 全スタッフのrowIndex順を保持
@@ -7071,6 +7107,19 @@
                     else customAlert(r.error || '失敗');
                   }).resetStaffPassword(staffName);
                 });
+              });
+            });
+            // 非表示トグルボタンのイベント
+            document.querySelectorAll('.btnToggleHidden').forEach(function(btn) {
+              btn.addEventListener('click', function() {
+                var row = parseInt(this.getAttribute('data-row'), 10);
+                var thisBtn = this;
+                thisBtn.disabled = true;
+                google.script.run.withSuccessHandler(function(j) {
+                  var r = JSON.parse(j);
+                  if (r.success) loadStaffList();
+                  else { thisBtn.disabled = false; customAlert(r.error || '失敗'); }
+                }).withFailureHandler(function() { thisBtn.disabled = false; }).toggleStaffHidden(row);
               });
             });
             // 上下ボタンのイベント

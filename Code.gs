@@ -3097,6 +3097,28 @@ function markNotificationAsRead(rowIndex) {
 }
 
 /**
+ * 全通知を既読にする
+ */
+function markAllNotificationsAsRead() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NOTIFICATIONS);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true });
+    var lastCol = Math.max(sheet.getLastColumn(), 4);
+    if (lastCol < 4) {
+      sheet.getRange(1, 4).setValue('既読');
+      lastCol = 4;
+    }
+    var numRows = sheet.getLastRow() - 1;
+    var vals = [];
+    for (var i = 0; i < numRows; i++) vals.push(['Y']);
+    sheet.getRange(2, 4, numRows, 1).setValues(vals);
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * 通知を一括削除（全行削除してヘッダーだけ残す）
  */
 function clearAllNotifications() {
@@ -3144,9 +3166,10 @@ function getStaffList() {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。', list: [] });
     ensureSheetsExist();
     ensureStaffOrderColumn_();
+    ensureStaffHiddenColumn_();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const lastCol = Math.max(sheet.getLastColumn(), 11);
+    const lastCol = Math.max(sheet.getLastColumn(), 12);
     const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
     const list = rows.map(function(row, i) {
       return {
@@ -3161,7 +3184,8 @@ function getStaffList() {
         accountHolder: String(row[7] || '').trim(),
         active: String(row[8] || 'Y').trim(),
         hasPassword: lastCol >= 10 ? !!String(row[9] || '').trim() : false,
-        displayOrder: parseInt(row[10], 10) || 9999
+        displayOrder: parseInt(row[10], 10) || 9999,
+        hidden: lastCol >= 12 ? String(row[11] || '').trim() === 'Y' : false
       };
     }).filter(function(item) { return item.name || item.email; });
     list.sort(function(a, b) { return a.displayOrder - b.displayOrder; });
@@ -3190,6 +3214,45 @@ function ensureStaffOrderColumn_() {
       }
     }
   } catch (e) {}
+}
+
+/** スタッフシートに非表示列を保証 */
+function ensureStaffHiddenColumn_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === '非表示') return;
+    }
+    var nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue('非表示');
+  } catch (e) {}
+}
+
+/** スタッフの非表示をトグル */
+function toggleStaffHidden(rowIndex) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet) return JSON.stringify({ success: false, error: 'スタッフシートが見つかりません。' });
+    ensureStaffHiddenColumn_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var hiddenCol = -1;
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === '非表示') { hiddenCol = i + 1; break; }
+    }
+    if (hiddenCol < 0) return JSON.stringify({ success: false, error: '非表示列が見つかりません。' });
+    var current = String(sheet.getRange(rowIndex, hiddenCol).getValue() || '').trim();
+    var newVal = current === 'Y' ? '' : 'Y';
+    sheet.getRange(rowIndex, hiddenCol).setValue(newVal);
+    invalidateStaffCache_();
+    return JSON.stringify({ success: true, hidden: newVal === 'Y' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
 }
 
 /** スタッフの表示順を一括保存 */
@@ -5448,7 +5511,7 @@ function getStaffNamesForSelection() {
     ensureSheetsExist();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: true, list: [] });
-    const lastCol = Math.max(sheet.getLastColumn(), 11);
+    const lastCol = Math.max(sheet.getLastColumn(), 12);
     const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
     const list = rows
       .map(function(row) {
@@ -5456,6 +5519,8 @@ function getStaffNamesForSelection() {
         var email = String(row[2] || '').trim();
         var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
         if (active === 'N') return null;
+        var hidden = lastCol >= 12 ? String(row[11] || '').trim() === 'Y' : false;
+        if (hidden) return null;
         var hasPassword = lastCol >= 10 ? !!String(row[9] || '').trim() : false;
         var displayOrder = parseInt(row[10], 10) || 9999;
         return (name || email) ? { name: name || email, email: email, hasPassword: hasPassword, displayOrder: displayOrder } : null;
@@ -7016,13 +7081,15 @@ function getAllActiveStaff_(ss) {
   }
   var staffSheet = ss.getSheetByName(SHEET_STAFF);
   if (!staffSheet || staffSheet.getLastRow() < 2) return [];
-  var lastCol = Math.max(staffSheet.getLastColumn(), 11);
+  var lastCol = Math.max(staffSheet.getLastColumn(), 12);
   var rows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
   var result = rows.map(function(row) {
     var name = String(row[0] || '').trim();
     var email = String(row[2] || '').trim();
     var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
     if (active === 'N' || (!name && !email)) return null;
+    var hidden = lastCol >= 12 ? String(row[11] || '').trim() === 'Y' : false;
+    if (hidden) return null;
     var order = parseInt(row[10], 10) || 9999;
     return { staffName: name || email, email: email, displayOrder: order };
   }).filter(Boolean).sort(function(a, b) { return a.displayOrder - b.displayOrder; });

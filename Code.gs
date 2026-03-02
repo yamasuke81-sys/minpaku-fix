@@ -4219,8 +4219,8 @@ function sendTestNotification(notifyKey) {
         break;
 
       case '直前予約リマインド':
-        var irSubj = (settingsMap['直前予約リマインド件名'] || '').trim();
-        var irBody = (settingsMap['直前予約リマインド本文'] || '').trim();
+        var irSubj = (settingsMap['即時リマインド件名'] || '').trim();
+        var irBody = (settingsMap['即時リマインド本文'] || '').trim();
         subject = irSubj || '【民泊】直前予約 - 清掃スタッフ手配が必要です: ' + sampleDate;
         body = irBody || '1週間以内にチェックインの予約が新たに追加されました。\n\nチェックイン: ' + sampleDate + '\nチェックアウト: ' + sampleDate + '\nプラットフォーム: Airbnb\n残り日数: 2日\n\n早急に清掃スタッフの手配をお願いします。';
         var irVars = { 'チェックイン': sampleDate, 'チェックアウト': sampleDate, 'プラットフォーム': 'Airbnb', '残り日数': '2', '清掃詳細リンク': 'https://example.com' };
@@ -4232,8 +4232,8 @@ function sendTestNotification(notifyKey) {
         break;
 
       case '名簿未入力リマインド':
-        var rosSubj = (settingsMap['rosterReminderSubject'] || '').trim();
-        var rosBody = (settingsMap['rosterReminderBody'] || '').trim();
+        var rosSubj = (settingsMap['名簿リマインド件名'] || '').trim();
+        var rosBody = (settingsMap['名簿リマインド本文'] || '').trim();
         subject = rosSubj || '【民泊】宿泊者名簿の未記入通知（2件）';
         body = rosBody || '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB\n\n※ アプリの通知にも同じ内容が届いています。';
         subject = subject.split('{件数}').join('2');

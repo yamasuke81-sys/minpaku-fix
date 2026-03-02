@@ -1060,6 +1060,56 @@ function checkDriveStorageStatus() {
 }
 
 /**
+ * LINE通知送信（募集設定シートからLINE設定を読み取る）
+ */
+function clSendLineMessage_(text) {
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_RECRUIT_SETTINGS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return { ok: false, reason: 'シートなし' };
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = String(row[1] || '').trim();
+    });
+    var token = map['LINEチャネルアクセストークン'] || '';
+    var targetMode = map['LINE送信先モード'] || 'group';
+    var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
+    if (!token || !targetId) return { ok: false, reason: 'トークンまたはIDが空' };
+    var payload = { to: targetId, messages: [{ type: 'text', text: text }] };
+    var options = {
+      method: 'post', contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + token },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    };
+    var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', options);
+    var code = resp.getResponseCode();
+    if (code !== 200) Logger.log('LINE送信エラー: HTTP ' + code + ' ' + resp.getContentText());
+    return { ok: code === 200, httpCode: code };
+  } catch (e) {
+    Logger.log('clSendLineMessage_: ' + e.toString());
+    return { ok: false, reason: e.toString() };
+  }
+}
+
+/**
+ * 特記事項をオーナーのLINEに送信
+ */
+function sendMemoToLine(checkoutDate, text, staffName) {
+  try {
+    var msg = '📝 特記事項・備品不足\n\n'
+      + '📅 チェックアウト日: ' + checkoutDate + '\n'
+      + '👤 記入者: ' + (staffName || '不明') + '\n\n'
+      + text;
+    var result = clSendLineMessage_(msg);
+    return JSON.stringify({ success: result.ok, error: result.ok ? '' : (result.reason || 'LINE送信失敗') });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * メモを追加
  */
 function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {

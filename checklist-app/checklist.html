@@ -2887,10 +2887,36 @@
           html += '<img src="https://drive.google.com/thumbnail?id=' + memo.photoFileId + '&sz=w300" alt="memo photo">';
           html += '</a></div>';
         }
-        html += '<div class="memo-meta">' + escapeHtml(memo.by) + ' - ' + formatDateTime(memo.at) + '</div>';
+        html += '<div class="memo-meta">' + escapeHtml(memo.by) + ' - ' + formatDateTime(memo.at);
+        var memoTextEsc = (memo.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        var memoByEsc = (memo.by || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        html += ' <button class="memo-line-btn" onclick="sendMemoToLine(' + idx + ', \'' + memoTextEsc + '\', \'' + memoByEsc + '\')" title="LINEで送信" style="background:none;border:none;font-size:16px;cursor:pointer;padding:0 4px;vertical-align:middle;">📤</button>';
+        html += '</div>';
         html += '</div>';
       });
       document.getElementById('memoList').innerHTML = html;
+    }
+
+    function sendMemoToLine(idx, text, by) {
+      var btn = event.target;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      var origText = btn.textContent;
+      btn.textContent = '⏳';
+      callGAS('sendMemoToLine', [checkoutDate, text, by]).then(function(res) {
+        btn.disabled = false;
+        if (res.success) {
+          btn.textContent = '✅';
+          setTimeout(function() { btn.textContent = origText; }, 2000);
+        } else {
+          btn.textContent = origText;
+          alert('LINE送信に失敗しました: ' + (res.error || '不明なエラー'));
+        }
+      }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = origText;
+        alert('LINE送信エラー: ' + (e ? e.toString() : ''));
+      });
     }
 
     // === 要補充リスト ===

@@ -2888,17 +2888,16 @@
           html += '</a></div>';
         }
         html += '<div class="memo-meta">' + escapeHtml(memo.by) + ' - ' + formatDateTime(memo.at);
-        var memoTextEsc = (memo.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        var memoTextEsc = (memo.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/[\n\r\t]/g, function(c) { return c === '\n' ? '\\n' : c === '\r' ? '\\r' : '\\t'; });
         var memoByEsc = (memo.by || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        html += ' <button class="memo-line-btn" onclick="sendMemoToLine(' + idx + ', \'' + memoTextEsc + '\', \'' + memoByEsc + '\')" title="LINEで送信" style="background:none;border:none;font-size:16px;cursor:pointer;padding:0 4px;vertical-align:middle;">📤</button>';
+        html += ' <button class="memo-line-btn" onclick="sendMemoToLine(this, \'' + memoTextEsc + '\', \'' + memoByEsc + '\')" title="LINEで送信" style="background:none;border:none;font-size:16px;cursor:pointer;padding:0 4px;vertical-align:middle;">📤</button>';
         html += '</div>';
         html += '</div>';
       });
       document.getElementById('memoList').innerHTML = html;
     }
 
-    function sendMemoToLine(idx, text, by) {
-      var btn = event.target;
+    function sendMemoToLine(btn, text, by) {
       if (btn.disabled) return;
       btn.disabled = true;
       var origText = btn.textContent;
@@ -4865,6 +4864,7 @@
             if (sp) {
               sp.before = sp.before.filter(function(p) { return p.fileId !== fileId; });
               sp.after = sp.after.filter(function(p) { return p.fileId !== fileId; });
+              if (sp.unsorted) sp.unsorted = sp.unsorted.filter(function(p) { return p.fileId !== fileId; });
             }
             renderChecklist();
             renderPhotoSection();

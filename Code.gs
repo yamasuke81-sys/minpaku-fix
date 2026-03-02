@@ -4166,13 +4166,26 @@ function sendTestNotification(notifyKey) {
 
     switch (notifyKey) {
       case '清掃スタッフ募集':
-        subject = '【民泊】清掃スタッフ募集: ' + sampleDate;
-        body = '新しい清掃募集があります。\n\nチェックアウト日: ' + sampleDate + '\n\nアプリにログインして詳細を確認し、立候補してください。';
+        var rsSubj = (settingsMap['募集開始件名'] || '').trim();
+        var rsBody = (settingsMap['募集開始本文'] || '').trim();
+        // サンプルのプレースホルダー値
+        var recruitSampleVars = { '作業日': sampleDate, '日付': sampleDate + ' \u301C ' + sampleDate, '人数': '\u5927\u4EBA2\u540D', '\u30D9\u30C3\u30C9': '1\u4EBA1\u53F0\u305A\u3064', 'BBQ': '\u306A\u3057', '\u56FD\u7C4D': '\u65E5\u672C', '\u56DE\u7B54URL': 'https://example.com/?date=' + sampleDate };
+        subject = rsSubj || '\u3010\u6C11\u6CCA\u3011\u6E05\u6383\u30B9\u30BF\u30C3\u30D5\u52DF\u96C6: ' + sampleDate;
+        if (rsBody) {
+          body = rsBody;
+        } else {
+          body = '\u6E05\u6383\u52DF\u96C6\n\n\u4F5C\u696D\u65E5: ' + sampleDate + '\n\n\u6B21\u56DE\u4E88\u7D04\uFF08\u5909\u66F4\u306E\u53EF\u80FD\u6027\u3042\u308A\uFF09\n\u65E5\u4ED8:\u3000\u3000' + sampleDate + ' \u301C ' + sampleDate + '\n\u4EBA\u6570:\u3000\u3000\u5927\u4EBA2\u540D\n\u30D9\u30C3\u30C9:\u3000' + '1\u4EBA1\u53F0\u305A\u3064\nBBQ:\u3000\u3000\u306A\u3057\n\u56FD\u7C4D:\u3000\u3000\u65E5\u672C\n\n\u203B\u4E88\u7D04\u72B6\u6CC1\u6B21\u7B2C\u3067\u306F\u5909\u66F4\u3068\u306A\u308B\u5834\u5408\u304C\u3042\u308A\u307E\u3059\u3002\n\nWeb\u30A2\u30D7\u30EA\u3067\u56DE\u7B54: https://example.com/?date=' + sampleDate;
+        }
+        var rsKeys = Object.keys(recruitSampleVars);
+        for (var rsi = 0; rsi < rsKeys.length; rsi++) {
+          subject = subject.split('{' + rsKeys[rsi] + '}').join(recruitSampleVars[rsKeys[rsi]]);
+          body = body.split('{' + rsKeys[rsi] + '}').join(recruitSampleVars[rsKeys[rsi]]);
+        }
         break;
 
       case '募集リマインド':
-        var rrSubj = (settingsMap['recruitReminderSubject'] || '').trim();
-        var rrBody = (settingsMap['recruitReminderBody'] || '').trim();
+        var rrSubj = (settingsMap['募集リマインド件名'] || '').trim();
+        var rrBody = (settingsMap['募集リマインド本文'] || '').trim();
         subject = rrSubj || '【民泊】清掃スタッフ募集のリマインド: ' + sampleDate;
         body = rrBody || 'まだ回答が2名に達していません。\nチェックアウト日: ' + sampleDate + '\n現在の回答数: 1名';
         subject = subject.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2');

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -4159,6 +4159,15 @@
           if (bsModal) bsModal.dispose();
           bsModal = new bootstrap.Modal(modal);
           _fixDialogBackdrop(modal);
+          // モーダル閉じたときにbody scroll復帰＋残留backdrop除去
+          function onHidden() {
+            modal.removeEventListener('hidden.bs.modal', onHidden);
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+          }
+          modal.addEventListener('hidden.bs.modal', onHidden);
           bsModal.show();
           _fixDialogBackdrop(modal);
         }

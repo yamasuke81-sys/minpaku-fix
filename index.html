@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1403,7 +1403,7 @@
         <div class="mb-3"><input type="text" class="form-control form-control-sm" id="recruitReminderRecipients" placeholder="例: staff1@example.com, staff2@example.com"></div>
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面テンプレート</label>
-        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックアウト}</code> <code>{回答数}</code> <code>{最少回答者数}</code></p>
+        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックアウト}</code> <code>{回答数}</code> <code>{最少回答者数}</code> <code>{回答URL}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitReminderSubject" placeholder="例: 【民泊】清掃募集リマインド: {チェックアウト}"></div>
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitReminderBody" rows="4" placeholder="例: 清掃スタッフの回答がまだ{最少回答者数}名に達していません。&#10;チェックアウト: {チェックアウト}&#10;現在の回答数: {回答数}名"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRecruitSettings">募集設定を保存</button>
@@ -1549,7 +1549,7 @@
         <div class="mb-3"><input type="text" class="form-control form-control-sm" id="rosterReminderRecipients" placeholder="例: owner@example.com, manager@example.com"></div>
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面テンプレート</label>
-        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{件数}</code> 未記入件数 <code>{未記入一覧}</code> 未記入予約の一覧</p>
+        <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{件数}</code> 未記入件数 <code>{未記入一覧}</code> 未記入予約の一覧 <code>{アプリURL}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="rosterReminderSubject" placeholder="例: 【民泊】宿泊者名簿の未記入通知（{件数}件）"></div>
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="rosterReminderBody" rows="4" placeholder="例: 宿泊者名簿が未記入の予約が{件数}件あります。&#10;宿泊者への催促をお願いします。&#10;&#10;{未記入一覧}&#10;&#10;※ アプリの通知にも同じ内容が届いています。"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿未入力リマインド設定を保存</button>
@@ -1704,14 +1704,14 @@
 
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面</label>
-        <p class="small text-muted mb-1">プレースホルダー: <code>{スタッフ名}</code> <code>{対象年月}</code> <code>{締切日}</code></p>
+        <p class="small text-muted mb-1">プレースホルダー: <code>{スタッフ名}</code> <code>{対象年月}</code> <code>{締切日}</code> <code>{アプリURL}</code></p>
         <div class="mb-2">
           <label class="form-label small">件名</label>
           <input type="text" class="form-control form-control-sm" id="invoiceRequestSubject" placeholder="例: 【民泊清掃】{対象年月}分の請求書をご提出ください">
         </div>
         <div class="mb-3">
           <label class="form-label small">本文</label>
-          <textarea class="form-control form-control-sm" id="invoiceRequestBody" rows="8" placeholder="例: {スタッフ名} さん&#10;&#10;お疲れ様です。&#10;{対象年月}分の請求書のご提出をお願いいたします。&#10;&#10;締切: {締切日}&#10;&#10;よろしくお願いいたします。"></textarea>
+          <textarea class="form-control form-control-sm" id="invoiceRequestBody" rows="8" placeholder="例: {スタッフ名} さん&#10;&#10;お疲れ様です。&#10;{対象年月}分の請求書のご提出をお願いいたします。&#10;&#10;締切: {締切日}&#10;&#10;Webアプリ: {アプリURL}&#10;&#10;よろしくお願いいたします。"></textarea>
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
@@ -8131,7 +8131,7 @@
 
       var INVOICE_REQUEST_DEFAULTS = {
         subject: '【民泊清掃】{対象年月}分の請求書をご提出ください',
-        body: '{スタッフ名} さん\n\nお疲れ様です。\n{対象年月}分の請求書のご提出をお願いいたします。\n\n締切: {締切日}\n\nよろしくお願いいたします。'
+        body: '{スタッフ名} さん\n\nお疲れ様です。\n{対象年月}分の請求書のご提出をお願いいたします。\n\n締切: {締切日}\n\nWebアプリ: {アプリURL}\n\nよろしくお願いいたします。'
       };
 
       function loadInvoiceRequestSettings() {

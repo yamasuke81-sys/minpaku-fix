@@ -1881,8 +1881,10 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
         }
       }
       // 各スタッフにメール通知
+      var cancelDetailUrl = buildCleaningDetailUrl_(coStr);
       var cancelSubject = '【民泊】予約キャンセルのお知らせ: ' + coStr;
-      var cancelBody = dateRange + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。';
+      var cancelBody = dateRange + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。'
+        + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
       var _ch_cancel = getNotifyChannel_('予約キャンセル');
       for (var sni = 0; sni < staffNames.length; sni++) {
         var name = staffNames[sni];
@@ -1905,7 +1907,8 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
             '期間: ' + dateRange + '\n' +
             'ゲスト: ' + guestLabel + '\n' +
             '清掃担当: ' + cleaningStaff + '\n\n' +
-            '清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。';
+            '清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。'
+            + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
           GmailApp.sendEmail(ownerEmail, oSubject, oBody);
         }
       } catch (ownerMailErr) {}
@@ -4163,6 +4166,7 @@ function sendTestNotification(notifyKey) {
     var subject = '';
     var body = '';
     var sampleDate = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+    var sampleDetailUrl = buildCleaningDetailUrl_(sampleDate);
 
     switch (notifyKey) {
       case '清掃スタッフ募集':
@@ -4186,10 +4190,12 @@ function sendTestNotification(notifyKey) {
       case '募集リマインド':
         var rrSubj = (settingsMap['募集リマインド件名'] || '').trim();
         var rrBody = (settingsMap['募集リマインド本文'] || '').trim();
+        var rrStaffUrl = getStaffAppUrl_();
+        var rrAnswerUrl = rrStaffUrl ? rrStaffUrl + (rrStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(sampleDate) : '';
         subject = rrSubj || '【民泊】清掃スタッフ募集のリマインド: ' + sampleDate;
-        body = rrBody || 'まだ回答が2名に達していません。\nチェックアウト日: ' + sampleDate + '\n現在の回答数: 1名';
-        subject = subject.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2');
-        body = body.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2');
+        body = rrBody || 'まだ回答が2名に達していません。\nチェックアウト日: ' + sampleDate + '\n現在の回答数: 1名\n\nWebアプリで回答: ' + rrAnswerUrl;
+        subject = subject.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2').split('{回答URL}').join(rrAnswerUrl);
+        body = body.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2').split('{回答URL}').join(rrAnswerUrl);
         break;
 
       case 'スタッフ確定':
@@ -4234,30 +4240,36 @@ function sendTestNotification(notifyKey) {
       case '名簿未入力リマインド':
         var rosSubj = (settingsMap['名簿リマインド件名'] || '').trim();
         var rosBody = (settingsMap['名簿リマインド本文'] || '').trim();
+        var sampleOwnerUrl = '';
+        try { sampleOwnerUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
         subject = rosSubj || '【民泊】宿泊者名簿の未記入通知（2件）';
-        body = rosBody || '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB\n\n※ アプリの通知にも同じ内容が届いています。';
-        subject = subject.split('{件数}').join('2');
-        body = body.split('{件数}').join('2').split('{未記入一覧}').join('・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB');
+        body = rosBody || '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB\n\n' + (sampleOwnerUrl ? 'アプリ: ' + sampleOwnerUrl + '\n\n' : '') + '※ アプリの通知にも同じ内容が届いています。';
+        subject = subject.split('{件数}').join('2').split('{アプリURL}').join(sampleOwnerUrl);
+        body = body.split('{件数}').join('2').split('{未記入一覧}').join('・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB').split('{アプリURL}').join(sampleOwnerUrl);
         break;
 
       case '予約キャンセル':
         subject = '【民泊】予約キャンセルのお知らせ: ' + sampleDate;
-        body = sampleDate + '～' + sampleDate + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。';
+        body = sampleDate + '～' + sampleDate + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。'
+          + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
         break;
 
       case '出勤キャンセル要望':
         subject = '【民泊】出勤キャンセル要望: テストスタッフ';
-        body = 'テストスタッフ さんが ' + sampleDate + ' の清掃について出勤キャンセルを要望しています。\n\n理由: テスト送信のサンプルです\n\nアプリから承認・却下を行ってください。';
+        body = 'テストスタッフ さんが ' + sampleDate + ' の清掃について出勤キャンセルを要望しています。\n\n理由: テスト送信のサンプルです\n\nアプリから承認・却下を行ってください。'
+          + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
         break;
 
       case 'キャンセル承認':
         subject = '【民泊】出勤キャンセル承認: ' + sampleDate;
-        body = sampleDate + ' の出勤キャンセルが承認されました。\nこの日の清掃担当は解除されています。';
+        body = sampleDate + ' の出勤キャンセルが承認されました。\nこの日の清掃担当は解除されています。'
+          + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
         break;
 
       case 'キャンセル却下':
         subject = '【民泊】出勤キャンセル却下: ' + sampleDate;
-        body = sampleDate + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。';
+        body = sampleDate + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。'
+          + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
         break;
 
       case '請求書送信':
@@ -4267,7 +4279,8 @@ function sendTestNotification(notifyKey) {
 
       case '清掃完了':
         subject = '【民泊】清掃完了報告: ' + sampleDate;
-        body = sampleDate + ' の清掃が完了しました。\n\n担当: テストスタッフ\nチェック項目: 15/15 完了\n撮影枚数: 8枚';
+        body = sampleDate + ' の清掃が完了しました。\n\n担当: テストスタッフ\nチェック項目: 15/15 完了\n撮影枚数: 8枚'
+          + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
         break;
 
       default:
@@ -4510,16 +4523,20 @@ function sendInvoiceRequestEmails(testRecipient) {
     // 締切日（配信月の末日）
     var deadlineDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     var deadlineText = (deadlineDate.getMonth() + 1) + '/' + deadlineDate.getDate();
+    // スタッフアプリURLを取得
+    var staffAppUrl = getStaffAppUrl_();
     // テスト送信先が指定されている場合は1通だけ送信
     if (testEmail) {
       var body = bodyTpl
         .replace(/\{スタッフ名\}/g, 'テストユーザー')
         .replace(/\{対象年月\}/g, ymText)
-        .replace(/\{締切日\}/g, deadlineText);
+        .replace(/\{締切日\}/g, deadlineText)
+        .replace(/\{アプリURL\}/g, staffAppUrl);
       var subj = '【テスト】' + subject
         .replace(/\{対象年月\}/g, ymText)
         .replace(/\{スタッフ名\}/g, 'テストユーザー')
-        .replace(/\{締切日\}/g, deadlineText);
+        .replace(/\{締切日\}/g, deadlineText)
+        .replace(/\{アプリURL\}/g, staffAppUrl);
       try {
         GmailApp.sendEmail(testEmail, subj, body, { name: '請求書要請（テスト送信）' });
         return JSON.stringify({ success: true, message: testEmail + ' にテストメールを送信しました。', sent: 1 });
@@ -4542,11 +4559,13 @@ function sendInvoiceRequestEmails(testRecipient) {
       var body = bodyTpl
         .replace(/\{スタッフ名\}/g, name || 'スタッフ')
         .replace(/\{対象年月\}/g, ymText)
-        .replace(/\{締切日\}/g, deadlineText);
+        .replace(/\{締切日\}/g, deadlineText)
+        .replace(/\{アプリURL\}/g, staffAppUrl);
       var subj = subject
         .replace(/\{対象年月\}/g, ymText)
         .replace(/\{スタッフ名\}/g, name || 'スタッフ')
-        .replace(/\{締切日\}/g, deadlineText);
+        .replace(/\{締切日\}/g, deadlineText)
+        .replace(/\{アプリURL\}/g, staffAppUrl);
       var _ch_inv = getNotifyChannel_('請求書要請');
       if (_ch_inv.email) {
         try {
@@ -4811,17 +4830,21 @@ function checkRosterReminder() {
 
     if (ownerEmail) {
       try {
+        var rosterOwnerUrl = '';
+        try { rosterOwnerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
+        if (!rosterOwnerUrl) { try { rosterOwnerUrl = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {} }
         var subjTpl = (res.settings.rosterReminderSubject || '').trim();
         var bodyTpl = (res.settings.rosterReminderBody || '').trim();
         var listText = msgLines.join('\n');
         var subj = subjTpl
-          ? subjTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText)
+          ? subjTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText).replace(/\{アプリURL\}/g, rosterOwnerUrl)
           : '【民泊】宿泊者名簿の未記入通知（' + missing.length + '件）';
         var body = bodyTpl
-          ? bodyTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText)
+          ? bodyTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText).replace(/\{アプリURL\}/g, rosterOwnerUrl)
           : '以下の予約について、宿泊者名簿がまだ記入されていません。\n' +
             '宿泊者への催促をお願いします。\n\n' +
             listText + '\n\n' +
+            (rosterOwnerUrl ? 'アプリ: ' + rosterOwnerUrl + '\n\n' : '') +
             '※ アプリの通知にも同じ内容が届いています。';
         var _ch_roster = getNotifyChannel_('名簿未入力リマインド');
         if (_ch_roster.email) GmailApp.sendEmail(ownerEmail, subj, body);
@@ -5864,8 +5887,10 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
       var ownerRes = JSON.parse(getOwnerEmail());
       var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
       if (ownerEmail && isEmailNotifyEnabled_('辞退申請通知有効')) {
+        var detailUrl = buildCleaningDetailUrl_(dateStr);
         var subject = '【民泊】清掃スタッフの出勤キャンセル要望: ' + dateStr;
-        var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。';
+        var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
+          + (detailUrl ? '\n\n清掃詳細: ' + detailUrl : '');
         var _ch_cancelReq = getNotifyChannel_('出勤キャンセル要望');
         if (_ch_cancelReq.email) GmailApp.sendEmail(ownerEmail, subject, body);
         if (_ch_cancelReq.line) { try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
@@ -5958,8 +5983,10 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     // スタッフにメール通知
     if (sEmail && isEmailNotifyEnabled_('辞退承認通知有効')) {
       try {
+        var approveDetailUrl = buildCleaningDetailUrl_(checkoutStr);
         var subject = '【民泊】出勤キャンセルが承認されました: ' + checkoutStr;
-        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。';
+        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
+          + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
         var _ch_approve = getNotifyChannel_('キャンセル承認');
         if (_ch_approve.email) GmailApp.sendEmail(sEmail, subject, body);
         if (_ch_approve.line) { try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
@@ -6004,8 +6031,10 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     // スタッフにメール通知
     if (sEmail && isEmailNotifyEnabled_('辞退却下通知有効')) {
       try {
+        var rejectDetailUrl = buildCleaningDetailUrl_(checkoutStr);
         var subject = '【民泊】出勤キャンセルが却下されました: ' + checkoutStr;
-        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。';
+        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
+          + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
         var _ch_reject = getNotifyChannel_('キャンセル却下');
         if (_ch_reject.email) GmailApp.sendEmail(sEmail, subject, body);
         if (_ch_reject.line) { try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
@@ -8706,10 +8735,13 @@ function checkAndSendReminders() {
           emails.forEach(function(r) { var e = String(r[0] || '').trim().toLowerCase(); if (e) toSet[e] = 1; });
           var to = Object.keys(toSet);
           if (to.length) {
+            var recruitStaffUrl = getStaffAppUrl_();
+            var recruitDateStr = String(rows[i][0] || '').trim();
+            var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateStr) : '';
             var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}';
-            var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名';
-            var subj = subjTpl.replace(/\{チェックアウト\}/g, rows[i][0]).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp));
-            var body = bodyTpl.replace(/\{チェックアウト\}/g, rows[i][0]).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp));
+            var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名\n\nWebアプリで回答: {回答URL}';
+            var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
+            var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var _ch_remind = getNotifyChannel_('募集リマインド');
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
             if (_ch_remind.line) { try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) {} }
@@ -8850,6 +8882,22 @@ function applyReminderTemplate_(template, vars) {
     result = result.split('{' + keys[i] + '}').join(val != null ? String(val) : '');
   }
   return result;
+}
+
+/**
+ * スタッフ用WebアプリのURLを取得（内部ヘルパー）
+ */
+function getStaffAppUrl_() {
+  var url = '';
+  try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch(e) {}
+  if (!url) { try { url = PropertiesService.getScriptProperties().getProperty('staffDeployUrl') || ''; } catch(e) {} }
+  if (!url) {
+    var base = '';
+    try { base = ScriptApp.getService().getUrl() || ''; } catch(e) {}
+    if (!base) { try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch(e) {} }
+    if (base) url = base + (base.indexOf('?') >= 0 ? '&staff=1' : '?staff=1');
+  }
+  return url;
 }
 
 /**
@@ -9595,6 +9643,7 @@ function notifyCleaningComplete(checkoutDate) {
     addNotification_('清掃完了', fmtDate + ' の清掃が完了しました（' + clRes.checkedCount + '/' + clRes.totalItems + '項目）');
 
     if (ownerEmail) {
+      var completeDetailUrl = buildCleaningDetailUrl_(dateKey);
       var subject = '【民泊】清掃完了: ' + fmtDate;
       var body = fmtDate + ' の清掃が完了しました。\n\n'
         + 'チェックリスト: ' + clRes.checkedCount + '/' + clRes.totalItems + ' 項目完了\n'
@@ -9603,6 +9652,7 @@ function notifyCleaningComplete(checkoutDate) {
         body += '\n--- 特記事項 ---\n';
         clRes.memos.forEach(function(m) { body += '・' + m.text + '（' + m.author + ' ' + m.timestamp + '）\n'; });
       }
+      if (completeDetailUrl) body += '\n清掃詳細: ' + completeDetailUrl + '\n';
       var _ch_complete = getNotifyChannel_('清掃完了');
       if (_ch_complete.email && isEmailNotifyEnabled_('清掃完了通知有効')) {
         GmailApp.sendEmail(ownerEmail, subject, body);

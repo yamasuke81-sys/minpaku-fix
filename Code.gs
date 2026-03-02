@@ -4463,7 +4463,16 @@ function getInvoiceRequestSettings() {
       settings: {
         enabled: enabledVal === true || String(enabledVal || '').trim() === 'true', // デフォルトOFF
         day: parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25,
-        time: String(map[INVOICE_REQ_KEYS_.time] || '09:00').trim(),
+        time: (function() {
+          var tv = map[INVOICE_REQ_KEYS_.time];
+          if (!tv) return '09:00';
+          if (tv instanceof Date) {
+            var hh = ('0' + tv.getHours()).slice(-2);
+            var mm = ('0' + tv.getMinutes()).slice(-2);
+            return hh + ':' + mm;
+          }
+          return String(tv).trim() || '09:00';
+        })(),
         deadline: parseInt(map[INVOICE_REQ_KEYS_.deadline], 10) || 0,
         subject: String(map[INVOICE_REQ_KEYS_.subject] || ''),
         body: String(map[INVOICE_REQ_KEYS_.body] || '')
@@ -4662,7 +4671,13 @@ function setupInvoiceRequestTrigger() {
       var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
       for (var i = 0; i < rows.length; i++) {
         if (String(rows[i][0] || '').trim() === INVOICE_REQ_KEYS_.time) {
-          var h = parseInt(String(rows[i][1] || '9'), 10);
+          var tv = rows[i][1];
+          var h;
+          if (tv instanceof Date) {
+            h = tv.getHours();
+          } else {
+            h = parseInt(String(tv || '9'), 10);
+          }
           if (!isNaN(h) && h >= 0 && h <= 23) hour = h;
           break;
         }

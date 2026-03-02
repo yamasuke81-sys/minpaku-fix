@@ -4273,11 +4273,21 @@ function sendTestNotification(notifyKey) {
         break;
 
       case '請求書要請':
+        var irqSubj = (settingsMap[INVOICE_REQ_KEYS_.subject] || '').trim();
+        var irqBody = (settingsMap[INVOICE_REQ_KEYS_.body] || '').trim();
         var irqStaffUrl = getStaffAppUrl_();
-        subject = '【民泊】2026年3月分の請求書をご提出ください';
-        body = 'テストスタッフ さん\n\nお疲れ様です。\n2026年3月分の請求書のご提出をお願いいたします。\n\n締切: 3/31'
-          + (irqStaffUrl ? '\n\nWebアプリ: ' + irqStaffUrl : '')
-          + '\n\nよろしくお願いいたします。';
+        var irqNow = new Date();
+        var irqYm = irqNow.getFullYear() + '年' + (irqNow.getMonth() + 1) + '月';
+        var irqDeadline = (settingsMap[INVOICE_REQ_KEYS_.deadline] || '').trim();
+        var irqDeadlineText = irqDeadline ? irqDeadline + '日' : ((irqNow.getMonth() + 2 > 12 ? 1 : irqNow.getMonth() + 2) + '/' + new Date(irqNow.getFullYear(), irqNow.getMonth() + 1, 0).getDate());
+        subject = irqSubj || '【民泊清掃】' + irqYm + '分の請求書をご提出ください';
+        body = irqBody || 'テストスタッフ さん\n\nお疲れ様です。\n' + irqYm + '分の請求書のご提出をお願いいたします。\n\n締切: ' + irqDeadlineText + '\n\nWebアプリ: ' + (irqStaffUrl || '') + '\n\nよろしくお願いいたします。';
+        var irqVars = { 'スタッフ名': 'テストスタッフ', '対象年月': irqYm, '締切日': irqDeadlineText, 'アプリURL': irqStaffUrl || '' };
+        var irqKeys = Object.keys(irqVars);
+        for (var irqi = 0; irqi < irqKeys.length; irqi++) {
+          subject = subject.split('{' + irqKeys[irqi] + '}').join(irqVars[irqKeys[irqi]]);
+          body = body.split('{' + irqKeys[irqi] + '}').join(irqVars[irqKeys[irqi]]);
+        }
         break;
 
       case '請求書送信':
@@ -4431,7 +4441,8 @@ var INVOICE_REQ_KEYS_ = {
   day: '請求書要請配信日',
   time: '請求書要請配信時刻',
   subject: '請求書要請件名',
-  body: '請求書要請本文'
+  body: '請求書要請本文',
+  deadline: '請求書要請締切日'
 };
 
 function getInvoiceRequestSettings() {
@@ -4453,6 +4464,7 @@ function getInvoiceRequestSettings() {
         enabled: enabledVal === true || String(enabledVal || '').trim() === 'true', // デフォルトOFF
         day: parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25,
         time: String(map[INVOICE_REQ_KEYS_.time] || '09:00').trim(),
+        deadline: parseInt(map[INVOICE_REQ_KEYS_.deadline], 10) || 0,
         subject: String(map[INVOICE_REQ_KEYS_.subject] || ''),
         body: String(map[INVOICE_REQ_KEYS_.body] || '')
       }
@@ -4478,6 +4490,7 @@ function saveInvoiceRequestSettings(settings) {
       [INVOICE_REQ_KEYS_.enabled, settings.enabled === true ? 'true' : 'false'],
       [INVOICE_REQ_KEYS_.day, String(settings.day || 25)],
       [INVOICE_REQ_KEYS_.time, String(settings.time || '09:00')],
+      [INVOICE_REQ_KEYS_.deadline, String(settings.deadline || '')],
       [INVOICE_REQ_KEYS_.subject, String(settings.subject || '')],
       [INVOICE_REQ_KEYS_.body, String(settings.body || '')]
     ];
@@ -4528,9 +4541,15 @@ function sendInvoiceRequestEmails(testRecipient) {
     var now = new Date();
     var targetMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     var ymText = targetMonth.getFullYear() + '年' + (targetMonth.getMonth() + 1) + '月';
-    // 締切日（配信月の末日）
-    var deadlineDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    var deadlineText = (deadlineDate.getMonth() + 1) + '/' + deadlineDate.getDate();
+    // 締切日（設定があればその日、なければ配信月の末日）
+    var deadlineDaySetting = parseInt(map[INVOICE_REQ_KEYS_.deadline], 10) || 0;
+    var deadlineText;
+    if (deadlineDaySetting > 0) {
+      deadlineText = (now.getMonth() + 1) + '/' + deadlineDaySetting;
+    } else {
+      var deadlineDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      deadlineText = (deadlineDate.getMonth() + 1) + '/' + deadlineDate.getDate();
+    }
     // スタッフアプリURLを取得
     var staffAppUrl = getStaffAppUrl_();
     // テスト送信先が指定されている場合は1通だけ送信

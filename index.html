@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1701,6 +1701,18 @@
             </select>
           </div>
         </div>
+        <label class="form-label small fw-bold">締切日</label>
+        <p class="small text-muted mb-1">テンプレートの <code>{締切日}</code> に使われます。未設定の場合は月末日になります。</p>
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col-auto small">毎月</div>
+          <div class="col-auto">
+            <select class="form-select form-select-sm" id="invoiceRequestDeadline" style="width:80px;">
+              <option value="0">未設定</option>
+            </select>
+          </div>
+          <div class="col-auto small">日</div>
+        </div>
+        <div id="invoiceRequestDebug" class="small text-info mb-2" style="font-family:monospace;font-size:11px;"></div>
 
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面</label>
@@ -8126,6 +8138,17 @@
           }
           timeSel.value = '09:00';
         }
+        // 締切日select 1〜31
+        var deadlineSel = document.getElementById('invoiceRequestDeadline');
+        if (deadlineSel) {
+          for (var dl = 1; dl <= 31; dl++) {
+            var opt = document.createElement('option');
+            opt.value = dl;
+            opt.textContent = dl + '日';
+            deadlineSel.appendChild(opt);
+          }
+          deadlineSel.value = '0';
+        }
       })();
 
       var INVOICE_REQUEST_DEFAULTS = {
@@ -8137,20 +8160,30 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
+            // DEBUG: 配信日設定の読み込みデバッグ
+            var dbgEl = document.getElementById('invoiceRequestDebug');
+            if (dbgEl) dbgEl.textContent = 'サーバーから取得: day=' + (r.settings ? r.settings.day : 'N/A') + ', time=' + (r.settings ? r.settings.time : 'N/A') + ', deadline=' + (r.settings ? r.settings.deadline : 'N/A') + ', enabled=' + (r.settings ? r.settings.enabled : 'N/A');
             if (r.success && r.settings) {
               var s = r.settings;
               var en = document.getElementById('invoiceRequestEnabled');
               if (en) en.checked = s.enabled === true;
               var daySel = document.getElementById('invoiceRequestDay');
-              if (daySel) daySel.value = String(s.day || 25);
+              if (daySel) { daySel.value = String(s.day || 25); }
               var timeSel = document.getElementById('invoiceRequestTime');
-              if (timeSel) timeSel.value = String(s.time || '09:00');
+              if (timeSel) { timeSel.value = String(s.time || '09:00'); }
+              var deadlineSel = document.getElementById('invoiceRequestDeadline');
+              if (deadlineSel) { deadlineSel.value = String(s.deadline || 0); }
               var subj = document.getElementById('invoiceRequestSubject');
               if (subj) subj.value = s.subject || INVOICE_REQUEST_DEFAULTS.subject;
               var body = document.getElementById('invoiceRequestBody');
               if (body) body.value = s.body || INVOICE_REQUEST_DEFAULTS.body;
+              // DEBUG: select反映後の値
+              if (dbgEl) dbgEl.textContent += ' → select反映後: day=' + (daySel ? daySel.value : '?') + ', time=' + (timeSel ? timeSel.value : '?') + ', deadline=' + (deadlineSel ? deadlineSel.value : '?');
             }
-          } catch (e) {}
+          } catch (e) {
+            var dbgEl2 = document.getElementById('invoiceRequestDebug');
+            if (dbgEl2) dbgEl2.textContent = 'エラー: ' + e.toString();
+          }
         }).getInvoiceRequestSettings();
       }
 
@@ -8161,6 +8194,7 @@
           enabled: document.getElementById('invoiceRequestEnabled').checked,
           day: parseInt(document.getElementById('invoiceRequestDay').value, 10) || 25,
           time: document.getElementById('invoiceRequestTime').value || '09:00',
+          deadline: parseInt(document.getElementById('invoiceRequestDeadline').value, 10) || 0,
           subject: document.getElementById('invoiceRequestSubject').value || '',
           body: document.getElementById('invoiceRequestBody').value || ''
         };

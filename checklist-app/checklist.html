@@ -1440,6 +1440,63 @@
       from { transform: translateX(-50%) translateY(20px); opacity: 0; }
       to { transform: translateX(-50%) translateY(0); opacity: 1; }
     }
+    /* === 写真ギャラリービューア === */
+    .gallery-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.92); z-index: 300;
+      display: flex; flex-direction: column;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    .gallery-header {
+      flex-shrink: 0; padding: 12px 16px; color: white;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .gallery-header-info {
+      flex: 1; text-align: center; font-size: 13px; line-height: 1.4;
+    }
+    .gallery-header-info .gallery-category { color: #aaa; font-size: 11px; }
+    .gallery-header-info .gallery-spot { font-weight: bold; font-size: 14px; }
+    .gallery-header-info .gallery-timing { color: #f39c12; font-size: 11px; }
+    .gallery-counter { color: #aaa; font-size: 12px; margin-top: 2px; }
+    .gallery-close-btn {
+      background: none; border: none; color: white; font-size: 28px;
+      padding: 4px 8px; cursor: pointer; flex-shrink: 0;
+    }
+    .gallery-body {
+      flex: 1; position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .gallery-img {
+      max-width: 100%; max-height: 100%; object-fit: contain;
+      transition: opacity 0.15s ease;
+    }
+    .gallery-nav {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.15); border: none; color: white;
+      font-size: 28px; padding: 12px 8px; cursor: pointer; border-radius: 8px;
+      z-index: 2;
+    }
+    .gallery-nav:hover { background: rgba(255,255,255,0.3); }
+    .gallery-nav.prev { left: 8px; }
+    .gallery-nav.next { right: 8px; }
+    .gallery-footer {
+      flex-shrink: 0; padding: 8px 16px 16px;
+      display: flex; gap: 8px; justify-content: center;
+    }
+    .gallery-footer button {
+      padding: 8px 16px; border: 1px solid #555; border-radius: 6px;
+      background: rgba(255,255,255,0.1); color: white; font-size: 13px; cursor: pointer;
+    }
+    .gallery-footer button:active { background: rgba(255,255,255,0.25); }
+    .gallery-dots {
+      display: flex; gap: 4px; justify-content: center; padding: 6px 0;
+      flex-shrink: 0; flex-wrap: wrap; max-height: 24px; overflow: hidden;
+    }
+    .gallery-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+    }
+    .gallery-dot.active { background: #f39c12; }
   </style>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head>
@@ -3413,20 +3470,142 @@
     }
 
     function showPhotoModal(spotId, fileId, spotName, timing) {
-      var overlay = document.createElement('div');
-      overlay.className = 'photo-modal-overlay';
-      overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-      var modal = document.createElement('div');
-      modal.className = 'photo-modal';
-      modal.innerHTML = '<h3>📷 ' + (spotName || '') + '</h3>' +
-        '<div style="text-align:center;"><img src="https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800" style="max-width:100%;border-radius:8px;" onerror="this.alt=\'画像を読み込めません\';"></div>' +
-        '<div style="display:flex;gap:8px;margin-top:12px;">' +
-        '<button class="photo-modal-close" style="flex:1;background:#6c5ce7;color:white;border-color:#6c5ce7;" onclick="this.closest(\'.photo-modal-overlay\').remove();openRetagModal(\'' + spotId + '\', \'' + fileId + '\', \'' + (timing || 'ビフォー') + '\')">タグ変更</button>' +
-        '<button class="photo-modal-close" style="flex:1;background:#e74c3c;color:white;border-color:#e74c3c;" onclick="this.closest(\'.photo-modal-overlay\').remove();deletePhoto(\'' + spotId + '\', \'' + fileId + '\')">削除</button>' +
+      // ギャラリーモードで開く（全写真を横断スワイプ）
+      openPhotoGallery(spotId, fileId);
+    }
+
+    // === 写真ギャラリービューア ===
+    var _galleryState = null;
+
+    function buildGalleryList_() {
+      // checklistDataから全写真をカテゴリ順にフラットリスト化
+      if (!checklistData || !checklistData.spots) return [];
+      var photos = checklistData.photos || {};
+      var spots = checklistData.spots;
+      // カテゴリ順にソート
+      var catOrder = [];
+      var catMap = {};
+      spots.forEach(function(s) {
+        var cat = s.category || 'その他';
+        if (!catMap[cat]) { catMap[cat] = []; catOrder.push(cat); }
+        catMap[cat].push(s);
+      });
+      var list = [];
+      catOrder.forEach(function(cat) {
+        catMap[cat].forEach(function(spot) {
+          var sp = photos[spot.id] || { before: [], after: [] };
+          sp.before.forEach(function(p) {
+            list.push({ fileId: p.fileId, spotId: spot.id, spotName: spot.name, category: cat, timing: 'ビフォー', by: p.by, at: p.at });
+          });
+          sp.after.forEach(function(p) {
+            list.push({ fileId: p.fileId, spotId: spot.id, spotName: spot.name, category: cat, timing: 'アフター', by: p.by, at: p.at });
+          });
+        });
+      });
+      return list;
+    }
+
+    function openPhotoGallery(spotId, fileId) {
+      var list = buildGalleryList_();
+      if (list.length === 0) return;
+      var idx = 0;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].fileId === fileId) { idx = i; break; }
+      }
+      _galleryState = { list: list, index: idx };
+      renderGallery_();
+    }
+
+    function renderGallery_() {
+      var g = _galleryState;
+      if (!g) return;
+      var item = g.list[g.index];
+      // 既存のオーバーレイがあれば更新
+      var overlay = document.getElementById('photoGalleryOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'photoGalleryOverlay';
+        overlay.className = 'gallery-overlay';
+        document.body.appendChild(overlay);
+        // タッチイベント
+        var touchStartX = 0, touchStartY = 0, touchMoved = false;
+        overlay.addEventListener('touchstart', function(e) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchMoved = false;
+        }, { passive: true });
+        overlay.addEventListener('touchmove', function(e) {
+          touchMoved = true;
+        }, { passive: true });
+        overlay.addEventListener('touchend', function(e) {
+          if (!touchMoved) return;
+          var dx = e.changedTouches[0].clientX - touchStartX;
+          var dy = e.changedTouches[0].clientY - touchStartY;
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            if (dx < 0) galleryNext_(); else galleryPrev_();
+          }
+        }, { passive: true });
+        // キーボード
+        overlay._keyHandler = function(e) {
+          if (e.key === 'ArrowLeft') galleryPrev_();
+          else if (e.key === 'ArrowRight') galleryNext_();
+          else if (e.key === 'Escape') closeGallery_();
+        };
+        document.addEventListener('keydown', overlay._keyHandler);
+      }
+      var prevDisabled = g.index <= 0;
+      var nextDisabled = g.index >= g.list.length - 1;
+      var dotsHtml = '';
+      if (g.list.length <= 40) {
+        dotsHtml = '<div class="gallery-dots">';
+        for (var d = 0; d < g.list.length; d++) {
+          dotsHtml += '<div class="gallery-dot' + (d === g.index ? ' active' : '') + '"></div>';
+        }
+        dotsHtml += '</div>';
+      }
+      var spotId = item.spotId;
+      var fileId = item.fileId;
+      var timing = item.timing || 'ビフォー';
+      overlay.innerHTML =
+        '<div class="gallery-header">' +
+          '<div style="width:40px;"></div>' +
+          '<div class="gallery-header-info">' +
+            '<div class="gallery-category">' + escapeHtml(item.category) + '</div>' +
+            '<div class="gallery-spot">' + escapeHtml(item.spotName) + '</div>' +
+            '<div class="gallery-timing">' + escapeHtml(item.timing) + (item.by ? ' / ' + escapeHtml(item.by) : '') + '</div>' +
+            '<div class="gallery-counter">' + (g.index + 1) + ' / ' + g.list.length + '</div>' +
+          '</div>' +
+          '<button class="gallery-close-btn" onclick="closeGallery_()">✕</button>' +
         '</div>' +
-        '<button class="photo-modal-close" onclick="this.closest(\'.photo-modal-overlay\').remove();">閉じる</button>';
-      overlay.appendChild(modal);
-      document.body.appendChild(overlay);
+        dotsHtml +
+        '<div class="gallery-body">' +
+          (prevDisabled ? '' : '<button class="gallery-nav prev" onclick="galleryPrev_()">‹</button>') +
+          '<img class="gallery-img" src="https://drive.google.com/thumbnail?id=' + item.fileId + '&sz=w800" onerror="this.alt=\'画像を読み込めません\';">' +
+          (nextDisabled ? '' : '<button class="gallery-nav next" onclick="galleryNext_()">›</button>') +
+        '</div>' +
+        '<div class="gallery-footer">' +
+          '<button onclick="closeGallery_();openRetagModal(\'' + spotId + '\', \'' + fileId + '\', \'' + timing + '\')">タグ変更</button>' +
+          '<button style="border-color:#e74c3c;color:#e74c3c;" onclick="closeGallery_();deletePhoto(\'' + spotId + '\', \'' + fileId + '\')">削除</button>' +
+        '</div>';
+    }
+
+    function galleryPrev_() {
+      if (!_galleryState || _galleryState.index <= 0) return;
+      _galleryState.index--;
+      renderGallery_();
+    }
+    function galleryNext_() {
+      if (!_galleryState || _galleryState.index >= _galleryState.list.length - 1) return;
+      _galleryState.index++;
+      renderGallery_();
+    }
+    function closeGallery_() {
+      var overlay = document.getElementById('photoGalleryOverlay');
+      if (overlay) {
+        if (overlay._keyHandler) document.removeEventListener('keydown', overlay._keyHandler);
+        overlay.remove();
+      }
+      _galleryState = null;
     }
 
     // === まとめてアップロード ===

@@ -4272,6 +4272,14 @@ function sendTestNotification(notifyKey) {
           + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
         break;
 
+      case '請求書要請':
+        var irqStaffUrl = getStaffAppUrl_();
+        subject = '【民泊】2026年3月分の請求書をご提出ください';
+        body = 'テストスタッフ さん\n\nお疲れ様です。\n2026年3月分の請求書のご提出をお願いいたします。\n\n締切: 3/31'
+          + (irqStaffUrl ? '\n\nWebアプリ: ' + irqStaffUrl : '')
+          + '\n\nよろしくお願いいたします。';
+        break;
+
       case '請求書送信':
         subject = '【民泊】請求書送信通知';
         body = 'テストスタッフ さんの請求書が作成されました。\n\n対象月: 2026年3月\n金額: ¥10,000（サンプル）';

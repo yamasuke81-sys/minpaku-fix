@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0301p</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1404,6 +1404,13 @@
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitReminderBody" rows="4" placeholder="例: 清掃スタッフの回答がまだ{最少回答者数}名に達していません。&#10;チェックアウト: {チェックアウト}&#10;現在の回答数: {回答数}名"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRecruitSettings">募集設定を保存</button>
         <p class="small text-muted mt-2">※ リマインド送信にはトリガーの設定が必要です。下の「トリガーをセットアップ」ボタンで自動設定できます。</p>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">テスト送信</label>
+        <div class="d-flex gap-2 flex-wrap mb-1">
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="清掃スタッフ募集">募集開始テスト</button>
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="募集リマインド">リマインドテスト</button>
+        </div>
+        <p class="small text-muted">オーナーのメール宛 / LINE宛にサンプル通知を送信します</p>
       </div>
       <div id="settingsReminderEmail" style="display:none;">
         <p class="small text-muted mb-2">清掃スタッフが未確定の予約について、<strong>オーナー</strong>へリマインドを送信します。2種類あります：</p>
@@ -1501,6 +1508,13 @@
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveReminderEmail">リマインド設定を保存</button>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="btnSetupTriggers">トリガーをセットアップ</button>
         <p class="small text-muted mt-2">※ 「トリガーをセットアップ」を押すと、リマインド関連のトリガーが自動で設定されます（重複があれば自動整理）。</p>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">テスト送信</label>
+        <div class="d-flex gap-2 flex-wrap mb-1">
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="スタッフ未決定リマインド">未決定リマインドテスト</button>
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="直前予約リマインド">直前予約テスト</button>
+        </div>
+        <p class="small text-muted">オーナーのメール宛 / LINE宛にサンプル通知を送信します</p>
       </div>
       <div id="settingsRosterReminder" style="display:none;">
         <p class="small text-muted mb-2">チェックイン日が近い予約で宿泊者名簿が未記入の場合に、<strong>オーナー</strong>へリマインドを送信します。「名簿がまだ記入されていません。宿泊者への催促をお願いします」という内容です。</p>
@@ -1536,6 +1550,12 @@
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="rosterReminderBody" rows="4" placeholder="例: 宿泊者名簿が未記入の予約が{件数}件あります。&#10;宿泊者への催促をお願いします。&#10;&#10;{未記入一覧}&#10;&#10;※ アプリの通知にも同じ内容が届いています。"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿未入力リマインド設定を保存</button>
         <p class="small text-muted mt-2">※ 名簿リマインドのトリガーは保存時に自動設定されます。</p>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">テスト送信</label>
+        <div class="d-flex gap-2 flex-wrap mb-1">
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="名簿未入力リマインド">テスト送信</button>
+        </div>
+        <p class="small text-muted">オーナーのメール宛 / LINE宛にサンプル通知を送信します</p>
       </div>
       <div id="settingsSync" style="display:none;">
         <p class="small text-muted">Airbnb・Booking.comなどのiCal URLを登録すると、予約を自動取り込みできます。宿泊者がフォームで詳細入力すると、既存予約にマージされます。</p>
@@ -1755,6 +1775,12 @@
           <label class="form-label small fw-bold">プレビュー</label>
           <pre class="border rounded p-2 small bg-light" id="confirmTemplatePreview" style="white-space:pre-wrap;max-height:300px;overflow-y:auto;"></pre>
         </div>
+        <hr class="my-3">
+        <label class="form-label small fw-bold">テスト送信</label>
+        <div class="d-flex gap-2 flex-wrap mb-1">
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="スタッフ確定">テスト送信</button>
+        </div>
+        <p class="small text-muted">オーナーのメール宛 / LINE宛にサンプル通知を送信します（プレースホルダーはサンプル値に置換されます）</p>
       </div>
 
 
@@ -1775,6 +1801,9 @@
           </select>
         </div>
         <p class="small text-muted">※ この通知はiCal同期でキャンセルを検知した際に自動送信されます。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="予約キャンセル">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCancelRequest" style="display:none;">
@@ -1792,6 +1821,9 @@
           </select>
         </div>
         <p class="small text-muted">※ この通知はスタッフがアプリから辞退申請した際に自動送信されます。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="出勤キャンセル要望">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCancelApprove" style="display:none;">
@@ -1809,6 +1841,9 @@
           </select>
         </div>
         <p class="small text-muted">※ この通知はオーナーがキャンセル申請を承認した際に自動送信されます。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="キャンセル承認">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCancelReject" style="display:none;">
@@ -1826,6 +1861,9 @@
           </select>
         </div>
         <p class="small text-muted">※ この通知はオーナーがキャンセル申請を却下した際に自動送信されます。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="キャンセル却下">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyInvoiceSend" style="display:none;">
@@ -1843,6 +1881,9 @@
           </select>
         </div>
         <p class="small text-muted">※ この通知は請求書作成時に自動送信されます。LINEの場合はPDF添付なしのテキスト通知のみです。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="請求書送信">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCleaningDone" style="display:none;">
@@ -1860,6 +1901,9 @@
           </select>
         </div>
         <p class="small text-muted">※ この通知はスタッフがチェックリストアプリで「清掃完了報告」ボタンを押した際に自動送信されます。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="清掃完了">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsMaintenance" style="display:none;">
@@ -8010,6 +8054,37 @@
           btn.textContent = origText;
           alert('送信に失敗しました。\n' + (e ? e.toString() : ''));
         }).sendLineTestMessage();
+      });
+
+      // 各通知タブのテスト送信ボタン（共通ハンドラー）
+      document.querySelectorAll('.btn-test-notify').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var notifyKey = this.getAttribute('data-notify-key');
+          if (!notifyKey || this.disabled) return;
+          this.disabled = true;
+          var origText = this.textContent;
+          this.textContent = '送信中...';
+          var self = this;
+          google.script.run.withSuccessHandler(function(jsonStr) {
+            self.disabled = false;
+            self.textContent = origText;
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              alert('テスト送信完了\n\n' + (r.message || '送信しました。'));
+            } else {
+              var detail = '';
+              if (r.results) {
+                if (r.results.email && !r.results.email.success) detail += '\nメール: ' + (r.results.email.error || '失敗');
+                if (r.results.line && !r.results.line.ok) detail += '\nLINE: ' + (r.results.line.reason || '失敗');
+              }
+              alert('テスト送信に問題がありました\n\n' + (r.message || r.error || '不明なエラー') + detail);
+            }
+          }).withFailureHandler(function(e) {
+            self.disabled = false;
+            self.textContent = origText;
+            alert('テスト送信に失敗しました。\n' + (e ? e.toString() : ''));
+          }).sendTestNotification(notifyKey);
+        });
       });
 
       // 請求書要請メール設定（スタッフ宛）

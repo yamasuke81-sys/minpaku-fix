@@ -4129,6 +4129,181 @@ function getNotifyChannel_(notifyKey) {
   }
 }
 
+/**
+ * 各通知タブのテスト送信
+ * @param {string} notifyKey - NOTIFY_CHANNEL_KEYS_ のキー（例: '予約キャンセル', 'スタッフ確定'）
+ */
+function sendTestNotification(notifyKey) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+
+    // オーナーのメールを取得（テスト送信先）
+    var ownerRes = JSON.parse(getOwnerEmail());
+    var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
+    if (!ownerEmail) return JSON.stringify({ success: false, error: 'オーナーメールが設定されていません。URL設定タブで設定してください。' });
+
+    // チャンネル設定取得
+    var ch = getNotifyChannel_(notifyKey);
+
+    // 募集設定シートからテンプレートを読む
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var settingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var settingsMap = {};
+    if (settingsSheet && settingsSheet.getLastRow() >= 2) {
+      var sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
+      for (var si = 0; si < sRows.length; si++) {
+        var sk = String(sRows[si][0] || '').trim();
+        if (sk) settingsMap[sk] = String(sRows[si][1] || '');
+      }
+    }
+
+    // 通知種別ごとのサンプルメッセージを作成
+    var subject = '';
+    var body = '';
+    var sampleDate = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+
+    switch (notifyKey) {
+      case '清掃スタッフ募集':
+        subject = '【民泊】清掃スタッフ募集: ' + sampleDate;
+        body = '新しい清掃募集があります。\n\nチェックアウト日: ' + sampleDate + '\n\nアプリにログインして詳細を確認し、立候補してください。';
+        break;
+
+      case '募集リマインド':
+        var rrSubj = (settingsMap['recruitReminderSubject'] || '').trim();
+        var rrBody = (settingsMap['recruitReminderBody'] || '').trim();
+        subject = rrSubj || '【民泊】清掃スタッフ募集のリマインド: ' + sampleDate;
+        body = rrBody || 'まだ回答が2名に達していません。\nチェックアウト日: ' + sampleDate + '\n現在の回答数: 1名';
+        subject = subject.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2');
+        body = body.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2');
+        break;
+
+      case 'スタッフ確定':
+        var ctSubj = (settingsMap['スタッフ確定メール件名'] || '').trim() || DEFAULT_CONFIRM_SUBJECT_;
+        var ctBody = (settingsMap['スタッフ確定通知テンプレート'] || '').trim() || DEFAULT_CONFIRM_TEMPLATE_;
+        subject = ctSubj;
+        body = ctBody;
+        var confirmVars = { '作業日': sampleDate, 'スタッフ一覧': 'テストスタッフA\nテストスタッフB', '次回予約': '次回予約: ' + sampleDate + ' 〜（サンプル）', 'アプリURL': 'https://example.com', 'ゲスト名': 'サンプルゲスト', 'CI': sampleDate, 'CO': sampleDate, 'プラットフォーム': 'Airbnb', '備考': 'テスト送信です' };
+        var cvKeys = Object.keys(confirmVars);
+        for (var ci = 0; ci < cvKeys.length; ci++) {
+          subject = subject.split('{' + cvKeys[ci] + '}').join(confirmVars[cvKeys[ci]]);
+          body = body.split('{' + cvKeys[ci] + '}').join(confirmVars[cvKeys[ci]]);
+        }
+        break;
+
+      case 'スタッフ未決定リマインド':
+        var urSubj = (settingsMap['リマインド件名'] || '').trim();
+        var urBody = (settingsMap['リマインド本文'] || '').trim();
+        subject = urSubj || '【民泊】清掃スタッフ未確定のリマインド: ' + sampleDate;
+        body = urBody || '以下の予約について、清掃スタッフがまだ確定していません。\n\nチェックイン: ' + sampleDate + '\nチェックアウト: ' + sampleDate + '\n残り日数: 3日\n\n早めに清掃スタッフの手配をお願いします。';
+        var urVars = { 'チェックイン': sampleDate, 'チェックアウト': sampleDate, '残り日数': '3', '清掃詳細リンク': 'https://example.com' };
+        var urKeys = Object.keys(urVars);
+        for (var ui = 0; ui < urKeys.length; ui++) {
+          subject = subject.split('{' + urKeys[ui] + '}').join(urVars[urKeys[ui]]);
+          body = body.split('{' + urKeys[ui] + '}').join(urVars[urKeys[ui]]);
+        }
+        break;
+
+      case '直前予約リマインド':
+        var irSubj = (settingsMap['直前予約リマインド件名'] || '').trim();
+        var irBody = (settingsMap['直前予約リマインド本文'] || '').trim();
+        subject = irSubj || '【民泊】直前予約 - 清掃スタッフ手配が必要です: ' + sampleDate;
+        body = irBody || '1週間以内にチェックインの予約が新たに追加されました。\n\nチェックイン: ' + sampleDate + '\nチェックアウト: ' + sampleDate + '\nプラットフォーム: Airbnb\n残り日数: 2日\n\n早急に清掃スタッフの手配をお願いします。';
+        var irVars = { 'チェックイン': sampleDate, 'チェックアウト': sampleDate, 'プラットフォーム': 'Airbnb', '残り日数': '2', '清掃詳細リンク': 'https://example.com' };
+        var irKeys = Object.keys(irVars);
+        for (var ii = 0; ii < irKeys.length; ii++) {
+          subject = subject.split('{' + irKeys[ii] + '}').join(irVars[irKeys[ii]]);
+          body = body.split('{' + irKeys[ii] + '}').join(irVars[irKeys[ii]]);
+        }
+        break;
+
+      case '名簿未入力リマインド':
+        var rosSubj = (settingsMap['rosterReminderSubject'] || '').trim();
+        var rosBody = (settingsMap['rosterReminderBody'] || '').trim();
+        subject = rosSubj || '【民泊】宿泊者名簿の未記入通知（2件）';
+        body = rosBody || '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB\n\n※ アプリの通知にも同じ内容が届いています。';
+        subject = subject.split('{件数}').join('2');
+        body = body.split('{件数}').join('2').split('{未記入一覧}').join('・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB');
+        break;
+
+      case '予約キャンセル':
+        subject = '【民泊】予約キャンセルのお知らせ: ' + sampleDate;
+        body = sampleDate + '～' + sampleDate + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。';
+        break;
+
+      case '出勤キャンセル要望':
+        subject = '【民泊】出勤キャンセル要望: テストスタッフ';
+        body = 'テストスタッフ さんが ' + sampleDate + ' の清掃について出勤キャンセルを要望しています。\n\n理由: テスト送信のサンプルです\n\nアプリから承認・却下を行ってください。';
+        break;
+
+      case 'キャンセル承認':
+        subject = '【民泊】出勤キャンセル承認: ' + sampleDate;
+        body = sampleDate + ' の出勤キャンセルが承認されました。\nこの日の清掃担当は解除されています。';
+        break;
+
+      case 'キャンセル却下':
+        subject = '【民泊】出勤キャンセル却下: ' + sampleDate;
+        body = sampleDate + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。';
+        break;
+
+      case '請求書送信':
+        subject = '【民泊】請求書送信通知';
+        body = 'テストスタッフ さんの請求書が作成されました。\n\n対象月: 2026年3月\n金額: ¥10,000（サンプル）';
+        break;
+
+      case '清掃完了':
+        subject = '【民泊】清掃完了報告: ' + sampleDate;
+        body = sampleDate + ' の清掃が完了しました。\n\n担当: テストスタッフ\nチェック項目: 15/15 完了\n撮影枚数: 8枚';
+        break;
+
+      default:
+        return JSON.stringify({ success: false, error: '不明な通知キー: ' + notifyKey });
+    }
+
+    // 【テスト】プレフィックスを追加
+    subject = '【テスト】' + subject;
+
+    // 送信結果を記録
+    var results = { email: null, line: null };
+
+    // メール送信（オーナーに送信）
+    if (ch.email) {
+      try {
+        GmailApp.sendEmail(ownerEmail, subject, body, { name: '通知テスト送信' });
+        results.email = { success: true, to: ownerEmail };
+      } catch (mailErr) {
+        results.email = { success: false, error: mailErr.toString() };
+      }
+    }
+
+    // LINE送信
+    if (ch.line) {
+      try {
+        var lineResult = sendLineMessage_(subject + '\n\n' + body, true);
+        results.line = lineResult || { ok: false, reason: '応答なし' };
+      } catch (lineErr) {
+        results.line = { ok: false, reason: lineErr.toString() };
+      }
+    }
+
+    // 結果をまとめる
+    var emailOk = !ch.email || (results.email && results.email.success);
+    var lineOk = !ch.line || (results.line && results.line.ok);
+    var msgs = [];
+    if (ch.email) msgs.push('メール: ' + (results.email && results.email.success ? ownerEmail + ' に送信済み' : '失敗'));
+    if (ch.line) msgs.push('LINE: ' + (results.line && results.line.ok ? '送信済み' : '失敗'));
+    if (!ch.email && !ch.line) msgs.push('送信チャンネルが未設定です');
+
+    return JSON.stringify({
+      success: emailOk && lineOk,
+      message: msgs.join(' / '),
+      results: results,
+      channel: ch
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 /** LINE通知テスト送信 */
 function sendLineTestMessage() {
   try {

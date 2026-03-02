@@ -3812,7 +3812,9 @@ function getRecruitmentSettings() {
         schedules: schedules,
         recipients: String(map['募集リマインド送信先'] || ''),
         recruitReminderSubject: String(map['募集リマインド件名'] || ''),
-        recruitReminderBody: String(map['募集リマインド本文'] || '')
+        recruitReminderBody: String(map['募集リマインド本文'] || ''),
+        recruitStartSubject: String(map['募集開始件名'] || ''),
+        recruitStartBody: String(map['募集開始本文'] || '')
       }
     });
   } catch (e) {
@@ -3840,7 +3842,9 @@ function setRecruitmentSettings(settings) {
       ['募集リマインドスケジュール', JSON.stringify(settings.schedules || [])],
       ['募集リマインド送信先', String(settings.recipients || '')],
       ['募集リマインド件名', String(settings.recruitReminderSubject || '')],
-      ['募集リマインド本文', String(settings.recruitReminderBody || '')]
+      ['募集リマインド本文', String(settings.recruitReminderBody || '')],
+      ['募集開始件名', String(settings.recruitStartSubject || '')],
+      ['募集開始本文', String(settings.recruitStartBody || '')]
     ];
     for (var ei = 0; ei < entries.length; ei++) {
       var eKey = entries[ei][0], eVal = entries[ei][1];
@@ -5627,47 +5631,84 @@ function getCheckoutDateFromFormSheet_(bookingRowNumber, ss) {
   return toDateKeySafe_(val) || String(val).trim();
 }
 
-function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
-  // 作業日 = チェックアウト日（清掃詳細最上部と同じ値）
-  var fmtDate = (checkoutDateStr || '－');
+/**
+ * 募集開始テンプレートのプレースホルダー値を計算するヘルパー
+ * 返り値: { 作業日, 日付, 人数, ベッド, BBQ, 国籍, 回答URL }
+ */
+function buildRecruitPlaceholders_(checkoutDateStr, nextReservation, appUrl) {
+  var fmtDate = (checkoutDateStr || '\uFF0D');
   var dm = fmtDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
+  if (dm) fmtDate = dm[1] + '\u5E74' + ('0' + dm[2]).slice(-2) + '\u6708' + ('0' + dm[3]).slice(-2) + '\u65E5';
 
   var nr = nextReservation || {};
-  // チェックイン期間: dateRange (YYYY-MM-DD ～ YYYY-MM-DD) があればそれを使う
   var dateRange = nr.dateRange || '';
   if (!dateRange && nr.date) dateRange = nr.date;
-  // 日付表示を YYYY/M/D 形式に変換
   var checkinDisp = (dateRange || '-').replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(_, y, m, d) {
     return y + '/' + parseInt(m, 10) + '/' + parseInt(d, 10);
   });
   var guestDisp = nr.guestCount || '-';
   var bedDisp = nr.bedCount || '-';
-  // BBQ: yes/no → あり/なし, 未入力 → -
+  var bedParts = String(bedDisp).split(/[,\u3001\n]/).map(function(s) { return s.trim(); }).filter(Boolean);
   var bbqRaw = (nr.bbq || '').toString().trim().toLowerCase();
   var bbqDisp = '-';
-  if (bbqRaw.indexOf('yes') >= 0 || bbqRaw.indexOf('はい') >= 0) bbqDisp = 'あり';
-  else if (bbqRaw.indexOf('no') >= 0 || bbqRaw.indexOf('いいえ') >= 0) bbqDisp = 'なし';
+  if (bbqRaw.indexOf('yes') >= 0 || bbqRaw.indexOf('\u306F\u3044') >= 0) bbqDisp = '\u3042\u308A';
+  else if (bbqRaw.indexOf('no') >= 0 || bbqRaw.indexOf('\u3044\u3044\u3048') >= 0) bbqDisp = '\u306A\u3057';
   else if (nr.bbq) bbqDisp = nr.bbq;
   var natDisp = nr.nationality || '-';
+  var deepUrl = '';
+  if (appUrl) deepUrl = appUrl + (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + (checkoutDateStr || '');
 
-  var lines = ['清掃募集', '', '作業日: ' + fmtDate, ''];
-  lines.push('次回予約（変更の可能性あり）');
-  lines.push('日付:\u3000\u3000' + checkinDisp);
-  lines.push('人数:\u3000\u3000' + guestDisp);
-  // ベッド: カンマ区切りで1行表示
-  var bedParts = String(bedDisp).split(/[,、\n]/).map(function(s) { return s.trim(); }).filter(Boolean);
-  lines.push('ベッド:\u3000' + bedParts.join('、'));
-  lines.push('BBQ:\u3000\u3000' + bbqDisp);
-  lines.push('国籍:\u3000\u3000' + natDisp);
-  lines.push('');
-  lines.push('※予約状況次第では変更となる場合があります。');
-  lines.push('');
-  if (appUrl) {
-    // ディープリンク: 該当日の清掃詳細を直接開く
-    var deepUrl = appUrl + (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + (checkoutDateStr || '');
-    lines.push('Webアプリで回答: ' + deepUrl);
+  return {
+    '\u4F5C\u696D\u65E5': fmtDate,
+    '\u65E5\u4ED8': checkinDisp,
+    '\u4EBA\u6570': guestDisp,
+    '\u30D9\u30C3\u30C9': bedParts.join('\u3001'),
+    'BBQ': bbqDisp,
+    '\u56FD\u7C4D': natDisp,
+    '\u56DE\u7B54URL': deepUrl
+  };
+}
+
+function buildRecruitmentCopyText_(checkoutDateStr, nextReservation, appUrl) {
+  var ph = buildRecruitPlaceholders_(checkoutDateStr, nextReservation, appUrl);
+
+  // テンプレートが設定されていればそれを使う
+  var template = '';
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (sheet && sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][0] || '').trim() === '\u52DF\u96C6\u958B\u59CB\u672C\u6587') {
+          template = String(rows[i][1] || '').trim();
+          break;
+        }
+      }
+    }
+  } catch (e) {}
+
+  if (template) {
+    // テンプレートのプレースホルダーを置換
+    var result = template;
+    var keys = Object.keys(ph);
+    for (var k = 0; k < keys.length; k++) {
+      result = result.split('{' + keys[k] + '}').join(ph[keys[k]]);
+    }
+    return result;
   }
+
+  // デフォルト文面（テンプレート未設定時のフォールバック）
+  var lines = ['\u6E05\u6383\u52DF\u96C6', '', '\u4F5C\u696D\u65E5: ' + ph['\u4F5C\u696D\u65E5'], ''];
+  lines.push('\u6B21\u56DE\u4E88\u7D04\uFF08\u5909\u66F4\u306E\u53EF\u80FD\u6027\u3042\u308A\uFF09');
+  lines.push('\u65E5\u4ED8:\u3000\u3000' + ph['\u65E5\u4ED8']);
+  lines.push('\u4EBA\u6570:\u3000\u3000' + ph['\u4EBA\u6570']);
+  lines.push('\u30D9\u30C3\u30C9:\u3000' + ph['\u30D9\u30C3\u30C9']);
+  lines.push('BBQ:\u3000\u3000' + ph['BBQ']);
+  lines.push('\u56FD\u7C4D:\u3000\u3000' + ph['\u56FD\u7C4D']);
+  lines.push('');
+  lines.push('\u203B\u4E88\u7D04\u72B6\u6CC1\u6B21\u7B2C\u3067\u306F\u5909\u66F4\u3068\u306A\u308B\u5834\u5408\u304C\u3042\u308A\u307E\u3059\u3002');
+  lines.push('');
+  if (ph['\u56DE\u7B54URL']) lines.push('Web\u30A2\u30D7\u30EA\u3067\u56DE\u7B54: ' + ph['\u56DE\u7B54URL']);
   return lines.join('\n');
 }
 
@@ -5718,9 +5759,31 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
     } catch (er) {}
     var appUrl = getLatestStaffUrl_();
     var body = buildRecruitmentCopyText_(checkoutDateStr, nextRes, appUrl);
-    var dm = (checkoutDateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    var fmtDate = dm ? dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日' : checkoutDateStr;
-    const subject = '【民泊】清掃スタッフ募集: ' + fmtDate;
+    var ph = buildRecruitPlaceholders_(checkoutDateStr, nextRes, appUrl);
+    // 件名テンプレート
+    var subjectTpl = '';
+    try {
+      var settSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+      if (settSheet && settSheet.getLastRow() >= 2) {
+        var sRows = settSheet.getRange(2, 1, settSheet.getLastRow() - 1, 2).getValues();
+        for (var si = 0; si < sRows.length; si++) {
+          if (String(sRows[si][0] || '').trim() === '\u52DF\u96C6\u958B\u59CB\u4EF6\u540D') {
+            subjectTpl = String(sRows[si][1] || '').trim();
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+    var subject;
+    if (subjectTpl) {
+      subject = subjectTpl;
+      var phKeys = Object.keys(ph);
+      for (var pi = 0; pi < phKeys.length; pi++) {
+        subject = subject.split('{' + phKeys[pi] + '}').join(ph[phKeys[pi]]);
+      }
+    } else {
+      subject = '\u3010\u6C11\u6CCA\u3011\u6E05\u6383\u30B9\u30BF\u30C3\u30D5\u52DF\u96C6: ' + ph['\u4F5C\u696D\u65E5'];
+    }
     var _ch_recruit = getNotifyChannel_('清掃スタッフ募集');
     if (_ch_recruit.email) GmailApp.sendEmail(emails.join(','), subject, body);
     if (_ch_recruit.line) { try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }

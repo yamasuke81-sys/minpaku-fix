@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1366,7 +1366,11 @@
             <option value="line">LINEのみ</option>
           </select>
         </div>
-        <p class="small text-muted mb-1">※ 募集メールの本文は、募集作成時に自動生成されます（次回予約情報・アプリURL含む）。</p>
+        <label class="form-label small fw-bold">メール文面テンプレート</label>
+        <p class="small text-muted mb-1">プレースホルダー: <code>{作業日}</code> <code>{日付}</code> <code>{人数}</code> <code>{ベッド}</code> <code>{BBQ}</code> <code>{国籍}</code> <code>{回答URL}</code></p>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitStartSubject" placeholder="例: 【民泊】清掃スタッフ募集: {作業日}"></div>
+        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitStartBody" rows="8" placeholder="例: 清掃募集&#10;&#10;作業日: {作業日}&#10;&#10;次回予約（変更の可能性あり）&#10;日付：　　{日付}&#10;人数：　　{人数}&#10;ベッド：　{ベッド}&#10;BBQ：　　{BBQ}&#10;国籍：　　{国籍}&#10;&#10;※予約状況次第では変更となる場合があります。&#10;&#10;Webアプリで回答: {回答URL}"></textarea></div>
+        <p class="small text-muted mb-1">※ 空欄の場合はデフォルト文面が使われます。清掃詳細画面の「テキストコピー」ではこのテンプレートが初期表示され、その場で編集もできます（テンプレート本体は変更されません）。</p>
 
         <hr class="my-3">
         <h6 class="fw-bold mb-2" style="font-size:0.9rem;">募集リマインド</h6>
@@ -2288,8 +2292,9 @@
           <div id="recruitEditVolunteerArea" class="mb-2" style="display:none;">
           </div>
           <div id="recruitEditLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;">
-            <p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p>
-            <textarea id="recruitEditLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea>
+            <p class="small fw-bold mb-1">送信テキスト（コピーしてLINEグループに投稿）</p>
+            <p class="small text-muted mb-1">※ この場で自由に編集できます。編集しても設定タブのテンプレートは変更されません。</p>
+            <textarea id="recruitEditLineCopyText" class="form-control font-monospace small mb-2" rows="10"></textarea>
             <button type="button" class="btn btn-sm btn-primary" id="btnRecruitEditCopyToClipboard">コピー</button>
           </div>
           <div id="recruitEditError" class="text-danger small mt-2" style="display:none;"></div>
@@ -3057,7 +3062,7 @@
 
             // LINE用テキスト（オーナーのみ）
             if (!isStaffView) {
-              html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">LINE用テキスト（コピーしてLINEグループに投稿）</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="6"></textarea><button type="button" class="btn btn-sm btn-primary" id="eventModalCopyToClipboard">コピー</button></div>';
+              html += '<div id="eventModalLineCopyArea" class="mb-2 mt-2 p-2 border rounded bg-light" style="display:none;"><p class="small fw-bold mb-1">送信テキスト（コピーしてLINEグループに投稿）</p><p class="small text-muted mb-1">※ この場で自由に編集できます。編集しても設定タブのテンプレートは変更されません。</p><textarea id="eventModalLineCopyText" class="form-control font-monospace small mb-2" rows="10"></textarea><button type="button" class="btn btn-sm btn-primary" id="eventModalCopyToClipboard">コピー</button></div>';
             }
           }
 
@@ -3761,11 +3766,13 @@
                             var btnCopy = document.getElementById('eventModalCopyToClipboard');
                             if (jt.success && jt.copyText && lineArea && txtEl) {
                               txtEl.value = jt.copyText;
+                              txtEl.removeAttribute('readonly');
                               lineArea.style.display = 'block';
                               lineArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                               if (btnCopy) btnCopy.onclick = function() {
+                                var copyVal = txtEl.value;
                                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                                  navigator.clipboard.writeText(jt.copyText).then(function() {
+                                  navigator.clipboard.writeText(copyVal).then(function() {
                                     bootstrap.Modal.getInstance(document.getElementById('eventModal')).hide();
                                     loadAndRender();
                                     loadRecruitList();
@@ -3826,11 +3833,13 @@
                       var btnCopy = document.getElementById('eventModalCopyToClipboard');
                       if (jt.success && jt.copyText && lineArea && txtEl) {
                         txtEl.value = jt.copyText;
+                        txtEl.removeAttribute('readonly');
                         lineArea.style.display = 'block';
                         lineArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                         if (btnCopy) {
                           btnCopy.onclick = function() {
-                            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(jt.copyText).then(function() { alert('コピーしました。LINEに貼り付けてください。'); }).catch(function() { txtEl.select(); document.execCommand('copy'); alert('コピーしました。'); });
+                            var copyVal = txtEl.value;
+                            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(copyVal).then(function() { alert('コピーしました。LINEに貼り付けてください。'); }).catch(function() { txtEl.select(); document.execCommand('copy'); alert('コピーしました。'); });
                             else { txtEl.select(); document.execCommand('copy'); alert('コピーしました。'); }
                           };
                         }
@@ -5533,12 +5542,13 @@
           function showCopyText(copyText) {
             var txtEl = document.getElementById('recruitEditLineCopyText');
             var btnEl = document.getElementById('btnRecruitEditCopyToClipboard');
-            if (txtEl) txtEl.value = copyText;
+            if (txtEl) { txtEl.value = copyText; txtEl.removeAttribute('readonly'); }
             if (lineArea) lineArea.style.display = 'block';
             if (lineArea) lineArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             function doCopy() {
+              var val = txtEl ? txtEl.value : copyText;
               if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(copyText).catch(function() {});
+                navigator.clipboard.writeText(val).catch(function() {});
               } else if (txtEl && document.execCommand) {
                 txtEl.select();
                 document.execCommand('copy');
@@ -7798,6 +7808,10 @@
         subject: '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}',
         body: 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名'
       };
+      var RECRUIT_START_DEFAULTS = {
+        subject: '【民泊】清掃スタッフ募集: {作業日}',
+        body: '清掃募集\n\n作業日: {作業日}\n\n次回予約（変更の可能性あり）\n日付：\u3000\u3000{日付}\n人数：\u3000\u3000{人数}\nベッド：\u3000{ベッド}\nBBQ：\u3000\u3000{BBQ}\n国籍：\u3000\u3000{国籍}\n\n※予約状況次第では変更となる場合があります。\n\nWebアプリで回答: {回答URL}'
+      };
 
       function loadRecruitSettingsForm() {
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -7820,7 +7834,10 @@
               });
               // 送信先
               document.getElementById('recruitReminderRecipients').value = r.settings.recipients || '';
-              // テンプレート
+              // 募集開始テンプレート
+              document.getElementById('recruitStartSubject').value = r.settings.recruitStartSubject || RECRUIT_START_DEFAULTS.subject;
+              document.getElementById('recruitStartBody').value = r.settings.recruitStartBody || RECRUIT_START_DEFAULTS.body;
+              // リマインドテンプレート
               document.getElementById('recruitReminderSubject').value = r.settings.recruitReminderSubject || RECRUIT_REMINDER_DEFAULTS.subject;
               document.getElementById('recruitReminderBody').value = r.settings.recruitReminderBody || RECRUIT_REMINDER_DEFAULTS.body;
             }
@@ -7846,7 +7863,9 @@
           schedules: schedules,
           recipients: document.getElementById('recruitReminderRecipients').value.trim(),
           recruitReminderSubject: document.getElementById('recruitReminderSubject').value,
-          recruitReminderBody: document.getElementById('recruitReminderBody').value
+          recruitReminderBody: document.getElementById('recruitReminderBody').value,
+          recruitStartSubject: document.getElementById('recruitStartSubject').value,
+          recruitStartBody: document.getElementById('recruitStartBody').value
         };
         btn.disabled = true;
         var origText = btn.textContent;

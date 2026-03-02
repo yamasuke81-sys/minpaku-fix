@@ -94,6 +94,18 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### フロントエンド重複排除マージ（2026-02-28修正済み）
 同一日付の予約をマージする際、プレースホルダ名（Not available等）より実名を優先するよう修正。
 
+### チャンネル設定（LINE/メール）のチェック漏れ（未修正）
+予約キャンセル通知の`cancelBookingFromICal_`(1904行)で、オーナーへのメール送信が`_ch_cancel.email`をチェックせず`isEmailNotifyEnabled_`のみで判定。LINEのみに設定してもオーナーにメールが届く。請求書要請のテスト送信(4577行)も同様にチャンネル未チェック。
+
+### isEmailNotifyEnabled_ と getNotifyChannel_ の二重構造
+旧来の`isEmailNotifyEnabled_(sheetKey)`は各通知のON/OFFトグル。セッション5で追加した`getNotifyChannel_(notifyKey)`はメール/LINE/両方の選択。両方が混在しており、一部の関数で片方しかチェックしていない。全通知関数で統一が必要。
+
+### 募集開始通知はiCal同期後に自動送信されない
+`autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。
+
+### 請求書要請のLINEメッセージがサマリーのみ
+`sendInvoiceRequestEmails`(4617行)のLINEメッセージは「X名に送信しました」というサマリーのみ。他の12通知はメールと同内容（件名+本文）をLINEに送信しているが、請求書要請だけ異なる。
+
 ## 2026-03-01（セッション3）修正内容
 1. **通知の一括操作ボタン追加**: 通知タブに「すべて既読」「すべて削除」ボタン、新着通知バナーに「すべて既読」ボタンを追加。Code.gsに`markAllNotificationsAsRead()`関数を追加
 2. **スタッフ非表示機能追加**: 清掃スタッフシートに12列目「非表示」を追加。オーナー設定画面のスタッフ一覧に非表示トグルボタンを追加。非表示スタッフは`getStaffNamesForSelection()`と`getAllActiveStaff_()`から除外される（スタッフ選択肢・スタッフ回答状況に表示されなくなる）。仕事内容タブの報酬部分には非表示スタッフも引き続き表示
@@ -141,30 +153,36 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 6. **LINE通知機能追加**: LINE Messaging API経由でグループにメッセージ送信する機能を実装。メール通知と同タイミング・同内容でLINEグループにも送信。設定タブに「LINE通知」サブタブ追加（ON/OFF・チャネルアクセストークン・グループID・テスト送信）。募集設定シートに`LINE通知有効`・`LINEチャネルアクセストークン`・`LINEグループID`を保存
 
 ## 次回やること（優先度順）
-1. **[高]** 請求書要請の配信日デバッグ情報確認後、デバッグコード削除
-2. **[高]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
-3. **[中]** Airbnb iCal URLの再取得（HTTP 500 はURL期限切れの可能性大）
-4. **[中]** 残りの `getLastRow()` off-by-one 修正（約50箇所）
-5. **[低]** 「募集」シートの重複エントリクリーンアップ（必要に応じて）
+1. **[高]** 予約キャンセル通知のオーナーメールにチャンネルチェック追加（Code.gs 1904行、`_ch_cancel.email`チェック漏れ）
+2. **[高]** iCal同期時に募集開始通知を自動送信する機能追加（`autoSyncFromICal`内で`notifyStaffForRecruitment`を呼ぶ）
+3. **[高]** 請求書要請の配信日デバッグ情報確認後、デバッグコード削除
+4. **[中]** 請求書要請のLINEメッセージをメールと同内容にする（現状サマリーのみ、Code.gs 4617行）
+5. **[中]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
+6. **[中]** Airbnb iCal URLの再取得（HTTP 500 はURL期限切れの可能性大）
+7. **[中]** 残りの `getLastRow()` off-by-one 修正（約50箇所）
+8. **[低]** 「募集」シートの重複エントリクリーンアップ（必要に応じて）
 
 ## 現在のセッション状態
 - **ブランチ**: `claude/verify-staff-response-display-bvHjT`
-- **最新コミット**: `f764fe9`
-- **進行中タスク**: 配信時刻Date型バグ修正完了・デプロイ待ち確認
-- **デプロイ待ち**: あり（v0302m）
+- **最新コミット**: `68752a5`（コード変更最終: `f764fe9` v0302m）
+- **進行中タスク**: 通知システム全体精査完了・新チャットへの引き継ぎ
+- **デプロイ待ち**: あり（v0302m — 配信時刻Date型バグ修正）
 - **デバッグコード残存**: 請求書要請タブに `invoiceRequestDebug` 表示欄あり（確認後削除予定）
+- **セッション7で判明した未修正バグ**: チャンネルチェック漏れ2箇所（既知の注意点セクション参照）
 
 ## 2026-03-02（セッション7）修正内容
 1. **請求書要請テスト送信のテンプレート対応**: `sendTestNotification`の請求書要請caseがハードコードだったのを、`INVOICE_REQ_KEYS_`でシートから件名・本文テンプレートを読み込み+プレースホルダー置換するよう修正。全13通知のテスト送信vs実送信のテンプレートキー突き合わせ調査を実施
 2. **請求書要請に締切日設定を追加**: `INVOICE_REQ_KEYS_`に`deadline`キーを追加。`getInvoiceRequestSettings`/`saveInvoiceRequestSettings`/`sendInvoiceRequestEmails`に締切日対応。フロントエンドに締切日select（毎月○日）を追加。未設定時は従来どおり月末日
 3. **配信時刻のDate型バグ修正**: スプレッドシートが`07:00`を時刻Date型として解釈する問題。`getInvoiceRequestSettings`と`setupInvoiceRequestTrigger`でDate instanceofチェック+HH:mm変換を追加
 4. **配信日デバッグ表示追加**: `loadInvoiceRequestSettings`にサーバー取得値とselect反映後の値をデバッグ表示する`invoiceRequestDebug`欄を追加（確認後削除予定）
+5. **通知システム全体精査**: 全13通知のチャンネルチェック（email/LINE）を精査。チャンネルチェック漏れ2箇所を発見（cancelBookingFromICal_ 1904行、sendInvoiceRequestEmails テスト送信4577行）。募集開始通知がiCal同期後に自動送信されない仕様を確認。請求書要請のLINEメッセージがサマリーのみである不整合を確認
 
 ## 2026-03-02（セッション7）コミット履歴（コミットハッシュ付き）
 | コミット | 内容 |
 |---|---|
 | `a9274b2` | feat: v0302l 請求書要請テスト送信テンプレート対応 + 締切日設定 + 配信日デバッグ |
 | `f764fe9` | fix: v0302m 配信時刻がDate型で返るバグ修正（スプレッドシート→HH:mm変換） |
+| `68752a5` | docs: CLAUDE.md セッション7の引き継ぎ資料を更新 |
 
 ### 変更ファイルと箇所（セッション7）
 - **Code.gs**: `INVOICE_REQ_KEYS_`にdeadlineキー追加、`getInvoiceRequestSettings`にDate型→HH:mm変換+deadline追加、`saveInvoiceRequestSettings`にdeadline追加、`sendInvoiceRequestEmails`の締切日を設定値から取得、`setupInvoiceRequestTrigger`にDate型対応、`sendTestNotification`の請求書要請caseをテンプレート読み込み対応
@@ -282,11 +300,11 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ## 主要ファイル構成
 | ファイル | 行数 | 役割 |
 |----------|------|------|
-| `Code.gs` | ~10170行 | メインアプリ（予約管理）サーバー |
-| `index.html` | ~9395行 | メインアプリ フロントエンド |
-| `checklist-app/Code.gs` | ~2947行 | チェックリストアプリ サーバー |
-| `checklist-app/checklist.html` | ~5788行 | チェックリストアプリ フロントエンド |
-| `deploy-all.js` | ~403行 | 一括デプロイスクリプト |
+| `Code.gs` | ~10507行 | メインアプリ（予約管理）サーバー |
+| `index.html` | ~9495行 | メインアプリ フロントエンド |
+| `checklist-app/Code.gs` | ~2997行 | チェックリストアプリ サーバー |
+| `checklist-app/checklist.html` | ~6002行 | チェックリストアプリ フロントエンド |
+| `deploy-all.js` | ~457行 | 一括デプロイスクリプト |
 | `CLAUDE.md` | 本ファイル | 開発引き継ぎ資料 |
 
 ## チャット移行時の必須ルール

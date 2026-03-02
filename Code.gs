@@ -4120,23 +4120,51 @@ function diagnoseNotifyChannels() {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var allRows = [];
     var map = {};
     if (sheet && sheet.getLastRow() >= 2) {
       var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
-      rows.forEach(function(row) {
+      rows.forEach(function(row, idx) {
         var k = String(row[0] || '').trim();
-        if (k) map[k] = row[1];
+        if (k) {
+          map[k] = row[1];
+          // 通知CH_ で始まるキーをすべて記録（重複チェック用）
+          if (k.indexOf('通知CH_') === 0) {
+            allRows.push({ rowNum: idx + 2, key: k, value: String(row[1] || '') });
+          }
+        }
       });
     }
-    // 各通知のチャンネル設定
+    // 重複チェック: 同じキーが複数行にあるか
+    var duplicates = [];
+    var keyCounts = {};
+    allRows.forEach(function(r) {
+      if (!keyCounts[r.key]) keyCounts[r.key] = [];
+      keyCounts[r.key].push(r);
+    });
+    for (var dk in keyCounts) {
+      if (keyCounts[dk].length > 1) {
+        duplicates.push({ key: dk, entries: keyCounts[dk] });
+      }
+    }
+    // 各通知のチャンネル設定（getNotifyChannel_の結果 vs シート最終値）
     var results = [];
     NOTIFY_CHANNEL_KEYS_.forEach(function(item) {
-      var chRaw = map['通知CH_' + item.key] || '(未設定→both)';
+      var sheetKey = '通知CH_' + item.key;
+      var lastVal = map[sheetKey] || '(未設定→both)';
       var ch = getNotifyChannel_(item.key);
+      // getNotifyChannel_が読む「最初の値」も取得
+      var firstVal = '(未設定)';
+      for (var fi = 0; fi < allRows.length; fi++) {
+        if (allRows[fi].key === sheetKey) { firstVal = allRows[fi].value; break; }
+      }
+      var isDup = keyCounts[sheetKey] && keyCounts[sheetKey].length > 1;
       results.push({
         key: item.key,
         label: item.label,
-        channelRaw: String(chRaw),
+        firstVal: firstVal,
+        lastVal: String(lastVal),
+        isDuplicate: isDup,
         emailFlag: ch.email,
         lineFlag: ch.line
       });
@@ -4154,28 +4182,13 @@ function diagnoseNotifyChannels() {
       groupId: (map['LINEグループID'] || '') ? '設定済み(' + String(map['LINEグループID'] || '').substring(0, 5) + '...)' : '(空)',
       personalId: (map['LINEユーザーID'] || '') ? '設定済み(' + String(map['LINEユーザーID'] || '').substring(0, 5) + '...)' : '(空)'
     };
-    // 各通知のコード上のチェック構造
-    var codeAudit = [
-      { key: '予約キャンセル', staffEmail: 'ch.email && isEmailNotifyEnabled_', ownerEmail: 'isEmailNotifyEnabled_のみ（ch.emailチェック無し）', line: 'ch.line' },
-      { key: '請求書要請', normalEmail: 'ch.email', testEmail: 'チャンネルチェック無し（常にメール送信）', line: 'ch.line（サマリーのみ）' },
-      { key: '名簿未入力リマインド', email: 'ch.email', line: 'ch.line' },
-      { key: '清掃スタッフ募集', email: 'ch.email', line: 'ch.line' },
-      { key: '出勤キャンセル要望', email: 'ch.email', line: 'ch.line' },
-      { key: 'キャンセル承認', email: 'ch.email', line: 'ch.line' },
-      { key: 'キャンセル却下', email: 'ch.email', line: 'ch.line' },
-      { key: '請求書送信', email: 'ch.email', line: 'ch.line' },
-      { key: 'スタッフ確定', email: 'ch.email', line: 'ch.line' },
-      { key: '募集リマインド', email: 'ch.email', line: 'ch.line' },
-      { key: 'スタッフ未決定リマインド', email: 'ch.email', line: 'ch.line' },
-      { key: '直前予約リマインド', email: 'ch.email', line: 'ch.line' },
-      { key: '清掃完了', email: 'ch.email && isEmailNotifyEnabled_', line: 'ch.line' }
-    ];
     return JSON.stringify({
       success: true,
       channels: results,
       emailToggles: emailToggles,
       lineConfig: lineConfig,
-      codeAudit: codeAudit
+      duplicates: duplicates,
+      allChRows: allRows
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

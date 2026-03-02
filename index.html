@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -8103,6 +8103,20 @@
           var r = JSON.parse(jsonStr);
           if (!r.success) { resultDiv.innerHTML = '<div class="alert alert-danger small">' + (r.error || 'エラー') + '</div>'; return; }
           var html = '<div class="small">';
+          // 重複警告（最重要）
+          if (r.duplicates && r.duplicates.length > 0) {
+            html += '<div class="alert alert-danger py-1 px-2"><strong>⚠ キー重複あり！</strong> 以下のキーがスプレッドシートに複数存在します。getNotifyChannel_は最初の値を読むため、UIの設定と実際の動作がずれます。<br>';
+            r.duplicates.forEach(function(d) {
+              html += '<code>' + d.key + '</code>: ';
+              d.entries.forEach(function(e, i) {
+                html += (i > 0 ? ', ' : '') + '行' + e.rowNum + '=<strong>' + e.value + '</strong>';
+              });
+              html += '<br>';
+            });
+            html += '</div>';
+          } else {
+            html += '<div class="alert alert-success py-1 px-2">キー重複なし（正常）</div>';
+          }
           // LINE設定
           html += '<strong>LINE設定:</strong><br>';
           html += 'トークン: ' + r.lineConfig.token + '<br>';
@@ -8115,26 +8129,21 @@
           html += '<br>';
           // チャンネル設定一覧
           html += '<strong>チャンネル設定一覧:</strong>';
-          html += '<table class="table table-sm table-bordered mt-1"><thead><tr><th>通知</th><th>シート値</th><th>→email</th><th>→line</th></tr></thead><tbody>';
+          html += '<table class="table table-sm table-bordered mt-1"><thead><tr><th>通知</th><th>最初の値<br>(実際に使用)</th><th>最後の値<br>(UIが表示)</th><th>重複?</th><th>→email</th><th>→line</th></tr></thead><tbody>';
           r.channels.forEach(function(c) {
-            var emailBg = c.emailFlag ? '' : ' class="table-success"';
-            var lineBg = c.lineFlag ? '' : ' class="table-danger"';
-            html += '<tr><td>' + c.label + '</td><td><code>' + c.channelRaw + '</code></td><td' + emailBg + '>' + (c.emailFlag ? 'ON' : '<strong>OFF</strong>') + '</td><td' + lineBg + '>' + (c.lineFlag ? 'ON' : '<strong>OFF</strong>') + '</td></tr>';
+            var rowClass = c.isDuplicate ? ' class="table-warning"' : '';
+            var emailBg = c.emailFlag ? '' : ' style="color:green;font-weight:bold"';
+            var lineBg = c.lineFlag ? '' : ' style="color:red;font-weight:bold"';
+            html += '<tr' + rowClass + '><td>' + c.label + '</td><td><code>' + c.firstVal + '</code></td><td><code>' + c.lastVal + '</code></td><td>' + (c.isDuplicate ? '<strong class="text-danger">重複!</strong>' : 'OK') + '</td><td' + emailBg + '>' + (c.emailFlag ? 'ON' : 'OFF') + '</td><td' + lineBg + '>' + (c.lineFlag ? 'ON' : 'OFF') + '</td></tr>';
           });
           html += '</tbody></table>';
-          // コード監査
-          html += '<strong>コード上のチェック構造（疑わしい箇所は赤字）:</strong>';
-          html += '<table class="table table-sm table-bordered mt-1"><thead><tr><th>通知</th><th>メール送信条件</th><th>LINE送信条件</th></tr></thead><tbody>';
-          r.codeAudit.forEach(function(a) {
-            var emailDesc = a.email || '';
-            if (a.staffEmail) emailDesc = 'スタッフ: ' + a.staffEmail;
-            if (a.ownerEmail) emailDesc += (emailDesc ? '<br>' : '') + '<span class="text-danger">オーナー: ' + a.ownerEmail + '</span>';
-            if (a.normalEmail) emailDesc = '通常: ' + a.normalEmail;
-            if (a.testEmail) emailDesc += (emailDesc ? '<br>' : '') + '<span class="text-danger">テスト: ' + a.testEmail + '</span>';
-            var lineDesc = a.line || '';
-            html += '<tr><td>' + a.key + '</td><td>' + emailDesc + '</td><td>' + lineDesc + '</td></tr>';
+          // 全通知CH行の生データ
+          html += '<details><summary><strong>スプレッドシートの全通知CH行（生データ）</strong></summary>';
+          html += '<table class="table table-sm table-bordered mt-1"><thead><tr><th>行番号</th><th>キー</th><th>値</th></tr></thead><tbody>';
+          (r.allChRows || []).forEach(function(row) {
+            html += '<tr><td>' + row.rowNum + '</td><td><code>' + row.key + '</code></td><td><code>' + row.value + '</code></td></tr>';
           });
-          html += '</tbody></table>';
+          html += '</tbody></table></details>';
           html += '</div>';
           resultDiv.innerHTML = html;
         }).withFailureHandler(function(e) {

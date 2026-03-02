@@ -1566,6 +1566,16 @@ function syncFromICal() {
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformRemoved, error: '' });
     }
 
+    // iCal同期で予約が追加された場合、ソート→募集作成→スタッフ通知を自動実行
+    if (added > 0) {
+      try {
+        sortFormResponses_();
+        checkAndCreateRecruitments();
+      } catch (postErr) {
+        Logger.log('syncFromICal postProcess: ' + postErr.toString());
+      }
+    }
+
     return JSON.stringify({ success: true, added: added, removed: removed, details: details });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), added: 0, removed: 0, details: [] });
@@ -3734,6 +3744,13 @@ function checkAndCreateRecruitments() {
         const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
         ensureRecruitDetailColumns_();
         recruitSheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutStr, rowNumber, '', '募集中', '', '', now, '', 'メール', '', '', '', '', '', '']]);
+        // 募集作成と同時に告知日を記録し、スタッフにメール通知
+        try {
+          recruitSheet.getRange(nextRow, 3).setValue(now);
+          notifyStaffForRecruitment(nextRow, checkoutStr, rowNumber);
+        } catch (notifyErr) {
+          Logger.log('checkAndCreateRecruitments notify: ' + notifyErr.toString());
+        }
       }
     }
   } catch (e) {

@@ -4461,15 +4461,36 @@ function getInvoiceRequestSettings() {
     // 配信時刻: スプレッドシートが07:00等をDate型に自動変換する問題の対策
     // 数値(0-23)・Date型・HH:mm文字列いずれが来ても時間部分を取り出す
     var rawTimeVal = map[INVOICE_REQ_KEYS_.time];
+    // DEBUG: 生値の詳細をレスポンスに含める
+    var timeDebug = {
+      rawValue: String(rawTimeVal),
+      rawType: typeof rawTimeVal,
+      isDate: rawTimeVal instanceof Date,
+      isNull: rawTimeVal === null,
+      isUndefined: rawTimeVal === undefined,
+      isEmpty: rawTimeVal === ''
+    };
+    if (rawTimeVal instanceof Date) {
+      timeDebug.dateStr = rawTimeVal.toString();
+      timeDebug.hours = rawTimeVal.getHours();
+      timeDebug.minutes = rawTimeVal.getMinutes();
+    }
     var timeHour = 9; // デフォルト9時
     if (rawTimeVal instanceof Date) {
       timeHour = rawTimeVal.getHours();
+      timeDebug.branch = 'Date→getHours';
     } else if (rawTimeVal !== undefined && rawTimeVal !== null && rawTimeVal !== '') {
       var parsed = parseInt(String(rawTimeVal).split(':')[0], 10);
+      timeDebug.parsedInt = parsed;
+      timeDebug.branch = 'string→parseInt';
       if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) timeHour = parsed;
+    } else {
+      timeDebug.branch = 'fallback(9)';
     }
+    timeDebug.finalHour = timeHour;
     return JSON.stringify({
       success: true,
+      timeDebug: timeDebug,
       settings: {
         enabled: enabledVal === true || String(enabledVal || '').trim() === 'true', // デフォルトOFF
         day: parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25,

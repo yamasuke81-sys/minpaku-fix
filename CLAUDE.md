@@ -94,16 +94,14 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### フロントエンド重複排除マージ（2026-02-28修正済み）
 同一日付の予約をマージする際、プレースホルダ名（Not available等）より実名を優先するよう修正。
 
-### チャンネル設定（LINE/メール）のチェック漏れ（v0302nで修正済み）
-~~予約キャンセル通知の`cancelBookingFromICal_`(1904行)で、オーナーへのメール送信が`_ch_cancel.email`をチェックせず`isEmailNotifyEnabled_`のみで判定。LINEのみに設定してもオーナーにメールが届く。請求書要請のテスト送信(4577行)も同様にチャンネル未チェック。~~
-→ セッション8で`_ch_cancel.email`チェック追加、テスト送信もチャンネル制御対応済み。
+### チャンネル設定（LINE/メール）のチェック漏れ（未修正）
+予約キャンセル通知の`cancelBookingFromICal_`(1904行)で、オーナーへのメール送信が`_ch_cancel.email`をチェックせず`isEmailNotifyEnabled_`のみで判定。LINEのみに設定してもオーナーにメールが届く。請求書要請のテスト送信(4577行)も同様にチャンネル未チェック。
 
 ### isEmailNotifyEnabled_ と getNotifyChannel_ の二重構造
 旧来の`isEmailNotifyEnabled_(sheetKey)`は各通知のON/OFFトグル。セッション5で追加した`getNotifyChannel_(notifyKey)`はメール/LINE/両方の選択。両方が混在しており、一部の関数で片方しかチェックしていない。全通知関数で統一が必要。
 
-### 募集開始通知はiCal同期後に自動送信されない（v0302nで修正済み）
-~~`autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。~~
-→ セッション8で`syncFromICal`のインライン募集作成時と`checkAndCreateRecruitments`の新規エントリ作成時に`notifyStaffForRecruitment`を自動呼び出しするよう修正済み。
+### 募集開始通知はiCal同期後に自動送信されない
+`autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。
 
 ### 請求書要請のLINEメッセージがサマリーのみ
 `sendInvoiceRequestEmails`(4617行)のLINEメッセージは「X名に送信しました」というサマリーのみ。他の12通知はメールと同内容（件名+本文）をLINEに送信しているが、請求書要請だけ異なる。
@@ -155,8 +153,8 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 6. **LINE通知機能追加**: LINE Messaging API経由でグループにメッセージ送信する機能を実装。メール通知と同タイミング・同内容でLINEグループにも送信。設定タブに「LINE通知」サブタブ追加（ON/OFF・チャネルアクセストークン・グループID・テスト送信）。募集設定シートに`LINE通知有効`・`LINEチャネルアクセストークン`・`LINEグループID`を保存
 
 ## 次回やること（優先度順）
-1. ~~**[高]** 予約キャンセル通知のオーナーメールにチャンネルチェック追加~~ → **v0302nで修正済み**
-2. ~~**[高]** iCal同期時に募集開始通知を自動送信する機能追加~~ → **v0302nで実装済み**
+1. **[高]** 予約キャンセル通知のオーナーメールにチャンネルチェック追加（Code.gs 1904行、`_ch_cancel.email`チェック漏れ）
+2. **[高]** iCal同期時に募集開始通知を自動送信する機能追加（`autoSyncFromICal`内で`notifyStaffForRecruitment`を呼ぶ）
 3. **[高]** 請求書要請の配信日デバッグ情報確認後、デバッグコード削除
 4. **[中]** 請求書要請のLINEメッセージをメールと同内容にする（現状サマリーのみ、Code.gs 4617行）
 5. **[中]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
@@ -172,11 +170,6 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 - **デプロイ待ち**: あり（v0302m — 配信時刻Date型バグ修正）
 - **デバッグコード残存**: 請求書要請タブに `invoiceRequestDebug` 表示欄あり（確認後削除予定）
 - **セッション7で判明した未修正バグ**: チャンネルチェック漏れ2箇所（既知の注意点セクション参照）
-
-## 2026-03-02（セッション8）修正内容
-1. **予約キャンセル通知のオーナーメールにチャンネルチェック追加**: `cancelBookingFromICal_`のオーナーメール送信（1904行）で`_ch_cancel.email`チェックが漏れていたのを修正。LINEのみ設定時にオーナーにメールが届く問題を解消
-2. **請求書要請テスト送信にチャンネルチェック追加**: `sendInvoiceRequestEmails`のテスト送信（4577行）がチャンネル設定を無視してメール送信していたのを修正。チャンネル設定に従いメール/LINE/両方でテスト送信。両方無効時はエラーメッセージを返す
-3. **iCal同期時のスタッフ自動通知を実装**: `syncFromICal`内のインライン募集作成後に`notifyStaffForRecruitment`を呼び出し、スタッフに自動通知。`checkAndCreateRecruitments`でも新規「募集中」エントリ作成時に自動通知を追加。告知日も同時に記録
 
 ## 2026-03-02（セッション7）修正内容
 1. **請求書要請テスト送信のテンプレート対応**: `sendTestNotification`の請求書要請caseがハードコードだったのを、`INVOICE_REQ_KEYS_`でシートから件名・本文テンプレートを読み込み+プレースホルダー置換するよう修正。全13通知のテスト送信vs実送信のテンプレートキー突き合わせ調査を実施

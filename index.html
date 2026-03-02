@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1722,10 +1722,9 @@
         <hr class="my-2">
         <label class="form-label small fw-bold">テスト送信</label>
         <div class="d-flex gap-2 flex-wrap align-items-center mb-1">
-          <input type="email" class="form-control form-control-sm" id="invoiceTestRecipient" placeholder="送信先メールアドレス" style="max-width:280px;">
-          <button type="button" class="btn btn-sm btn-outline-info" id="btnSendInvoiceRequestNow">テスト送信</button>
+          <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="請求書要請">テスト送信</button>
         </div>
-        <p class="small text-muted mt-1">指定したアドレスにテストメールを1通送信します。空欄の場合は全スタッフに送信されます。</p>
+        <p class="small text-muted mt-1">オーナー宛に【テスト】プレフィックス付きでテスト送信します。</p>
         <div id="invoiceRequestResult" class="small mt-2" style="display:none;"></div>
       </div>
 
@@ -8203,31 +8202,7 @@
         }).setupInvoiceRequestTrigger();
       });
 
-      document.getElementById('btnSendInvoiceRequestNow').addEventListener('click', function() {
-        var testRecipient = (document.getElementById('invoiceTestRecipient').value || '').trim();
-        var confirmMsg = testRecipient ? testRecipient + ' にテストメールを送信しますか？' : '登録済みの全スタッフに請求書要請メールを今すぐ送信しますか？';
-        if (!confirm(confirmMsg)) return;
-        var btn = this;
-        if (btn.disabled) return;
-        btn.disabled = true;
-        var origText = btn.textContent;
-        btn.textContent = '送信中...';
-        var resEl = document.getElementById('invoiceRequestResult');
-        google.script.run.withSuccessHandler(function(jsonStr) {
-          btn.disabled = false;
-          btn.textContent = origText;
-          var r = JSON.parse(jsonStr);
-          if (resEl) {
-            resEl.style.display = 'block';
-            resEl.className = 'small mt-2 ' + (r.success ? 'text-success' : 'text-danger');
-            resEl.textContent = r.success ? r.message : (r.error || '失敗');
-          }
-        }).withFailureHandler(function() {
-          btn.disabled = false;
-          btn.textContent = origText;
-          if (resEl) { resEl.style.display = 'block'; resEl.className = 'small mt-2 text-danger'; resEl.textContent = '通信エラー'; }
-        }).sendInvoiceRequestEmails(testRecipient);
-      });
+      // 請求書要請テスト送信は共通の .btn-test-notify ハンドラーで処理
 
       // 確定通知テンプレート
       var CONFIRM_TEMPLATE_DEFAULT = 'スタッフ確定\n\n作業日: {作業日}\n\n{スタッフ一覧}\n\nよろしくお願いします\uD83C\uDF4A\n\n{次回予約}\n\n{アプリURL}';

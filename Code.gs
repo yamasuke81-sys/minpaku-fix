@@ -4458,8 +4458,21 @@ function getInvoiceRequestSettings() {
       if (key) map[key] = row[1];
     });
     var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
+    // DEBUG: スプレッドシートの生の値を記録
+    var rawTimeVal = map[INVOICE_REQ_KEYS_.time];
+    var rawDebug = {
+      time: { value: String(rawTimeVal), type: typeof rawTimeVal, isDate: rawTimeVal instanceof Date },
+      day: { value: String(map[INVOICE_REQ_KEYS_.day]), type: typeof map[INVOICE_REQ_KEYS_.day] },
+      deadline: { value: String(map[INVOICE_REQ_KEYS_.deadline]), type: typeof map[INVOICE_REQ_KEYS_.deadline] }
+    };
+    if (rawTimeVal instanceof Date) {
+      rawDebug.time.dateStr = rawTimeVal.toString();
+      rawDebug.time.hours = rawTimeVal.getHours();
+      rawDebug.time.minutes = rawTimeVal.getMinutes();
+    }
     return JSON.stringify({
       success: true,
+      debug: rawDebug,
       settings: {
         enabled: enabledVal === true || String(enabledVal || '').trim() === 'true', // デフォルトOFF
         day: parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25,
@@ -4495,6 +4508,8 @@ function saveInvoiceRequestSettings(settings) {
       var k = String(r[0] || '').trim();
       if (k) rowMap[k] = i + 2;
     });
+    // DEBUG: 受け取ったsettingsの内容をログ
+    Logger.log('saveInvoiceRequestSettings received: time=' + settings.time + ', typeof=' + typeof settings.time + ', day=' + settings.day + ', deadline=' + settings.deadline);
     var pairs = [
       [INVOICE_REQ_KEYS_.enabled, settings.enabled === true ? 'true' : 'false'],
       [INVOICE_REQ_KEYS_.day, String(settings.day || 25)],
@@ -4503,8 +4518,10 @@ function saveInvoiceRequestSettings(settings) {
       [INVOICE_REQ_KEYS_.subject, String(settings.subject || '')],
       [INVOICE_REQ_KEYS_.body, String(settings.body || '')]
     ];
+    var debugWritten = {};
     pairs.forEach(function(p) {
       var sheetKey = p[0], val = p[1];
+      debugWritten[sheetKey] = val;
       if (rowMap[sheetKey]) {
         sheet.getRange(rowMap[sheetKey], 2).setValue(val);
       } else {
@@ -4514,7 +4531,8 @@ function saveInvoiceRequestSettings(settings) {
         rowMap[sheetKey] = nr;
       }
     });
-    return JSON.stringify({ success: true });
+    // DEBUG: 書き込んだ値を返す
+    return JSON.stringify({ success: true, debug: { received: { time: settings.time, timeType: typeof settings.time, day: settings.day, deadline: settings.deadline }, written: debugWritten } });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

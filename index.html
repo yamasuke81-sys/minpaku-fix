@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302q</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302r</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2782,14 +2782,20 @@
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
             var volunteers = rec.volunteers || [];
             var selectedNames = (recStaff || bookStaff || '').split(/[,、]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
-            var isVolunteeredByMe = curStaff && volunteers.some(function(v) {
-              var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
-              return isMe && v.response && v.response !== '未回答' && v.response !== '×';
-            });
-            var isRejectedByMe = curStaff && volunteers.some(function(v) {
-              var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
-              return isMe && v.response === '×';
-            });
+            // 同一スタッフの最新（最後）のエントリの回答で判定（複数エントリがある場合、古い回答を無視）
+            var myLatestResponse = '';
+            if (curStaff) {
+              for (var vi = volunteers.length - 1; vi >= 0; vi--) {
+                var v = volunteers[vi];
+                var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
+                if (isMe) {
+                  myLatestResponse = v.response || '未回答';
+                  break;
+                }
+              }
+            }
+            var isVolunteeredByMe = myLatestResponse && myLatestResponse !== '×';
+            var isRejectedByMe = myLatestResponse === '×';
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
             // DEBUG: スタッフ枠線判定のデバッグ情報を収集（ツールチップ＋コンソール）
             var _borderDebug = null;
@@ -2798,7 +2804,8 @@
                 return (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
               });
               _borderDebug = '自分=' + curStaff
-                + ' | 自分の回答=' + (myVol.length > 0 ? myVol.map(function(v) { return v.response || '(空)'; }).join(',') : 'なし')
+                + ' | 全回答=' + (myVol.length > 0 ? myVol.map(function(v) { return v.response || '(空)'; }).join(',') : 'なし')
+                + ' | 最新回答=' + (myLatestResponse || 'なし')
                 + ' | 立候補=' + isVolunteeredByMe + ' 不可=' + isRejectedByMe
                 + ' | 確定=' + isDecided + ' 募集状態=' + (recStatus || 'なし');
               if (myVol.length > 0 || isVolunteeredByMe || isRejectedByMe) {

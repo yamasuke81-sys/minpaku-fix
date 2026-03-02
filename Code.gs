@@ -4517,14 +4517,14 @@ function saveInvoiceRequestSettings(settings) {
       var k = String(r[0] || '').trim();
       if (k) rowMap[k] = i + 2;
     });
-    // 配信時刻はHH:mm→数値(0-23)に変換して保存（スプレッドシートのDate型自動変換を回避）
+    // 配信時刻はHH:mm→数値文字列で保存 + セルをテキスト形式に強制（Date型自動変換を回避）
     var timeStr = String(settings.time || '09:00');
     var timeHourToSave = parseInt(timeStr.split(':')[0], 10);
     if (isNaN(timeHourToSave) || timeHourToSave < 0 || timeHourToSave > 23) timeHourToSave = 9;
     var pairs = [
       [INVOICE_REQ_KEYS_.enabled, settings.enabled === true ? 'true' : 'false'],
       [INVOICE_REQ_KEYS_.day, String(settings.day || 25)],
-      [INVOICE_REQ_KEYS_.time, timeHourToSave], // 数値で保存（Date型変換を回避）
+      [INVOICE_REQ_KEYS_.time, String(timeHourToSave)], // 文字列で保存 + 下でテキスト形式に強制
       [INVOICE_REQ_KEYS_.deadline, String(settings.deadline || '')],
       [INVOICE_REQ_KEYS_.subject, String(settings.subject || '')],
       [INVOICE_REQ_KEYS_.body, String(settings.body || '')]
@@ -4532,11 +4532,15 @@ function saveInvoiceRequestSettings(settings) {
     pairs.forEach(function(p) {
       var sheetKey = p[0], val = p[1];
       if (rowMap[sheetKey]) {
-        sheet.getRange(rowMap[sheetKey], 2).setValue(val);
+        var cell = sheet.getRange(rowMap[sheetKey], 2);
+        cell.setNumberFormat('@'); // テキスト形式に強制（Date型自動変換を防止）
+        cell.setValue(val);
       } else {
         var nr = sheet.getLastRow() + 1;
         sheet.getRange(nr, 1).setValue(sheetKey);
-        sheet.getRange(nr, 2).setValue(val);
+        var cell2 = sheet.getRange(nr, 2);
+        cell2.setNumberFormat('@'); // テキスト形式に強制
+        cell2.setValue(val);
         rowMap[sheetKey] = nr;
       }
     });

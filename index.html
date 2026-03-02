@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302m</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302n</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1668,6 +1668,12 @@
           <button type="button" class="btn btn-sm btn-primary" id="btnSaveLineNotify">LINE接続設定を保存</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnTestLineNotify">テスト送信</button>
         </div>
+
+        <hr class="my-3">
+        <h6>通知チャンネル診断</h6>
+        <p class="small text-muted mb-2">全13通知のチャンネル設定・LINE接続状態・コード上のチェック構造を一覧表示します。</p>
+        <button type="button" class="btn btn-sm btn-outline-info" id="btnDiagnoseChannels">診断を実行</button>
+        <div id="diagnoseChannelsResult" class="mt-2" style="display:none;"></div>
       </div>
 
       <div id="settingsInvoiceRequest" style="display:none;">
@@ -8081,6 +8087,61 @@
           btn.textContent = origText;
           alert('送信に失敗しました。\n' + (e ? e.toString() : ''));
         }).sendLineTestMessage();
+      });
+
+      // 通知チャンネル診断ボタン
+      document.getElementById('btnDiagnoseChannels').addEventListener('click', function() {
+        var btn = this;
+        var resultDiv = document.getElementById('diagnoseChannelsResult');
+        btn.disabled = true;
+        btn.textContent = '診断中...';
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<div class="spinner-border spinner-border-sm"></div> 取得中...';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '診断を実行';
+          var r = JSON.parse(jsonStr);
+          if (!r.success) { resultDiv.innerHTML = '<div class="alert alert-danger small">' + (r.error || 'エラー') + '</div>'; return; }
+          var html = '<div class="small">';
+          // LINE設定
+          html += '<strong>LINE設定:</strong><br>';
+          html += 'トークン: ' + r.lineConfig.token + '<br>';
+          html += '送信先モード: ' + r.lineConfig.targetMode + '<br>';
+          html += 'グループID: ' + r.lineConfig.groupId + '<br>';
+          html += '個人ID: ' + r.lineConfig.personalId + '<br><br>';
+          // メールトグル
+          html += '<strong>メール有効フラグ (isEmailNotifyEnabled_):</strong><br>';
+          for (var k in r.emailToggles) { html += k + ': <strong>' + (r.emailToggles[k] ? 'ON' : 'OFF') + '</strong><br>'; }
+          html += '<br>';
+          // チャンネル設定一覧
+          html += '<strong>チャンネル設定一覧:</strong>';
+          html += '<table class="table table-sm table-bordered mt-1"><thead><tr><th>通知</th><th>シート値</th><th>→email</th><th>→line</th></tr></thead><tbody>';
+          r.channels.forEach(function(c) {
+            var emailBg = c.emailFlag ? '' : ' class="table-success"';
+            var lineBg = c.lineFlag ? '' : ' class="table-danger"';
+            html += '<tr><td>' + c.label + '</td><td><code>' + c.channelRaw + '</code></td><td' + emailBg + '>' + (c.emailFlag ? 'ON' : '<strong>OFF</strong>') + '</td><td' + lineBg + '>' + (c.lineFlag ? 'ON' : '<strong>OFF</strong>') + '</td></tr>';
+          });
+          html += '</tbody></table>';
+          // コード監査
+          html += '<strong>コード上のチェック構造（疑わしい箇所は赤字）:</strong>';
+          html += '<table class="table table-sm table-bordered mt-1"><thead><tr><th>通知</th><th>メール送信条件</th><th>LINE送信条件</th></tr></thead><tbody>';
+          r.codeAudit.forEach(function(a) {
+            var emailDesc = a.email || '';
+            if (a.staffEmail) emailDesc = 'スタッフ: ' + a.staffEmail;
+            if (a.ownerEmail) emailDesc += (emailDesc ? '<br>' : '') + '<span class="text-danger">オーナー: ' + a.ownerEmail + '</span>';
+            if (a.normalEmail) emailDesc = '通常: ' + a.normalEmail;
+            if (a.testEmail) emailDesc += (emailDesc ? '<br>' : '') + '<span class="text-danger">テスト: ' + a.testEmail + '</span>';
+            var lineDesc = a.line || '';
+            html += '<tr><td>' + a.key + '</td><td>' + emailDesc + '</td><td>' + lineDesc + '</td></tr>';
+          });
+          html += '</tbody></table>';
+          html += '</div>';
+          resultDiv.innerHTML = html;
+        }).withFailureHandler(function(e) {
+          btn.disabled = false;
+          btn.textContent = '診断を実行';
+          resultDiv.innerHTML = '<div class="alert alert-danger small">' + (e ? e.toString() : '通信エラー') + '</div>';
+        }).diagnoseNotifyChannels();
       });
 
       // 各通知タブのテスト送信ボタン（共通ハンドラー）

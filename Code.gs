@@ -4112,6 +4112,77 @@ function saveNotifyChannelSettings(channels) {
 }
 
 /**
+ * 全13通知のチャンネル設定・メール有効フラグ・LINE設定を一括診断
+ * フロントエンドから呼び出して結果を表示する
+ */
+function diagnoseNotifyChannels() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var map = {};
+    if (sheet && sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+      rows.forEach(function(row) {
+        var k = String(row[0] || '').trim();
+        if (k) map[k] = row[1];
+      });
+    }
+    // 各通知のチャンネル設定
+    var results = [];
+    NOTIFY_CHANNEL_KEYS_.forEach(function(item) {
+      var chRaw = map['通知CH_' + item.key] || '(未設定→both)';
+      var ch = getNotifyChannel_(item.key);
+      results.push({
+        key: item.key,
+        label: item.label,
+        channelRaw: String(chRaw),
+        emailFlag: ch.email,
+        lineFlag: ch.line
+      });
+    });
+    // isEmailNotifyEnabled_ の状態
+    var emailToggles = {};
+    var toggleKeys = ['募集開始通知有効', 'キャンセル通知有効', '清掃完了通知有効'];
+    toggleKeys.forEach(function(k) {
+      emailToggles[k] = isEmailNotifyEnabled_(k);
+    });
+    // LINE設定
+    var lineConfig = {
+      token: (map['LINEチャネルアクセストークン'] || '') ? '設定済み(' + String(map['LINEチャネルアクセストークン'] || '').substring(0, 8) + '...)' : '(空)',
+      targetMode: map['LINE送信先モード'] || '(未設定→group)',
+      groupId: (map['LINEグループID'] || '') ? '設定済み(' + String(map['LINEグループID'] || '').substring(0, 5) + '...)' : '(空)',
+      personalId: (map['LINEユーザーID'] || '') ? '設定済み(' + String(map['LINEユーザーID'] || '').substring(0, 5) + '...)' : '(空)'
+    };
+    // 各通知のコード上のチェック構造
+    var codeAudit = [
+      { key: '予約キャンセル', staffEmail: 'ch.email && isEmailNotifyEnabled_', ownerEmail: 'isEmailNotifyEnabled_のみ（ch.emailチェック無し）', line: 'ch.line' },
+      { key: '請求書要請', normalEmail: 'ch.email', testEmail: 'チャンネルチェック無し（常にメール送信）', line: 'ch.line（サマリーのみ）' },
+      { key: '名簿未入力リマインド', email: 'ch.email', line: 'ch.line' },
+      { key: '清掃スタッフ募集', email: 'ch.email', line: 'ch.line' },
+      { key: '出勤キャンセル要望', email: 'ch.email', line: 'ch.line' },
+      { key: 'キャンセル承認', email: 'ch.email', line: 'ch.line' },
+      { key: 'キャンセル却下', email: 'ch.email', line: 'ch.line' },
+      { key: '請求書送信', email: 'ch.email', line: 'ch.line' },
+      { key: 'スタッフ確定', email: 'ch.email', line: 'ch.line' },
+      { key: '募集リマインド', email: 'ch.email', line: 'ch.line' },
+      { key: 'スタッフ未決定リマインド', email: 'ch.email', line: 'ch.line' },
+      { key: '直前予約リマインド', email: 'ch.email', line: 'ch.line' },
+      { key: '清掃完了', email: 'ch.email && isEmailNotifyEnabled_', line: 'ch.line' }
+    ];
+    return JSON.stringify({
+      success: true,
+      channels: results,
+      emailToggles: emailToggles,
+      lineConfig: lineConfig,
+      codeAudit: codeAudit
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * 通知チャンネル判定ヘルパー（内部用）
  * @param {string} notifyKey - NOTIFY_CHANNEL_KEYS_のkey
  * @return {{ email: boolean, line: boolean }}

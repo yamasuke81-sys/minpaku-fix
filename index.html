@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1637,12 +1637,7 @@
         </div>
       </div>
       <div id="settingsLineId" style="display:none;">
-        <p class="small text-muted mb-2">LINE Messaging APIの接続情報を設定します。各通知のメール/LINE切り替えは個別の通知設定タブで行います。</p>
-
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input" type="checkbox" id="lineNotifyEnabled">
-          <label class="form-check-label" for="lineNotifyEnabled"><strong>LINE通知を有効にする</strong></label>
-        </div>
+        <p class="small text-muted mb-2">LINE Messaging APIの接続情報を設定します。トークンと送信先IDを設定すると、各通知タブで「LINE」チャンネルが利用可能になります。</p>
 
         <div class="mb-3">
           <label class="form-label small fw-bold" for="lineChannelToken">チャネルアクセストークン</label>
@@ -7989,8 +7984,6 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
-              var el = document.getElementById('lineNotifyEnabled');
-              if (el) el.checked = r.settings.lineNotifyEnabled === true;
               var tk = document.getElementById('lineChannelToken');
               if (tk) tk.value = r.settings.lineChannelToken || '';
               var gid = document.getElementById('lineGroupId');
@@ -8009,16 +8002,11 @@
           ? (document.getElementById('lineUserId').value || '').trim()
           : (document.getElementById('lineGroupId').value || '').trim();
         var settings = {
-          lineNotifyEnabled: document.getElementById('lineNotifyEnabled').checked,
           lineChannelToken: (document.getElementById('lineChannelToken').value || '').trim(),
           lineGroupId: (document.getElementById('lineGroupId').value || '').trim(),
           lineUserId: (document.getElementById('lineUserId').value || '').trim(),
           lineTargetMode: _lineTargetMode
         };
-        if (settings.lineNotifyEnabled && (!settings.lineChannelToken || !targetId)) {
-          alert('LINE通知を有効にするには、チャネルアクセストークンと送信先IDを入力してください。');
-          return;
-        }
         btn.disabled = true;
         var origText = btn.textContent;
         btn.textContent = '保存中...';

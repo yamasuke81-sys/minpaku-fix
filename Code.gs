@@ -3988,7 +3988,6 @@ function getLineNotifySettings() {
     return JSON.stringify({
       success: true,
       settings: {
-        lineNotifyEnabled: map['LINE通知有効'] === 'true',
         lineChannelToken: map['LINEチャネルアクセストークン'] || '',
         lineGroupId: map['LINEグループID'] || '',
         lineUserId: map['LINEユーザーID'] || '',
@@ -4013,7 +4012,6 @@ function saveLineNotifySettings(settings) {
       if (k) rowMap[k] = i + 2;
     });
     var items = [
-      ['LINE通知有効', settings.lineNotifyEnabled ? 'true' : 'false'],
       ['LINEチャネルアクセストークン', settings.lineChannelToken || ''],
       ['LINEグループID', settings.lineGroupId || ''],
       ['LINEユーザーID', settings.lineUserId || ''],
@@ -4339,7 +4337,7 @@ function sendLineTestMessage() {
 
 /**
  * LINEグループにメッセージを送信（内部ヘルパー）
- * LINE通知が無効 or 設定不足の場合は何もしない
+ * トークン・送信先IDが設定されていれば送信する（設定不足の場合は何もしない）
  */
 function sendLineMessage_(text, returnDebug) {
   try {
@@ -4354,10 +4352,6 @@ function sendLineMessage_(text, returnDebug) {
       var key = String(row[0] || '').trim();
       if (key) map[key] = String(row[1] || '').trim();
     });
-    if (map['LINE通知有効'] !== 'true') {
-      if (returnDebug) return { ok: false, reason: 'LINE通知有効がtrue以外: "' + (map['LINE通知有効'] || '') + '"' };
-      return;
-    }
     var token = map['LINEチャネルアクセストークン'] || '';
     var targetMode = map['LINE送信先モード'] || 'group';
     var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');

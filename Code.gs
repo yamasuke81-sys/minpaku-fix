@@ -4088,6 +4088,35 @@ function saveNotifyChannelSettings(channels) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
     var lastRow = Math.max(sheet.getLastRow(), 1);
     var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    // 全出現行を記録（重複検出・クリーンアップ用）
+    var allOccurrences = {}; // key → [rowNum, rowNum, ...]
+    rows.forEach(function(r, i) {
+      var k = String(r[0] || '').trim();
+      if (k) {
+        if (!allOccurrences[k]) allOccurrences[k] = [];
+        allOccurrences[k].push(i + 2);
+      }
+    });
+    // 重複行のクリーンアップ: 同じキーが複数行にある場合、最後の行だけ残す
+    var rowsToDelete = [];
+    for (var dupKey in allOccurrences) {
+      if (allOccurrences[dupKey].length > 1) {
+        var dupRows = allOccurrences[dupKey];
+        // 最後の行以外を削除対象に
+        for (var di = 0; di < dupRows.length - 1; di++) {
+          rowsToDelete.push(dupRows[di]);
+        }
+        Logger.log('saveNotifyChannelSettings: 重複キー発見 ' + dupKey + ' 行=' + dupRows.join(',') + ' → 最後の行' + dupRows[dupRows.length - 1] + 'のみ残す');
+      }
+    }
+    // 行番号の大きい順に削除（小さい順だと行ずれが起きる）
+    rowsToDelete.sort(function(a, b) { return b - a; });
+    rowsToDelete.forEach(function(rowNum) {
+      sheet.deleteRow(rowNum);
+    });
+    // 削除後にrowMapを再構築
+    lastRow = Math.max(sheet.getLastRow(), 1);
+    rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
     var rowMap = {};
     rows.forEach(function(r, i) {
       var k = String(r[0] || '').trim();
@@ -4105,7 +4134,7 @@ function saveNotifyChannelSettings(channels) {
         sheet.getRange(nr, 2).setValue(val);
       }
     });
-    return JSON.stringify({ success: true });
+    return JSON.stringify({ success: true, deletedDuplicates: rowsToDelete.length });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -4206,10 +4235,11 @@ function getNotifyChannel_(notifyKey) {
     if (!sheet || sheet.getLastRow() < 2) return { email: true, line: true };
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
     var val = 'both';
+    var targetKey = '通知CH_' + notifyKey;
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0] || '').trim() === '通知CH_' + notifyKey) {
+      if (String(rows[i][0] || '').trim() === targetKey) {
         val = String(rows[i][1] || '').trim() || 'both';
-        break;
+        // breakしない: 重複行がある場合、最後の値を採用（saveと一貫性）
       }
     }
     return { email: val === 'both' || val === 'email', line: val === 'both' || val === 'line' };
@@ -4505,12 +4535,14 @@ function sendLineMessage_(text, returnDebug) {
     var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', options);
     var code = resp.getResponseCode();
     var body = resp.getContentText();
+    // 成功・失敗両方をログに記録（LINE不達調査用）
+    Logger.log('sendLineMessage_: HTTP ' + code + ' mode=' + targetMode + ' id=' + targetId.substring(0, 5) + '... text=' + text.substring(0, 50) + (text.length > 50 ? '...' : ''));
     if (code !== 200) {
-      Logger.log('LINE送信エラー: HTTP ' + code + ' ' + body);
+      Logger.log('LINE送信エラー詳細: ' + body);
     }
     if (returnDebug) return { ok: code === 200, httpCode: code, body: body, targetMode: targetMode, targetId: targetId.substring(0, 5) + '...' };
   } catch (e) {
-    Logger.log('sendLineMessage_: ' + e.toString());
+    Logger.log('sendLineMessage_ 例外: ' + e.toString());
     if (returnDebug) return { ok: false, reason: '例外: ' + e.toString() };
   }
 }
@@ -8869,8 +8901,9 @@ function checkAndSendReminders() {
             var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var _ch_remind = getNotifyChannel_('募集リマインド');
+            Logger.log('募集リマインド チャンネル: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' to=' + to.join(','));
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
-            if (_ch_remind.line) { try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) {} }
+            if (_ch_remind.line) { try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));

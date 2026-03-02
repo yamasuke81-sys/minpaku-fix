@@ -1901,7 +1901,7 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
       try {
         var ownerRes = JSON.parse(getOwnerEmail());
         var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-        if (ownerEmail && isEmailNotifyEnabled_('キャンセル通知有効')) {
+        if (ownerEmail && _ch_cancel.email && isEmailNotifyEnabled_('キャンセル通知有効')) {
           var oSubject = '【民泊】予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
           var oBody = '以下の予約がキャンセルされました。\n\n' +
             '期間: ' + dateRange + '\n' +
@@ -2462,6 +2462,9 @@ function syncFromICal() {
               var rNextRow = rSheet.getLastRow() + 1;
               var nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
               rSheet.getRange(rNextRow, 1, 1, 15).setValues([[coKey, nextRow, '', '募集中', '', '', nowStr, '', 'メール', '', '', '', '', '', '']]);
+              // 告知日を記録し、スタッフに自動通知
+              rSheet.getRange(rNextRow, 3).setValue(nowStr);
+              try { notifyStaffForRecruitment(rNextRow, coKey, nextRow); } catch (notifyErr) { Logger.log('Auto-notify error: ' + notifyErr.toString()); }
             }
           }
         } catch (autoRecruitErr) {
@@ -4573,12 +4576,23 @@ function sendInvoiceRequestEmails(testRecipient) {
         .replace(/\{スタッフ名\}/g, 'テストユーザー')
         .replace(/\{締切日\}/g, deadlineText)
         .replace(/\{アプリURL\}/g, staffAppUrl);
-      try {
-        GmailApp.sendEmail(testEmail, subj, body, { name: '請求書要請（テスト送信）' });
-        return JSON.stringify({ success: true, message: testEmail + ' にテストメールを送信しました。', sent: 1 });
-      } catch (e) {
-        return JSON.stringify({ success: false, error: '送信失敗: ' + e.toString() });
+      var _ch_inv_test = getNotifyChannel_('請求書要請');
+      var testResults = [];
+      if (_ch_inv_test.email) {
+        try {
+          GmailApp.sendEmail(testEmail, subj, body, { name: '請求書要請（テスト送信）' });
+          testResults.push('メール送信済み');
+        } catch (e) {
+          testResults.push('メール送信失敗: ' + e.toString());
+        }
       }
+      if (_ch_inv_test.line) {
+        try { sendLineMessage_('【テスト】' + subj + '\n\n' + body); testResults.push('LINE送信済み'); } catch (lineErr) { testResults.push('LINE送信失敗: ' + lineErr.toString()); }
+      }
+      if (testResults.length === 0) {
+        return JSON.stringify({ success: false, error: 'メール・LINEの両方が無効に設定されています。チャンネル設定を確認してください。' });
+      }
+      return JSON.stringify({ success: true, message: testResults.join(' / '), sent: 1 });
     }
     // スタッフ一覧取得（全員に送信）
     var staffSheet = ss.getSheetByName(SHEET_STAFF);
@@ -8716,6 +8730,15 @@ function checkAndCreateRecruitments() {
       const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
       recruitSheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutStr, rowNumber, '', status, assignedStaff, '', now, '', 'メール', '', '', '', '', '', '']]);
       existingRowNums[rowNumber] = true;
+      // 募集中の新規エントリはスタッフに自動通知
+      if (status === '募集中') {
+        try {
+          recruitSheet.getRange(nextRow, 3).setValue(now);
+          notifyStaffForRecruitment(nextRow, checkoutStr, rowNumber);
+        } catch (notifyErr) {
+          Logger.log('checkAndCreateRecruitments notify: ' + notifyErr.toString());
+        }
+      }
     }
   } catch (e) {
     Logger.log('checkAndCreateRecruitments: ' + e.toString());

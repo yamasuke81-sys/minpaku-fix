@@ -7,15 +7,10 @@
 
 {{-- ヒーローセクション --}}
 <section class="relative h-[80vh] min-h-[500px] flex items-center justify-center overflow-hidden">
-    {{-- 背景画像（プレースホルダー: グラデーションで代替） --}}
-    <div class="absolute inset-0 bg-gradient-to-br from-navy via-navy-light to-navy-dark">
-        {{-- 後で実際の写真に差し替え --}}
-        <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzFCM0E1QyIgc3RvcC1vcGFjaXR5PSIwLjgiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMyQTU1ODAiIHN0b3Atb3BhY2l0eT0iMC42Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3QgZmlsbD0idXJsKCNnKSIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIvPjwvc3ZnPg==')] opacity-50"></div>
-    </div>
-
-    {{-- ヒーロー写真用プレースホルダー --}}
-    <div class="absolute inset-0 flex items-center justify-center text-white/10 text-sm">
-        ※ 施設写真をここに配置
+    {{-- 背景画像 --}}
+    <div class="absolute inset-0">
+        <img src="{{ asset('images/terrace-hero.jpg') }}" alt="the Terrace 長浜 — テラスからの瀬戸内海の眺望" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-navy/40"></div>
     </div>
 
     {{-- テキストオーバーレイ --}}
@@ -117,16 +112,16 @@
 <section class="py-16 sm:py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {{-- 写真エリア（プレースホルダー） --}}
+            {{-- 写真エリア --}}
             <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2 aspect-[16/10] bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm">
-                    施設写真 1（リビング）
+                <div class="col-span-2 aspect-[16/10] rounded-2xl overflow-hidden">
+                    <img src="{{ asset('images/terrace-overview.jpg') }}" alt="テラスから望む瀬戸内海のパノラマ" class="w-full h-full object-cover">
                 </div>
-                <div class="aspect-square bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm">
-                    写真 2（テラス）
+                <div class="aspect-square rounded-2xl overflow-hidden">
+                    <img src="{{ asset('images/balcony-left.jpg') }}" alt="バルコニーからの眺望" class="w-full h-full object-cover">
                 </div>
-                <div class="aspect-square bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm">
-                    写真 3（寝室）
+                <div class="aspect-square rounded-2xl overflow-hidden">
+                    <img src="{{ asset('images/balcony-right.jpg') }}" alt="バルコニーからの眺望（別アングル）" class="w-full h-full object-cover">
                 </div>
             </div>
 

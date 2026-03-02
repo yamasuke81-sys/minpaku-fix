@@ -22,18 +22,18 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             {{-- メイン写真（大） --}}
-            <div class="col-span-2 row-span-2 aspect-[4/3] bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm overflow-hidden">
-                <span>メイン写真（テラスからの海の眺望）</span>
+            <div class="col-span-2 row-span-2 aspect-[4/3] rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/terrace-hero.jpg') }}" alt="テラスからの瀬戸内海の眺望" class="w-full h-full object-cover">
             </div>
             {{-- サブ写真 --}}
-            <div class="aspect-square bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-xs overflow-hidden">
-                <span>リビング</span>
+            <div class="aspect-square rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/terrace-overview.jpg') }}" alt="テラス俯瞰" class="w-full h-full object-cover">
             </div>
-            <div class="aspect-square bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-xs overflow-hidden">
-                <span>寝室①</span>
+            <div class="aspect-square rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/balcony-left.jpg') }}" alt="バルコニーからの眺め" class="w-full h-full object-cover">
             </div>
-            <div class="aspect-square bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-xs overflow-hidden">
-                <span>キッチン</span>
+            <div class="aspect-square rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/balcony-right.jpg') }}" alt="バルコニー別アングル" class="w-full h-full object-cover">
             </div>
             <div class="aspect-square bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-xs overflow-hidden">
                 <span>BBQ設備</span>
@@ -42,7 +42,7 @@
                 <span>バスルーム</span>
             </div>
         </div>
-        <p class="text-xs text-navy/30 mt-3 text-center">※ 写真は後日差し替え予定です</p>
+        <p class="text-xs text-navy/30 mt-3 text-center">※ 一部の写真は後日追加予定です</p>
     </div>
 </section>
 
@@ -56,8 +56,8 @@
 
         {{-- 特徴①: テラス --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-16">
-            <div class="aspect-[16/10] bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm">
-                テラスの写真
+            <div class="aspect-[16/10] rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/terrace-overview.jpg') }}" alt="海を見渡すテラス" class="w-full h-full object-cover">
             </div>
             <div>
                 <span class="inline-block px-3 py-1 bg-sunset/10 text-sunset text-xs font-bold rounded-full mb-3">TERRACE</span>
@@ -75,8 +75,8 @@
 
         {{-- 特徴②: リビング --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-16">
-            <div class="order-1 lg:order-2 aspect-[16/10] bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm">
-                リビングの写真
+            <div class="order-1 lg:order-2 aspect-[16/10] rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/balcony-left.jpg') }}" alt="バルコニーからの眺望" class="w-full h-full object-cover">
             </div>
             <div class="order-2 lg:order-1">
                 <span class="inline-block px-3 py-1 bg-sunset/10 text-sunset text-xs font-bold rounded-full mb-3">LIVING</span>
@@ -93,8 +93,8 @@
 
         {{-- 特徴③: BBQ --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div class="aspect-[16/10] bg-sand-light rounded-2xl flex items-center justify-center text-navy/30 text-sm">
-                BBQの写真
+            <div class="aspect-[16/10] rounded-2xl overflow-hidden">
+                <img src="{{ asset('images/balcony-right.jpg') }}" alt="テラスでのBBQエリア" class="w-full h-full object-cover">
             </div>
             <div>
                 <span class="inline-block px-3 py-1 bg-sunset/10 text-sunset text-xs font-bold rounded-full mb-3">BBQ</span>

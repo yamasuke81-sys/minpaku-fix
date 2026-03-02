@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302s</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302t</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1712,7 +1712,6 @@
           </div>
           <div class="col-auto small">日</div>
         </div>
-        <div id="invoiceRequestDebug" class="small text-info mb-2" style="font-family:monospace;font-size:11px;"></div>
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面</label>
         <p class="small text-muted mb-1">プレースホルダー: <code>{スタッフ名}</code> <code>{対象年月}</code> <code>{締切日}</code> <code>{アプリURL}</code></p>
@@ -2797,22 +2796,6 @@
             var isVolunteeredByMe = myLatestResponse && myLatestResponse !== '×' && myLatestResponse !== '未回答';
             var isRejectedByMe = myLatestResponse === '×';
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
-            // DEBUG: スタッフ枠線判定のデバッグ情報を収集（ツールチップ＋コンソール）
-            var _borderDebug = null;
-            if (window.staffMode) {
-              var myVol = volunteers.filter(function(v) {
-                return (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
-              });
-              _borderDebug = '自分=' + curStaff
-                + ' | 全回答=' + (myVol.length > 0 ? myVol.map(function(v) { return v.response || '(空)'; }).join(',') : 'なし')
-                + ' | 最新回答=' + (myLatestResponse || 'なし')
-                + ' | 立候補=' + isVolunteeredByMe + ' 不可=' + isRejectedByMe
-                + ' | 確定=' + isDecided + ' 募集状態=' + (recStatus || 'なし');
-              if (myVol.length > 0 || isVolunteeredByMe || isRejectedByMe) {
-                console.log('[枠線DEBUG] CO=' + checkOut + ' ' + _borderDebug
-                  + ' | recStaff=' + recStaff + ' bookStaff=' + bookStaff);
-              }
-            }
             if (window.staffMode && isVolunteeredByMe) {
               if (isSelectedByMe) {
                 cleaningClasses.push('fc-event-cleaning-selected-by-me');
@@ -2834,8 +2817,7 @@
                 rowNumber: b.rowNumber,
                 data: b,
                 recruitStatus: recStatus,
-                statusDot: cleaningStatus,
-                borderDebug: _borderDebug
+                statusDot: cleaningStatus
               },
               backgroundColor: isCancelled ? '#9e9e9e' : '#ffc107',
               borderColor: 'transparent',
@@ -4858,12 +4840,6 @@
               arg.el.style.border = '3px solid ' + (window.matchMedia('(prefers-color-scheme: dark)').matches ? '#6c757d' : '#999');
             } else {
               arg.el.style.border = 'none';
-            }
-            // DEBUG: スタッフモードで枠線デバッグ情報をツールチップ表示
-            var _bd = arg.event.extendedProps && arg.event.extendedProps.borderDebug;
-            if (_bd) {
-              var border = arg.el.style.border || 'none';
-              arg.el.title = '[枠線: ' + border + '] ' + _bd;
             }
             var sd = arg.event.extendedProps && arg.event.extendedProps.statusDot;
             var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#dc3545' : sd === 'cleaning-decided' ? '#198754' : null;
@@ -8188,11 +8164,6 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            // DEBUG: 配信時刻デバッグ表示
-            var dbgEl = document.getElementById('invoiceRequestDebug');
-            if (dbgEl && r.timeDebug) {
-              dbgEl.textContent = '【時刻DEBUG】' + JSON.stringify(r.timeDebug);
-            }
             if (r.success && r.settings) {
               var s = r.settings;
               var en = document.getElementById('invoiceRequestEnabled');
@@ -8207,13 +8178,8 @@
               if (subj) subj.value = s.subject || INVOICE_REQUEST_DEFAULTS.subject;
               var body = document.getElementById('invoiceRequestBody');
               if (body) body.value = s.body || INVOICE_REQUEST_DEFAULTS.body;
-              // DEBUG: select反映後の値
-              if (dbgEl) dbgEl.textContent += ' → 【select後】time=' + (timeSel ? timeSel.value : '?') + ', day=' + (daySel ? daySel.value : '?');
             }
-          } catch (e) {
-            var dbgEl2 = document.getElementById('invoiceRequestDebug');
-            if (dbgEl2) dbgEl2.textContent = 'エラー: ' + e.toString();
-          }
+          } catch (e) { /* ignore */ }
         }).getInvoiceRequestSettings();
       }
 

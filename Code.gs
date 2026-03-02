@@ -4458,34 +4458,22 @@ function getInvoiceRequestSettings() {
       if (key) map[key] = row[1];
     });
     var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
-    // DEBUG: スプレッドシートの生の値を記録
+    // 配信時刻: スプレッドシートが07:00等をDate型に自動変換する問題の対策
+    // 数値(0-23)・Date型・HH:mm文字列いずれが来ても時間部分を取り出す
     var rawTimeVal = map[INVOICE_REQ_KEYS_.time];
-    var rawDebug = {
-      time: { value: String(rawTimeVal), type: typeof rawTimeVal, isDate: rawTimeVal instanceof Date },
-      day: { value: String(map[INVOICE_REQ_KEYS_.day]), type: typeof map[INVOICE_REQ_KEYS_.day] },
-      deadline: { value: String(map[INVOICE_REQ_KEYS_.deadline]), type: typeof map[INVOICE_REQ_KEYS_.deadline] }
-    };
+    var timeHour = 9; // デフォルト9時
     if (rawTimeVal instanceof Date) {
-      rawDebug.time.dateStr = rawTimeVal.toString();
-      rawDebug.time.hours = rawTimeVal.getHours();
-      rawDebug.time.minutes = rawTimeVal.getMinutes();
+      timeHour = rawTimeVal.getHours();
+    } else if (rawTimeVal !== undefined && rawTimeVal !== null && rawTimeVal !== '') {
+      var parsed = parseInt(String(rawTimeVal).split(':')[0], 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) timeHour = parsed;
     }
     return JSON.stringify({
       success: true,
-      debug: rawDebug,
       settings: {
         enabled: enabledVal === true || String(enabledVal || '').trim() === 'true', // デフォルトOFF
         day: parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25,
-        time: (function() {
-          var tv = map[INVOICE_REQ_KEYS_.time];
-          if (!tv) return '09:00';
-          if (tv instanceof Date) {
-            var hh = ('0' + tv.getHours()).slice(-2);
-            var mm = ('0' + tv.getMinutes()).slice(-2);
-            return hh + ':' + mm;
-          }
-          return String(tv).trim() || '09:00';
-        })(),
+        time: ('0' + timeHour).slice(-2) + ':00',
         deadline: parseInt(map[INVOICE_REQ_KEYS_.deadline], 10) || 0,
         subject: String(map[INVOICE_REQ_KEYS_.subject] || ''),
         body: String(map[INVOICE_REQ_KEYS_.body] || '')
@@ -4508,20 +4496,20 @@ function saveInvoiceRequestSettings(settings) {
       var k = String(r[0] || '').trim();
       if (k) rowMap[k] = i + 2;
     });
-    // DEBUG: 受け取ったsettingsの内容をログ
-    Logger.log('saveInvoiceRequestSettings received: time=' + settings.time + ', typeof=' + typeof settings.time + ', day=' + settings.day + ', deadline=' + settings.deadline);
+    // 配信時刻はHH:mm→数値(0-23)に変換して保存（スプレッドシートのDate型自動変換を回避）
+    var timeStr = String(settings.time || '09:00');
+    var timeHourToSave = parseInt(timeStr.split(':')[0], 10);
+    if (isNaN(timeHourToSave) || timeHourToSave < 0 || timeHourToSave > 23) timeHourToSave = 9;
     var pairs = [
       [INVOICE_REQ_KEYS_.enabled, settings.enabled === true ? 'true' : 'false'],
       [INVOICE_REQ_KEYS_.day, String(settings.day || 25)],
-      [INVOICE_REQ_KEYS_.time, String(settings.time || '09:00')],
+      [INVOICE_REQ_KEYS_.time, timeHourToSave], // 数値で保存（Date型変換を回避）
       [INVOICE_REQ_KEYS_.deadline, String(settings.deadline || '')],
       [INVOICE_REQ_KEYS_.subject, String(settings.subject || '')],
       [INVOICE_REQ_KEYS_.body, String(settings.body || '')]
     ];
-    var debugWritten = {};
     pairs.forEach(function(p) {
       var sheetKey = p[0], val = p[1];
-      debugWritten[sheetKey] = val;
       if (rowMap[sheetKey]) {
         sheet.getRange(rowMap[sheetKey], 2).setValue(val);
       } else {
@@ -4531,8 +4519,7 @@ function saveInvoiceRequestSettings(settings) {
         rowMap[sheetKey] = nr;
       }
     });
-    // DEBUG: 書き込んだ値を返す
-    return JSON.stringify({ success: true, debug: { received: { time: settings.time, timeType: typeof settings.time, day: settings.day, deadline: settings.deadline }, written: debugWritten } });
+    return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

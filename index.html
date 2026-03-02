@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0302o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1712,8 +1712,6 @@
           </div>
           <div class="col-auto small">日</div>
         </div>
-        <div id="invoiceRequestDebug" class="small text-info mb-2" style="font-family:monospace;font-size:11px;"></div>
-
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面</label>
         <p class="small text-muted mb-1">プレースホルダー: <code>{スタッフ名}</code> <code>{対象年月}</code> <code>{締切日}</code> <code>{アプリURL}</code></p>
@@ -8160,14 +8158,6 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            // DEBUG: 配信日設定の読み込みデバッグ（生の値+変換後の値）
-            var dbgEl = document.getElementById('invoiceRequestDebug');
-            if (dbgEl) {
-              var lines = [];
-              lines.push('【読込】settings: day=' + (r.settings ? r.settings.day : 'N/A') + ', time=' + (r.settings ? r.settings.time : 'N/A') + ', deadline=' + (r.settings ? r.settings.deadline : 'N/A'));
-              if (r.debug) lines.push('【生値】time=' + JSON.stringify(r.debug.time) + ', day=' + JSON.stringify(r.debug.day) + ', deadline=' + JSON.stringify(r.debug.deadline));
-              dbgEl.innerHTML = lines.join('<br>');
-            }
             if (r.success && r.settings) {
               var s = r.settings;
               var en = document.getElementById('invoiceRequestEnabled');
@@ -8182,13 +8172,8 @@
               if (subj) subj.value = s.subject || INVOICE_REQUEST_DEFAULTS.subject;
               var body = document.getElementById('invoiceRequestBody');
               if (body) body.value = s.body || INVOICE_REQUEST_DEFAULTS.body;
-              // DEBUG: select反映後の値
-              if (dbgEl) dbgEl.innerHTML += '<br>【select反映後】day=' + (daySel ? daySel.value : '?') + ', time=' + (timeSel ? timeSel.value : '?') + ', deadline=' + (deadlineSel ? deadlineSel.value : '?');
             }
-          } catch (e) {
-            var dbgEl2 = document.getElementById('invoiceRequestDebug');
-            if (dbgEl2) dbgEl2.textContent = 'エラー: ' + e.toString();
-          }
+          } catch (e) { /* ignore */ }
         }).getInvoiceRequestSettings();
       }
 
@@ -8203,9 +8188,6 @@
           subject: document.getElementById('invoiceRequestSubject').value || '',
           body: document.getElementById('invoiceRequestBody').value || ''
         };
-        // DEBUG: 保存時の送信値を表示
-        var dbgEl = document.getElementById('invoiceRequestDebug');
-        if (dbgEl) dbgEl.textContent = '【保存送信値】day=' + settings.day + ', time=' + settings.time + ', deadline=' + settings.deadline + ', enabled=' + settings.enabled + ', typeof time=' + typeof settings.time;
         btn.disabled = true;
         var origText = btn.textContent;
         btn.textContent = '保存中...';
@@ -8213,17 +8195,10 @@
           btn.disabled = false;
           btn.textContent = origText;
           var r = JSON.parse(jsonStr);
-          // DEBUG: 保存結果を表示して再読み込み
-          if (dbgEl) dbgEl.textContent += ' → 【保存結果】' + (r.success ? 'OK' : 'NG: ' + (r.error || ''));
-          if (r.success) {
-            // 保存後に再読み込みして保存された値を確認
-            loadInvoiceRequestSettings();
-          }
           alert(r.success ? '保存しました。' : (r.error || '失敗'));
-        }).withFailureHandler(function(e) {
+        }).withFailureHandler(function() {
           btn.disabled = false;
           btn.textContent = origText;
-          if (dbgEl) dbgEl.textContent += ' → 【保存失敗】' + (e ? e.toString() : '不明');
           alert('保存に失敗しました。');
         }).saveInvoiceRequestSettings(settings);
       });

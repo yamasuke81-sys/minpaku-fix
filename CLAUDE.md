@@ -141,16 +141,40 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 6. **LINE通知機能追加**: LINE Messaging API経由でグループにメッセージ送信する機能を実装。メール通知と同タイミング・同内容でLINEグループにも送信。設定タブに「LINE通知」サブタブ追加（ON/OFF・チャネルアクセストークン・グループID・テスト送信）。募集設定シートに`LINE通知有効`・`LINEチャネルアクセストークン`・`LINEグループID`を保存
 
 ## 次回やること（優先度順）
-1. **[高]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
-2. **[中]** Airbnb iCal URLの再取得（HTTP 500 はURL期限切れの可能性大）
-3. **[中]** 残りの `getLastRow()` off-by-one 修正（約50箇所）
-4. **[低]** 「募集」シートの重複エントリクリーンアップ（必要に応じて）
+1. **[高]** 請求書要請の配信日デバッグ情報確認後、デバッグコード削除
+2. **[高]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
+3. **[中]** Airbnb iCal URLの再取得（HTTP 500 はURL期限切れの可能性大）
+4. **[中]** 残りの `getLastRow()` off-by-one 修正（約50箇所）
+5. **[低]** 「募集」シートの重複エントリクリーンアップ（必要に応じて）
 
 ## 現在のセッション状態
 - **ブランチ**: `claude/verify-staff-response-display-bvHjT`
-- **最新コミット**: `e1cb10b`
-- **進行中タスク**: テスト送信機能実装完了・デプロイ待ち
-- **デプロイ待ち**: あり
+- **最新コミット**: `f764fe9`
+- **進行中タスク**: 配信時刻Date型バグ修正完了・デプロイ待ち確認
+- **デプロイ待ち**: あり（v0302m）
+- **デバッグコード残存**: 請求書要請タブに `invoiceRequestDebug` 表示欄あり（確認後削除予定）
+
+## 2026-03-02（セッション7）修正内容
+1. **請求書要請テスト送信のテンプレート対応**: `sendTestNotification`の請求書要請caseがハードコードだったのを、`INVOICE_REQ_KEYS_`でシートから件名・本文テンプレートを読み込み+プレースホルダー置換するよう修正。全13通知のテスト送信vs実送信のテンプレートキー突き合わせ調査を実施
+2. **請求書要請に締切日設定を追加**: `INVOICE_REQ_KEYS_`に`deadline`キーを追加。`getInvoiceRequestSettings`/`saveInvoiceRequestSettings`/`sendInvoiceRequestEmails`に締切日対応。フロントエンドに締切日select（毎月○日）を追加。未設定時は従来どおり月末日
+3. **配信時刻のDate型バグ修正**: スプレッドシートが`07:00`を時刻Date型として解釈する問題。`getInvoiceRequestSettings`と`setupInvoiceRequestTrigger`でDate instanceofチェック+HH:mm変換を追加
+4. **配信日デバッグ表示追加**: `loadInvoiceRequestSettings`にサーバー取得値とselect反映後の値をデバッグ表示する`invoiceRequestDebug`欄を追加（確認後削除予定）
+
+## 2026-03-02（セッション7）コミット履歴（コミットハッシュ付き）
+| コミット | 内容 |
+|---|---|
+| `a9274b2` | feat: v0302l 請求書要請テスト送信テンプレート対応 + 締切日設定 + 配信日デバッグ |
+| `f764fe9` | fix: v0302m 配信時刻がDate型で返るバグ修正（スプレッドシート→HH:mm変換） |
+
+### 変更ファイルと箇所（セッション7）
+- **Code.gs**: `INVOICE_REQ_KEYS_`にdeadlineキー追加、`getInvoiceRequestSettings`にDate型→HH:mm変換+deadline追加、`saveInvoiceRequestSettings`にdeadline追加、`sendInvoiceRequestEmails`の締切日を設定値から取得、`setupInvoiceRequestTrigger`にDate型対応、`sendTestNotification`の請求書要請caseをテンプレート読み込み対応
+- **index.html**: 請求書要請タブに締切日select追加、loadInvoiceRequestSettingsにデバッグ表示追加、save処理にdeadline追加
+
+### テンプレートキー突き合わせ結果（セッション7で調査）
+全13通知のテスト送信vs実送信のテンプレートキーを突き合わせた結果:
+- 通知1-6（テンプレートあり）: すべてキー一致 ✅
+- 通知7-10,12-13（ハードコード）: テスト送信・実送信ともハードコードで一致 ✅
+- **通知11（請求書要請）: ミスマッチ発見→修正済み** ✅（テスト送信がハードコードだったのをテンプレート読み込みに修正）
 
 ## 2026-03-02（セッション6）修正内容
 1. **各通知タブにテスト送信機能を追加**: Code.gsに`sendTestNotification(notifyKey)`関数を追加。13種類の通知すべてに対応。テンプレートがある通知はサンプルプレースホルダー値で置換、テンプレートがない通知はサンプルメッセージを自動生成。送信チャンネル設定（メール/LINE/両方）に従って送信。メールはオーナー宛に【テスト】プレフィックス付きで送信

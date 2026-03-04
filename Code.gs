@@ -8872,7 +8872,13 @@ function checkAndSendReminders() {
         Logger.log('[DEBUG-REMIND] 募集設定シート全行=' + JSON.stringify(_dbgRows));
       }
     } catch (_dbgE) { Logger.log('[DEBUG-REMIND] 設定シート読込エラー: ' + _dbgE); }
+    // ループ前にテンプレート・チャンネルを1回出力（propKeyスキップ時もログが残る）
+    var _ch_remind_preloop = getNotifyChannel_('募集リマインド');
+    Logger.log('[DEBUG-REMIND] チャンネル(ループ前): email=' + _ch_remind_preloop.email + ' line=' + _ch_remind_preloop.line);
+    Logger.log('[DEBUG-REMIND] テンプレート件名=[' + (res.settings.recruitReminderSubject || '') + ']');
+    Logger.log('[DEBUG-REMIND] テンプレート本文=[' + (res.settings.recruitReminderBody || '') + ']');
     var _remindSentCount = 0;
+    var _remindSkippedCount = 0;
     for (var i = 0; i < rows.length; i++) {
       Logger.log('[DEBUG-REMIND] row=' + (i+2) + ' status=[' + String(rows[i][3]).trim() + '] date=' + rows[i][0] + ' notifyMethod=[' + String(rows[i][8] || '').trim() + ']');
       if (String(rows[i][3]).trim() !== '募集中') continue;
@@ -8897,7 +8903,7 @@ function checkAndSendReminders() {
       if (shouldRemind) {
         // 同日重複送信を防止（フラグを送信前にセットして競合を排除）
         var propKey = 'staffRemind_' + rowIndex + '_' + todayStr;
-        if (props.getProperty(propKey)) continue;
+        if (props.getProperty(propKey)) { _remindSkippedCount++; continue; }
         props.setProperty(propKey, '1');
         const staffSheet = ss.getSheetByName(SHEET_STAFF);
         if (staffSheet && staffSheet.getLastRow() >= 2) {
@@ -8930,7 +8936,7 @@ function checkAndSendReminders() {
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
       }
     }
-    Logger.log('[DEBUG-REMIND] 完了: 送信数=' + _remindSentCount);
+    Logger.log('[DEBUG-REMIND] 完了: 送信数=' + _remindSentCount + ' スキップ(propKey)=' + _remindSkippedCount);
   } catch (e) {
     Logger.log('checkAndSendReminders: ' + e.toString());
   } finally {

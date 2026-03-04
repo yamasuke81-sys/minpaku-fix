@@ -1235,7 +1235,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       });
     }
 
-    var subject = '【民泊】清掃完了報告 - ' + checkoutDate;
+    var subject = '清掃完了報告 - ' + checkoutDate;
     var body = '清掃が完了しました。\n\n';
     body += 'チェックアウト日: ' + checkoutDate + '\n';
     body += '清掃担当: ' + (staffName || '不明') + '\n';

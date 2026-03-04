@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0304l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0304m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1368,7 +1368,7 @@
         </div>
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">プレースホルダー: <code>{作業日}</code> <code>{日付}</code> <code>{人数}</code> <code>{ベッド}</code> <code>{BBQ}</code> <code>{国籍}</code> <code>{回答URL}</code></p>
-        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitStartSubject" placeholder="例: 【民泊】清掃スタッフ募集: {作業日}"></div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitStartSubject" placeholder="例: 清掃スタッフ募集: {作業日}"></div>
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitStartBody" rows="8" placeholder="例: 清掃募集&#10;&#10;作業日: {作業日}&#10;&#10;次回予約（変更の可能性あり）&#10;日付：　　{日付}&#10;人数：　　{人数}&#10;ベッド：　{ベッド}&#10;BBQ：　　{BBQ}&#10;国籍：　　{国籍}&#10;&#10;※予約状況次第では変更となる場合があります。&#10;&#10;Webアプリで回答: {回答URL}"></textarea></div>
         <p class="small text-muted mb-1">※ 空欄の場合はデフォルト文面が使われます。清掃詳細画面の「テキストコピー」ではこのテンプレートが初期表示され、その場で編集もできます（テンプレート本体は変更されません）。</p>
 
@@ -1404,7 +1404,7 @@
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックアウト}</code> <code>{回答数}</code> <code>{最少回答者数}</code> <code>{回答URL}</code></p>
-        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitReminderSubject" placeholder="例: 【民泊】清掃募集リマインド: {チェックアウト}"></div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitReminderSubject" placeholder="例: 清掃募集リマインド: {チェックアウト}"></div>
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitReminderBody" rows="4" placeholder="例: 清掃スタッフの回答がまだ{最少回答者数}名に達していません。&#10;チェックアウト: {チェックアウト}&#10;現在の回答数: {回答数}名"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRecruitSettings">募集設定を保存</button>
         <p class="small text-muted mt-2">※ リマインド送信にはトリガーの設定が必要です。下の「トリガーをセットアップ」ボタンで自動設定できます。</p>
@@ -1481,7 +1481,7 @@
         <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックイン}</code> <code>{チェックアウト}</code> <code>{残り日数}</code> <code>{清掃詳細リンク}</code></p>
         <div class="mb-2">
           <label class="form-label small">件名</label>
-          <input type="text" class="form-control form-control-sm" id="reminderSubject" placeholder="例: 【民泊】清掃スタッフ未確定のリマインド: {チェックイン}">
+          <input type="text" class="form-control form-control-sm" id="reminderSubject" placeholder="例: 清掃スタッフ未確定のリマインド: {チェックイン}">
         </div>
         <div class="mb-3">
           <label class="form-label small">本文</label>
@@ -1506,7 +1506,7 @@
         <p class="small text-muted mb-1">iCal取り込み時の直前予約通知用。プレースホルダー: <code>{チェックイン}</code> <code>{チェックアウト}</code> <code>{プラットフォーム}</code> <code>{残り日数}</code> <code>{清掃詳細リンク}</code></p>
         <div class="mb-2">
           <label class="form-label small">件名</label>
-          <input type="text" class="form-control form-control-sm" id="immediateSubject" placeholder="例: 【民泊】直前予約 - 清掃スタッフ手配が必要: {チェックイン}">
+          <input type="text" class="form-control form-control-sm" id="immediateSubject" placeholder="例: 直前予約 - 清掃スタッフ手配が必要: {チェックイン}">
         </div>
         <div class="mb-3">
           <label class="form-label small">本文</label>
@@ -1553,7 +1553,7 @@
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{件数}</code> 未記入件数 <code>{未記入一覧}</code> 未記入予約の一覧 <code>{アプリURL}</code></p>
-        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="rosterReminderSubject" placeholder="例: 【民泊】宿泊者名簿の未記入通知（{件数}件）"></div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="rosterReminderSubject" placeholder="例: 宿泊者名簿の未記入通知（{件数}件）"></div>
         <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="rosterReminderBody" rows="4" placeholder="例: 宿泊者名簿が未記入の予約が{件数}件あります。&#10;宿泊者への催促をお願いします。&#10;&#10;{未記入一覧}&#10;&#10;※ アプリの通知にも同じ内容が届いています。"></textarea></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿未入力リマインド設定を保存</button>
         <p class="small text-muted mt-2">※ 名簿リマインドのトリガーは保存時に自動設定されます。</p>
@@ -1778,7 +1778,7 @@
         </div>
         <div class="mb-2">
           <label class="form-label small fw-bold">メール件名</label>
-          <input type="text" class="form-control form-control-sm" id="confirmEmailSubject" placeholder="例: 【民泊】スタッフ確定: {作業日}">
+          <input type="text" class="form-control form-control-sm" id="confirmEmailSubject" placeholder="例: スタッフ確定: {作業日}">
         </div>
         <div class="mb-2">
           <label class="form-label small fw-bold">テンプレート（メール本文 / テキストコピー共通）</label>
@@ -7833,11 +7833,11 @@
       });
 
       var RECRUIT_REMINDER_DEFAULTS = {
-        subject: '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}',
+        subject: '清掃スタッフ募集のリマインド: {チェックアウト}',
         body: 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名'
       };
       var RECRUIT_START_DEFAULTS = {
-        subject: '【民泊】清掃スタッフ募集: {作業日}',
+        subject: '清掃スタッフ募集: {作業日}',
         body: '清掃募集\n\n作業日: {作業日}\n\n次回予約（変更の可能性あり）\n日付：\u3000\u3000{日付}\n人数：\u3000\u3000{人数}\nベッド：\u3000{ベッド}\nBBQ：\u3000\u3000{BBQ}\n国籍：\u3000\u3000{国籍}\n\n※予約状況次第では変更となる場合があります。\n\nWebアプリで回答: {回答URL}'
       };
 
@@ -7924,7 +7924,7 @@
       })();
 
       var ROSTER_REMINDER_DEFAULTS = {
-        subject: '【民泊】宿泊者名簿の未記入通知（{件数}件）',
+        subject: '宿泊者名簿の未記入通知（{件数}件）',
         body: '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n{未記入一覧}\n\n※ アプリの通知にも同じ内容が届いています。'
       };
 
@@ -8306,7 +8306,7 @@
 
       // 確定通知テンプレート
       var CONFIRM_TEMPLATE_DEFAULT = 'スタッフ確定\n\n作業日: {作業日}\n\n{スタッフ一覧}\n\nよろしくお願いします\uD83C\uDF4A\n\n{次回予約}\n\n{アプリURL}';
-      var CONFIRM_SUBJECT_DEFAULT = '【民泊】スタッフ確定: {作業日}';
+      var CONFIRM_SUBJECT_DEFAULT = 'スタッフ確定: {作業日}';
 
       function loadConfirmationTemplate() {
         google.script.run.withSuccessHandler(function(jsonStr) {
@@ -8386,9 +8386,9 @@
       })();
 
       var REMINDER_EMAIL_DEFAULTS = {
-        subject: '【民泊】清掃スタッフ未確定のリマインド: {チェックイン}',
+        subject: '清掃スタッフ未確定のリマインド: {チェックイン}',
         body: '以下の予約について、清掃スタッフがまだ確定していません。\n\nチェックイン: {チェックイン}\nチェックアウト: {チェックアウト}\n残り日数: {残り日数}日\n\n清掃詳細: {清掃詳細リンク}\n\n早めに清掃スタッフの手配をお願いします。',
-        immediateSubject: '【民泊】直前予約 - 清掃スタッフ手配が必要です: {チェックイン}',
+        immediateSubject: '直前予約 - 清掃スタッフ手配が必要です: {チェックイン}',
         immediateBody: '1週間以内にチェックインの予約が新たに追加されました。\n\nチェックイン: {チェックイン}\nチェックアウト: {チェックアウト}\nプラットフォーム: {プラットフォーム}\n残り日数: {残り日数}日\n\n清掃詳細: {清掃詳細リンク}\n\n早急に清掃スタッフの手配をお願いします。'
       };
 

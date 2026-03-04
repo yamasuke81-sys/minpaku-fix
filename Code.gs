@@ -8861,27 +8861,15 @@ function checkAndSendReminders() {
     const today = new Date();
     var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
     var props = PropertiesService.getScriptProperties();
-    var recruitingCount = 0;
-    for (var ri = 0; ri < rows.length; ri++) { if (String(rows[ri][3]).trim() === '募集中') recruitingCount++; }
-    Logger.log('[DEBUG-REMIND] 募集中エントリ数=' + recruitingCount + ' 全行数=' + rows.length);
-    // 募集設定シートの全行をダンプ（チャンネルキー・テンプレートキー確認用）
-    try {
-      var _dbgSettingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
-      if (_dbgSettingsSheet && _dbgSettingsSheet.getLastRow() >= 2) {
-        var _dbgRows = _dbgSettingsSheet.getRange(2, 1, _dbgSettingsSheet.getLastRow() - 1, 2).getValues();
-        Logger.log('[DEBUG-REMIND] 募集設定シート全行=' + JSON.stringify(_dbgRows));
-      }
-    } catch (_dbgE) { Logger.log('[DEBUG-REMIND] 設定シート読込エラー: ' + _dbgE); }
-    // ループ前にテンプレート・チャンネルを1回出力（propKeyスキップ時もログが残る）
-    var _ch_remind_preloop = getNotifyChannel_('募集リマインド');
-    Logger.log('[DEBUG-REMIND] チャンネル(ループ前): email=' + _ch_remind_preloop.email + ' line=' + _ch_remind_preloop.line);
-    Logger.log('[DEBUG-REMIND] テンプレート件名=[' + (res.settings.recruitReminderSubject || '') + ']');
-    Logger.log('[DEBUG-REMIND] テンプレート本文=[' + (res.settings.recruitReminderBody || '') + ']');
-    var _remindSentCount = 0;
-    var _remindSkippedCount = 0;
     for (var i = 0; i < rows.length; i++) {
-      Logger.log('[DEBUG-REMIND] row=' + (i+2) + ' status=[' + String(rows[i][3]).trim() + '] date=' + rows[i][0] + ' notifyMethod=[' + String(rows[i][8] || '').trim() + ']');
       if (String(rows[i][3]).trim() !== '募集中') continue;
+      // 過去のチェックアウト日はリマインド不要
+      var _recruitDate = rows[i][0];
+      if (_recruitDate instanceof Date && _recruitDate < today) continue;
+      if (!(_recruitDate instanceof Date)) {
+        var _parsedDate = new Date(_recruitDate);
+        if (!isNaN(_parsedDate.getTime()) && _parsedDate < today) continue;
+      }
       if ((String(rows[i][8] || '').trim() || 'メール') === 'LINE') continue;
       const lastRemind = rows[i][5] ? new Date(rows[i][5]) : null;
       const rowIndex = i + 2;
@@ -8903,7 +8891,7 @@ function checkAndSendReminders() {
       if (shouldRemind) {
         // 同日重複送信を防止（フラグを送信前にセットして競合を排除）
         var propKey = 'staffRemind_' + rowIndex + '_' + todayStr;
-        if (props.getProperty(propKey)) { _remindSkippedCount++; continue; }
+        if (props.getProperty(propKey)) continue;
         props.setProperty(propKey, '1');
         const staffSheet = ss.getSheetByName(SHEET_STAFF);
         if (staffSheet && staffSheet.getLastRow() >= 2) {
@@ -8913,22 +8901,14 @@ function checkAndSendReminders() {
           var to = Object.keys(toSet);
           if (to.length) {
             var recruitStaffUrl = getStaffAppUrl_();
-            var recruitDateStr = String(rows[i][0] || '').trim();
-            Logger.log('[DEBUG-REMIND] recruitDate raw=' + rows[i][0] + ' isDate=' + (rows[i][0] instanceof Date) + ' recruitDateStr=' + recruitDateStr);
-            Logger.log('[DEBUG-REMIND] settings.recruitReminderSubject=[' + (res.settings.recruitReminderSubject || '') + ']');
-            Logger.log('[DEBUG-REMIND] settings.recruitReminderBody=[' + (res.settings.recruitReminderBody || '') + ']');
+            var recruitDateRaw = rows[i][0];
+            var recruitDateStr = (recruitDateRaw instanceof Date) ? Utilities.formatDate(recruitDateRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(recruitDateRaw || '').trim();
             var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateStr) : '';
             var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}';
             var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名\n\nWebアプリで回答: {回答URL}';
-            Logger.log('[DEBUG-REMIND] subjTpl=[' + subjTpl + ']');
-            Logger.log('[DEBUG-REMIND] bodyTpl=[' + bodyTpl + ']');
             var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
-            Logger.log('[DEBUG-REMIND] final subj=[' + subj + ']');
             var _ch_remind = getNotifyChannel_('募集リマインド');
-            Logger.log('[DEBUG-REMIND] チャンネル: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' to=' + to.join(','));
-            _remindSentCount++;
-            Logger.log('[DEBUG-REMIND] 送信#' + _remindSentCount + ' row=' + rowIndex + ' propKey=' + propKey);
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
             if (_ch_remind.line) { try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
           }
@@ -8936,12 +8916,70 @@ function checkAndSendReminders() {
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
       }
     }
-    Logger.log('[DEBUG-REMIND] 完了: 送信数=' + _remindSentCount + ' スキップ(propKey)=' + _remindSkippedCount);
   } catch (e) {
     Logger.log('checkAndSendReminders: ' + e.toString());
   } finally {
     try { lock.releaseLock(); } catch (e) {}
   }
+}
+
+/**
+ * 募集シートの重複・期限切れエントリをクリーンアップ
+ * GASエディタから手動実行する関数。行は削除せずステータスを変更するのみ。
+ * - 過去日付（チェックアウト日 < 今日）の「募集中」→「期限切れ」
+ * - 同じ予約行番号の「募集中」が複数ある場合、最新1つだけ残し他を「重複無効」
+ */
+function cleanupRecruitmentDuplicates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_RECRUIT);
+  if (!sheet || sheet.getLastRow() < 2) { Logger.log('募集シートが空'); return; }
+  var maxCol = Math.max(sheet.getLastColumn(), 9);
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, maxCol).getValues();
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  var expiredCount = 0;
+  var duplicateCount = 0;
+
+  // パス1: 過去日付の「募集中」→「期限切れ」
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][3]).trim() !== '募集中') continue;
+    var d = rows[i][0];
+    var checkoutDate = (d instanceof Date) ? d : new Date(d);
+    if (!isNaN(checkoutDate.getTime()) && checkoutDate < today) {
+      sheet.getRange(i + 2, 4).setValue('期限切れ');
+      rows[i][3] = '期限切れ';
+      expiredCount++;
+      Logger.log('期限切れ: row=' + (i + 2) + ' date=' + checkoutDate);
+    }
+  }
+
+  // パス2: 同じ予約行番号の「募集中」重複を検出し、最新1つだけ残す
+  // bookingRowNum(列2, 0ベース[1]) をキーに、「募集中」行をグループ化
+  var groups = {};
+  for (var j = 0; j < rows.length; j++) {
+    if (String(rows[j][3]).trim() !== '募集中') continue;
+    var bookingRow = String(rows[j][1] || '').trim();
+    if (!bookingRow) continue;
+    if (!groups[bookingRow]) groups[bookingRow] = [];
+    groups[bookingRow].push(j);
+  }
+
+  // 各グループで2つ以上ある場合、最後の1つ（最新）を残し他を「重複無効」
+  var keys = Object.keys(groups);
+  for (var k = 0; k < keys.length; k++) {
+    var indices = groups[keys[k]];
+    if (indices.length <= 1) continue;
+    for (var m = 0; m < indices.length - 1; m++) {
+      var idx = indices[m];
+      sheet.getRange(idx + 2, 4).setValue('重複無効');
+      rows[idx][3] = '重複無効';
+      duplicateCount++;
+      Logger.log('重複無効: row=' + (idx + 2) + ' bookingRow=' + keys[k]);
+    }
+  }
+
+  Logger.log('クリーンアップ完了: 期限切れ=' + expiredCount + ' 重複無効=' + duplicateCount);
 }
 
 /**********************************************

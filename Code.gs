@@ -1901,7 +1901,7 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
       try {
         var ownerRes = JSON.parse(getOwnerEmail());
         var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-        if (ownerEmail && isEmailNotifyEnabled_('キャンセル通知有効')) {
+        if (ownerEmail && _ch_cancel.email && isEmailNotifyEnabled_('キャンセル通知有効')) {
           var oSubject = '【民泊】予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
           var oBody = '以下の予約がキャンセルされました。\n\n' +
             '期間: ' + dateRange + '\n' +

@@ -9291,6 +9291,11 @@ function checkAndSendReminderEmails() {
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var props = PropertiesService.getScriptProperties();
 
+    // デバッグ: チャンネル設定を確認
+    var _dbgChUndecided = getNotifyChannel_('スタッフ未決定リマインド');
+    Logger.log('[DEBUG-CH] checkAndSendReminderEmails: スタッフ未決定リマインド email=' + _dbgChUndecided.email + ' line=' + _dbgChUndecided.line);
+    Logger.log('[DEBUG-CH] ownerEmail=' + ownerEmail + ' reminders.length=' + reminders.length);
+
     for (var ri = 0; ri < rData.length; ri++) {
       var status = String(rData[ri][3] || '').trim();
       if (status !== '募集中') continue;
@@ -9331,7 +9336,7 @@ function checkAndSendReminderEmails() {
           if (checkinDay >= today) {
             // PropertiesService による重複送信防止
             var propKey = 'ownerRemind_' + checkoutDateStr + '_' + remIdx;
-            if (props.getProperty(propKey)) continue;
+            if (props.getProperty(propKey)) { Logger.log('[DEBUG-CH] 重複防止スキップ: ' + propKey); continue; }
             props.setProperty(propKey, Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
             var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
             var detailLink = buildCleaningDetailUrl_(checkoutDateStr);
@@ -9349,8 +9354,9 @@ function checkAndSendReminderEmails() {
                   + '清掃詳細: ' + detailLink + '\n\n'
                   + '早めに清掃スタッフの手配をお願いします。';
               var _ch_undecided = getNotifyChannel_('スタッフ未決定リマインド');
-              if (_ch_undecided.email) GmailApp.sendEmail(ownerEmail, subject, body);
-              if (_ch_undecided.line) { try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
+              Logger.log('[DEBUG-CH] 送信判定: CO=' + checkoutDateStr + ' email=' + _ch_undecided.email + ' line=' + _ch_undecided.line);
+              if (_ch_undecided.email) { Logger.log('[DEBUG-CH] → メール送信実行'); GmailApp.sendEmail(ownerEmail, subject, body); } else { Logger.log('[DEBUG-CH] → メール送信スキップ（チャンネル設定）'); }
+              if (_ch_undecided.line) { try { Logger.log('[DEBUG-CH] → LINE送信実行'); sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) { Logger.log('[DEBUG-CH] LINE送信エラー: ' + lineErr.toString()); } } else { Logger.log('[DEBUG-CH] → LINE送信スキップ（チャンネル設定）'); }
               newSent.push(remIdx);
             } catch (mailErr) {
               Logger.log('reminderEmail error: ' + mailErr.toString());

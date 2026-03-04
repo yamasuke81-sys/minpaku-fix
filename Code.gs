@@ -8845,10 +8845,14 @@ function checkAndSendReminders() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;
   try {
-    const res = JSON.parse(getRecruitmentSettings());
-    if (!res.success || !res.settings) return;
+    var _rawSettings = getRecruitmentSettings();
+    Logger.log('[DEBUG-CH] getRecruitmentSettings raw=' + _rawSettings.substring(0, 500));
+    const res = JSON.parse(_rawSettings);
+    Logger.log('[DEBUG-CH] res.success=' + res.success + ' hasSettings=' + !!res.settings);
+    if (!res.success || !res.settings) { Logger.log('[DEBUG-CH] 設定取得失敗で早期return'); return; }
+    Logger.log('[DEBUG-CH] recruitReminderEnabled=' + res.settings.recruitReminderEnabled);
     // 募集リマインドが無効ならスキップ
-    if (!res.settings.recruitReminderEnabled) return;
+    if (!res.settings.recruitReminderEnabled) { Logger.log('[DEBUG-CH] リマインド無効で早期return'); return; }
     ensureRecruitNotifyMethodColumn_();
     const minResp = res.settings.minRespondents || 2;
     const intervalWeeks = res.settings.reminderIntervalWeeks || 1;

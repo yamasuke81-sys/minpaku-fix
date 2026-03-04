@@ -4211,6 +4211,16 @@ function diagnoseNotifyChannels() {
       groupId: (map['LINEグループID'] || '') ? '設定済み(' + String(map['LINEグループID'] || '').substring(0, 5) + '...)' : '(空)',
       personalId: (map['LINEユーザーID'] || '') ? '設定済み(' + String(map['LINEユーザーID'] || '').substring(0, 5) + '...)' : '(空)'
     };
+    // ログ出力（GASエディタから実行時に確認用）
+    Logger.log('=== 通知チャンネル診断 ===');
+    results.forEach(function(r) {
+      Logger.log('[' + r.key + '] firstVal=' + r.firstVal + ' lastVal=' + r.lastVal + ' email=' + r.emailFlag + ' line=' + r.lineFlag + (r.isDuplicate ? ' ★重複あり' : ''));
+    });
+    Logger.log('--- メールトグル ---');
+    for (var tk in emailToggles) Logger.log(tk + '=' + emailToggles[tk]);
+    Logger.log('--- LINE設定 ---');
+    Logger.log('token=' + lineConfig.token + ' mode=' + lineConfig.targetMode + ' group=' + lineConfig.groupId + ' personal=' + lineConfig.personalId);
+    if (duplicates.length) Logger.log('★ 重複キー: ' + JSON.stringify(duplicates));
     return JSON.stringify({
       success: true,
       channels: results,

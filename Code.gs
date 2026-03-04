@@ -8861,6 +8861,11 @@ function checkAndSendReminders() {
     const today = new Date();
     var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
     var props = PropertiesService.getScriptProperties();
+    // デバッグ: チャンネル設定とテンプレートを確認
+    var _dbgCh = getNotifyChannel_('募集リマインド');
+    Logger.log('[DEBUG-CH] 募集リマインド チャンネル: email=' + _dbgCh.email + ' line=' + _dbgCh.line);
+    Logger.log('[DEBUG-CH] テンプレート件名=[' + (res.settings.recruitReminderSubject || '(空)') + ']');
+    Logger.log('[DEBUG-CH] テンプレート本文=[' + (res.settings.recruitReminderBody || '(空)') + ']');
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][3]).trim() !== '募集中') continue;
       // 過去のチェックアウト日はリマインド不要

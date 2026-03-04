@@ -8856,13 +8856,10 @@ function checkAndSendReminders() {
   if (!lock.tryLock(5000)) return;
   try {
     var _rawSettings = getRecruitmentSettings();
-    Logger.log('[DEBUG-CH] getRecruitmentSettings raw=' + _rawSettings.substring(0, 500));
     const res = JSON.parse(_rawSettings);
-    Logger.log('[DEBUG-CH] res.success=' + res.success + ' hasSettings=' + !!res.settings);
-    if (!res.success || !res.settings) { Logger.log('[DEBUG-CH] 設定取得失敗で早期return'); return; }
-    Logger.log('[DEBUG-CH] recruitReminderEnabled=' + res.settings.recruitReminderEnabled);
+    if (!res.success || !res.settings) return;
     // 募集リマインドが無効ならスキップ
-    if (!res.settings.recruitReminderEnabled) { Logger.log('[DEBUG-CH] リマインド無効で早期return'); return; }
+    if (!res.settings.recruitReminderEnabled) return;
     ensureRecruitNotifyMethodColumn_();
     const minResp = res.settings.minRespondents || 2;
     const intervalWeeks = res.settings.reminderIntervalWeeks || 1;
@@ -8875,11 +8872,6 @@ function checkAndSendReminders() {
     const today = new Date();
     var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
     var props = PropertiesService.getScriptProperties();
-    // デバッグ: チャンネル設定とテンプレートを確認
-    var _dbgCh = getNotifyChannel_('募集リマインド');
-    Logger.log('[DEBUG-CH] 募集リマインド チャンネル: email=' + _dbgCh.email + ' line=' + _dbgCh.line);
-    Logger.log('[DEBUG-CH] テンプレート件名=[' + (res.settings.recruitReminderSubject || '(空)') + ']');
-    Logger.log('[DEBUG-CH] テンプレート本文=[' + (res.settings.recruitReminderBody || '(空)') + ']');
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][3]).trim() !== '募集中') continue;
       // 過去のチェックアウト日はリマインド不要
@@ -9291,11 +9283,6 @@ function checkAndSendReminderEmails() {
     var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var props = PropertiesService.getScriptProperties();
 
-    // デバッグ: チャンネル設定を確認
-    var _dbgChUndecided = getNotifyChannel_('スタッフ未決定リマインド');
-    Logger.log('[DEBUG-CH] checkAndSendReminderEmails: スタッフ未決定リマインド email=' + _dbgChUndecided.email + ' line=' + _dbgChUndecided.line);
-    Logger.log('[DEBUG-CH] ownerEmail=' + ownerEmail + ' reminders.length=' + reminders.length);
-
     for (var ri = 0; ri < rData.length; ri++) {
       var status = String(rData[ri][3] || '').trim();
       if (status !== '募集中') continue;
@@ -9336,7 +9323,7 @@ function checkAndSendReminderEmails() {
           if (checkinDay >= today) {
             // PropertiesService による重複送信防止
             var propKey = 'ownerRemind_' + checkoutDateStr + '_' + remIdx;
-            if (props.getProperty(propKey)) { Logger.log('[DEBUG-CH] 重複防止スキップ: ' + propKey); continue; }
+            if (props.getProperty(propKey)) continue;
             props.setProperty(propKey, Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
             var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
             var detailLink = buildCleaningDetailUrl_(checkoutDateStr);
@@ -9354,9 +9341,8 @@ function checkAndSendReminderEmails() {
                   + '清掃詳細: ' + detailLink + '\n\n'
                   + '早めに清掃スタッフの手配をお願いします。';
               var _ch_undecided = getNotifyChannel_('スタッフ未決定リマインド');
-              Logger.log('[DEBUG-CH] 送信判定: CO=' + checkoutDateStr + ' email=' + _ch_undecided.email + ' line=' + _ch_undecided.line);
-              if (_ch_undecided.email) { Logger.log('[DEBUG-CH] → メール送信実行'); GmailApp.sendEmail(ownerEmail, subject, body); } else { Logger.log('[DEBUG-CH] → メール送信スキップ（チャンネル設定）'); }
-              if (_ch_undecided.line) { try { Logger.log('[DEBUG-CH] → LINE送信実行'); sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) { Logger.log('[DEBUG-CH] LINE送信エラー: ' + lineErr.toString()); } } else { Logger.log('[DEBUG-CH] → LINE送信スキップ（チャンネル設定）'); }
+              if (_ch_undecided.email) GmailApp.sendEmail(ownerEmail, subject, body);
+              if (_ch_undecided.line) { try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) { Logger.log('未決定リマインド LINE送信エラー: ' + lineErr.toString()); } }
               newSent.push(remIdx);
             } catch (mailErr) {
               Logger.log('reminderEmail error: ' + mailErr.toString());

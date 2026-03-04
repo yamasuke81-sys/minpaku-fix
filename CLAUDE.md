@@ -107,8 +107,10 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### フロントエンド重複排除マージ（2026-02-28修正済み）
 同一日付の予約をマージする際、プレースホルダ名（Not available等）より実名を優先するよう修正。
 
-### チャンネル設定（LINE/メール）のチェック漏れ（未修正）
-予約キャンセル通知の`cancelBookingFromICal_`(1904行)で、オーナーへのメール送信が`_ch_cancel.email`をチェックせず`isEmailNotifyEnabled_`のみで判定。LINEのみに設定してもオーナーにメールが届く。請求書要請のテスト送信(4577行)も同様にチャンネル未チェック。
+### チャンネル設定（LINE/メール）のチェック漏れ（1箇所未修正）
+予約キャンセル通知の`cancelBookingFromICal_`(1904行付近)で、オーナーへのメール送信が`_ch_cancel.email`をチェックせず`isEmailNotifyEnabled_`のみで判定。LINEのみに設定してもオーナーにメールが届く。
+- ~~請求書要請のテスト送信(4577行)も同様にチャンネル未チェック~~ → セッション8で精査し、請求書要請は正常と確認済み
+- セッション8で全13通知を精査した結果、チェック漏れはcancelBookingFromICal_の1箇所のみ
 
 ### isEmailNotifyEnabled_ と getNotifyChannel_ の二重構造
 旧来の`isEmailNotifyEnabled_(sheetKey)`は各通知のON/OFFトグル。セッション5で追加した`getNotifyChannel_(notifyKey)`はメール/LINE/両方の選択。両方が混在しており、一部の関数で片方しかチェックしていない。全通知関数で統一が必要。
@@ -166,23 +168,53 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 6. **LINE通知機能追加**: LINE Messaging API経由でグループにメッセージ送信する機能を実装。メール通知と同タイミング・同内容でLINEグループにも送信。設定タブに「LINE通知」サブタブ追加（ON/OFF・チャネルアクセストークン・グループID・テスト送信）。募集設定シートに`LINE通知有効`・`LINEチャネルアクセストークン`・`LINEグループID`を保存
 
 ## 次回やること（優先度順）
-1. **[高]** 予約キャンセル通知のオーナーメールにチャンネルチェック追加（Code.gs 1904行、`_ch_cancel.email`チェック漏れ）
-2. **[高]** iCal同期時に募集開始通知を自動送信する機能追加（`autoSyncFromICal`内で`notifyStaffForRecruitment`を呼ぶ）
-3. **[高]** 請求書要請の配信日デバッグ情報確認後、デバッグコード削除
-4. **[中]** 請求書要請のLINEメッセージをメールと同内容にする（現状サマリーのみ、Code.gs 4617行）
-5. **[中]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
-6. **[中]** Airbnb iCal URLの再取得（HTTP 500 はURL期限切れの可能性大）
-7. **[中]** 残りの `getLastRow()` off-by-one 修正（約50箇所）
-8. **[低]** 「募集」シートの重複エントリクリーンアップ（必要に応じて）
+1. **[高]** デバッグコード削除 — セッション8で追加した募集リマインド・チャンネル診断・checkAndSendReminderEmailsのデバッグログを削除（動作確認完了後）
+2. **[高]** 予約キャンセル通知のオーナーメールにチャンネルチェック追加（Code.gs cancelBookingFromICal_ 1904行付近、`_ch_cancel.email`チェック漏れ — 残り1箇所のみ）
+3. **[高]** iCal同期時に募集開始通知を自動送信する機能追加（`autoSyncFromICal`内で`notifyStaffForRecruitment`を呼ぶ）
+4. **[高]** 請求書要請の配信日デバッグ情報確認後、デバッグコード削除（invoiceRequestDebug表示欄）
+5. **[中]** 請求書要請のLINEメッセージをメールと同内容にする（現状サマリーのみ、Code.gs 4617行付近）
+6. **[中]** 新規通知タブのテンプレート編集機能を実装（予約キャンセル、出勤キャンセル要望、キャンセル承認/却下、請求書送信、清掃完了）
+7. **[中]** Airbnb iCal URLの再取得（HTTP 500 はURL期限切れの可能性大）
+8. **[中]** 残りの `getLastRow()` off-by-one 修正（約50箇所）
+9. **[低]** 「募集」シートの重複エントリクリーンアップ（必要に応じて）
 
 ## 現在のセッション状態
-- **ブランチ**: `claude/verify-staff-response-display-msaN6`（`bvHjT` ブランチをマージ済み）
-- **前チャットの作業ブランチ**: `claude/verify-staff-response-display-bvHjT`（最新コミット: `68752a5`）
-- **Code.gs行数**: 10,507行（ルール8の検証用）
-- **進行中タスク**: チャンネルチェック漏れ修正 + iCal同期自動通知実装
-- **デプロイ待ち**: あり（v0302m — 配信時刻Date型バグ修正）
-- **デバッグコード残存**: 請求書要請タブに `invoiceRequestDebug` 表示欄あり（確認後削除予定）
-- **セッション7で判明した未修正バグ**: チャンネルチェック漏れ2箇所（既知の注意点セクション参照）
+- **ブランチ**: `claude/verify-staff-response-display-msaN6`
+- **最新コミット**: `86c80b2`
+- **Code.gs行数**: 10,715行（ルール8の検証用）
+- **index.html行数**: 9,558行
+- **進行中タスク**: 募集リマインドのデバッグ→修正が完了、チャンネルチェック精査完了
+- **デプロイ済み**: v0304i（checkAndSendReminderEmailsデバッグログ追加）
+- **デバッグコード残存**: 複数箇所（下記セッション8詳細参照）
+- **未修正バグ**: cancelBookingFromICal_のチャンネルチェック漏れ1箇所のみ
+
+## 2026-03-04（セッション8）修正内容
+1. **募集リマインドのデバッグ→修正サイクル**: `checkAndSendReminders`が募集リマインドを送信しない問題を調査。デバッグログ追加→原因特定→修正の3ステップで対応
+2. **募集リマインド3修正（v0304e）**: (a) `reminderDate`がDate型の場合のフォーマット対応、(b) 過去エントリ（CO < 今日）のスキップ、(c) 重複募集エントリのクリーンアップ関数`cleanupDuplicateRecruitments`追加
+3. **チャンネルチェック全13通知精査**: `diagnoseNotifyChannels`関数で全通知のチャンネル設定を診断。結果: cancelBookingFromICal_の1箇所のみチェック漏れ（請求書要請テスト送信は正常と確認）
+4. **checkAndSendReminderEmailsにデバッグログ追加（v0304i）**: チャンネルチェック結果・重複防止スキップのログを追加。手動実行で`email=false line=true`が正しく返されることを確認
+
+## 2026-03-04（セッション8）コミット履歴（コミットハッシュ付き）
+| コミット | 内容 |
+|---|---|
+| `734f0e9` | debug: v0304b 募集リマインドのデバッグログ追加（日付型・テンプレート値・チャンネル設定） |
+| `a69a706` | debug: v0304c 募集リマインドのループカウンター+募集設定シート全行ダンプ追加 |
+| `3115ee2` | debug: v0304d テンプレート・チャンネルのログをループ外に追加 |
+| `0134a64` | fix: v0304e 募集リマインド3修正 — 日付フォーマット+過去エントリスキップ+重複クリーンアップ関数 |
+| `3d85778` | debug: v0304f 募集リマインドのチャンネル・テンプレート診断ログ追加 |
+| `f49bc3e` | debug: v0304g getRecruitmentSettings返値+requireOwner診断ログ追加 |
+| `25f8ae3` | debug: v0304h diagnoseNotifyChannelsにLogger.log出力追加 |
+| `86c80b2` | debug: v0304i checkAndSendReminderEmailsにチャンネルチェックのデバッグログ追加 |
+
+### 変更ファイルと箇所（セッション8）
+- **Code.gs**: `checkAndSendReminders`にデバッグログ多数追加、`reminderDate`のDate型フォーマット対応、過去エントリスキップ追加、`cleanupDuplicateRecruitments`関数追加、`diagnoseNotifyChannels`にLogger.log追加、`checkAndSendReminderEmails`にチャンネルチェックデバッグログ追加
+- **index.html**: バージョンバッジ v0304a → v0304i
+
+### デバッグコード残存箇所（セッション8）
+- `checkAndSendReminders`: [DEBUG-CH], [DEBUG-REMIND] ログ多数（v0304b〜g で追加）
+- `checkAndSendReminderEmails`: [DEBUG-CH] ログ（v0304i で追加）
+- `diagnoseNotifyChannels`: Logger.log出力（v0304h で追加）— この関数自体が診断用なので残してもOK
+- 請求書要請タブ: `invoiceRequestDebug` 表示欄（セッション7で追加、未確認）
 
 ## 2026-03-02（セッション7）修正内容
 1. **請求書要請テスト送信のテンプレート対応**: `sendTestNotification`の請求書要請caseがハードコードだったのを、`INVOICE_REQ_KEYS_`でシートから件名・本文テンプレートを読み込み+プレースホルダー置換するよう修正。全13通知のテスト送信vs実送信のテンプレートキー突き合わせ調査を実施

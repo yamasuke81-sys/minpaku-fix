@@ -9046,13 +9046,15 @@ function getReminderEmailSettings() {
     while (reminders.length < 5) {
       reminders.push({ daysBefore: reminders.length === 0 ? 7 : 0, time: '09:00', enabled: false });
     }
+    var periodicEnabled = String(settings['定期リマインド有効'] || 'yes');
     var immediateNotify = String(settings['即時通知有効'] || 'yes');
     var reminderSubject = String(settings['リマインド件名'] || '');
     var reminderBody = String(settings['リマインド本文'] || '');
     var immediateSubject = String(settings['即時リマインド件名'] || '');
     var immediateBody = String(settings['即時リマインド本文'] || '');
     return JSON.stringify({
-      success: true, reminders: reminders, immediateNotify: immediateNotify,
+      success: true, reminders: reminders, periodicEnabled: periodicEnabled,
+      immediateNotify: immediateNotify,
       reminderSubject: reminderSubject, reminderBody: reminderBody,
       immediateSubject: immediateSubject, immediateBody: immediateBody
     });
@@ -9064,7 +9066,7 @@ function getReminderEmailSettings() {
 /**
  * リマインドメール設定を保存
  */
-function setReminderEmailSettings(reminders, immediateNotify, templates) {
+function setReminderEmailSettings(reminders, immediateNotify, templates, periodicEnabled) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
     ensureSheetsExist();
@@ -9081,7 +9083,8 @@ function setReminderEmailSettings(reminders, immediateNotify, templates) {
     // 設定キーと値のペアを一括処理
     var entries = [
       ['リマインドメール設定', JSON.stringify(reminders || [])],
-      ['即時通知有効', String(immediateNotify || 'yes')]
+      ['即時通知有効', String(immediateNotify || 'yes')],
+      ['定期リマインド有効', String(periodicEnabled || 'yes')]
     ];
     if (templates) {
       entries.push(['リマインド件名', String(templates.reminderSubject || '')]);
@@ -9243,6 +9246,8 @@ function checkAndSendReminderEmails() {
       var key = String(row[0] || '').trim();
       if (key) settingsMap[key] = row[1];
     });
+    // 定期リマインド全体ON/OFFチェック
+    if (String(settingsMap['定期リマインド有効'] || 'yes') === 'no') return;
     var reminders = [];
     try { reminders = JSON.parse(settingsMap['リマインドメール設定'] || '[]'); } catch (e) { return; }
     var enabledReminders = reminders.filter(function(r, idx) { return r && r.enabled && r.daysBefore > 0; });

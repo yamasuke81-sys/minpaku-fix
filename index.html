@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0304k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0304l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1424,6 +1424,10 @@
         </ul>
 
         <h6 class="fw-bold mt-3 mb-2" style="font-size:0.9rem;">定期リマインド</h6>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="periodicReminderEnabled">
+          <label class="form-check-label" for="periodicReminderEnabled"><strong>定期リマインドを有効にする</strong></label>
+        </div>
         <div class="mb-3">
           <label class="form-label small fw-bold">送信チャンネル</label>
           <select class="form-select form-select-sm notify-channel-select" id="chUndecidedRemind" style="max-width:180px;" data-notify-key="スタッフ未決定リマインド">
@@ -1485,12 +1489,11 @@
         </div>
         <hr class="my-3">
         <h6 class="fw-bold mb-2" style="font-size:0.9rem;">直前予約リマインド（即時）</h6>
-        <div class="mb-3">
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="reminderImmediate" checked>
-            <label class="form-check-label small" for="reminderImmediate">iCal取り込み時に1週間以内の予約があれば即時送信</label>
-          </div>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="reminderImmediate" checked>
+          <label class="form-check-label" for="reminderImmediate"><strong>直前予約リマインドを有効にする</strong></label>
         </div>
+        <p class="small text-muted mb-2">iCal取り込み時に1週間以内のチェックイン予約があれば即時送信します。</p>
         <div class="mb-3">
           <label class="form-label small fw-bold">送信チャンネル</label>
           <select class="form-select form-select-sm notify-channel-select" id="chImmediateRemind" style="max-width:180px;" data-notify-key="直前予約リマインド">
@@ -8394,6 +8397,8 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
+              var perEl = document.getElementById('periodicReminderEnabled');
+              if (perEl) perEl.checked = (r.periodicEnabled !== 'no');
               var imEl = document.getElementById('reminderImmediate');
               if (imEl) imEl.checked = (r.immediateNotify !== 'no');
               var entries = document.querySelectorAll('.reminder-entry');
@@ -8429,6 +8434,7 @@
           });
         });
         var immediateNotify = document.getElementById('reminderImmediate').checked ? 'yes' : 'no';
+        var periodicEnabled = document.getElementById('periodicReminderEnabled').checked ? 'yes' : 'no';
         var templates = {
           reminderSubject: document.getElementById('reminderSubject').value,
           reminderBody: document.getElementById('reminderBody').value,
@@ -8447,7 +8453,7 @@
           btn.disabled = false;
           btn.textContent = origText;
           alert('保存に失敗しました。');
-        }).setReminderEmailSettings(reminders, immediateNotify, templates);
+        }).setReminderEmailSettings(reminders, immediateNotify, templates, periodicEnabled);
       });
 
       document.getElementById('btnSetupTriggers').addEventListener('click', function() {

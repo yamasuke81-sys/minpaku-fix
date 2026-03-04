@@ -8895,13 +8895,19 @@ function checkAndSendReminders() {
           if (to.length) {
             var recruitStaffUrl = getStaffAppUrl_();
             var recruitDateStr = String(rows[i][0] || '').trim();
+            Logger.log('[DEBUG-REMIND] recruitDate raw=' + rows[i][0] + ' isDate=' + (rows[i][0] instanceof Date) + ' recruitDateStr=' + recruitDateStr);
+            Logger.log('[DEBUG-REMIND] settings.recruitReminderSubject=[' + (res.settings.recruitReminderSubject || '') + ']');
+            Logger.log('[DEBUG-REMIND] settings.recruitReminderBody=[' + (res.settings.recruitReminderBody || '') + ']');
             var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateStr) : '';
             var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '【民泊】清掃スタッフ募集のリマインド: {チェックアウト}';
             var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名\n\nWebアプリで回答: {回答URL}';
+            Logger.log('[DEBUG-REMIND] subjTpl=[' + subjTpl + ']');
+            Logger.log('[DEBUG-REMIND] bodyTpl=[' + bodyTpl + ']');
             var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
+            Logger.log('[DEBUG-REMIND] final subj=[' + subj + ']');
             var _ch_remind = getNotifyChannel_('募集リマインド');
-            Logger.log('募集リマインド チャンネル: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' to=' + to.join(','));
+            Logger.log('[DEBUG-REMIND] チャンネル: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' to=' + to.join(','));
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
             if (_ch_remind.line) { try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
           }

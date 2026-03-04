@@ -8861,7 +8861,20 @@ function checkAndSendReminders() {
     const today = new Date();
     var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
     var props = PropertiesService.getScriptProperties();
+    var recruitingCount = 0;
+    for (var ri = 0; ri < rows.length; ri++) { if (String(rows[ri][3]).trim() === '募集中') recruitingCount++; }
+    Logger.log('[DEBUG-REMIND] 募集中エントリ数=' + recruitingCount + ' 全行数=' + rows.length);
+    // 募集設定シートの全行をダンプ（チャンネルキー・テンプレートキー確認用）
+    try {
+      var _dbgSettingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+      if (_dbgSettingsSheet && _dbgSettingsSheet.getLastRow() >= 2) {
+        var _dbgRows = _dbgSettingsSheet.getRange(2, 1, _dbgSettingsSheet.getLastRow() - 1, 2).getValues();
+        Logger.log('[DEBUG-REMIND] 募集設定シート全行=' + JSON.stringify(_dbgRows));
+      }
+    } catch (_dbgE) { Logger.log('[DEBUG-REMIND] 設定シート読込エラー: ' + _dbgE); }
+    var _remindSentCount = 0;
     for (var i = 0; i < rows.length; i++) {
+      Logger.log('[DEBUG-REMIND] row=' + (i+2) + ' status=[' + String(rows[i][3]).trim() + '] date=' + rows[i][0] + ' notifyMethod=[' + String(rows[i][8] || '').trim() + ']');
       if (String(rows[i][3]).trim() !== '募集中') continue;
       if ((String(rows[i][8] || '').trim() || 'メール') === 'LINE') continue;
       const lastRemind = rows[i][5] ? new Date(rows[i][5]) : null;
@@ -8908,6 +8921,8 @@ function checkAndSendReminders() {
             Logger.log('[DEBUG-REMIND] final subj=[' + subj + ']');
             var _ch_remind = getNotifyChannel_('募集リマインド');
             Logger.log('[DEBUG-REMIND] チャンネル: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' to=' + to.join(','));
+            _remindSentCount++;
+            Logger.log('[DEBUG-REMIND] 送信#' + _remindSentCount + ' row=' + rowIndex + ' propKey=' + propKey);
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
             if (_ch_remind.line) { try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
           }
@@ -8915,6 +8930,7 @@ function checkAndSendReminders() {
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
       }
     }
+    Logger.log('[DEBUG-REMIND] 完了: 送信数=' + _remindSentCount);
   } catch (e) {
     Logger.log('checkAndSendReminders: ' + e.toString());
   } finally {

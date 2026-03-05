@@ -7697,7 +7697,6 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     var sendResult = '（送信先なし）';
     var ownerSheet = ss.getSheetByName(SHEET_OWNER);
     var ownerEmail = ownerSheet ? String(ownerSheet.getRange(2, 1).getValue() || '').trim() : '';
-    Logger.log('[DEBUG mail] ownerSheet存在=' + !!ownerSheet + ', ownerEmail="' + ownerEmail + '"');
     if (ownerEmail && /@/.test(ownerEmail)) {
       var subject = '【請求書】' + staffName + ' - ' + ymText;
       var bodyText =
@@ -7708,9 +7707,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         'PDFを添付しておりますのでご確認ください。\n' +
         '請求書はGoogleドライブにも保存されています。\n' +
         'PDF: ' + pdfFile.getUrl() + '\n';
-      Logger.log('[DEBUG mail] subject="' + subject + '", pdfBlobSize=' + (pdfBlob ? pdfBlob.getBytes().length : 'null'));
       var emailNotifyEnabled = isEmailNotifyEnabled_('請求書送信通知有効');
-      Logger.log('[DEBUG mail] isEmailNotifyEnabled_("請求書送信通知有効")=' + emailNotifyEnabled);
       try {
         var _ch_invoice = getNotifyChannel_('請求書送信');
         var invoiceLineText = subject + '\n\n' + bodyText;
@@ -7738,10 +7735,7 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         }
       } catch (mailErr) {
         sendResult = 'メール送信スキップ（PDF作成は成功）: ' + String(mailErr);
-        Logger.log('[DEBUG mail] メール送信エラー詳細: ' + mailErr + ' / stack: ' + (mailErr.stack || 'N/A'));
       }
-    } else {
-      Logger.log('[DEBUG mail] 送信先なし: ownerEmail="' + ownerEmail + '" → メール送信スキップ');
     }
 
     // --- 履歴に記録 ---

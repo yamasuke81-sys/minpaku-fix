@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0305l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0305m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2738,16 +2738,16 @@
             var isDecided = isConfirmed || !!bookStaff || !!recStaff;
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             if (isCancelled) cleaningClasses.push('fc-event-cancelled');
-            var curStaff = (window.currentUserName || '').trim().toLowerCase();
+            var curStaff = normalizeName_(window.currentUserName);
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
             var volunteers = rec.volunteers || [];
-            var selectedNames = (recStaff || bookStaff || '').split(/[,、]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+            var selectedNames = (recStaff || bookStaff || '').split(/[,、]/).map(function(s) { return normalizeName_(s); }).filter(Boolean);
             var isVolunteeredByMe = curStaff && volunteers.some(function(v) {
-              var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
+              var isMe = normalizeName_(v.staffName) === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
               return isMe && v.response && v.response !== '未回答' && v.response !== '×';
             });
             var isRejectedByMe = curStaff && volunteers.some(function(v) {
-              var isMe = (v.staffName || '').trim().toLowerCase() === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
+              var isMe = normalizeName_(v.staffName) === curStaff || (v.email || '').trim().toLowerCase() === curEmail;
               return isMe && v.response === '×';
             });
             var isSelectedByMe = curStaff && selectedNames.some(function(s) { return s === curStaff; });
@@ -3378,21 +3378,20 @@
               var cancelBtnArea = document.getElementById('eventModalCancelBtnArea');
               if (r.success && r.recruitRowIndex && resolvedStaff && cancelBtnArea) {
                 var assignedStaff = resolvedStaff;
-                var curName2 = (window.currentUserName || '').trim();
+                var curName2 = normalizeName_(window.currentUserName);
                 var curEmail2 = (window.currentUserEmail || '').trim().toLowerCase();
-                var selectedParts = (assignedStaff || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
+                var selectedParts = (assignedStaff || '').split(/[,、]/).map(function(s) { return normalizeName_(s); }).filter(Boolean);
                 var isSelected = selectedParts.some(function(part) {
-                  var p = part.toLowerCase();
-                  return (curName2 && curName2.toLowerCase() === p) || (curEmail2 && p.indexOf('@') >= 0 && p === curEmail2);
+                  return (curName2 && part === curName2) || (curEmail2 && part.indexOf('@') >= 0 && part === curEmail2);
                 });
                 if (isSelected) {
                   // キャンセル否認チェック
                   var wasRejected = r.cancelRejected && r.cancelRejected.some(function(cr) {
-                    return (curName2 && cr.staffName === curName2) || (curEmail2 && cr.email === curEmail2);
+                    return (curName2 && normalizeName_(cr.staffName) === curName2) || (curEmail2 && (cr.email || '').trim().toLowerCase() === curEmail2);
                   });
                   // 既にキャンセル申請済みかチェック
                   var alreadyRequested = r.cancelRequested && r.cancelRequested.some(function(cr) {
-                    return (curName2 && cr.staffName === curName2) || (curEmail2 && cr.email === curEmail2);
+                    return (curName2 && normalizeName_(cr.staffName) === curName2) || (curEmail2 && (cr.email || '').trim().toLowerCase() === curEmail2);
                   });
                   if (wasRejected) {
                     // 否認通知 + 確認ボタン → 確認後にキャンセル申請ボタン復活
@@ -3474,13 +3473,13 @@
               }
               var isEventConfirmed = r.success && r.recruitRowIndex && (r.status === 'スタッフ確定済み' || r.status === '選定済');
               if (r.success && r.recruitRowIndex && !staffAssigned) {
-                var curName = (window.currentUserName || '').trim().toLowerCase();
+                var curName = normalizeName_(window.currentUserName);
                 var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
                 var myResponse = '';
                 var myMemo = '';
                 if (r.volunteers) {
                   r.volunteers.forEach(function(v) {
-                    if ((v.staffName || '').trim().toLowerCase() === curName || (v.email || '').trim().toLowerCase() === curEmail) {
+                    if (normalizeName_(v.staffName) === curName || (v.email || '').trim().toLowerCase() === curEmail) {
                       myResponse = v.response || '未回答';
                       myMemo = v.memo || '';
                     }
@@ -4172,6 +4171,11 @@
           _fixDialogBackdrop(modal);
           setTimeout(function() { input.focus(); }, 300);
         });
+      }
+
+      // 名前比較用の正規化（全角スペース→半角、連続スペース除去、trim、lowercase）
+      function normalizeName_(s) {
+        return (s || '').replace(/\u3000/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
       }
 
       function escapeHtml(s) {
@@ -8113,6 +8117,7 @@
           var notifyKey = this.getAttribute('data-notify-key');
           if (!notifyKey || this.disabled) return;
           var sendTarget = sel.value || 'owner';
+          if (sendTarget === 'staff' && !confirm('スタッフ全員にテストメールを送信します。よろしいですか？')) return;
           this.disabled = true;
           var origText = this.textContent;
           this.textContent = '送信中...';
@@ -8777,11 +8782,67 @@
         }).selectStaffForRecruitment(row, staff);
       });
 
+      // 未保存変更の追跡
+      var _unsavedTabs = {};
+      function markTabDirty_(tabKey) { _unsavedTabs[tabKey] = true; }
+      function clearTabDirty_(tabKey) { delete _unsavedTabs[tabKey]; }
+      function hasUnsavedChanges_() { return Object.keys(_unsavedTabs).length > 0; }
+      // saveボタンがあるタブとそのフォーム要素のマッピング
+      var _saveButtonTabMap = {
+        recruitSettings: 'settingsRecruitSettings',
+        reminderEmail: 'settingsReminderEmail',
+        rosterReminder: 'settingsRosterReminder',
+        invoiceRequest: 'settingsInvoiceRequest',
+        confirmTemplate: 'settingsConfirmTemplate',
+        lineId: 'settingsLineId',
+        sync: 'settingsSync'
+      };
+      // フォーム入力変更を監視してダーティフラグを設定
+      document.addEventListener('input', function(e) {
+        var el = e.target;
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+          Object.keys(_saveButtonTabMap).forEach(function(tabKey) {
+            var panel = document.getElementById(_saveButtonTabMap[tabKey]);
+            if (panel && panel.contains(el) && !el.classList.contains('notify-target-cb') && !el.classList.contains('test-send-target')) {
+              markTabDirty_(tabKey);
+            }
+          });
+        }
+      });
+      // selectのchangeも監視
+      document.addEventListener('change', function(e) {
+        var el = e.target;
+        if (el.tagName === 'SELECT' && !el.classList.contains('notify-target-cb') && !el.classList.contains('test-send-target')) {
+          Object.keys(_saveButtonTabMap).forEach(function(tabKey) {
+            var panel = document.getElementById(_saveButtonTabMap[tabKey]);
+            if (panel && panel.contains(el)) markTabDirty_(tabKey);
+          });
+        }
+      });
+
+      // 保存ボタンクリック時にダーティフラグクリア（共通）
+      var _saveBtnIdToTab = {
+        btnSaveRecruitSettings: 'recruitSettings',
+        btnSaveReminderEmail: 'reminderEmail',
+        btnSaveRosterReminder: 'rosterReminder',
+        btnSaveInvoiceRequest: 'invoiceRequest',
+        btnSaveConfirmTemplate: 'confirmTemplate',
+        btnSaveLineNotify: 'lineId',
+        btnSaveSyncForm: 'sync',
+        btnSaveAutoSync: 'sync'
+      };
+      Object.keys(_saveBtnIdToTab).forEach(function(btnId) {
+        var btn = document.getElementById(btnId);
+        if (btn) btn.addEventListener('click', function() { clearTabDirty_(_saveBtnIdToTab[btnId]); });
+      });
+
       // 設定サブタブ
       document.querySelectorAll('[data-subtab]').forEach(function(a) {
         a.addEventListener('click', function(e) {
           e.preventDefault();
           var t = this.getAttribute('data-subtab');
+          if (hasUnsavedChanges_() && !confirm('未保存の変更があります。破棄してタブを切り替えますか？')) return;
+          _unsavedTabs = {};
           document.querySelectorAll('[data-subtab]').forEach(function(l) { l.classList.remove('active'); });
           this.classList.add('active');
           // 全設定パネルのID→subtab値マッピング

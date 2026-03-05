@@ -2617,6 +2617,10 @@ function syncFromICal() {
       for (var ei = 0; ei < events.length; ei++) {
         var ev = events[ei];
         var key = ev.checkIn + '|' + ev.checkOut;
+        // [DEBUG-SYNC] 4月のエントリは重複判定結果を詳細ログ
+        if (ev.checkIn && ev.checkIn.indexOf('2026-04') === 0) {
+          Logger.log('[DEBUG-SYNC] CHECK APR: CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" existingMatch=' + !!existingPairs[key]);
+        }
         if (existingPairs[key]) {
           var updateRowNum = existingRowByKey[key];
           if (updateRowNum) {
@@ -2642,7 +2646,10 @@ function syncFromICal() {
             }
           }
         }
-        if (overlaps) continue;
+        if (overlaps) {
+          if (ev.checkIn && ev.checkIn.indexOf('2026-04') === 0) Logger.log('[DEBUG-SYNC] OVERLAP SKIP APR: CI=' + ev.checkIn + ' CO=' + ev.checkOut);
+          continue;
+        }
         existingPairs[key] = true;
 
         var formLastCol = formSheet.getLastColumn();
@@ -2655,6 +2662,8 @@ function syncFromICal() {
         if (colMap.icalGuestCount >= 0) rowData[colMap.icalGuestCount] = ev.guestCount || '';
 
         formSheet.getRange(nextRow, 1, 1, formLastCol).setValues([rowData]);
+        // [DEBUG-SYNC] 追加された予約の詳細をログ
+        Logger.log('[DEBUG-SYNC] ADDED: platform=' + ev.platform + ' CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" row=' + nextRow);
         // 自動で清掃募集を開始
         try {
           var coKey = ev.checkOut;
@@ -2705,12 +2714,16 @@ function syncFromICal() {
           var isPast = coDate && coDate < todaySync;
           // 明示的キャンセル（STATUS:CANCELLEDまたはSUMMARYに"cancel"） → 即キャンセル
           if (cancelledPairs[pairKey] && !isPast && !cancelledVal) {
+            // [DEBUG-SYNC] キャンセル検出をログ
+            if (ciKey && ciKey.indexOf('2026-04') === 0) Logger.log('[DEBUG-SYNC] CANCEL(explicit) APR: CI=' + ciKey + ' CO=' + coKey + ' row=' + (ri + 2));
             if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
               platformCancelled++; removed++;
             }
           } else if (!validPairs[pairKey] && !cancelledPairs[pairKey] && !isPast) {
             // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
             if (!cancelledVal) {
+              // [DEBUG-SYNC] フィードから消えた予約のキャンセルをログ
+              if (ciKey && ciKey.indexOf('2026-04') === 0) Logger.log('[DEBUG-SYNC] CANCEL(disappeared) APR: CI=' + ciKey + ' CO=' + coKey + ' row=' + (ri + 2) + ' inValidPairs=' + !!validPairs[pairKey] + ' inCancelledPairs=' + !!cancelledPairs[pairKey]);
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;
               }
@@ -2738,8 +2751,22 @@ function syncFromICal() {
       syncSheet.getRange(si + 2, 4).setValue(statusStr);
       if (platformAdded > 0) {
         var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
-        addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が追加されました（チェックイン: ' + ciList + '）');
+        addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました（チェックイン: ' + ciList + '）');
       }
+      // [DEBUG-SYNC] 追加・キャンセルの有無にかかわらず、iCalフィード全体の概要をログ
+      Logger.log('[DEBUG-SYNC] ' + platformName + ': events(pass filter)=' + events.length + ' added=' + platformAdded + ' cancelled=' + platformCancelled + ' existingPairs=' + Object.keys(existingPairs).length + ' allDatePairs=' + Object.keys(validPairs).length);
+      // [DEBUG-SYNC] 4月のエントリを特別に記録（幽霊予約調査用）
+      events.forEach(function(ev) {
+        if (ev.checkIn && ev.checkIn.indexOf('2026-04') === 0) {
+          Logger.log('[DEBUG-SYNC] APR entry: CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" platform=' + ev.platform);
+        }
+      });
+      // [DEBUG-SYNC] allDatePairs内の4月エントリも記録
+      Object.keys(validPairs).forEach(function(pair) {
+        if (pair.indexOf('2026-04') >= 0) {
+          Logger.log('[DEBUG-SYNC] APR in allDatePairs: ' + pair);
+        }
+      });
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length, skipReasons: parseResult.skipReasons });
     }
 

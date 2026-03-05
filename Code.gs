@@ -4766,13 +4766,17 @@ function sendTestNotification(notifyKey, sendTarget) {
     var emailTo = (effectiveTarget === 'staff' && staffEmails.length > 0) ? staffEmails.join(',') : ownerEmail;
     var targetLabel = (effectiveTarget === 'staff') ? 'スタッフ全員' : 'オーナー';
 
-    Logger.log('[TEST-NOTIFY] notifyKey=' + notifyKey + ' sendTarget=' + effectiveTarget + ' lineTarget=' + lineTarget + ' emailTo=' + emailTo + ' ch.email=' + ch.email + ' ch.line=' + ch.line);
+    // 5フラグ形式から送信先に応じた有効フラグを算出
+    var shouldEmail = (effectiveTarget === 'staff') ? ch.staff_email : ch.owner_email;
+    var shouldLine = (effectiveTarget === 'staff') ? (ch.group_line || ch.staff_line) : ch.owner_line;
+
+    Logger.log('[TEST-NOTIFY] notifyKey=' + notifyKey + ' sendTarget=' + effectiveTarget + ' lineTarget=' + lineTarget + ' emailTo=' + emailTo + ' shouldEmail=' + shouldEmail + ' shouldLine=' + shouldLine);
 
     // 送信結果を記録
     var results = { email: null, line: null };
 
     // メール送信
-    if (ch.email) {
+    if (shouldEmail) {
       try {
         GmailApp.sendEmail(emailTo, subject, body, { name: '通知テスト送信' });
         results.email = { success: true, to: emailTo };
@@ -4782,7 +4786,7 @@ function sendTestNotification(notifyKey, sendTarget) {
     }
 
     // LINE送信
-    if (ch.line) {
+    if (shouldLine) {
       try {
         var lineResult = sendLineMessage_(subject + '\n\n' + body, true, lineTarget);
         results.line = lineResult || { ok: false, reason: '応答なし' };
@@ -4793,21 +4797,21 @@ function sendTestNotification(notifyKey, sendTarget) {
     }
 
     // 結果をまとめる
-    var emailOk = !ch.email || (results.email && results.email.success);
-    var lineOk = !ch.line || (results.line && results.line.ok);
+    var emailOk = !shouldEmail || (results.email && results.email.success);
+    var lineOk = !shouldLine || (results.line && results.line.ok);
     var msgs = [];
     msgs.push('送信先: ' + targetLabel);
-    if (ch.email) {
+    if (shouldEmail) {
       var emailLabel = (effectiveTarget === 'staff' && staffEmails.length > 0)
         ? staffEmails.length + '名のスタッフに送信済み'
         : ownerEmail + ' に送信済み';
       msgs.push('メール: ' + (results.email && results.email.success ? emailLabel : '失敗'));
     }
-    if (ch.line) {
+    if (shouldLine) {
       var lineLabel = lineTarget === 'owner' ? 'オーナー個人LINE' : 'グループLINE';
       msgs.push('LINE(' + lineLabel + '): ' + (results.line && results.line.ok ? '送信済み' : '失敗'));
     }
-    if (!ch.email && !ch.line) msgs.push('送信チャンネルが未設定です');
+    if (!shouldEmail && !shouldLine) msgs.push('送信チャンネルが未設定です');
 
     return JSON.stringify({
       success: emailOk && lineOk,
@@ -5146,7 +5150,7 @@ function sendInvoiceRequestEmails(testRecipient) {
     var errors = [];
     staffRows.forEach(function(row) {
       var name = String(row[0] || '').trim();
-      var email = String(row[1] || '').trim();
+      var email = String(row[2] || '').trim(); // C列=メール（row[1]はB列=住所なので注意）
       if (!email || !/@/.test(email)) return;
       var body = bodyTpl
         .replace(/\{スタッフ名\}/g, name || 'スタッフ')

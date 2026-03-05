@@ -4840,6 +4840,20 @@ function sendTestNotification(notifyKey, sendTarget) {
     }
     if (!shouldEmail && !shouldLine) msgs.push('送信チャンネルが未設定です');
 
+    // [DEBUG-NOTIFY] チャンネル設定の詳細をレスポンスに含める
+    var debugFlags = 'チャンネル設定(' + notifyKey + '): ' +
+      'owner_email=' + !!ch.owner_email + ', owner_line=' + !!ch.owner_line +
+      ', staff_email=' + !!ch.staff_email + ', staff_line=' + !!ch.staff_line +
+      ', group_line=' + !!ch.group_line;
+    var debugLogic = '判定: effectiveTarget=' + effectiveTarget +
+      ' → shouldEmail=' + shouldEmail + '(' + (effectiveTarget === 'staff' ? 'staff_email' : 'owner_email') + ')' +
+      ', shouldLine=' + shouldLine + '(' + (effectiveTarget === 'staff' ? 'group_line||staff_line' : 'owner_line') + ')';
+    msgs.push('\n--- デバッグ ---');
+    msgs.push(debugFlags);
+    msgs.push(debugLogic);
+    Logger.log('[DEBUG-NOTIFY] ' + debugFlags);
+    Logger.log('[DEBUG-NOTIFY] ' + debugLogic);
+
     return JSON.stringify({
       success: emailOk && lineOk,
       message: msgs.join('\n'),

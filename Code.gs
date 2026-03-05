@@ -214,6 +214,10 @@ function doGet(e) {
     PropertiesService.getScriptProperties().setProperty('GATEWAY_URL', String(url).trim());
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
+  // JSON API: ウィジェット向けデータ取得
+  if (params.type === 'json') {
+    return handleJsonApi_(params);
+  }
   // オーナーURL取得アクション（deploy-all.jsがデプロイ時にユーザー保存URLを確認するため）
   if (action === 'getOwnerBaseUrl') {
     var ownerUrl = '';
@@ -279,6 +283,192 @@ function doGet(e) {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// ============================================================
+// JSON API（ウィジェット向け）
+// ============================================================
+
+/**
+ * JSON APIのリクエストを処理する
+ * ?type=json&token=XXXX でアクセスされた場合に呼ばれる
+ */
+function handleJsonApi_(params) {
+  // トークン認証
+  var storedToken = '';
+  try { storedToken = PropertiesService.getScriptProperties().getProperty('WIDGET_API_TOKEN') || ''; } catch(e) {}
+  if (!storedToken) {
+    return jsonResponse_({ error: 'API token not configured. Run setWidgetApiToken() first.' }, 403);
+  }
+  if (String(params.token || '') !== storedToken) {
+    return jsonResponse_({ error: 'Invalid token' }, 401);
+  }
+  try {
+    var data = buildWidgetData_();
+    return jsonResponse_(data, 200);
+  } catch(e) {
+    return jsonResponse_({ error: e.message || 'Internal error' }, 500);
+  }
+}
+
+/**
+ * JSON APIレスポンスを生成
+ */
+function jsonResponse_(obj, statusCode) {
+  obj._status = statusCode;
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * ウィジェット向けAPIトークンを設定する
+ * GASエディタのスクリプトエディタで1回だけ手動実行:
+ *   setWidgetApiToken('your-secret-token')
+ */
+function setWidgetApiToken(token) {
+  if (!token) throw new Error('トークンを引数に指定してください');
+  PropertiesService.getScriptProperties().setProperty('WIDGET_API_TOKEN', String(token));
+  Logger.log('Widget API token saved: ' + String(token).substring(0, 4) + '***');
+}
+
+/**
+ * ウィジェット向けデータを構築
+ */
+function buildWidgetData_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var today = new Date();
+  var todayStr = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+  // ── 予約データ読み込み ──
+  var formSheet = ss.getSheetByName(SHEET_NAME);
+  var nextCheckout = null;
+  var todayBookings = [];
+  var upcomingBookings = [];
+  if (formSheet && formSheet.getLastRow() >= 2) {
+    var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+    var colMap = buildColumnMap(headers);
+    if (colMap.checkIn < 0 || colMap.checkOut < 0) colMap = buildColumnMapFromSource_(headers);
+    var rows = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var ci = parseDate(row[colMap.checkIn]);
+      var co = parseDate(row[colMap.checkOut]);
+      // キャンセル済みはスキップ
+      if (colMap.cancelledAt >= 0 && row[colMap.cancelledAt]) continue;
+      var ciStr = ci ? toDateKeySafe_(ci) : '';
+      var coStr = co ? toDateKeySafe_(co) : '';
+      var guestName = colMap.guestName >= 0 ? String(row[colMap.guestName] || '').trim() : '';
+      var bookingSite = colMap.bookingSite >= 0 ? String(row[colMap.bookingSite] || '').trim() : '';
+      var cleaningStaff = colMap.cleaningStaff >= 0 ? String(row[colMap.cleaningStaff] || '').trim() : '';
+      // 今日チェックアウト = 今日清掃が必要
+      if (coStr === todayStr) {
+        todayBookings.push({ guestName: guestName, bookingSite: bookingSite, checkIn: ciStr, checkOut: coStr, cleaningStaff: cleaningStaff });
+      }
+      // 直近の未来チェックアウト（= 次の清掃日）
+      if (coStr > todayStr) {
+        if (!nextCheckout || coStr < nextCheckout.checkOut) {
+          nextCheckout = { guestName: guestName, bookingSite: bookingSite, checkIn: ciStr, checkOut: coStr, cleaningStaff: cleaningStaff };
+        }
+        // 7日以内の予約を返す
+        var coDt = parseDate(coStr);
+        if (coDt) {
+          var diffDays = Math.floor((coDt.getTime() - today.getTime()) / 86400000);
+          if (diffDays <= 7) {
+            upcomingBookings.push({ guestName: guestName, bookingSite: bookingSite, checkIn: ciStr, checkOut: coStr, cleaningStaff: cleaningStaff, daysUntilCheckout: diffDays });
+          }
+        }
+      }
+    }
+    // upcomingBookingsをチェックアウト日順にソート
+    upcomingBookings.sort(function(a, b) { return a.checkOut < b.checkOut ? -1 : (a.checkOut > b.checkOut ? 1 : 0); });
+  }
+
+  // ── 募集データ読み込み ──
+  var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
+  var volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
+  var activeRecruitments = [];
+  var totalVolunteers = 0;
+  if (recruitSheet && recruitSheet.getLastRow() >= 2) {
+    var rRows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, Math.max(recruitSheet.getLastColumn(), 8)).getValues();
+    // 立候補データ
+    var volByRid = {};
+    if (volSheet && volSheet.getLastRow() >= 2) {
+      var vRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, Math.max(volSheet.getLastColumn(), 7)).getValues();
+      for (var v = 0; v < vRows.length; v++) {
+        var rid = String(vRows[v][0] || '').trim();
+        var vStatus = normalizeVolStatus_(String(vRows[v][5] || '').trim());
+        if (rid && vStatus !== '不可') {
+          if (!volByRid[rid]) volByRid[rid] = 0;
+          volByRid[rid]++;
+        }
+      }
+    }
+    for (var r = 0; r < rRows.length; r++) {
+      var rDate = rRows[r][0];
+      var rDateStr = rDate instanceof Date ? toDateKeySafe_(rDate) : String(rDate || '').trim();
+      var rStatus = String(rRows[r][3] || '').trim();
+      var rStaff = String(rRows[r][4] || '').trim();
+      var rId = rDateStr + '_' + String(rRows[r][1] || '').trim();
+      // 過去の募集はスキップ
+      if (rDateStr < todayStr) continue;
+      var volCount = volByRid[rId] || 0;
+      totalVolunteers += volCount;
+      activeRecruitments.push({
+        date: rDateStr,
+        dateDisplay: formatDateWithDay_(rDateStr),
+        status: rStatus || '募集中',
+        assignedStaff: rStaff,
+        volunteerCount: volCount
+      });
+    }
+    activeRecruitments.sort(function(a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  }
+
+  // ── サマリーステータス生成 ──
+  var summary = buildWidgetSummary_(todayBookings, nextCheckout, activeRecruitments, totalVolunteers);
+
+  return {
+    success: true,
+    today: todayStr,
+    todayDisplay: formatDateWithDay_(todayStr),
+    todayCleaning: todayBookings.length > 0 ? {
+      count: todayBookings.length,
+      bookings: todayBookings
+    } : null,
+    nextCheckout: nextCheckout ? {
+      date: nextCheckout.checkOut,
+      dateDisplay: formatDateWithDay_(nextCheckout.checkOut),
+      guestName: nextCheckout.guestName,
+      cleaningStaff: nextCheckout.cleaningStaff || '未定'
+    } : null,
+    upcomingBookings: upcomingBookings,
+    recruitments: {
+      active: activeRecruitments,
+      totalVolunteers: totalVolunteers
+    },
+    summary: summary
+  };
+}
+
+/**
+ * ウィジェット向け一言サマリーを生成
+ */
+function buildWidgetSummary_(todayBookings, nextCheckout, recruitments, totalVol) {
+  var parts = [];
+  if (todayBookings.length > 0) {
+    var staffNames = todayBookings.map(function(b) { return b.cleaningStaff || '未定'; }).join(', ');
+    parts.push('本日清掃' + todayBookings.length + '件（' + staffNames + '）');
+  } else {
+    parts.push('本日清掃なし');
+  }
+  if (nextCheckout) {
+    parts.push('次回CO: ' + formatDateWithDay_(nextCheckout.checkOut));
+  }
+  var undecided = recruitments.filter(function(r) { return !r.assignedStaff; });
+  if (undecided.length > 0) {
+    parts.push('未決定' + undecided.length + '件（応募計' + totalVol + '名）');
+  }
+  return parts.join(' / ');
 }
 
 /**

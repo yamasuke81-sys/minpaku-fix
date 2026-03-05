@@ -4819,7 +4819,23 @@ function sendInvoiceRequestEmails(testRecipient) {
     });
     if (sentCount > 0 || !getNotifyChannel_('請求書要請').email) {
       var _ch_inv2 = getNotifyChannel_('請求書要請');
-      if (_ch_inv2.line) { Logger.log('[LINE-TARGET] 請求書要請サマリー: owner'); try { sendLineMessage_('請求書要請メールを' + sentCount + '名のスタッフに送信しました（' + ymText + '分）', false, 'owner'); } catch (lineErr) {} }
+      if (_ch_inv2.line) {
+        // グループに依頼内容を送信（スタッフ名は「スタッフの皆さま」で共通化）
+        var lineBody = bodyTpl
+          .replace(/\{スタッフ名\}/g, 'スタッフの皆さま')
+          .replace(/\{対象年月\}/g, ymText)
+          .replace(/\{締切日\}/g, deadlineText)
+          .replace(/\{アプリURL\}/g, staffAppUrl);
+        var lineSubj = subject
+          .replace(/\{対象年月\}/g, ymText)
+          .replace(/\{スタッフ名\}/g, 'スタッフの皆さま')
+          .replace(/\{締切日\}/g, deadlineText)
+          .replace(/\{アプリURL\}/g, staffAppUrl);
+        Logger.log('[LINE-TARGET] 請求書要請: group（依頼内容）+ owner（サマリー）');
+        try { sendLineMessage_(lineSubj + '\n\n' + lineBody, false, 'group'); } catch (lineErr) {}
+        // オーナーにサマリーも送信
+        try { sendLineMessage_('請求書要請メールを' + sentCount + '名のスタッフに送信しました（' + ymText + '分）', false, 'owner'); } catch (lineErr) {}
+      }
     }
     var msg = sentCount + '件送信しました。';
     if (errors.length) msg += ' エラー: ' + errors.join('; ');

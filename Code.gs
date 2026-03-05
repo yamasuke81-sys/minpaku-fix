@@ -4821,7 +4821,7 @@ function sendTestNotification(notifyKey, sendTarget) {
       case '請求書送信':
         subject = '請求書送信通知';
         var invNow = new Date();
-        body = 'テストスタッフ さんの請求書が作成されました。\n\n対象月: ' + invNow.getFullYear() + '年' + (invNow.getMonth() + 1) + '月\n金額: ¥10,000（サンプル）';
+        body = 'テストスタッフ さんの請求書が作成されました。\n\n対象月: ' + invNow.getFullYear() + '年' + (invNow.getMonth() + 1) + '月\n金額: ¥10,000（サンプル）\n\n保存先フォルダ: https://drive.google.com/drive/folders/1ucWQQtv8xYsblcWiSSg1gcpgC9dfa5kh';
         break;
 
       case '清掃完了':
@@ -7782,7 +7782,8 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
         '支払期限：' + dueText + '\n\n' +
         'PDFを添付しておりますのでご確認ください。\n' +
         '請求書はGoogleドライブにも保存されています。\n' +
-        'PDF: ' + pdfFile.getUrl() + '\n';
+        'PDF: ' + pdfFile.getUrl() + '\n' +
+        '保存先フォルダ: https://drive.google.com/drive/folders/1ucWQQtv8xYsblcWiSSg1gcpgC9dfa5kh\n';
       var emailNotifyEnabled = isEmailNotifyEnabled_('請求書送信通知有効');
       try {
         var _ch_invoice = getNotifyChannel_('請求書送信');

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0304m</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0305a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1652,17 +1652,19 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label small fw-bold">送信先</label>
-          <div class="d-flex gap-2 mb-2">
+          <label class="form-label small fw-bold">送信先ID</label>
+          <p class="small text-muted mb-2">スタッフ向け通知（募集・確定等）はグループに、オーナー向け通知（リマインド・完了報告等）は個人に自動振り分けされます。両方のIDを設定してください。</p>
+          <!-- 旧送信先モード切替ボタン（非表示・互換維持） -->
+          <div style="display:none;">
             <button type="button" class="btn btn-sm" id="btnLineTargetGroup">グループ</button>
-            <button type="button" class="btn btn-sm" id="btnLineTargetPersonal">個人（テスト用）</button>
+            <button type="button" class="btn btn-sm" id="btnLineTargetPersonal">個人</button>
           </div>
           <div class="mb-2" id="lineTargetGroupInputs">
-            <label class="form-label small" for="lineGroupId">グループID</label>
+            <label class="form-label small" for="lineGroupId">グループID（スタッフ向け通知）</label>
             <input type="text" class="form-control form-control-sm" id="lineGroupId" placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
           <div class="mb-2" id="lineTargetPersonalInputs">
-            <label class="form-label small" for="lineUserId">個人ID（テスト用）</label>
+            <label class="form-label small" for="lineUserId">オーナー個人ID（オーナー向け通知）</label>
             <input type="text" class="form-control form-control-sm" id="lineUserId" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
           </div>
         </div>
@@ -8005,24 +8007,14 @@
       }
 
       // LINE通知設定
-      var _lineTargetMode = 'group'; // 'group' or 'personal'
+      var _lineTargetMode = 'group'; // 互換維持（実際は通知ごとに自動振り分け）
       function setLineTargetMode(mode) {
         _lineTargetMode = mode;
-        var grpBtn = document.getElementById('btnLineTargetGroup');
-        var prsBtn = document.getElementById('btnLineTargetPersonal');
+        // 両方のIDを常にフル表示（新ロジックでは通知ごとに自動振り分け）
         var grpDiv = document.getElementById('lineTargetGroupInputs');
         var prsDiv = document.getElementById('lineTargetPersonalInputs');
-        if (mode === 'personal') {
-          grpBtn.className = 'btn btn-sm btn-outline-secondary';
-          prsBtn.className = 'btn btn-sm btn-primary';
-          grpDiv.style.opacity = '0.4';
-          prsDiv.style.opacity = '1';
-        } else {
-          grpBtn.className = 'btn btn-sm btn-primary';
-          prsBtn.className = 'btn btn-sm btn-outline-secondary';
-          grpDiv.style.opacity = '1';
-          prsDiv.style.opacity = '0.4';
-        }
+        if (grpDiv) grpDiv.style.opacity = '1';
+        if (prsDiv) prsDiv.style.opacity = '1';
       }
       document.getElementById('btnLineTargetGroup').addEventListener('click', function() { setLineTargetMode('group'); });
       document.getElementById('btnLineTargetPersonal').addEventListener('click', function() { setLineTargetMode('personal'); });
@@ -8156,10 +8148,20 @@
       });
 
       // 各通知タブのテスト送信ボタン（共通ハンドラー）
+      // 各テスト送信ボタンの横にLINE送信先セレクトを動的挿入
       document.querySelectorAll('.btn-test-notify').forEach(function(btn) {
+        var sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm d-inline-block ms-1 test-line-target';
+        sel.style.width = 'auto';
+        sel.style.verticalAlign = 'middle';
+        sel.innerHTML = '<option value="owner">LINE→オーナー</option><option value="group">LINE→グループ</option>';
+        btn.parentNode.insertBefore(sel, btn.nextSibling);
+
         btn.addEventListener('click', function() {
           var notifyKey = this.getAttribute('data-notify-key');
           if (!notifyKey || this.disabled) return;
+          // 隣のセレクトからLINE送信先を取得
+          var lineTarget = sel.value || 'group';
           this.disabled = true;
           var origText = this.textContent;
           this.textContent = '送信中...';
@@ -8168,13 +8170,14 @@
             self.disabled = false;
             self.textContent = origText;
             var r = JSON.parse(jsonStr);
+            var targetLabel = r.lineTarget === 'owner' ? 'オーナー個人' : 'グループ';
             if (r.success) {
-              alert('テスト送信完了\n\n' + (r.message || '送信しました。'));
+              alert('テスト送信完了\n\n' + (r.message || '送信しました。') + '\n\nLINE送信先: ' + targetLabel);
             } else {
               var detail = '';
               if (r.results) {
                 if (r.results.email && !r.results.email.success) detail += '\nメール: ' + (r.results.email.error || '失敗');
-                if (r.results.line && !r.results.line.ok) detail += '\nLINE: ' + (r.results.line.reason || '失敗');
+                if (r.results.line && !r.results.line.ok) detail += '\nLINE: ' + (r.results.line.reason || '失敗') + ' (送信先: ' + targetLabel + ')';
               }
               alert('テスト送信に問題がありました\n\n' + (r.message || r.error || '不明なエラー') + detail);
             }
@@ -8182,7 +8185,7 @@
             self.disabled = false;
             self.textContent = origText;
             alert('テスト送信に失敗しました。\n' + (e ? e.toString() : ''));
-          }).sendTestNotification(notifyKey);
+          }).sendTestNotification(notifyKey, lineTarget);
         });
       });
 

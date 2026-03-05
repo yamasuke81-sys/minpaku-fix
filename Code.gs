@@ -9402,6 +9402,18 @@ function checkAndSendReminders() {
     ensureRecruitNotifyMethodColumn_();
     const minResp = res.settings.minRespondents || 2;
     const intervalWeeks = res.settings.reminderIntervalWeeks || 1;
+    // リマインドスケジュールから最大日数を取得（デフォルト7日）
+    // スケジュール設定の最大daysBefore以上先の募集にはリマインドを送らない
+    var maxDaysBefore = 7;
+    var schedules = res.settings.schedules || [];
+    for (var si = 0; si < schedules.length; si++) {
+      if (schedules[si].enabled && schedules[si].daysBefore > maxDaysBefore) {
+        maxDaysBefore = schedules[si].daysBefore;
+      }
+    }
+    // 募集開始週数（デフォルト4週）も考慮し、どちらか大きい方を上限とする
+    var recruitStartDays = (res.settings.recruitStartWeeks || 4) * 7;
+    var maxFutureDays = Math.max(maxDaysBefore, recruitStartDays);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
@@ -9410,15 +9422,19 @@ function checkAndSendReminders() {
     const rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, maxCol).getValues();
     const today = new Date();
     var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
+    // 未来の上限日を計算
+    var futureLimit = new Date(today);
+    futureLimit.setDate(futureLimit.getDate() + maxFutureDays);
     var props = PropertiesService.getScriptProperties();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][3]).trim() !== '募集中') continue;
       // 過去のチェックアウト日はリマインド不要
       var _recruitDate = rows[i][0];
-      if (_recruitDate instanceof Date && _recruitDate < today) continue;
-      if (!(_recruitDate instanceof Date)) {
-        var _parsedDate = new Date(_recruitDate);
-        if (!isNaN(_parsedDate.getTime()) && _parsedDate < today) continue;
+      var _recruitDateObj = (_recruitDate instanceof Date) ? _recruitDate : new Date(_recruitDate);
+      if (!isNaN(_recruitDateObj.getTime())) {
+        if (_recruitDateObj < today) continue;
+        // 遠い未来（募集開始週数 or リマインドスケジュール最大日数を超える）はスキップ
+        if (_recruitDateObj > futureLimit) continue;
       }
       if ((String(rows[i][8] || '').trim() || 'メール') === 'LINE') continue;
       const lastRemind = rows[i][5] ? new Date(rows[i][5]) : null;

@@ -45,7 +45,22 @@ function run(cmd, cwd, timeoutMs) {
         return { ok: true, out: msg };
       }
     }
-    return { ok: false, out: msg };
+    // バージョン上限エラーを検出
+    var versionLimit = /Cannot create more versions/i.test(msg) || /reached the limit of \d+ versions/i.test(msg);
+    return { ok: false, out: msg, versionLimitReached: versionLimit };
+  }
+}
+
+/** バージョン上限到達時にGASエディタを開いて案内する */
+function handleVersionLimitError(cwd, label) {
+  console.error('  ⚠ ' + label + ': バージョン数が上限(200件)に達しました！');
+  console.error('    GASエディタで古いバージョンを削除してからデプロイし直してください。');
+  console.error('    手順: 左サイドバー「プロジェクトの履歴」→ 右上「すべてのバージョンを表示」→ 選択して削除');
+  var scriptId = getScriptId(cwd);
+  if (scriptId) {
+    var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
+    console.error('    GASエディタを開きます: ' + editorUrl);
+    openBrowser(editorUrl);
   }
 }
 
@@ -226,6 +241,28 @@ function main() {
     console.log('  OK');
   }
 
+  // === デプロイ前にバージョン数チェック（200件上限到達を事前検出） ===
+  console.log('');
+  console.log('[事前チェック] バージョン数を確認中...');
+  var preCheckMainVersions = run(clasp + ' versions', rootDir, 30000);
+  var preMainVersionCount = preCheckMainVersions.ok ? countVersions(preCheckMainVersions.out) : -1;
+  if (preMainVersionCount >= 0) {
+    console.log('  メインアプリ: バージョン数 ' + preMainVersionCount + '/' + VERSION_LIMIT + '件');
+  }
+  // clasp versionsはページネーションで全件返さないことがあるため、
+  // 150件超（実際には200件近い可能性）でも警告を出す
+  if (preMainVersionCount >= VERSION_WARN) {
+    console.log('  ⚠ バージョン数が' + VERSION_WARN + '件以上です。GASエディタで古いバージョンを削除してください。');
+    console.log('    ※ clasp versionsは全件を返さないことがあるため、実際の件数はGASエディタで確認してください。');
+    var preScriptId = getScriptId(rootDir);
+    if (preScriptId) {
+      var preEditorUrl = 'https://script.google.com/home/projects/' + preScriptId + '/edit';
+      console.log('    GASエディタを開きます: ' + preEditorUrl);
+      openBrowser(preEditorUrl);
+    }
+  }
+  console.log('');
+
   console.log('[2/3] メインアプリ: デプロイを更新...');
   var today = new Date().toISOString().slice(0, 10);
 
@@ -239,19 +276,24 @@ function main() {
 
   var mainId = null;
 
+  var mainVersionLimitHit = false;
+
   // 優先順位1: deploy-config.json の保存済みID
   if (savedMainId) {
     console.log('  保存済みデプロイIDで更新: ' + savedMainId.substring(0, 30) + '...');
     var r = run(clasp + ' deploy --deploymentId "' + savedMainId + '" --description "メインアプリ ' + today + '"', rootDir);
     if (r.ok) {
       mainId = savedMainId;
+    } else if (r.versionLimitReached) {
+      mainVersionLimitHit = true;
+      handleVersionLimitError(rootDir, 'メインアプリ');
     } else {
       console.log('  保存済みIDでの更新に失敗。既存デプロイを探します...');
     }
   }
 
   // 優先順位2: clasp deployments から探す
-  if (!mainId) {
+  if (!mainId && !mainVersionLimitHit) {
     var mainDeps = run(clasp + ' deployments', rootDir);
     var foundId = mainDeps.ok ? getDeployId(mainDeps.out) : null;
     if (foundId) {
@@ -259,17 +301,23 @@ function main() {
       var r = run(clasp + ' deploy --deploymentId "' + foundId + '" --description "メインアプリ ' + today + '"', rootDir);
       if (r.ok) {
         mainId = foundId;
+      } else if (r.versionLimitReached) {
+        mainVersionLimitHit = true;
+        handleVersionLimitError(rootDir, 'メインアプリ');
       }
     }
   }
 
   // 優先順位3: 新規作成（最終手段）
-  if (!mainId) {
+  if (!mainId && !mainVersionLimitHit) {
     console.log('  既存デプロイが見つかりません。新規作成...');
     var r = run(clasp + ' deploy --description "メインアプリ ' + today + '"', rootDir);
     if (r.ok) {
       var m = r.out.match(/(AKfycb[A-Za-z0-9_-]{20,})/);
       if (m) mainId = m[1];
+    } else if (r.versionLimitReached) {
+      mainVersionLimitHit = true;
+      handleVersionLimitError(rootDir, 'メインアプリ');
     }
   }
 
@@ -286,7 +334,12 @@ function main() {
       try { fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8'); } catch (e) {}
     }
   } else {
-    console.error('  デプロイに失敗しました。');
+    if (mainVersionLimitHit) {
+      console.error('  デプロイに失敗しました（バージョン上限到達）。');
+      console.error('  → GASエディタで古いバージョンを削除してから node deploy-all.js を再実行してください。');
+    } else {
+      console.error('  デプロイに失敗しました。');
+    }
   }
 
   // === オーナーURL・スタッフ用URLをGASに保存 ===

@@ -9642,7 +9642,13 @@ function checkAndSendReminderEmails() {
                   + '清掃詳細: ' + detailLink + '\n\n'
                   + '早めに清掃スタッフの手配をお願いします。';
               var _ch_undecided = getNotifyChannel_('スタッフ未決定リマインド');
-              if (_ch_undecided.email) GmailApp.sendEmail(ownerEmail, subject, body);
+              Logger.log('[DEBUG-UNDECIDED-v0305g] channel: email=' + _ch_undecided.email + ' line=' + _ch_undecided.line + ' | subj=' + subject + ' | tmplSubject=' + tmplSubject + ' | ownerEmail=' + ownerEmail);
+              if (_ch_undecided.email) {
+                Logger.log('[DEBUG-UNDECIDED-v0305g] SENDING EMAIL (email=true)');
+                GmailApp.sendEmail(ownerEmail, subject, body);
+              } else {
+                Logger.log('[DEBUG-UNDECIDED-v0305g] SKIPPED EMAIL (email=false)');
+              }
               if (_ch_undecided.line) { Logger.log('[LINE-TARGET] スタッフ未決定リマインド: owner'); try { sendLineMessage_(subject + '\n\n' + body, false, 'owner'); } catch (lineErr) { Logger.log('未決定リマインド LINE送信エラー: ' + lineErr.toString()); } }
               newSent.push(remIdx);
             } catch (mailErr) {

@@ -4793,9 +4793,10 @@ function sendTestNotification(notifyKey, sendTarget) {
     var emailTo = (effectiveTarget === 'staff' && staffEmails.length > 0) ? staffEmails.join(',') : ownerEmail;
     var targetLabel = (effectiveTarget === 'staff') ? 'スタッフ全員' : 'オーナー';
 
-    // 5フラグ形式から送信先に応じた有効フラグを算出
-    var shouldEmail = (effectiveTarget === 'staff') ? ch.staff_email : ch.owner_email;
-    var shouldLine = (effectiveTarget === 'staff') ? (ch.group_line || ch.staff_line) : ch.owner_line;
+    // テスト送信は通知の動作確認が目的なので、チャンネル設定に関係なく常に送信する
+    // （実際の通知はチャンネル設定に従う。テスト送信は選択した送信先に必ず届ける）
+    var shouldEmail = true;
+    var shouldLine = true;
 
     Logger.log('[TEST-NOTIFY] notifyKey=' + notifyKey + ' sendTarget=' + effectiveTarget + ' lineTarget=' + lineTarget + ' emailTo=' + emailTo + ' shouldEmail=' + shouldEmail + ' shouldLine=' + shouldLine);
 
@@ -4839,20 +4840,6 @@ function sendTestNotification(notifyKey, sendTarget) {
       msgs.push('LINE(' + lineLabel + '): ' + (results.line && results.line.ok ? '送信済み' : '失敗'));
     }
     if (!shouldEmail && !shouldLine) msgs.push('送信チャンネルが未設定です');
-
-    // [DEBUG-NOTIFY] チャンネル設定の詳細をレスポンスに含める
-    var debugFlags = 'チャンネル設定(' + notifyKey + '): ' +
-      'owner_email=' + !!ch.owner_email + ', owner_line=' + !!ch.owner_line +
-      ', staff_email=' + !!ch.staff_email + ', staff_line=' + !!ch.staff_line +
-      ', group_line=' + !!ch.group_line;
-    var debugLogic = '判定: effectiveTarget=' + effectiveTarget +
-      ' → shouldEmail=' + shouldEmail + '(' + (effectiveTarget === 'staff' ? 'staff_email' : 'owner_email') + ')' +
-      ', shouldLine=' + shouldLine + '(' + (effectiveTarget === 'staff' ? 'group_line||staff_line' : 'owner_line') + ')';
-    msgs.push('\n--- デバッグ ---');
-    msgs.push(debugFlags);
-    msgs.push(debugLogic);
-    Logger.log('[DEBUG-NOTIFY] ' + debugFlags);
-    Logger.log('[DEBUG-NOTIFY] ' + debugLogic);
 
     return JSON.stringify({
       success: emailOk && lineOk,

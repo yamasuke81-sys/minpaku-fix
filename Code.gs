@@ -2468,12 +2468,15 @@ function parseICal_(icalText, platformName) {
         // キャンセルでないイベントの日付ペアを全て記録（ブロック日・予約名なし含む）
         // これにより、iCalフィードに存在する日付の予約を誤ってキャンセルしない
         allDatePairs[checkIn + '|' + checkOut] = true;
-        // [DEBUG-PHANTOM] 4月関連のイベントを詳細にログ
-        if (checkIn.indexOf('-04-') >= 0 || checkOut.indexOf('-04-') >= 0) {
-          Logger.log('[DEBUG-PHANTOM] parseICal 4月イベント: platform=' + platformName + ' SUMMARY="' + sum + '" CI=' + checkIn + ' CO=' + checkOut + ' UID=' + uid + ' STATUS=' + (current.status || '') + ' DESC=' + (current.description || '').substring(0, 100));
-        }
         // ブロック日・利用不可日は予約追加対象外（ただしallDatePairsには含める）
-        if (/^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)) { Logger.log('  → skip: blocked/not-available'); skipReasons.blocked++; current = null; continue; }
+        // "Not available", "Closed", "Blocked" の完全一致に加え、
+        // "CLOSED - Not available" 等の複合パターンも検出する
+        // 注: 実ゲスト名に "not available" や "closed" が含まれることは想定しない
+        var sumLower = sum.toLowerCase();
+        var isBlockedEntry = /^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)
+          || sumLower.indexOf('not available') >= 0
+          || (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum)));
+        if (isBlockedEntry) { skipReasons.blocked++; current = null; continue; }
         // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
         var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         // "Reserved"のみ → ゲスト名不明だがブロック日ではない実予約
@@ -2619,10 +2622,6 @@ function syncFromICal() {
       for (var ei = 0; ei < events.length; ei++) {
         var ev = events[ei];
         var key = ev.checkIn + '|' + ev.checkOut;
-        // [DEBUG-SYNC] 4月のエントリは重複判定結果を詳細ログ
-        if (ev.checkIn && ev.checkIn.indexOf('2026-04') === 0) {
-          Logger.log('[DEBUG-SYNC] CHECK APR: CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" existingMatch=' + !!existingPairs[key]);
-        }
         if (existingPairs[key]) {
           var updateRowNum = existingRowByKey[key];
           if (updateRowNum) {
@@ -2649,7 +2648,6 @@ function syncFromICal() {
           }
         }
         if (overlaps) {
-          if (ev.checkIn && ev.checkIn.indexOf('2026-04') === 0) Logger.log('[DEBUG-SYNC] OVERLAP SKIP APR: CI=' + ev.checkIn + ' CO=' + ev.checkOut);
           continue;
         }
         existingPairs[key] = true;
@@ -2716,16 +2714,12 @@ function syncFromICal() {
           var isPast = coDate && coDate < todaySync;
           // 明示的キャンセル（STATUS:CANCELLEDまたはSUMMARYに"cancel"） → 即キャンセル
           if (cancelledPairs[pairKey] && !isPast && !cancelledVal) {
-            // [DEBUG-SYNC] キャンセル検出をログ
-            if (ciKey && ciKey.indexOf('2026-04') === 0) Logger.log('[DEBUG-SYNC] CANCEL(explicit) APR: CI=' + ciKey + ' CO=' + coKey + ' row=' + (ri + 2));
             if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
               platformCancelled++; removed++;
             }
           } else if (!validPairs[pairKey] && !cancelledPairs[pairKey] && !isPast) {
             // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
             if (!cancelledVal) {
-              // [DEBUG-SYNC] フィードから消えた予約のキャンセルをログ
-              if (ciKey && ciKey.indexOf('2026-04') === 0) Logger.log('[DEBUG-SYNC] CANCEL(disappeared) APR: CI=' + ciKey + ' CO=' + coKey + ' row=' + (ri + 2) + ' inValidPairs=' + !!validPairs[pairKey] + ' inCancelledPairs=' + !!cancelledPairs[pairKey]);
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;
               }
@@ -2757,18 +2751,6 @@ function syncFromICal() {
       }
       // [DEBUG-SYNC] 追加・キャンセルの有無にかかわらず、iCalフィード全体の概要をログ
       Logger.log('[DEBUG-SYNC] ' + platformName + ': events(pass filter)=' + events.length + ' added=' + platformAdded + ' cancelled=' + platformCancelled + ' existingPairs=' + Object.keys(existingPairs).length + ' allDatePairs=' + Object.keys(validPairs).length);
-      // [DEBUG-SYNC] 4月のエントリを特別に記録（幽霊予約調査用）
-      events.forEach(function(ev) {
-        if (ev.checkIn && ev.checkIn.indexOf('2026-04') === 0) {
-          Logger.log('[DEBUG-SYNC] APR entry: CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" platform=' + ev.platform);
-        }
-      });
-      // [DEBUG-SYNC] allDatePairs内の4月エントリも記録
-      Object.keys(validPairs).forEach(function(pair) {
-        if (pair.indexOf('2026-04') >= 0) {
-          Logger.log('[DEBUG-SYNC] APR in allDatePairs: ' + pair);
-        }
-      });
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length, skipReasons: parseResult.skipReasons });
     }
 
@@ -2822,14 +2804,6 @@ function autoSyncFromICal() {
       }
     }
 
-    // [DEBUG-PHANTOM] スプレッドシートに既存の4月予約を記録
-    var debugExistingApril = Object.keys(existingPairs).filter(function(k) { return k.indexOf('-04-') >= 0; });
-    if (debugExistingApril.length > 0) {
-      Logger.log('[DEBUG-PHANTOM] 既存4月予約(existingPairs): ' + debugExistingApril.join(', '));
-    } else {
-      Logger.log('[DEBUG-PHANTOM] 既存4月予約: なし');
-    }
-
     var added = 0;
     for (var si = 0; si < syncRows.length; si++) {
       var platformName = String(syncRows[si][0] || '').trim();
@@ -2856,26 +2830,6 @@ function autoSyncFromICal() {
         }
         var icalText = resp.getContentText();
 
-        // [DEBUG-PHANTOM] iCalフィード内の4月エントリを生データで記録
-        if (platformName.toLowerCase().indexOf('booking') >= 0) {
-          var debugLines = icalText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '').split('\n');
-          var inEvent = false;
-          var eventBuf = [];
-          for (var di = 0; di < debugLines.length; di++) {
-            if (debugLines[di].indexOf('BEGIN:VEVENT') === 0) { inEvent = true; eventBuf = []; }
-            if (inEvent) eventBuf.push(debugLines[di]);
-            if (inEvent && debugLines[di].indexOf('END:VEVENT') === 0) {
-              inEvent = false;
-              var eventStr = eventBuf.join(' | ');
-              // 4月を含むイベント or 日付がないイベントをすべてログ
-              if (/04[-/]?01/.test(eventStr) || /0401/.test(eventStr) || /april/i.test(eventStr)) {
-                Logger.log('[DEBUG-PHANTOM] Booking RAW VEVENT(4月関連): ' + eventStr.substring(0, 500));
-              }
-            }
-          }
-          Logger.log('[DEBUG-PHANTOM] Booking iCal総VEVENT数: ' + (icalText.match(/BEGIN:VEVENT/g) || []).length + ' フィードサイズ: ' + icalText.length + 'bytes');
-        }
-
         var parseResult = parseICal_(icalText, platformName);
         var events = parseResult.events;
         // allDatePairs: キャンセル以外の全日付（ブロック日含む）→ 既存予約の誤キャンセル防止
@@ -2885,15 +2839,6 @@ function autoSyncFromICal() {
         var nextRow = formSheet.getLastRow() + 1;
         var platformAdded = 0;
         var platformCheckIns = [];
-
-        // [DEBUG-PHANTOM] parseICal結果のallDatePairsとcancelledPairsに4月があるか
-        var debugAprilPairs = Object.keys(validPairs).filter(function(k) { return k.indexOf('-04-') >= 0; });
-        var debugAprilCancelled = Object.keys(cancelledPairs).filter(function(k) { return k.indexOf('-04-') >= 0; });
-        if (platformName.toLowerCase().indexOf('booking') >= 0) {
-          Logger.log('[DEBUG-PHANTOM] Booking validPairs(4月): ' + (debugAprilPairs.length > 0 ? debugAprilPairs.join(', ') : 'なし'));
-          Logger.log('[DEBUG-PHANTOM] Booking cancelledPairs(4月): ' + (debugAprilCancelled.length > 0 ? debugAprilCancelled.join(', ') : 'なし'));
-          Logger.log('[DEBUG-PHANTOM] Booking events(4月): ' + events.filter(function(e) { return e.checkIn.indexOf('-04-') >= 0; }).map(function(e) { return e.checkIn + '|' + e.checkOut + ' "' + e.guestName + '"'; }).join(', '));
-        }
 
         for (var ei = 0; ei < events.length; ei++) {
           var ev = events[ei];
@@ -2908,10 +2853,6 @@ function autoSyncFromICal() {
               }
             }
             continue;
-          }
-          // [DEBUG-PHANTOM] 新規追加される予約を記録
-          if (ev.checkIn.indexOf('-04-') >= 0) {
-            Logger.log('[DEBUG-PHANTOM] → ADD NEW row=' + nextRow + ' CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" platform=' + ev.platform);
           }
           existingPairs[key] = true;
           existingRowByKey[key] = nextRow;
@@ -2950,18 +2891,12 @@ function autoSyncFromICal() {
             var coDateAuto = cok ? new Date(cok) : null;
             var todayAuto = new Date(); todayAuto.setHours(0,0,0,0);
             var isPastAuto = coDateAuto && coDateAuto < todayAuto;
-            // [DEBUG-PHANTOM] 4月の予約について判定過程を記録
-            if (cik && cik.indexOf('-04-') >= 0) {
-              Logger.log('[DEBUG-PHANTOM] AUTO判定 row=' + (ci+2) + ' CI=' + cik + ' CO=' + cok + ' platform=' + icalSrc + ' cancelledVal=' + cancelledValAuto + ' isPast=' + isPastAuto + ' inValidPairs=' + !!validPairs[autoPairKey] + ' inCancelledPairs=' + !!cancelledPairs[autoPairKey]);
-            }
             // 明示的キャンセル（STATUS:CANCELLEDまたはSUMMARYに"cancel"） → 即キャンセル
             if (cancelledPairs[autoPairKey] && !isPastAuto && !cancelledValAuto) {
-              if (cik && cik.indexOf('-04-') >= 0) Logger.log('[DEBUG-PHANTOM] → CANCEL(explicit) CI=' + cik);
               try { cancelBookingFromICal_(formSheet, ci + 2, colMap, platformName); } catch (e) {}
             } else if (!validPairs[autoPairKey] && !cancelledPairs[autoPairKey] && !isPastAuto) {
               // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
               if (!cancelledValAuto) {
-                if (cik && cik.indexOf('-04-') >= 0) Logger.log('[DEBUG-PHANTOM] → CANCEL(disappeared) CI=' + cik + ' — フィードに存在しない');
                 try { cancelBookingFromICal_(formSheet, ci + 2, colMap, platformName); } catch (e) {}
               }
             } else if (cancelledValAuto && validPairs[autoPairKey]) {

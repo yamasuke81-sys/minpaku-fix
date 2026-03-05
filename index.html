@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0305b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0305c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -8148,20 +8148,19 @@
       });
 
       // 各通知タブのテスト送信ボタン（共通ハンドラー）
-      // 各テスト送信ボタンの横にLINE送信先セレクトを動的挿入
+      // 各テスト送信ボタンの横に送信先セレクトを動的挿入
       document.querySelectorAll('.btn-test-notify').forEach(function(btn) {
         var sel = document.createElement('select');
-        sel.className = 'form-select form-select-sm d-inline-block ms-1 test-line-target';
+        sel.className = 'form-select form-select-sm d-inline-block ms-1 test-send-target';
         sel.style.width = 'auto';
         sel.style.verticalAlign = 'middle';
-        sel.innerHTML = '<option value="owner">LINE→オーナー</option><option value="group">LINE→グループ</option>';
+        sel.innerHTML = '<option value="owner">オーナー宛</option><option value="staff">スタッフ全員宛</option>';
         btn.parentNode.insertBefore(sel, btn.nextSibling);
 
         btn.addEventListener('click', function() {
           var notifyKey = this.getAttribute('data-notify-key');
           if (!notifyKey || this.disabled) return;
-          // 隣のセレクトからLINE送信先を取得
-          var lineTarget = sel.value || 'group';
+          var sendTarget = sel.value || 'owner';
           this.disabled = true;
           var origText = this.textContent;
           this.textContent = '送信中...';
@@ -8170,14 +8169,14 @@
             self.disabled = false;
             self.textContent = origText;
             var r = JSON.parse(jsonStr);
-            var targetLabel = r.lineTarget === 'owner' ? 'オーナー個人' : 'グループ';
+            var targetLabel = r.sendTarget === 'owner' ? 'オーナー宛' : 'スタッフ全員宛';
             if (r.success) {
-              alert('テスト送信完了\n\n' + (r.message || '送信しました。') + '\n\nLINE送信先: ' + targetLabel);
+              alert('テスト送信完了\n\n' + (r.message || '送信しました。'));
             } else {
               var detail = '';
               if (r.results) {
                 if (r.results.email && !r.results.email.success) detail += '\nメール: ' + (r.results.email.error || '失敗');
-                if (r.results.line && !r.results.line.ok) detail += '\nLINE: ' + (r.results.line.reason || '失敗') + ' (送信先: ' + targetLabel + ')';
+                if (r.results.line && !r.results.line.ok) detail += '\nLINE: ' + (r.results.line.reason || '失敗');
               }
               alert('テスト送信に問題がありました\n\n' + (r.message || r.error || '不明なエラー') + detail);
             }
@@ -8185,7 +8184,7 @@
             self.disabled = false;
             self.textContent = origText;
             alert('テスト送信に失敗しました。\n' + (e ? e.toString() : ''));
-          }).sendTestNotification(notifyKey, lineTarget);
+          }).sendTestNotification(notifyKey, sendTarget);
         });
       });
 

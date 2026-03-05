@@ -4267,16 +4267,37 @@ function getNotifyChannel_(notifyKey) {
 /**
  * 各通知タブのテスト送信
  * @param {string} notifyKey - NOTIFY_CHANNEL_KEYS_ のキー（例: '予約キャンセル', 'スタッフ確定'）
- * @param {string} lineTarget - LINE送信先 'owner' or 'group'（省略時は通知種別のデフォルト）
+ * @param {string} sendTarget - 'owner'=オーナー宛（オーナーメール+個人LINE）, 'staff'=スタッフ全員宛（スタッフメール+グループLINE）
  */
-function sendTestNotification(notifyKey, lineTarget) {
+function sendTestNotification(notifyKey, sendTarget) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
 
-    // オーナーのメールを取得（テスト送信先）
+    var effectiveTarget = sendTarget || 'owner';
+
+    // オーナーのメールを取得
     var ownerRes = JSON.parse(getOwnerEmail());
     var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
     if (!ownerEmail) return JSON.stringify({ success: false, error: 'オーナーメールが設定されていません。URL設定タブで設定してください。' });
+
+    // スタッフ全員宛の場合、スタッフメールアドレス一覧を取得
+    var staffEmails = [];
+    if (effectiveTarget === 'staff') {
+      try {
+        var staffSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
+        if (staffSheet && staffSheet.getLastRow() >= 2) {
+          var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
+          var emailSet = {};
+          staffRows.forEach(function(row) {
+            var hidden = String(row[11] || '').trim();
+            if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
+            var e = String(row[2] || '').trim().toLowerCase();
+            if (e) emailSet[e] = 1;
+          });
+          staffEmails = Object.keys(emailSet);
+        }
+      } catch (e) { Logger.log('スタッフメール取得エラー: ' + e.toString()); }
+    }
 
     // チャンネル設定取得
     var ch = getNotifyChannel_(notifyKey);
@@ -4441,29 +4462,32 @@ function sendTestNotification(notifyKey, lineTarget) {
     // 【テスト】プレフィックスを追加
     subject = '【テスト】' + subject;
 
-    // lineTarget: 引数で明示的に指定されている場合はそれを使う
-    var effectiveLineTarget = lineTarget || 'group';
-    Logger.log('[TEST-NOTIFY] notifyKey=' + notifyKey + ' lineTarget=' + effectiveLineTarget + ' ch.email=' + ch.email + ' ch.line=' + ch.line);
+    // 送信先に応じてメール宛先とLINE宛先を決定
+    var lineTarget = (effectiveTarget === 'staff') ? 'group' : 'owner';
+    var emailTo = (effectiveTarget === 'staff' && staffEmails.length > 0) ? staffEmails.join(',') : ownerEmail;
+    var targetLabel = (effectiveTarget === 'staff') ? 'スタッフ全員' : 'オーナー';
+
+    Logger.log('[TEST-NOTIFY] notifyKey=' + notifyKey + ' sendTarget=' + effectiveTarget + ' lineTarget=' + lineTarget + ' emailTo=' + emailTo + ' ch.email=' + ch.email + ' ch.line=' + ch.line);
 
     // 送信結果を記録
     var results = { email: null, line: null };
 
-    // メール送信（オーナーに送信）
+    // メール送信
     if (ch.email) {
       try {
-        GmailApp.sendEmail(ownerEmail, subject, body, { name: '通知テスト送信' });
-        results.email = { success: true, to: ownerEmail };
+        GmailApp.sendEmail(emailTo, subject, body, { name: '通知テスト送信' });
+        results.email = { success: true, to: emailTo };
       } catch (mailErr) {
         results.email = { success: false, error: mailErr.toString() };
       }
     }
 
-    // LINE送信（送信先をlineTargetで制御）
+    // LINE送信
     if (ch.line) {
       try {
-        var lineResult = sendLineMessage_(subject + '\n\n' + body, true, effectiveLineTarget);
+        var lineResult = sendLineMessage_(subject + '\n\n' + body, true, lineTarget);
         results.line = lineResult || { ok: false, reason: '応答なし' };
-        results.line.requestedTarget = effectiveLineTarget;
+        results.line.requestedTarget = lineTarget;
       } catch (lineErr) {
         results.line = { ok: false, reason: lineErr.toString() };
       }
@@ -4473,19 +4497,25 @@ function sendTestNotification(notifyKey, lineTarget) {
     var emailOk = !ch.email || (results.email && results.email.success);
     var lineOk = !ch.line || (results.line && results.line.ok);
     var msgs = [];
-    if (ch.email) msgs.push('メール: ' + (results.email && results.email.success ? ownerEmail + ' に送信済み' : '失敗'));
+    msgs.push('送信先: ' + targetLabel);
+    if (ch.email) {
+      var emailLabel = (effectiveTarget === 'staff' && staffEmails.length > 0)
+        ? staffEmails.length + '名のスタッフに送信済み'
+        : ownerEmail + ' に送信済み';
+      msgs.push('メール: ' + (results.email && results.email.success ? emailLabel : '失敗'));
+    }
     if (ch.line) {
-      var lineTargetLabel = effectiveLineTarget === 'owner' ? 'オーナー個人' : 'グループ';
-      msgs.push('LINE(' + lineTargetLabel + '): ' + (results.line && results.line.ok ? '送信済み' : '失敗'));
+      var lineLabel = lineTarget === 'owner' ? 'オーナー個人LINE' : 'グループLINE';
+      msgs.push('LINE(' + lineLabel + '): ' + (results.line && results.line.ok ? '送信済み' : '失敗'));
     }
     if (!ch.email && !ch.line) msgs.push('送信チャンネルが未設定です');
 
     return JSON.stringify({
       success: emailOk && lineOk,
-      message: msgs.join(' / '),
+      message: msgs.join('\n'),
       results: results,
       channel: ch,
-      lineTarget: effectiveLineTarget
+      sendTarget: effectiveTarget
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

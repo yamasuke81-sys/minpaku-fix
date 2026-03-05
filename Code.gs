@@ -2078,36 +2078,44 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
       var cancelBody = dateRange + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。'
         + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
       var _ch_cancel = getNotifyChannel_('予約キャンセル');
-      for (var sni = 0; sni < staffNames.length; sni++) {
-        var name = staffNames[sni];
-        var email = staffEmails[name] || '';
-        if (email && _ch_cancel.email && isEmailNotifyEnabled_('キャンセル通知有効')) {
-          try {
-            GmailApp.sendEmail(email, cancelSubject, name + ' 様\n\n' + cancelBody + '\n\nご確認ください。');
-          } catch (mailErr) {}
+      var cancelLineText = cancelSubject + '\n\n' + cancelBody;
+      // スタッフ個別メール
+      if (_ch_cancel.staff_email && isEmailNotifyEnabled_('キャンセル通知有効')) {
+        for (var sni = 0; sni < staffNames.length; sni++) {
+          var name = staffNames[sni];
+          var email = staffEmails[name] || '';
+          if (email) {
+            try { GmailApp.sendEmail(email, cancelSubject, name + ' 様\n\n' + cancelBody + '\n\nご確認ください。'); } catch (mailErr) {}
+          }
         }
       }
-      // LINE通知（スタッフ向け→グループ、オーナー向け→個人）
-      if (_ch_cancel.line) {
-        Logger.log('[LINE-TARGET] 予約キャンセル: group+owner両方に送信');
-        try { sendLineMessage_(cancelSubject + '\n\n' + cancelBody, false, 'group'); } catch (lineErr) {}
-        try { sendLineMessage_(cancelSubject + '\n\n' + cancelBody, false, 'owner'); } catch (lineErr) {}
+      // オーナーメール
+      if (_ch_cancel.owner_email && isEmailNotifyEnabled_('キャンセル通知有効')) {
+        try {
+          var ownerEmail = getOwnerEmailAddress_();
+          if (ownerEmail) {
+            var oSubject = '予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
+            var oBody = '以下の予約がキャンセルされました。\n\n' +
+              '期間: ' + dateRange + '\n' +
+              'ゲスト: ' + guestLabel + '\n' +
+              '清掃担当: ' + cleaningStaff + '\n\n' +
+              '清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。'
+              + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
+            GmailApp.sendEmail(ownerEmail, oSubject, oBody);
+          }
+        } catch (ownerMailErr) {}
       }
-      // オーナーにメールで督促
-      try {
-        var ownerRes = JSON.parse(getOwnerEmail());
-        var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-        if (ownerEmail && _ch_cancel.email && isEmailNotifyEnabled_('キャンセル通知有効')) {
-          var oSubject = '予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
-          var oBody = '以下の予約がキャンセルされました。\n\n' +
-            '期間: ' + dateRange + '\n' +
-            'ゲスト: ' + guestLabel + '\n' +
-            '清掃担当: ' + cleaningStaff + '\n\n' +
-            '清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。'
-            + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
-          GmailApp.sendEmail(ownerEmail, oSubject, oBody);
-        }
-      } catch (ownerMailErr) {}
+      // LINEグループ
+      if (_ch_cancel.group_line) { try { sendLineMessage_(cancelLineText, false, 'group'); } catch (lineErr) {} }
+      // オーナーLINE
+      if (_ch_cancel.owner_line) { try { sendLineMessage_(cancelLineText, false, 'owner'); } catch (lineErr) {} }
+      // スタッフ個別LINE
+      if (_ch_cancel.staff_line) {
+        var cancelStaffList = staffNames.map(function(n) { return { staffName: n, lineUserId: '' }; });
+        var allStaff = getAllActiveStaff_(ss);
+        cancelStaffList.forEach(function(cs) { allStaff.forEach(function(as) { if (as.staffName === cs.staffName) cs.lineUserId = as.lineUserId; }); });
+        try { sendLineToStaffMembers_(cancelStaffList, cancelLineText); } catch (lineErr) {}
+      }
     }
     return true;
   } catch (e) {
@@ -3369,9 +3377,10 @@ function getStaffList() {
     ensureSheetsExist();
     ensureStaffOrderColumn_();
     ensureStaffHiddenColumn_();
+    ensureStaffLineIdColumn_();
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_STAFF);
     const lastRow = Math.max(sheet.getLastRow(), 1);
-    const lastCol = Math.max(sheet.getLastColumn(), 12);
+    const lastCol = Math.max(sheet.getLastColumn(), 13);
     const rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
     const list = rows.map(function(row, i) {
       return {
@@ -3387,7 +3396,8 @@ function getStaffList() {
         active: String(row[8] || 'Y').trim(),
         hasPassword: lastCol >= 10 ? !!String(row[9] || '').trim() : false,
         displayOrder: parseInt(row[10], 10) || 9999,
-        hidden: lastCol >= 12 ? String(row[11] || '').trim() === 'Y' : false
+        hidden: lastCol >= 12 ? String(row[11] || '').trim() === 'Y' : false,
+        lineUserId: lastCol >= 13 ? String(row[12] || '').trim() : ''
       };
     }).filter(function(item) { return item.name || item.email; });
     list.sort(function(a, b) { return a.displayOrder - b.displayOrder; });
@@ -3430,6 +3440,21 @@ function ensureStaffHiddenColumn_() {
     }
     var nextCol = sheet.getLastColumn() + 1;
     sheet.getRange(1, nextCol).setValue('非表示');
+  } catch (e) {}
+}
+
+/** スタッフシートにLINEユーザーID列を保証 */
+function ensureStaffLineIdColumn_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === 'LINEユーザーID') return;
+    }
+    var nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue('LINEユーザーID');
   } catch (e) {}
 }
 
@@ -3501,6 +3526,15 @@ function saveStaff(rowIndex, data) {
         data.bankName || '', data.bankBranch || '', data.accountType || '',
         data.accountNumber || '', data.accountHolder || '', data.active !== 'N' ? 'Y' : 'N'
       ]]);
+      // LINEユーザーIDを保存（列13）
+      ensureStaffLineIdColumn_();
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      for (var li = 0; li < headers.length; li++) {
+        if (String(headers[li] || '').trim() === 'LINEユーザーID') {
+          sheet.getRange(rowIndex, li + 1).setValue(data.lineUserId || '');
+          break;
+        }
+      }
       if (oldName && newName && oldName !== newName) {
         propagateStaffNameChange_(ss, oldName, newName);
       }
@@ -3514,6 +3548,15 @@ function saveStaff(rowIndex, data) {
       data.bankName || '', data.bankBranch || '', data.accountType || '',
       data.accountNumber || '', data.accountHolder || '', data.active !== 'N' ? 'Y' : 'N'
     ]]);
+    // 新規スタッフのLINEユーザーIDを保存
+    ensureStaffLineIdColumn_();
+    var newHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var nli = 0; nli < newHeaders.length; nli++) {
+      if (String(newHeaders[nli] || '').trim() === 'LINEユーザーID') {
+        sheet.getRange(nextRow, nli + 1).setValue(data.lineUserId || '');
+        break;
+      }
+    }
     invalidateStaffCache_();
     invalidateInitDataCache_();
     return JSON.stringify({ success: true, rowIndex: nextRow });
@@ -4239,6 +4282,58 @@ function saveLineNotifySettings(settings) {
  * 通知チャンネル設定キー一覧
  * 値: 'both'(デフォルト), 'email', 'line'
  */
+/** 通知ごとのデフォルト送信先（現在の動作を反映） */
+var NOTIFY_DEFAULT_TARGETS_ = {
+  '予約キャンセル': 'owner_email,staff_email,owner_line,group_line',
+  '請求書要請': 'staff_email,group_line',
+  '名簿未入力リマインド': 'owner_email,owner_line',
+  '清掃スタッフ募集': 'staff_email,group_line',
+  '出勤キャンセル要望': 'owner_email,owner_line',
+  'キャンセル承認': 'staff_email,group_line',
+  'キャンセル却下': 'staff_email,group_line',
+  '請求書送信': 'owner_email,owner_line',
+  'スタッフ確定': 'staff_email,group_line',
+  '募集リマインド': 'staff_email,group_line',
+  'スタッフ未決定リマインド': 'owner_email,owner_line',
+  '直前予約リマインド': 'owner_email,owner_line',
+  '清掃完了': 'owner_email,owner_line'
+};
+
+/** カンマ区切りの送信先文字列を5フラグオブジェクトに変換 */
+function parseNotifyTargets_(str) {
+  var parts = String(str || '').split(',').map(function(s) { return s.trim(); });
+  return {
+    owner_line: parts.indexOf('owner_line') >= 0,
+    owner_email: parts.indexOf('owner_email') >= 0,
+    staff_email: parts.indexOf('staff_email') >= 0,
+    staff_line: parts.indexOf('staff_line') >= 0,
+    group_line: parts.indexOf('group_line') >= 0
+  };
+}
+
+/** 旧フォーマット（email/line/both）を新フォーマットに変換 */
+function migrateOldChannelFormat_(notifyKey, oldVal) {
+  var defaults = parseNotifyTargets_(NOTIFY_DEFAULT_TARGETS_[notifyKey] || 'owner_email,owner_line');
+  if (oldVal === 'email') {
+    return { owner_email: defaults.owner_email, staff_email: defaults.staff_email, owner_line: false, staff_line: false, group_line: false };
+  }
+  if (oldVal === 'line') {
+    return { owner_email: false, staff_email: false, owner_line: defaults.owner_line, staff_line: defaults.staff_line, group_line: defaults.group_line };
+  }
+  return defaults;
+}
+
+/** 5フラグオブジェクトをカンマ区切り文字列に変換 */
+function notifyTargetsToString_(ch) {
+  var parts = [];
+  if (ch.owner_email) parts.push('owner_email');
+  if (ch.staff_email) parts.push('staff_email');
+  if (ch.owner_line) parts.push('owner_line');
+  if (ch.staff_line) parts.push('staff_line');
+  if (ch.group_line) parts.push('group_line');
+  return parts.join(',') || 'none';
+}
+
 var NOTIFY_CHANNEL_KEYS_ = [
   { key: '予約キャンセル', label: '予約キャンセル通知' },
   { key: '請求書要請', label: '請求書要請メール' },
@@ -4269,7 +4364,14 @@ function getNotifyChannelSettings() {
     });
     var channels = {};
     NOTIFY_CHANNEL_KEYS_.forEach(function(item) {
-      channels[item.key] = map['通知CH_' + item.key] || 'both';
+      var val = map['通知CH_' + item.key] || '';
+      if (!val) {
+        channels[item.key] = NOTIFY_DEFAULT_TARGETS_[item.key] || 'owner_email,owner_line';
+      } else if (val === 'both' || val === 'email' || val === 'line') {
+        channels[item.key] = notifyTargetsToString_(migrateOldChannelFormat_(item.key, val));
+      } else {
+        channels[item.key] = val;
+      }
     });
     return JSON.stringify({ success: true, channels: channels, keys: NOTIFY_CHANNEL_KEYS_ });
   } catch (e) {
@@ -4438,23 +4540,26 @@ function diagnoseNotifyChannels() {
 function getNotifyChannel_(notifyKey) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
-    if (!sheet || sheet.getLastRow() < 2) { Logger.log('[DEBUG-CH-v0305g] ' + notifyKey + ': sheet missing or empty → default both'); return { email: true, line: true }; }
+    if (!sheet || sheet.getLastRow() < 2) {
+      return parseNotifyTargets_(NOTIFY_DEFAULT_TARGETS_[notifyKey] || 'owner_email,owner_line');
+    }
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
-    var val = 'both';
+    var val = '';
     var targetKey = '通知CH_' + notifyKey;
-    var found = false;
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0] || '').trim() === targetKey) {
-        val = String(rows[i][1] || '').trim() || 'both';
-        found = true;
-        // breakしない: 重複行がある場合、最後の値を採用（saveと一貫性）
+        val = String(rows[i][1] || '').trim();
       }
     }
-    Logger.log('[DEBUG-CH-v0305g] ' + notifyKey + ': found=' + found + ' val=' + val + ' → email=' + (val === 'both' || val === 'email') + ' line=' + (val === 'both' || val === 'line'));
-    return { email: val === 'both' || val === 'email', line: val === 'both' || val === 'line' };
+    if (!val) {
+      return parseNotifyTargets_(NOTIFY_DEFAULT_TARGETS_[notifyKey] || 'owner_email,owner_line');
+    }
+    if (val === 'both' || val === 'email' || val === 'line') {
+      return migrateOldChannelFormat_(notifyKey, val);
+    }
+    return parseNotifyTargets_(val);
   } catch (e) {
-    Logger.log('[DEBUG-CH-v0305g] ' + notifyKey + ': EXCEPTION ' + e.toString() + ' → default both');
-    return { email: true, line: true };
+    return parseNotifyTargets_(NOTIFY_DEFAULT_TARGETS_[notifyKey] || 'owner_email,owner_line');
   }
 }
 
@@ -4829,6 +4934,58 @@ function sendLineMessage_(text, returnDebug, target) {
   }
 }
 
+/**
+ * スタッフ個別LINEに送信するヘルパー
+ * @param {Array} staffList - [{ staffName, lineUserId }] 対象スタッフ配列
+ * @param {string} text - 送信テキスト
+ */
+function sendLineToStaffMembers_(staffList, text) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    var map = {};
+    rows.forEach(function(row) {
+      var key = String(row[0] || '').trim();
+      if (key) map[key] = String(row[1] || '').trim();
+    });
+    var token = map['LINEチャネルアクセストークン'] || '';
+    if (!token) return;
+    var sentCount = 0;
+    for (var i = 0; i < staffList.length; i++) {
+      var userId = staffList[i].lineUserId;
+      if (!userId) continue;
+      try {
+        var payload = { to: userId, messages: [{ type: 'text', text: text }] };
+        var options = {
+          method: 'post', contentType: 'application/json',
+          headers: { 'Authorization': 'Bearer ' + token },
+          payload: JSON.stringify(payload), muteHttpExceptions: true
+        };
+        var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', options);
+        var code = resp.getResponseCode();
+        if (code === 200) sentCount++;
+        else Logger.log('sendLineToStaffMembers_: HTTP ' + code + ' for ' + staffList[i].staffName);
+      } catch (sendErr) {
+        Logger.log('sendLineToStaffMembers_ error for ' + staffList[i].staffName + ': ' + sendErr.toString());
+      }
+    }
+    Logger.log('sendLineToStaffMembers_: sent=' + sentCount + '/' + staffList.length);
+  } catch (e) {
+    Logger.log('sendLineToStaffMembers_ exception: ' + e.toString());
+  }
+}
+
+/**
+ * オーナーのメールアドレスを取得するヘルパー（通知関数用）
+ */
+function getOwnerEmailAddress_() {
+  try {
+    var res = JSON.parse(getOwnerEmail());
+    return (res && res.email) ? String(res.email).trim() : '';
+  } catch (e) { return ''; }
+}
+
 /**********************************************
  * 請求書要請メール設定（スタッフ宛）
  * デフォルト: 送信無し（enabled=false）
@@ -5002,7 +5159,7 @@ function sendInvoiceRequestEmails(testRecipient) {
         .replace(/\{締切日\}/g, deadlineText)
         .replace(/\{アプリURL\}/g, staffAppUrl);
       var _ch_inv = getNotifyChannel_('請求書要請');
-      if (_ch_inv.email) {
+      if (_ch_inv.staff_email) {
         try {
           GmailApp.sendEmail(email, subj, body, { name: '請求書要請（自動送信）' });
           sentCount++;
@@ -5011,25 +5168,28 @@ function sendInvoiceRequestEmails(testRecipient) {
         }
       }
     });
-    if (sentCount > 0 || !getNotifyChannel_('請求書要請').email) {
-      var _ch_inv2 = getNotifyChannel_('請求書要請');
-      if (_ch_inv2.line) {
-        // グループに依頼内容を送信（スタッフ名は「スタッフの皆さま」で共通化）
-        var lineBody = bodyTpl
-          .replace(/\{スタッフ名\}/g, 'スタッフの皆さま')
-          .replace(/\{対象年月\}/g, ymText)
-          .replace(/\{締切日\}/g, deadlineText)
-          .replace(/\{アプリURL\}/g, staffAppUrl);
-        var lineSubj = subject
-          .replace(/\{対象年月\}/g, ymText)
-          .replace(/\{スタッフ名\}/g, 'スタッフの皆さま')
-          .replace(/\{締切日\}/g, deadlineText)
-          .replace(/\{アプリURL\}/g, staffAppUrl);
-        Logger.log('[LINE-TARGET] 請求書要請: group（依頼内容）+ owner（サマリー）');
-        try { sendLineMessage_(lineSubj + '\n\n' + lineBody, false, 'group'); } catch (lineErr) {}
-        // オーナーにサマリーも送信
-        try { sendLineMessage_('請求書要請メールを' + sentCount + '名のスタッフに送信しました（' + ymText + '分）', false, 'owner'); } catch (lineErr) {}
-      }
+    // LINE/オーナー通知
+    var _ch_inv2 = getNotifyChannel_('請求書要請');
+    var lineBody = bodyTpl
+      .replace(/\{スタッフ名\}/g, 'スタッフの皆さま')
+      .replace(/\{対象年月\}/g, ymText)
+      .replace(/\{締切日\}/g, deadlineText)
+      .replace(/\{アプリURL\}/g, staffAppUrl);
+    var lineSubj = subject
+      .replace(/\{対象年月\}/g, ymText)
+      .replace(/\{スタッフ名\}/g, 'スタッフの皆さま')
+      .replace(/\{締切日\}/g, deadlineText)
+      .replace(/\{アプリURL\}/g, staffAppUrl);
+    var invLineText = lineSubj + '\n\n' + lineBody;
+    var invSummary = '請求書要請メールを' + sentCount + '名のスタッフに送信しました（' + ymText + '分）';
+    if (_ch_inv2.group_line) { try { sendLineMessage_(invLineText, false, 'group'); } catch (lineErr) {} }
+    if (_ch_inv2.owner_line) { try { sendLineMessage_(invSummary, false, 'owner'); } catch (lineErr) {} }
+    if (_ch_inv2.owner_email) {
+      try { var invOwner = getOwnerEmailAddress_(); if (invOwner) GmailApp.sendEmail(invOwner, lineSubj, invSummary); } catch (e) {}
+    }
+    if (_ch_inv2.staff_line) {
+      var invAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
+      try { sendLineToStaffMembers_(invAllStaff, invLineText); } catch (lineErr) {}
     }
     var msg = sentCount + '件送信しました。';
     if (errors.length) msg += ' エラー: ' + errors.join('; ');
@@ -5304,8 +5464,17 @@ function checkRosterReminder() {
             (rosterOwnerUrl ? 'アプリ: ' + rosterOwnerUrl + '\n\n' : '') +
             '※ アプリの通知にも同じ内容が届いています。';
         var _ch_roster = getNotifyChannel_('名簿未入力リマインド');
-        if (_ch_roster.email) GmailApp.sendEmail(ownerEmail, subj, body);
-        if (_ch_roster.line) { Logger.log('[LINE-TARGET] 名簿未入力リマインド: owner'); try { sendLineMessage_(subj + '\n\n' + body, false, 'owner'); } catch (lineErr) {} }
+        var rosterLineText = subj + '\n\n' + body;
+        if (_ch_roster.owner_email) GmailApp.sendEmail(ownerEmail, subj, body);
+        if (_ch_roster.owner_line) { try { sendLineMessage_(rosterLineText, false, 'owner'); } catch (lineErr) {} }
+        if (_ch_roster.group_line) { try { sendLineMessage_(rosterLineText, false, 'group'); } catch (lineErr) {} }
+        if (_ch_roster.staff_email) {
+          var rosterAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
+          rosterAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subj, body); } catch (e) {} });
+        }
+        if (_ch_roster.staff_line) {
+          try { sendLineToStaffMembers_(getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet()), rosterLineText); } catch (lineErr) {}
+        }
       } catch (e) {
         Logger.log('名簿リマインダーメール送信失敗: ' + e.toString());
       }
@@ -6276,8 +6445,17 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
       subject = '\u3010\u6C11\u6CCA\u3011\u6E05\u6383\u30B9\u30BF\u30C3\u30D5\u52DF\u96C6: ' + ph['\u4F5C\u696D\u65E5'];
     }
     var _ch_recruit = getNotifyChannel_('清掃スタッフ募集');
-    if (_ch_recruit.email) GmailApp.sendEmail(emails.join(','), subject, body);
-    if (_ch_recruit.line) { Logger.log('[LINE-TARGET] 清掃スタッフ募集: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
+    var recruitLineText = subject + '\n\n' + body;
+    if (_ch_recruit.staff_email) GmailApp.sendEmail(emails.join(','), subject, body);
+    if (_ch_recruit.group_line) { try { sendLineMessage_(recruitLineText, false, 'group'); } catch (lineErr) {} }
+    if (_ch_recruit.owner_line) { try { sendLineMessage_(recruitLineText, false, 'owner'); } catch (lineErr) {} }
+    if (_ch_recruit.owner_email) {
+      try { var recruitOwner = getOwnerEmailAddress_(); if (recruitOwner) GmailApp.sendEmail(recruitOwner, subject, body); } catch (e) {}
+    }
+    if (_ch_recruit.staff_line) {
+      var recruitAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
+      try { sendLineToStaffMembers_(recruitAllStaff, recruitLineText); } catch (lineErr) {}
+    }
   } catch (e) {
     Logger.log('notifyStaffForRecruitment: ' + e.toString());
   }
@@ -6348,8 +6526,17 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
         var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateDisp + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
           + (detailUrl ? '\n\n清掃詳細: ' + detailUrl : '');
         var _ch_cancelReq = getNotifyChannel_('出勤キャンセル要望');
-        if (_ch_cancelReq.email) GmailApp.sendEmail(ownerEmail, subject, body);
-        if (_ch_cancelReq.line) { Logger.log('[LINE-TARGET] 出勤キャンセル要望: owner'); try { sendLineMessage_(subject + '\n\n' + body, false, 'owner'); } catch (lineErr) {} }
+        var cancelReqLineText = subject + '\n\n' + body;
+        if (_ch_cancelReq.owner_email) GmailApp.sendEmail(ownerEmail, subject, body);
+        if (_ch_cancelReq.owner_line) { try { sendLineMessage_(cancelReqLineText, false, 'owner'); } catch (lineErr) {} }
+        if (_ch_cancelReq.group_line) { try { sendLineMessage_(cancelReqLineText, false, 'group'); } catch (lineErr) {} }
+        if (_ch_cancelReq.staff_email) {
+          var crAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
+          crAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
+        }
+        if (_ch_cancelReq.staff_line) {
+          try { sendLineToStaffMembers_(getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet()), cancelReqLineText); } catch (lineErr) {}
+        }
       }
     } catch (mailErr) { Logger.log('Cancel request email failed: ' + mailErr.toString()); }
     return JSON.stringify({ success: true });
@@ -6445,8 +6632,17 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
         var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
           + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
         var _ch_approve = getNotifyChannel_('キャンセル承認');
-        if (_ch_approve.email) GmailApp.sendEmail(sEmail, subject, body);
-        if (_ch_approve.line) { Logger.log('[LINE-TARGET] キャンセル承認: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
+        var approveLineText = subject + '\n\n' + body;
+        if (_ch_approve.staff_email && sEmail) GmailApp.sendEmail(sEmail, subject, body);
+        if (_ch_approve.group_line) { try { sendLineMessage_(approveLineText, false, 'group'); } catch (lineErr) {} }
+        if (_ch_approve.owner_line) { try { sendLineMessage_(approveLineText, false, 'owner'); } catch (lineErr) {} }
+        if (_ch_approve.owner_email) {
+          try { var approveOwner = getOwnerEmailAddress_(); if (approveOwner) GmailApp.sendEmail(approveOwner, subject, body); } catch (e) {}
+        }
+        if (_ch_approve.staff_line) {
+          var approveStaff = getAllActiveStaff_(ss).filter(function(s) { return s.staffName === sName || s.email.toLowerCase() === sEmail; });
+          try { sendLineToStaffMembers_(approveStaff, approveLineText); } catch (lineErr) {}
+        }
       } catch (mailErr) {}
     }
 
@@ -6494,8 +6690,17 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
         var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
           + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
         var _ch_reject = getNotifyChannel_('キャンセル却下');
-        if (_ch_reject.email) GmailApp.sendEmail(sEmail, subject, body);
-        if (_ch_reject.line) { Logger.log('[LINE-TARGET] キャンセル却下: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
+        var rejectLineText = subject + '\n\n' + body;
+        if (_ch_reject.staff_email && sEmail) GmailApp.sendEmail(sEmail, subject, body);
+        if (_ch_reject.group_line) { try { sendLineMessage_(rejectLineText, false, 'group'); } catch (lineErr) {} }
+        if (_ch_reject.owner_line) { try { sendLineMessage_(rejectLineText, false, 'owner'); } catch (lineErr) {} }
+        if (_ch_reject.owner_email) {
+          try { var rejectOwner = getOwnerEmailAddress_(); if (rejectOwner) GmailApp.sendEmail(rejectOwner, subject, body); } catch (e) {}
+        }
+        if (_ch_reject.staff_line) {
+          var rejectStaff = getAllActiveStaff_(ss).filter(function(s) { return s.staffName === sName || s.email.toLowerCase() === sEmail; });
+          try { sendLineToStaffMembers_(rejectStaff, rejectLineText); } catch (lineErr) {}
+        }
       } catch (mailErr) {}
     }
 
@@ -7497,13 +7702,22 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
           sendResult = 'メール送信OFF（PDF作成は成功）';
         } else {
           var _ch_invoice = getNotifyChannel_('請求書送信');
-          if (_ch_invoice.email) {
+          var invoiceLineText = subject + '\n\n' + bodyText;
+          if (_ch_invoice.owner_email) {
             GmailApp.sendEmail(ownerEmail, subject, bodyText, {
               attachments: [pdfBlob],
               name: '請求書（自動送信）'
             });
           }
-          if (_ch_invoice.line) { Logger.log('[LINE-TARGET] 請求書送信: owner'); try { sendLineMessage_(subject + '\n\n' + bodyText, false, 'owner'); } catch (lineErr) {} }
+          if (_ch_invoice.owner_line) { try { sendLineMessage_(invoiceLineText, false, 'owner'); } catch (lineErr) {} }
+          if (_ch_invoice.group_line) { try { sendLineMessage_(invoiceLineText, false, 'group'); } catch (lineErr) {} }
+          if (_ch_invoice.staff_email) {
+            var invSendAllStaff = getAllActiveStaff_(ss);
+            invSendAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, bodyText); } catch (e) {} });
+          }
+          if (_ch_invoice.staff_line) {
+            try { sendLineToStaffMembers_(getAllActiveStaff_(ss), invoiceLineText); } catch (lineErr) {}
+          }
           sendResult = '送信済み：' + ownerEmail;
         }
       } catch (mailErr) {
@@ -8110,7 +8324,7 @@ function getAllActiveStaff_(ss) {
   }
   var staffSheet = ss.getSheetByName(SHEET_STAFF);
   if (!staffSheet || staffSheet.getLastRow() < 2) return [];
-  var lastCol = Math.max(staffSheet.getLastColumn(), 12);
+  var lastCol = Math.max(staffSheet.getLastColumn(), 13);
   var rows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
   var result = rows.map(function(row) {
     var name = String(row[0] || '').trim();
@@ -8120,7 +8334,8 @@ function getAllActiveStaff_(ss) {
     var hidden = lastCol >= 12 ? String(row[11] || '').trim() === 'Y' : false;
     if (hidden) return null;
     var order = parseInt(row[10], 10) || 9999;
-    return { staffName: name || email, email: email, displayOrder: order };
+    var lineUserId = lastCol >= 13 ? String(row[12] || '').trim() : '';
+    return { staffName: name || email, email: email, displayOrder: order, lineUserId: lineUserId };
   }).filter(Boolean).sort(function(a, b) { return a.displayOrder - b.displayOrder; });
   try { cache.put('activeStaffList', JSON.stringify(result), 600); } catch (e) { /* ignore cache write errors */ }
   return result;
@@ -9054,8 +9269,17 @@ function notifyStaffConfirmation(recruitRowIndex) {
       .replace(/\{作業日\}/g, fmtDate)
       .replace(/\{スタッフ一覧\}/g, selectedStaff);
     var _ch_confirm = getNotifyChannel_('スタッフ確定');
-    if (_ch_confirm.email) GmailApp.sendEmail(emails.join(','), subject, body);
-    if (_ch_confirm.line) { Logger.log('[LINE-TARGET] スタッフ確定: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
+    var confirmLineText = subject + '\n\n' + body;
+    if (_ch_confirm.staff_email) GmailApp.sendEmail(emails.join(','), subject, body);
+    if (_ch_confirm.group_line) { try { sendLineMessage_(confirmLineText, false, 'group'); } catch (lineErr) {} }
+    if (_ch_confirm.owner_line) { try { sendLineMessage_(confirmLineText, false, 'owner'); } catch (lineErr) {} }
+    if (_ch_confirm.owner_email) {
+      try { var confirmOwner = getOwnerEmailAddress_(); if (confirmOwner) GmailApp.sendEmail(confirmOwner, subject, body); } catch (e) {}
+    }
+    if (_ch_confirm.staff_line) {
+      var confirmStaffList = getAllActiveStaff_(ss).filter(function(s) { return emails.indexOf(s.email) >= 0 || emails.indexOf(s.email.toLowerCase()) >= 0; });
+      try { sendLineToStaffMembers_(confirmStaffList, confirmLineText); } catch (lineErr) {}
+    }
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -9208,14 +9432,16 @@ function checkAndSendReminders() {
             var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var _ch_remind = getNotifyChannel_('募集リマインド');
-            Logger.log('[DEBUG-REMIND-v0305g] channel: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' | subjTpl=' + subjTpl + ' | subj=' + subj + ' | recruitDateDisp=' + recruitDateDisp + ' | to=' + to.join(','));
-            if (_ch_remind.email) {
-              Logger.log('[DEBUG-REMIND-v0305g] SENDING EMAIL (email=true)');
-              GmailApp.sendEmail(to.join(','), subj, body);
-            } else {
-              Logger.log('[DEBUG-REMIND-v0305g] SKIPPED EMAIL (email=false)');
+            var remindLineText = subj + '\n\n' + body;
+            if (_ch_remind.staff_email) { GmailApp.sendEmail(to.join(','), subj, body); }
+            if (_ch_remind.group_line) { try { sendLineMessage_(remindLineText, false, 'group'); } catch (lineErr) {} }
+            if (_ch_remind.owner_line) { try { sendLineMessage_(remindLineText, false, 'owner'); } catch (lineErr) {} }
+            if (_ch_remind.owner_email) {
+              try { var remindOwner = getOwnerEmailAddress_(); if (remindOwner) GmailApp.sendEmail(remindOwner, subj, body); } catch (e) {}
             }
-            if (_ch_remind.line) { Logger.log('[LINE-TARGET] 募集リマインド: group'); try { sendLineMessage_(subj + '\n\n' + body, false, 'group'); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
+            if (_ch_remind.staff_line) {
+              try { sendLineToStaffMembers_(getAllActiveStaff_(ss), remindLineText); } catch (lineErr) {}
+            }
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
@@ -9726,14 +9952,17 @@ function checkAndSendReminderEmails() {
                   + '清掃詳細: ' + detailLink + '\n\n'
                   + '早めに清掃スタッフの手配をお願いします。';
               var _ch_undecided = getNotifyChannel_('スタッフ未決定リマインド');
-              Logger.log('[DEBUG-UNDECIDED-v0305g] channel: email=' + _ch_undecided.email + ' line=' + _ch_undecided.line + ' | subj=' + subject + ' | tmplSubject=' + tmplSubject + ' | ownerEmail=' + ownerEmail);
-              if (_ch_undecided.email) {
-                Logger.log('[DEBUG-UNDECIDED-v0305g] SENDING EMAIL (email=true)');
-                GmailApp.sendEmail(ownerEmail, subject, body);
-              } else {
-                Logger.log('[DEBUG-UNDECIDED-v0305g] SKIPPED EMAIL (email=false)');
+              var undecidedLineText = subject + '\n\n' + body;
+              if (_ch_undecided.owner_email) { GmailApp.sendEmail(ownerEmail, subject, body); }
+              if (_ch_undecided.owner_line) { try { sendLineMessage_(undecidedLineText, false, 'owner'); } catch (lineErr) {} }
+              if (_ch_undecided.group_line) { try { sendLineMessage_(undecidedLineText, false, 'group'); } catch (lineErr) {} }
+              if (_ch_undecided.staff_email) {
+                var undecAllStaff = getAllActiveStaff_(ss);
+                undecAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
               }
-              if (_ch_undecided.line) { Logger.log('[LINE-TARGET] スタッフ未決定リマインド: owner'); try { sendLineMessage_(subject + '\n\n' + body, false, 'owner'); } catch (lineErr) { Logger.log('未決定リマインド LINE送信エラー: ' + lineErr.toString()); } }
+              if (_ch_undecided.staff_line) {
+                try { sendLineToStaffMembers_(getAllActiveStaff_(ss), undecidedLineText); } catch (lineErr) {}
+              }
               newSent.push(remIdx);
             } catch (mailErr) {
               Logger.log('reminderEmail error: ' + mailErr.toString());
@@ -9818,8 +10047,17 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
         + '清掃詳細: ' + detailLink + '\n\n'
         + '早急に清掃スタッフの手配をお願いします。';
     var _ch_immediate = getNotifyChannel_('直前予約リマインド');
-    if (_ch_immediate.email) GmailApp.sendEmail(ownerEmail, subject, body);
-    if (_ch_immediate.line) { Logger.log('[LINE-TARGET] 直前予約リマインド: owner'); try { sendLineMessage_(subject + '\n\n' + body, false, 'owner'); } catch (lineErr) {} }
+    var immediateLineText = subject + '\n\n' + body;
+    if (_ch_immediate.owner_email) GmailApp.sendEmail(ownerEmail, subject, body);
+    if (_ch_immediate.owner_line) { try { sendLineMessage_(immediateLineText, false, 'owner'); } catch (lineErr) {} }
+    if (_ch_immediate.group_line) { try { sendLineMessage_(immediateLineText, false, 'group'); } catch (lineErr) {} }
+    if (_ch_immediate.staff_email) {
+      var immAllStaff = getAllActiveStaff_(ss);
+      immAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
+    }
+    if (_ch_immediate.staff_line) {
+      try { sendLineToStaffMembers_(getAllActiveStaff_(ss), immediateLineText); } catch (lineErr) {}
+    }
     addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
   } catch (e) {
     Logger.log('sendImmediateReminderIfNeeded_: ' + e.toString());
@@ -10281,10 +10519,19 @@ function notifyCleaningComplete(checkoutDate) {
       }
       if (completeDetailUrl) body += '\n清掃詳細: ' + completeDetailUrl + '\n';
       var _ch_complete = getNotifyChannel_('清掃完了');
-      if (_ch_complete.email && isEmailNotifyEnabled_('清掃完了通知有効')) {
+      var completeLineText = subject + '\n\n' + body;
+      if (_ch_complete.owner_email && isEmailNotifyEnabled_('清掃完了通知有効')) {
         GmailApp.sendEmail(ownerEmail, subject, body);
       }
-      if (_ch_complete.line) { Logger.log('[LINE-TARGET] 清掃完了: owner'); try { sendLineMessage_(subject + '\n\n' + body, false, 'owner'); } catch (lineErr) {} }
+      if (_ch_complete.owner_line) { try { sendLineMessage_(completeLineText, false, 'owner'); } catch (lineErr) {} }
+      if (_ch_complete.group_line) { try { sendLineMessage_(completeLineText, false, 'group'); } catch (lineErr) {} }
+      if (_ch_complete.staff_email) {
+        var compAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
+        compAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
+      }
+      if (_ch_complete.staff_line) {
+        try { sendLineToStaffMembers_(getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet()), completeLineText); } catch (lineErr) {}
+      }
     }
     return JSON.stringify({ success: true, message: '清掃完了通知を送信しました。' });
   } catch (e) {

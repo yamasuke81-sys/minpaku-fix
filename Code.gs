@@ -5140,15 +5140,17 @@ function sendInvoiceRequestEmails(testRecipient) {
         return JSON.stringify({ success: false, error: '送信失敗: ' + e.toString() });
       }
     }
-    // スタッフ一覧取得（全員に送信）
+    // スタッフ一覧取得（非表示スタッフを除外して送信）
     var staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) {
       return JSON.stringify({ success: true, message: 'スタッフが登録されていません。', sent: 0 });
     }
-    var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 3).getValues();
+    var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
     var sentCount = 0;
     var errors = [];
     staffRows.forEach(function(row) {
+      var hidden = String(row[11] || '').trim();
+      if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
       var name = String(row[0] || '').trim();
       var email = String(row[2] || '').trim(); // C列=メール（row[1]はB列=住所なので注意）
       if (!email || !/@/.test(email)) return;
@@ -6402,7 +6404,6 @@ function createRecruitmentForBooking(bookingRowNumber, checkoutDateStr) {
 
 function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowNumber) {
   try {
-    if (!isEmailNotifyEnabled_('募集開始通知有効')) return;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) return;
@@ -6452,12 +6453,15 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
     }
     var _ch_recruit = getNotifyChannel_('清掃スタッフ募集');
     var recruitLineText = subject + '\n\n' + body;
-    if (_ch_recruit.staff_email) GmailApp.sendEmail(emails.join(','), subject, body);
-    if (_ch_recruit.group_line) { try { sendLineMessage_(recruitLineText, false, 'group'); } catch (lineErr) {} }
-    if (_ch_recruit.owner_line) { try { sendLineMessage_(recruitLineText, false, 'owner'); } catch (lineErr) {} }
-    if (_ch_recruit.owner_email) {
+    var recruitEmailEnabled = isEmailNotifyEnabled_('募集開始通知有効');
+    // メール送信（isEmailNotifyEnabled_ + チャンネル制御）
+    if (recruitEmailEnabled && _ch_recruit.staff_email) GmailApp.sendEmail(emails.join(','), subject, body);
+    if (recruitEmailEnabled && _ch_recruit.owner_email) {
       try { var recruitOwner = getOwnerEmailAddress_(); if (recruitOwner) GmailApp.sendEmail(recruitOwner, subject, body); } catch (e) {}
     }
+    // LINE送信（チャンネル制御のみ）
+    if (_ch_recruit.group_line) { try { sendLineMessage_(recruitLineText, false, 'group'); } catch (lineErr) {} }
+    if (_ch_recruit.owner_line) { try { sendLineMessage_(recruitLineText, false, 'owner'); } catch (lineErr) {} }
     if (_ch_recruit.staff_line) {
       var recruitAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
       try { sendLineToStaffMembers_(recruitAllStaff, recruitLineText); } catch (lineErr) {}
@@ -9227,7 +9231,6 @@ function getConfirmationCopyText(recruitRowIndex) {
 function notifyStaffConfirmation(recruitRowIndex) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ実行できます。' });
-    if (!isEmailNotifyEnabled_('スタッフ確定通知有効')) return JSON.stringify({ success: true, message: 'メール通知はOFFに設定されています。' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     if (!recruitSheet || recruitSheet.getLastRow() < recruitRowIndex) return JSON.stringify({ success: false, error: '募集が見つかりません' });
@@ -9238,12 +9241,16 @@ function notifyStaffConfirmation(recruitRowIndex) {
     var checkoutDateStr = getCheckoutDateFromFormSheet_(bookingRowNumber, ss) || recruitDateStr;
     var selectedStaff = String(row[4] || '').trim();
 
-    // スタッフ全員のメールアドレスを取得
+    // スタッフ全員のメールアドレスを取得（非表示スタッフを除外）
     var staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフが登録されていません' });
     var emailSet = {};
-    var data = staffSheet.getRange(2, 3, staffSheet.getLastRow() - 1, 1).getValues();
-    data.forEach(function(r) { var e = String(r[0] || '').trim().toLowerCase(); if (e) emailSet[e] = 1; });
+    var data = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
+    data.forEach(function(r) {
+      var hidden = String(r[11] || '').trim();
+      if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
+      var e = String(r[2] || '').trim().toLowerCase(); if (e) emailSet[e] = 1;
+    });
     var emails = Object.keys(emailSet);
     if (emails.length === 0) return JSON.stringify({ success: false, error: 'メールアドレスが登録されていません' });
 
@@ -9282,12 +9289,15 @@ function notifyStaffConfirmation(recruitRowIndex) {
       .replace(/\{スタッフ一覧\}/g, selectedStaff);
     var _ch_confirm = getNotifyChannel_('スタッフ確定');
     var confirmLineText = subject + '\n\n' + body;
-    if (_ch_confirm.staff_email) GmailApp.sendEmail(emails.join(','), subject, body);
-    if (_ch_confirm.group_line) { try { sendLineMessage_(confirmLineText, false, 'group'); } catch (lineErr) {} }
-    if (_ch_confirm.owner_line) { try { sendLineMessage_(confirmLineText, false, 'owner'); } catch (lineErr) {} }
-    if (_ch_confirm.owner_email) {
+    var confirmEmailEnabled = isEmailNotifyEnabled_('スタッフ確定通知有効');
+    // メール送信（isEmailNotifyEnabled_ + チャンネル制御）
+    if (confirmEmailEnabled && _ch_confirm.staff_email) GmailApp.sendEmail(emails.join(','), subject, body);
+    if (confirmEmailEnabled && _ch_confirm.owner_email) {
       try { var confirmOwner = getOwnerEmailAddress_(); if (confirmOwner) GmailApp.sendEmail(confirmOwner, subject, body); } catch (e) {}
     }
+    // LINE送信（チャンネル制御のみ）
+    if (_ch_confirm.group_line) { try { sendLineMessage_(confirmLineText, false, 'group'); } catch (lineErr) {} }
+    if (_ch_confirm.owner_line) { try { sendLineMessage_(confirmLineText, false, 'owner'); } catch (lineErr) {} }
     if (_ch_confirm.staff_line) {
       var confirmStaffList = getAllActiveStaff_(ss).filter(function(s) { return emails.indexOf(s.email) >= 0 || emails.indexOf(s.email.toLowerCase()) >= 0; });
       try { sendLineToStaffMembers_(confirmStaffList, confirmLineText); } catch (lineErr) {}

@@ -6083,7 +6083,7 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
     }
     var _ch_recruit = getNotifyChannel_('清掃スタッフ募集');
     if (_ch_recruit.email) GmailApp.sendEmail(emails.join(','), subject, body);
-    if (_ch_recruit.line) { Logger.log('[LINE-TARGET] 清掃スタッフ募集: group'); try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
+    if (_ch_recruit.line) { Logger.log('[LINE-TARGET] 清掃スタッフ募集: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
   } catch (e) {
     Logger.log('notifyStaffForRecruitment: ' + e.toString());
   }
@@ -6252,7 +6252,7 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
           + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
         var _ch_approve = getNotifyChannel_('キャンセル承認');
         if (_ch_approve.email) GmailApp.sendEmail(sEmail, subject, body);
-        if (_ch_approve.line) { Logger.log('[LINE-TARGET] キャンセル承認: group'); try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
+        if (_ch_approve.line) { Logger.log('[LINE-TARGET] キャンセル承認: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
       } catch (mailErr) {}
     }
 
@@ -6301,7 +6301,7 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
           + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
         var _ch_reject = getNotifyChannel_('キャンセル却下');
         if (_ch_reject.email) GmailApp.sendEmail(sEmail, subject, body);
-        if (_ch_reject.line) { Logger.log('[LINE-TARGET] キャンセル却下: group'); try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
+        if (_ch_reject.line) { Logger.log('[LINE-TARGET] キャンセル却下: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
       } catch (mailErr) {}
     }
 
@@ -8861,7 +8861,7 @@ function notifyStaffConfirmation(recruitRowIndex) {
       .replace(/\{スタッフ一覧\}/g, selectedStaff);
     var _ch_confirm = getNotifyChannel_('スタッフ確定');
     if (_ch_confirm.email) GmailApp.sendEmail(emails.join(','), subject, body);
-    if (_ch_confirm.line) { Logger.log('[LINE-TARGET] スタッフ確定: group'); try { sendLineMessage_(subject + '\n\n' + body); } catch (lineErr) {} }
+    if (_ch_confirm.line) { Logger.log('[LINE-TARGET] スタッフ確定: group'); try { sendLineMessage_(subject + '\n\n' + body, false, 'group'); } catch (lineErr) {} }
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -9015,7 +9015,7 @@ function checkAndSendReminders() {
             var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var _ch_remind = getNotifyChannel_('募集リマインド');
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
-            if (_ch_remind.line) { Logger.log('[LINE-TARGET] 募集リマインド: group'); try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
+            if (_ch_remind.line) { Logger.log('[LINE-TARGET] 募集リマインド: group'); try { sendLineMessage_(subj + '\n\n' + body, false, 'group'); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
           }
         }
         recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));

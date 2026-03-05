@@ -9505,10 +9505,94 @@ function listTriggers() {
         id: triggers[i].getUniqueId()
       });
     }
+    Logger.log('listTriggers: ' + JSON.stringify(list));
     return JSON.stringify({ success: true, triggers: list });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/**
+ * 全トリガーを削除して最新バージョンで再作成する
+ * 古いバージョンに紐づいたトリガーを一掃するための関数。
+ * GASエディタから手動実行する。
+ */
+function recreateAllTriggers() {
+  var results = [];
+  // ステップ1: 既存トリガーを全削除
+  var triggers = ScriptApp.getProjectTriggers();
+  var deletedCount = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    try {
+      var funcName = triggers[i].getHandlerFunction();
+      ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
+      Logger.log('削除: ' + funcName);
+    } catch (e) {
+      Logger.log('削除失敗: ' + e.toString());
+    }
+  }
+  results.push('削除済み: ' + deletedCount + '件');
+
+  // ステップ2: リマインド系トリガーを再作成（1時間ごと）
+  ScriptApp.newTrigger('checkAndSendReminders')
+    .timeBased().everyHours(1).create();
+  results.push('作成: checkAndSendReminders (1時間ごと)');
+
+  ScriptApp.newTrigger('checkAndSendReminderEmails')
+    .timeBased().everyHours(1).create();
+  results.push('作成: checkAndSendReminderEmails (1時間ごと)');
+
+  // ステップ3: iCal同期トリガーを再作成（設定から間隔を読む）
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var settingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var syncInterval = 1; // デフォルト1時間
+    if (settingsSheet && settingsSheet.getLastRow() >= 2) {
+      var sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
+      for (var j = 0; j < sRows.length; j++) {
+        if (String(sRows[j][0]).trim() === 'iCal同期間隔') {
+          syncInterval = parseInt(sRows[j][1], 10) || 1;
+          break;
+        }
+      }
+    }
+    ScriptApp.newTrigger('autoSyncFromICal')
+      .timeBased().everyHours(syncInterval).create();
+    results.push('作成: autoSyncFromICal (' + syncInterval + '時間ごと)');
+  } catch (e) {
+    // iCal同期設定がない場合はデフォルト1時間
+    ScriptApp.newTrigger('autoSyncFromICal')
+      .timeBased().everyHours(1).create();
+    results.push('作成: autoSyncFromICal (1時間ごと, デフォルト)');
+  }
+
+  // ステップ4: 請求書要請トリガー（存在する場合のみ再作成）
+  try {
+    var ss2 = SpreadsheetApp.getActiveSpreadsheet();
+    var rSheet = ss2.getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (rSheet && rSheet.getLastRow() >= 2) {
+      var rows = rSheet.getRange(2, 1, rSheet.getLastRow() - 1, 2).getValues();
+      var invoiceEnabled = false;
+      for (var k = 0; k < rows.length; k++) {
+        if (String(rows[k][0]).trim() === '請求書要請有効' && String(rows[k][1]).trim() === 'yes') {
+          invoiceEnabled = true;
+          break;
+        }
+      }
+      if (invoiceEnabled) {
+        ScriptApp.newTrigger('sendInvoiceRequestEmails')
+          .timeBased().everyHours(1).create();
+        results.push('作成: sendInvoiceRequestEmails (1時間ごと)');
+      }
+    }
+  } catch (e) {
+    Logger.log('請求書トリガー再作成スキップ: ' + e.toString());
+  }
+
+  var summary = results.join('\n');
+  Logger.log('=== recreateAllTriggers 完了 ===\n' + summary);
+  return JSON.stringify({ success: true, message: summary });
 }
 
 /**

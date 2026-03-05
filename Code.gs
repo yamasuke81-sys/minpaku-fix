@@ -4438,18 +4438,22 @@ function diagnoseNotifyChannels() {
 function getNotifyChannel_(notifyKey) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
-    if (!sheet || sheet.getLastRow() < 2) return { email: true, line: true };
+    if (!sheet || sheet.getLastRow() < 2) { Logger.log('[DEBUG-CH-v0305g] ' + notifyKey + ': sheet missing or empty → default both'); return { email: true, line: true }; }
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
     var val = 'both';
     var targetKey = '通知CH_' + notifyKey;
+    var found = false;
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0] || '').trim() === targetKey) {
         val = String(rows[i][1] || '').trim() || 'both';
+        found = true;
         // breakしない: 重複行がある場合、最後の値を採用（saveと一貫性）
       }
     }
+    Logger.log('[DEBUG-CH-v0305g] ' + notifyKey + ': found=' + found + ' val=' + val + ' → email=' + (val === 'both' || val === 'email') + ' line=' + (val === 'both' || val === 'line'));
     return { email: val === 'both' || val === 'email', line: val === 'both' || val === 'line' };
   } catch (e) {
+    Logger.log('[DEBUG-CH-v0305g] ' + notifyKey + ': EXCEPTION ' + e.toString() + ' → default both');
     return { email: true, line: true };
   }
 }
@@ -9204,7 +9208,13 @@ function checkAndSendReminders() {
             var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var _ch_remind = getNotifyChannel_('募集リマインド');
-            if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
+            Logger.log('[DEBUG-REMIND-v0305g] channel: email=' + _ch_remind.email + ' line=' + _ch_remind.line + ' | subjTpl=' + subjTpl + ' | subj=' + subj + ' | recruitDateDisp=' + recruitDateDisp + ' | to=' + to.join(','));
+            if (_ch_remind.email) {
+              Logger.log('[DEBUG-REMIND-v0305g] SENDING EMAIL (email=true)');
+              GmailApp.sendEmail(to.join(','), subj, body);
+            } else {
+              Logger.log('[DEBUG-REMIND-v0305g] SKIPPED EMAIL (email=false)');
+            }
             if (_ch_remind.line) { Logger.log('[LINE-TARGET] 募集リマインド: group'); try { sendLineMessage_(subj + '\n\n' + body, false, 'group'); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
           }
         }

@@ -1845,8 +1845,10 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
     var cleaningStaff = newMap.cleaningStaff >= 0 ? String(formSheet.getRange(rowNumber, newMap.cleaningStaff + 1).getValue() || '').trim() : '';
     var ciVal = newMap.checkIn >= 0 ? formSheet.getRange(rowNumber, newMap.checkIn + 1).getValue() : '';
     var coVal = newMap.checkOut >= 0 ? formSheet.getRange(rowNumber, newMap.checkOut + 1).getValue() : '';
-    var ciStr = ciVal ? (ciVal instanceof Date ? Utilities.formatDate(ciVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(ciVal).trim()) : '';
-    var coStr = coVal ? (coVal instanceof Date ? Utilities.formatDate(coVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(coVal).trim()) : '';
+    var ciRaw = ciVal ? (ciVal instanceof Date ? Utilities.formatDate(ciVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(ciVal).trim()) : '';
+    var coRaw = coVal ? (coVal instanceof Date ? Utilities.formatDate(coVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(coVal).trim()) : '';
+    var ciStr = formatDateWithDay_(ciRaw) || ciRaw;
+    var coStr = formatDateWithDay_(coRaw) || coRaw;
     var dateRange = ciStr + '～' + coStr;
 
     // 募集ステータスを「キャンセル」に更新
@@ -4294,8 +4296,9 @@ function sendTestNotification(notifyKey, lineTarget) {
     // 通知種別ごとのサンプルメッセージを作成
     var subject = '';
     var body = '';
-    var sampleDate = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
-    var sampleDetailUrl = buildCleaningDetailUrl_(sampleDate);
+    var sampleDateKey = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+    var sampleDate = formatDateWithDay_(sampleDateKey);
+    var sampleDetailUrl = buildCleaningDetailUrl_(sampleDateKey);
 
     switch (notifyKey) {
       case '清掃スタッフ募集':
@@ -4307,7 +4310,7 @@ function sendTestNotification(notifyKey, lineTarget) {
         if (rsBody) {
           body = rsBody;
         } else {
-          body = '\u6E05\u6383\u52DF\u96C6\n\n\u4F5C\u696D\u65E5: ' + sampleDate + '\n\n\u6B21\u56DE\u4E88\u7D04\uFF08\u5909\u66F4\u306E\u53EF\u80FD\u6027\u3042\u308A\uFF09\n\u65E5\u4ED8:\u3000\u3000' + sampleDate + ' \u301C ' + sampleDate + '\n\u4EBA\u6570:\u3000\u3000\u5927\u4EBA2\u540D\n\u30D9\u30C3\u30C9:\u3000' + '1\u4EBA1\u53F0\u305A\u3064\nBBQ:\u3000\u3000\u306A\u3057\n\u56FD\u7C4D:\u3000\u3000\u65E5\u672C\n\n\u203B\u4E88\u7D04\u72B6\u6CC1\u6B21\u7B2C\u3067\u306F\u5909\u66F4\u3068\u306A\u308B\u5834\u5408\u304C\u3042\u308A\u307E\u3059\u3002\n\nWeb\u30A2\u30D7\u30EA\u3067\u56DE\u7B54: https://example.com/?date=' + sampleDate;
+          body = '\u6E05\u6383\u52DF\u96C6\n\n\u4F5C\u696D\u65E5: ' + sampleDate + '\n\n\u6B21\u56DE\u4E88\u7D04\uFF08\u5909\u66F4\u306E\u53EF\u80FD\u6027\u3042\u308A\uFF09\n\u65E5\u4ED8:\u3000\u3000' + sampleDate + ' \u301C ' + sampleDate + '\n\u4EBA\u6570:\u3000\u3000\u5927\u4EBA2\u540D\n\u30D9\u30C3\u30C9:\u3000' + '1\u4EBA1\u53F0\u305A\u3064\nBBQ:\u3000\u3000\u306A\u3057\n\u56FD\u7C4D:\u3000\u3000\u65E5\u672C\n\n\u203B\u4E88\u7D04\u72B6\u6CC1\u6B21\u7B2C\u3067\u306F\u5909\u66F4\u3068\u306A\u308B\u5834\u5408\u304C\u3042\u308A\u307E\u3059\u3002\n\nWeb\u30A2\u30D7\u30EA\u3067\u56DE\u7B54: https://example.com/?date=' + sampleDateKey;
         }
         var rsKeys = Object.keys(recruitSampleVars);
         for (var rsi = 0; rsi < rsKeys.length; rsi++) {
@@ -4320,7 +4323,7 @@ function sendTestNotification(notifyKey, lineTarget) {
         var rrSubj = (settingsMap['募集リマインド件名'] || '').trim();
         var rrBody = (settingsMap['募集リマインド本文'] || '').trim();
         var rrStaffUrl = getStaffAppUrl_();
-        var rrAnswerUrl = rrStaffUrl ? rrStaffUrl + (rrStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(sampleDate) : '';
+        var rrAnswerUrl = rrStaffUrl ? rrStaffUrl + (rrStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(sampleDateKey) : '';
         subject = rrSubj || '清掃スタッフ募集のリマインド: ' + sampleDate;
         body = rrBody || 'まだ回答が2名に達していません。\nチェックアウト日: ' + sampleDate + '\n現在の回答数: 1名\n\nWebアプリで回答: ' + rrAnswerUrl;
         subject = subject.split('{チェックアウト}').join(sampleDate).split('{回答数}').join('1').split('{最少回答者数}').join('2').split('{回答URL}').join(rrAnswerUrl);
@@ -4372,9 +4375,9 @@ function sendTestNotification(notifyKey, lineTarget) {
         var sampleOwnerUrl = '';
         try { sampleOwnerUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
         subject = rosSubj || '宿泊者名簿の未記入通知（2件）';
-        body = rosBody || '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB\n\n' + (sampleOwnerUrl ? 'アプリ: ' + sampleOwnerUrl + '\n\n' : '') + '※ アプリの通知にも同じ内容が届いています。';
+        body = rosBody || '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n・' + sampleDate + ' サンプルゲストA\n・' + sampleDate + ' サンプルゲストB\n\n' + (sampleOwnerUrl ? 'アプリ: ' + sampleOwnerUrl + '\n\n' : '') + '※ アプリの通知にも同じ内容が届いています。';
         subject = subject.split('{件数}').join('2').split('{アプリURL}').join(sampleOwnerUrl);
-        body = body.split('{件数}').join('2').split('{未記入一覧}').join('・2026-03-05 サンプルゲストA\n・2026-03-10 サンプルゲストB').split('{アプリURL}').join(sampleOwnerUrl);
+        body = body.split('{件数}').join('2').split('{未記入一覧}').join('・' + sampleDate + ' サンプルゲストA\n・' + sampleDate + ' サンプルゲストB').split('{アプリURL}').join(sampleOwnerUrl);
         break;
 
       case '予約キャンセル':
@@ -4421,7 +4424,8 @@ function sendTestNotification(notifyKey, lineTarget) {
 
       case '請求書送信':
         subject = '請求書送信通知';
-        body = 'テストスタッフ さんの請求書が作成されました。\n\n対象月: 2026年3月\n金額: ¥10,000（サンプル）';
+        var invNow = new Date();
+        body = 'テストスタッフ さんの請求書が作成されました。\n\n対象月: ' + invNow.getFullYear() + '年' + (invNow.getMonth() + 1) + '月\n金額: ¥10,000（サンプル）';
         break;
 
       case '清掃完了':
@@ -4518,6 +4522,30 @@ function sendLineTestMessage() {
     return JSON.stringify({ success: code === 200, debug: debug, error: code !== 200 ? 'HTTP ' + code : '' });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * yyyy-MM-dd 文字列を「2026/3/5(木)」形式に変換する共通ヘルパー
+ * @param {string|Date} dateInput - yyyy-MM-dd文字列またはDateオブジェクト
+ * @return {string} 「YYYY/M/D(曜日)」形式の文字列。変換失敗時は入力値をそのまま返す
+ */
+function formatDateWithDay_(dateInput) {
+  var DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+  try {
+    var d;
+    if (dateInput instanceof Date) {
+      d = dateInput;
+    } else {
+      var s = String(dateInput || '').trim();
+      var m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (!m) return s;
+      d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    }
+    if (isNaN(d.getTime())) return String(dateInput);
+    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + '(' + DAY_NAMES[d.getDay()] + ')';
+  } catch (e) {
+    return String(dateInput);
   }
 }
 
@@ -4700,10 +4728,11 @@ function sendInvoiceRequestEmails(testRecipient) {
     var deadlineDaySetting = parseInt(map[INVOICE_REQ_KEYS_.deadline], 10) || 0;
     var deadlineText;
     if (deadlineDaySetting > 0) {
-      deadlineText = (now.getMonth() + 1) + '/' + deadlineDaySetting;
+      var dlDate = new Date(now.getFullYear(), now.getMonth(), deadlineDaySetting);
+      deadlineText = formatDateWithDay_(dlDate);
     } else {
       var deadlineDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      deadlineText = (deadlineDate.getMonth() + 1) + '/' + deadlineDate.getDate();
+      deadlineText = formatDateWithDay_(deadlineDate);
     }
     // スタッフアプリURLを取得
     var staffAppUrl = getStaffAppUrl_();
@@ -4998,7 +5027,7 @@ function checkRosterReminder() {
       }
       if (!hasGuestName) {
         missing.push({
-          checkIn: Utilities.formatDate(checkInDate, 'Asia/Tokyo', 'yyyy-MM-dd'),
+          checkIn: formatDateWithDay_(checkInDate),
           rowNumber: i + 2
         });
       }
@@ -5860,15 +5889,13 @@ function getCheckoutDateFromFormSheet_(bookingRowNumber, ss) {
  * 返り値: { 作業日, 日付, 人数, ベッド, BBQ, 国籍, 回答URL }
  */
 function buildRecruitPlaceholders_(checkoutDateStr, nextReservation, appUrl) {
-  var fmtDate = (checkoutDateStr || '\uFF0D');
-  var dm = fmtDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (dm) fmtDate = dm[1] + '\u5E74' + ('0' + dm[2]).slice(-2) + '\u6708' + ('0' + dm[3]).slice(-2) + '\u65E5';
+  var fmtDate = formatDateWithDay_(checkoutDateStr) || (checkoutDateStr || '\uFF0D');
 
   var nr = nextReservation || {};
   var dateRange = nr.dateRange || '';
   if (!dateRange && nr.date) dateRange = nr.date;
-  var checkinDisp = (dateRange || '-').replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(_, y, m, d) {
-    return y + '/' + parseInt(m, 10) + '/' + parseInt(d, 10);
+  var checkinDisp = (dateRange || '-').replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(m0) {
+    return formatDateWithDay_(m0);
   });
   var guestDisp = nr.guestCount || '-';
   var bedDisp = nr.bedCount || '-';
@@ -6027,6 +6054,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     ensureSheetsExist();
     var staff = (staffName || '').trim() || (staffEmail || '').trim() || 'スタッフ';
     var dateStr = (checkoutDateStr || '').toString().trim() || '';
+    var dateDisp = formatDateWithDay_(dateStr) || dateStr;
     var rid = 'r' + recruitRowIndex;
     var sName = (staffName || staff).trim();
     var sEmail = (staffEmail || '').trim().toLowerCase();
@@ -6069,15 +6097,15 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     invalidateInitDataCache_();
 
     // 通知（シート書き込み）
-    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateStr + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) { Logger.log('Cancel request notification failed: ' + ne.toString()); }
+    try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateDisp + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) { Logger.log('Cancel request notification failed: ' + ne.toString()); }
     // メール送信（最も遅い処理 - 失敗しても成功扱い）
     try {
       var ownerRes = JSON.parse(getOwnerEmail());
       var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
       if (ownerEmail && isEmailNotifyEnabled_('辞退申請通知有効')) {
         var detailUrl = buildCleaningDetailUrl_(dateStr);
-        var subject = '清掃スタッフの出勤キャンセル要望: ' + dateStr;
-        var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateStr + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
+        var subject = '清掃スタッフの出勤キャンセル要望: ' + dateDisp;
+        var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateDisp + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
           + (detailUrl ? '\n\n清掃詳細: ' + detailUrl : '');
         var _ch_cancelReq = getNotifyChannel_('出勤キャンセル要望');
         if (_ch_cancelReq.email) GmailApp.sendEmail(ownerEmail, subject, body);
@@ -6166,14 +6194,15 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
 
     // 通知を追加（フォームシートの最新日付を優先）
     var checkoutStr = getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss);
-    addNotification_('キャンセル承認', (sName || sEmail) + ' のキャンセルを承認しました（' + checkoutStr + '）');
+    var checkoutDisp = formatDateWithDay_(checkoutStr) || checkoutStr;
+    addNotification_('キャンセル承認', (sName || sEmail) + ' のキャンセルを承認しました（' + checkoutDisp + '）');
 
     // スタッフにメール通知
     if (sEmail && isEmailNotifyEnabled_('辞退承認通知有効')) {
       try {
         var approveDetailUrl = buildCleaningDetailUrl_(checkoutStr);
-        var subject = '出勤キャンセルが承認されました: ' + checkoutStr;
-        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
+        var subject = '出勤キャンセルが承認されました: ' + checkoutDisp;
+        var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
           + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
         var _ch_approve = getNotifyChannel_('キャンセル承認');
         if (_ch_approve.email) GmailApp.sendEmail(sEmail, subject, body);
@@ -6214,14 +6243,15 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     }
 
     var checkoutStr = recruitSheet ? getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss) : '';
-    addNotification_('キャンセル却下', (sName || sEmail) + ' のキャンセル申請を却下しました（' + checkoutStr + '）');
+    var checkoutDisp = formatDateWithDay_(checkoutStr) || checkoutStr;
+    addNotification_('キャンセル却下', (sName || sEmail) + ' のキャンセル申請を却下しました（' + checkoutDisp + '）');
 
     // スタッフにメール通知
     if (sEmail && isEmailNotifyEnabled_('辞退却下通知有効')) {
       try {
         var rejectDetailUrl = buildCleaningDetailUrl_(checkoutStr);
-        var subject = '出勤キャンセルが却下されました: ' + checkoutStr;
-        var body = sName + ' 様\n\n' + checkoutStr + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
+        var subject = '出勤キャンセルが却下されました: ' + checkoutDisp;
+        var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
           + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
         var _ch_reject = getNotifyChannel_('キャンセル却下');
         if (_ch_reject.email) GmailApp.sendEmail(sEmail, subject, body);
@@ -8626,9 +8656,7 @@ function getConfirmationTemplate_() {
  * テンプレートのプレースホルダーを実データに置換する
  */
 function buildConfirmationCopyText_(checkoutDateStr, selectedStaffNames, volunteers, nextReservation, appUrl) {
-  var fmtDate = (checkoutDateStr || '－');
-  var dm = fmtDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
+  var fmtDate = formatDateWithDay_(checkoutDateStr) || (checkoutDateStr || '－');
 
   // 確定スタッフ一覧（備考付き）
   var staffNames = (selectedStaffNames || '').split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
@@ -8646,8 +8674,8 @@ function buildConfirmationCopyText_(checkoutDateStr, selectedStaffNames, volunte
   var nr = nextReservation || {};
   var dateRange = nr.dateRange || '';
   if (!dateRange && nr.date) dateRange = nr.date;
-  var checkinDisp = (dateRange || '-').replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(_, y, m, d) {
-    return y + '/' + parseInt(m, 10) + '/' + parseInt(d, 10);
+  var checkinDisp = (dateRange || '-').replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g, function(m0) {
+    return formatDateWithDay_(m0);
   });
   var guestDisp = nr.guestCount || '-';
   var bedDisp = nr.bedCount || '-';
@@ -8766,8 +8794,7 @@ function notifyStaffConfirmation(recruitRowIndex) {
 
     var appUrl = getLatestStaffUrl_();
     var body = buildConfirmationCopyText_(checkoutDateStr, selectedStaff, volunteers, nextRes, appUrl);
-    var dm = (checkoutDateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    var fmtDate = dm ? dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日' : checkoutDateStr;
+    var fmtDate = formatDateWithDay_(checkoutDateStr) || checkoutDateStr;
     // メール件名テンプレートを取得
     var subjTpl = DEFAULT_CONFIRM_SUBJECT_;
     try {
@@ -8933,12 +8960,13 @@ function checkAndSendReminders() {
           if (to.length) {
             var recruitStaffUrl = getStaffAppUrl_();
             var recruitDateRaw = rows[i][0];
-            var recruitDateStr = (recruitDateRaw instanceof Date) ? Utilities.formatDate(recruitDateRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(recruitDateRaw || '').trim();
-            var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateStr) : '';
+            var recruitDateKey = (recruitDateRaw instanceof Date) ? Utilities.formatDate(recruitDateRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(recruitDateRaw || '').trim();
+            var recruitDateDisp = formatDateWithDay_(recruitDateKey) || recruitDateKey;
+            var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateKey) : '';
             var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '清掃スタッフ募集のリマインド: {チェックアウト}';
             var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名\n\nWebアプリで回答: {回答URL}';
-            var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
-            var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateStr).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
+            var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
+            var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
             var _ch_remind = getNotifyChannel_('募集リマインド');
             if (_ch_remind.email) GmailApp.sendEmail(to.join(','), subj, body);
             if (_ch_remind.line) { Logger.log('[LINE-TARGET] 募集リマインド: group'); try { sendLineMessage_(subj + '\n\n' + body); } catch (lineErr) { Logger.log('募集リマインド LINE送信例外: ' + lineErr.toString()); } }
@@ -9352,16 +9380,18 @@ function checkAndSendReminderEmails() {
             props.setProperty(propKey, Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
             var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
             var detailLink = buildCleaningDetailUrl_(checkoutDateStr);
-            var tmplVars = { 'チェックイン': checkinDateStr, 'チェックアウト': checkoutDateStr, '残り日数': daysLeft, '清掃詳細リンク': detailLink };
+            var tmplVars = { 'チェックイン': formatDateWithDay_(checkinDateStr) || checkinDateStr, 'チェックアウト': formatDateWithDay_(checkoutDateStr) || checkoutDateStr, '残り日数': daysLeft, '清掃詳細リンク': detailLink };
             try {
+              var checkinDisp = formatDateWithDay_(checkinDateStr) || checkinDateStr;
+              var checkoutDisp = formatDateWithDay_(checkoutDateStr) || checkoutDateStr;
               var subject = tmplSubject
                 ? applyReminderTemplate_(tmplSubject, tmplVars)
-                : '清掃スタッフ未確定のリマインド: ' + checkinDateStr;
+                : '清掃スタッフ未確定のリマインド: ' + checkinDisp;
               var body = tmplBody
                 ? applyReminderTemplate_(tmplBody, tmplVars)
                 : '以下の予約について、清掃スタッフがまだ確定していません。\n\n'
-                  + 'チェックイン: ' + checkinDateStr + '\n'
-                  + 'チェックアウト: ' + checkoutDateStr + '\n'
+                  + 'チェックイン: ' + checkinDisp + '\n'
+                  + 'チェックアウト: ' + checkoutDisp + '\n'
                   + '残り日数: ' + daysLeft + '日\n\n'
                   + '清掃詳細: ' + detailLink + '\n\n'
                   + '早めに清掃スタッフの手配をお願いします。';
@@ -9429,7 +9459,9 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
 
     var daysLeft = Math.round((checkinDay - today) / (1000 * 60 * 60 * 24));
     var detailLink = buildCleaningDetailUrl_(checkOutStr);
-    var tmplVars = { 'チェックイン': checkInStr, 'チェックアウト': checkOutStr, 'プラットフォーム': platformName || '不明', '残り日数': daysLeft, '清掃詳細リンク': detailLink };
+    var checkInDisp = formatDateWithDay_(checkInStr) || checkInStr;
+    var checkOutDisp = formatDateWithDay_(checkOutStr) || checkOutStr;
+    var tmplVars = { 'チェックイン': checkInDisp, 'チェックアウト': checkOutDisp, 'プラットフォーム': platformName || '不明', '残り日数': daysLeft, '清掃詳細リンク': detailLink };
     // テンプレート設定を取得
     var imSubjectTmpl = '', imBodyTmpl = '';
     sRows.forEach(function(row) {
@@ -9439,12 +9471,12 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
     });
     var subject = imSubjectTmpl
       ? applyReminderTemplate_(imSubjectTmpl, tmplVars)
-      : '直前予約 - 清掃スタッフ手配が必要です: ' + checkInStr;
+      : '直前予約 - 清掃スタッフ手配が必要です: ' + checkInDisp;
     var body = imBodyTmpl
       ? applyReminderTemplate_(imBodyTmpl, tmplVars)
       : '1週間以内にチェックインの予約が新たに追加されました。\n\n'
-        + 'チェックイン: ' + checkInStr + '\n'
-        + 'チェックアウト: ' + checkOutStr + '\n'
+        + 'チェックイン: ' + checkInDisp + '\n'
+        + 'チェックアウト: ' + checkOutDisp + '\n'
         + 'プラットフォーム: ' + (platformName || '不明') + '\n'
         + '残り日数: ' + daysLeft + '日\n\n'
         + '清掃詳細: ' + detailLink + '\n\n'
@@ -9897,9 +9929,7 @@ function notifyCleaningComplete(checkoutDate) {
     var ownerRes = JSON.parse(getOwnerEmail());
     var ownerEmail = (ownerRes.email || '').trim();
 
-    var fmtDate = dateKey;
-    var dm = dateKey.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    if (dm) fmtDate = dm[1] + '年' + ('0' + dm[2]).slice(-2) + '月' + ('0' + dm[3]).slice(-2) + '日';
+    var fmtDate = formatDateWithDay_(dateKey) || dateKey;
 
     addNotification_('清掃完了', fmtDate + ' の清掃が完了しました（' + clRes.checkedCount + '/' + clRes.totalItems + '項目）');
 

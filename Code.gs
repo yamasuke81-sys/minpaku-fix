@@ -6716,7 +6716,6 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
         try { sendLineToStaffMembers_(rejectStaff, rejectLineText); } catch (lineErr) {}
       }
     } catch (mailErr) {}
-    }
 
     return JSON.stringify({ success: true });
   } catch (e) {

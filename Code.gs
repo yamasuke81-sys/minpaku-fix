@@ -6407,9 +6407,11 @@ function notifyStaffForRecruitment(recruitRowIndex, checkoutDateStr, bookingRowN
     const staffSheet = ss.getSheetByName(SHEET_STAFF);
     if (!staffSheet || staffSheet.getLastRow() < 2) return;
     var emailSet = {};
-    const data = staffSheet.getRange(2, 3, staffSheet.getLastRow(), 3).getValues();
+    const data = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
     data.forEach(function(row) {
-      const e = String(row[0] || '').trim().toLowerCase();
+      var hidden = String(row[11] || '').trim();
+      if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
+      const e = String(row[2] || '').trim().toLowerCase();
       if (e) emailSet[e] = 1;
     });
     const emails = Object.keys(emailSet);
@@ -6520,29 +6522,30 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
 
     // 通知（シート書き込み）
     try { addNotification_('出勤キャンセル要望', staff + ' が出勤キャンセルの要望を提出しました（' + dateDisp + '）', { bookingRowNumber: Number(bookingRowNumber) || 0, checkoutDate: dateStr, recruitRowIndex: recruitRowIndex, staffName: staff, staffEmail: String(staffEmail || '').trim() }); } catch (ne) { Logger.log('Cancel request notification failed: ' + ne.toString()); }
-    // メール送信（最も遅い処理 - 失敗しても成功扱い）
+    // 通知送信（メール+LINE - 失敗しても成功扱い）
     try {
       var ownerRes = JSON.parse(getOwnerEmail());
       var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-      if (ownerEmail && isEmailNotifyEnabled_('辞退申請通知有効')) {
-        var detailUrl = buildCleaningDetailUrl_(dateStr);
-        var subject = '清掃スタッフの出勤キャンセル要望: ' + dateDisp;
-        var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateDisp + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
-          + (detailUrl ? '\n\n清掃詳細: ' + detailUrl : '');
-        var _ch_cancelReq = getNotifyChannel_('出勤キャンセル要望');
-        var cancelReqLineText = subject + '\n\n' + body;
-        if (_ch_cancelReq.owner_email) GmailApp.sendEmail(ownerEmail, subject, body);
-        if (_ch_cancelReq.owner_line) { try { sendLineMessage_(cancelReqLineText, false, 'owner'); } catch (lineErr) {} }
-        if (_ch_cancelReq.group_line) { try { sendLineMessage_(cancelReqLineText, false, 'group'); } catch (lineErr) {} }
-        if (_ch_cancelReq.staff_email) {
-          var crAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
-          crAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
-        }
-        if (_ch_cancelReq.staff_line) {
-          try { sendLineToStaffMembers_(getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet()), cancelReqLineText); } catch (lineErr) {}
-        }
+      var detailUrl = buildCleaningDetailUrl_(dateStr);
+      var subject = '清掃スタッフの出勤キャンセル要望: ' + dateDisp;
+      var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateDisp + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
+        + (detailUrl ? '\n\n清掃詳細: ' + detailUrl : '');
+      var _ch_cancelReq = getNotifyChannel_('出勤キャンセル要望');
+      var cancelReqLineText = subject + '\n\n' + body;
+      var emailEnabled = isEmailNotifyEnabled_('辞退申請通知有効');
+      // メール送信（isEmailNotifyEnabled_ + チャンネル制御）
+      if (ownerEmail && emailEnabled && _ch_cancelReq.owner_email) GmailApp.sendEmail(ownerEmail, subject, body);
+      if (emailEnabled && _ch_cancelReq.staff_email) {
+        var crAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
+        crAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
       }
-    } catch (mailErr) { Logger.log('Cancel request email failed: ' + mailErr.toString()); }
+      // LINE送信（チャンネル制御のみ — isEmailNotifyEnabled_ に依存しない）
+      if (_ch_cancelReq.owner_line) { try { sendLineMessage_(cancelReqLineText, false, 'owner'); } catch (lineErr) {} }
+      if (_ch_cancelReq.group_line) { try { sendLineMessage_(cancelReqLineText, false, 'group'); } catch (lineErr) {} }
+      if (_ch_cancelReq.staff_line) {
+        try { sendLineToStaffMembers_(getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet()), cancelReqLineText); } catch (lineErr) {}
+      }
+    } catch (mailErr) { Logger.log('Cancel request notification failed: ' + mailErr.toString()); }
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -6628,27 +6631,28 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     var checkoutDisp = formatDateWithDay_(checkoutStr) || checkoutStr;
     addNotification_('キャンセル承認', (sName || sEmail) + ' のキャンセルを承認しました（' + checkoutDisp + '）');
 
-    // スタッフにメール通知
-    if (sEmail && isEmailNotifyEnabled_('辞退承認通知有効')) {
-      try {
-        var approveDetailUrl = buildCleaningDetailUrl_(checkoutStr);
-        var subject = '出勤キャンセルが承認されました: ' + checkoutDisp;
-        var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
-          + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
-        var _ch_approve = getNotifyChannel_('キャンセル承認');
-        var approveLineText = subject + '\n\n' + body;
-        if (_ch_approve.staff_email && sEmail) GmailApp.sendEmail(sEmail, subject, body);
-        if (_ch_approve.group_line) { try { sendLineMessage_(approveLineText, false, 'group'); } catch (lineErr) {} }
-        if (_ch_approve.owner_line) { try { sendLineMessage_(approveLineText, false, 'owner'); } catch (lineErr) {} }
-        if (_ch_approve.owner_email) {
-          try { var approveOwner = getOwnerEmailAddress_(); if (approveOwner) GmailApp.sendEmail(approveOwner, subject, body); } catch (e) {}
-        }
-        if (_ch_approve.staff_line) {
-          var approveStaff = getAllActiveStaff_(ss).filter(function(s) { return s.staffName === sName || s.email.toLowerCase() === sEmail; });
-          try { sendLineToStaffMembers_(approveStaff, approveLineText); } catch (lineErr) {}
-        }
-      } catch (mailErr) {}
-    }
+    // スタッフ・オーナーに通知
+    try {
+      var approveDetailUrl = buildCleaningDetailUrl_(checkoutStr);
+      var subject = '出勤キャンセルが承認されました: ' + checkoutDisp;
+      var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
+        + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
+      var _ch_approve = getNotifyChannel_('キャンセル承認');
+      var approveLineText = subject + '\n\n' + body;
+      var approveEmailEnabled = isEmailNotifyEnabled_('辞退承認通知有効');
+      // メール送信（isEmailNotifyEnabled_ + チャンネル制御）
+      if (approveEmailEnabled && _ch_approve.staff_email && sEmail) GmailApp.sendEmail(sEmail, subject, body);
+      if (approveEmailEnabled && _ch_approve.owner_email) {
+        try { var approveOwner = getOwnerEmailAddress_(); if (approveOwner) GmailApp.sendEmail(approveOwner, subject, body); } catch (e) {}
+      }
+      // LINE送信（チャンネル制御のみ）
+      if (_ch_approve.group_line) { try { sendLineMessage_(approveLineText, false, 'group'); } catch (lineErr) {} }
+      if (_ch_approve.owner_line) { try { sendLineMessage_(approveLineText, false, 'owner'); } catch (lineErr) {} }
+      if (_ch_approve.staff_line) {
+        var approveStaff = getAllActiveStaff_(ss).filter(function(s) { return s.staffName === sName || s.email.toLowerCase() === sEmail; });
+        try { sendLineToStaffMembers_(approveStaff, approveLineText); } catch (lineErr) {}
+      }
+    } catch (mailErr) {}
 
     return JSON.stringify({ success: true });
   } catch (e) {
@@ -6686,26 +6690,28 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     var checkoutDisp = formatDateWithDay_(checkoutStr) || checkoutStr;
     addNotification_('キャンセル却下', (sName || sEmail) + ' のキャンセル申請を却下しました（' + checkoutDisp + '）');
 
-    // スタッフにメール通知
-    if (sEmail && isEmailNotifyEnabled_('辞退却下通知有効')) {
-      try {
-        var rejectDetailUrl = buildCleaningDetailUrl_(checkoutStr);
-        var subject = '出勤キャンセルが却下されました: ' + checkoutDisp;
-        var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
-          + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
-        var _ch_reject = getNotifyChannel_('キャンセル却下');
-        var rejectLineText = subject + '\n\n' + body;
-        if (_ch_reject.staff_email && sEmail) GmailApp.sendEmail(sEmail, subject, body);
-        if (_ch_reject.group_line) { try { sendLineMessage_(rejectLineText, false, 'group'); } catch (lineErr) {} }
-        if (_ch_reject.owner_line) { try { sendLineMessage_(rejectLineText, false, 'owner'); } catch (lineErr) {} }
-        if (_ch_reject.owner_email) {
-          try { var rejectOwner = getOwnerEmailAddress_(); if (rejectOwner) GmailApp.sendEmail(rejectOwner, subject, body); } catch (e) {}
-        }
-        if (_ch_reject.staff_line) {
-          var rejectStaff = getAllActiveStaff_(ss).filter(function(s) { return s.staffName === sName || s.email.toLowerCase() === sEmail; });
-          try { sendLineToStaffMembers_(rejectStaff, rejectLineText); } catch (lineErr) {}
-        }
-      } catch (mailErr) {}
+    // スタッフ・オーナーに通知
+    try {
+      var rejectDetailUrl = buildCleaningDetailUrl_(checkoutStr);
+      var subject = '出勤キャンセルが却下されました: ' + checkoutDisp;
+      var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
+        + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
+      var _ch_reject = getNotifyChannel_('キャンセル却下');
+      var rejectLineText = subject + '\n\n' + body;
+      var rejectEmailEnabled = isEmailNotifyEnabled_('辞退却下通知有効');
+      // メール送信（isEmailNotifyEnabled_ + チャンネル制御）
+      if (rejectEmailEnabled && _ch_reject.staff_email && sEmail) GmailApp.sendEmail(sEmail, subject, body);
+      if (rejectEmailEnabled && _ch_reject.owner_email) {
+        try { var rejectOwner = getOwnerEmailAddress_(); if (rejectOwner) GmailApp.sendEmail(rejectOwner, subject, body); } catch (e) {}
+      }
+      // LINE送信（チャンネル制御のみ）
+      if (_ch_reject.group_line) { try { sendLineMessage_(rejectLineText, false, 'group'); } catch (lineErr) {} }
+      if (_ch_reject.owner_line) { try { sendLineMessage_(rejectLineText, false, 'owner'); } catch (lineErr) {} }
+      if (_ch_reject.staff_line) {
+        var rejectStaff = getAllActiveStaff_(ss).filter(function(s) { return s.staffName === sName || s.email.toLowerCase() === sEmail; });
+        try { sendLineToStaffMembers_(rejectStaff, rejectLineText); } catch (lineErr) {}
+      }
+    } catch (mailErr) {}
     }
 
     return JSON.stringify({ success: true });
@@ -7702,27 +7708,29 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       var emailNotifyEnabled = isEmailNotifyEnabled_('請求書送信通知有効');
       Logger.log('[DEBUG mail] isEmailNotifyEnabled_("請求書送信通知有効")=' + emailNotifyEnabled);
       try {
+        var _ch_invoice = getNotifyChannel_('請求書送信');
+        var invoiceLineText = subject + '\n\n' + bodyText;
+        // メール送信（isEmailNotifyEnabled_ + チャンネル制御）
         if (!emailNotifyEnabled) {
           sendResult = 'メール送信OFF（PDF作成は成功）';
         } else {
-          var _ch_invoice = getNotifyChannel_('請求書送信');
-          var invoiceLineText = subject + '\n\n' + bodyText;
           if (_ch_invoice.owner_email) {
             GmailApp.sendEmail(ownerEmail, subject, bodyText, {
               attachments: [pdfBlob],
               name: '請求書（自動送信）'
             });
           }
-          if (_ch_invoice.owner_line) { try { sendLineMessage_(invoiceLineText, false, 'owner'); } catch (lineErr) {} }
-          if (_ch_invoice.group_line) { try { sendLineMessage_(invoiceLineText, false, 'group'); } catch (lineErr) {} }
           if (_ch_invoice.staff_email) {
             var invSendAllStaff = getAllActiveStaff_(ss);
             invSendAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, bodyText); } catch (e) {} });
           }
-          if (_ch_invoice.staff_line) {
-            try { sendLineToStaffMembers_(getAllActiveStaff_(ss), invoiceLineText); } catch (lineErr) {}
-          }
           sendResult = '送信済み：' + ownerEmail;
+        }
+        // LINE送信（チャンネル制御のみ — isEmailNotifyEnabled_ に依存しない）
+        if (_ch_invoice.owner_line) { try { sendLineMessage_(invoiceLineText, false, 'owner'); } catch (lineErr) {} }
+        if (_ch_invoice.group_line) { try { sendLineMessage_(invoiceLineText, false, 'group'); } catch (lineErr) {} }
+        if (_ch_invoice.staff_line) {
+          try { sendLineToStaffMembers_(getAllActiveStaff_(ss), invoiceLineText); } catch (lineErr) {}
         }
       } catch (mailErr) {
         sendResult = 'メール送信スキップ（PDF作成は成功）: ' + String(mailErr);
@@ -9421,9 +9429,13 @@ function checkAndSendReminders() {
         props.setProperty(propKey, '1');
         const staffSheet = ss.getSheetByName(SHEET_STAFF);
         if (staffSheet && staffSheet.getLastRow() >= 2) {
-          const emails = staffSheet.getRange(2, 3, staffSheet.getLastRow(), 3).getValues();
+          const staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
           var toSet = {};
-          emails.forEach(function(r) { var e = String(r[0] || '').trim().toLowerCase(); if (e) toSet[e] = 1; });
+          staffRows.forEach(function(r) {
+            var hidden = String(r[11] || '').trim();
+            if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
+            var e = String(r[2] || '').trim().toLowerCase(); if (e) toSet[e] = 1;
+          });
           var to = Object.keys(toSet);
           if (to.length) {
             var recruitStaffUrl = getStaffAppUrl_();
@@ -10529,7 +10541,7 @@ function notifyCleaningComplete(checkoutDate) {
       }
       if (_ch_complete.owner_line) { try { sendLineMessage_(completeLineText, false, 'owner'); } catch (lineErr) {} }
       if (_ch_complete.group_line) { try { sendLineMessage_(completeLineText, false, 'group'); } catch (lineErr) {} }
-      if (_ch_complete.staff_email) {
+      if (_ch_complete.staff_email && isEmailNotifyEnabled_('清掃完了通知有効')) {
         var compAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
         compAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, body); } catch (e) {} });
       }

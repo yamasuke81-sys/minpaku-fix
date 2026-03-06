@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0306i</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0306j</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7883,15 +7883,38 @@
         body: '清掃募集\n\n作業日: {作業日}\n\n次回予約（変更の可能性あり）\n日付：\u3000\u3000{日付}\n人数：\u3000\u3000{人数}\nベッド：\u3000{ベッド}\nBBQ：\u3000\u3000{BBQ}\n国籍：\u3000\u3000{国籍}\n\n※予約状況次第では変更となる場合があります。\n\nWebアプリで回答: {回答URL}'
       };
 
+      // --- タブローディングオーバーレイ ---
+      function showTabLoading_(panelId) {
+        var panel = document.getElementById(panelId);
+        if (!panel) return;
+        var ov = panel.querySelector('.tab-loading-overlay');
+        if (!ov) {
+          ov = document.createElement('div');
+          ov.className = 'tab-loading-overlay';
+          ov.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.85);display:flex;align-items:center;justify-content:center;z-index:10;';
+          ov.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted small ms-2">読み込み中…</span></div>';
+          panel.style.position = 'relative';
+          panel.appendChild(ov);
+        }
+        ov.style.display = 'flex';
+      }
+      function hideTabLoading_(panelId) {
+        var panel = document.getElementById(panelId);
+        if (!panel) return;
+        var ov = panel.querySelector('.tab-loading-overlay');
+        if (ov) ov.style.display = 'none';
+      }
+
       function loadRecruitSettingsForm() {
+        showTabLoading_('settingsRecruitSettings');
         google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsRecruitSettings');
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
               document.getElementById('recruitReminderEnabled').checked = !!r.settings.recruitReminderEnabled;
               document.getElementById('minRespondents').value = r.settings.minRespondents || 2;
               document.getElementById('selectCount').value = r.settings.selectCount || 2;
-              // スケジュールエントリ
               var entries = document.querySelectorAll('.recruit-reminder-entry');
               (r.settings.schedules || []).forEach(function(sch, idx) {
                 if (idx >= entries.length) return;
@@ -7902,17 +7925,14 @@
                 var hour = ('0' + parseInt(t.split(':')[0], 10)).slice(-2);
                 entry.querySelector('.rr-time').value = hour + ':00';
               });
-              // 送信先
               document.getElementById('recruitReminderRecipients').value = r.settings.recipients || '';
-              // 募集開始テンプレート
               document.getElementById('recruitStartSubject').value = r.settings.recruitStartSubject || RECRUIT_START_DEFAULTS.subject;
               document.getElementById('recruitStartBody').value = r.settings.recruitStartBody || RECRUIT_START_DEFAULTS.body;
-              // リマインドテンプレート
               document.getElementById('recruitReminderSubject').value = r.settings.recruitReminderSubject || RECRUIT_REMINDER_DEFAULTS.subject;
               document.getElementById('recruitReminderBody').value = r.settings.recruitReminderBody || RECRUIT_REMINDER_DEFAULTS.body;
             }
           } catch (e) {}
-        }).getRecruitmentSettings();
+        }).withFailureHandler(function() { hideTabLoading_('settingsRecruitSettings'); }).getRecruitmentSettings();
       }
 
       document.getElementById('btnSaveRecruitSettings').addEventListener('click', function() {
@@ -7971,12 +7991,13 @@
       };
 
       function loadRosterReminderSettings() {
+        showTabLoading_('settingsRosterReminder');
         google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsRosterReminder');
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
               document.getElementById('rosterReminderEnabled').checked = !!r.settings.rosterReminderEnabled;
-              // スケジュールエントリ
               var entries = document.querySelectorAll('.roster-reminder-entry');
               (r.settings.schedules || []).forEach(function(sch, idx) {
                 if (idx >= entries.length) return;
@@ -7987,14 +8008,12 @@
                 var hour = ('0' + parseInt(t.split(':')[0], 10)).slice(-2);
                 entry.querySelector('.rostr-time').value = hour + ':00';
               });
-              // 送信先
               document.getElementById('rosterReminderRecipients').value = r.settings.recipients || '';
-              // テンプレート
               document.getElementById('rosterReminderSubject').value = r.settings.rosterReminderSubject || ROSTER_REMINDER_DEFAULTS.subject;
               document.getElementById('rosterReminderBody').value = r.settings.rosterReminderBody || ROSTER_REMINDER_DEFAULTS.body;
             }
           } catch (e) {}
-        }).getRosterReminderSettings();
+        }).withFailureHandler(function() { hideTabLoading_('settingsRosterReminder'); }).getRosterReminderSettings();
       }
 
       document.getElementById('btnSaveRosterReminder').addEventListener('click', function() {
@@ -8059,7 +8078,9 @@
       document.getElementById('btnLineTargetGroup').addEventListener('click', function() { setLineTargetMode('group'); });
       document.getElementById('btnLineTargetPersonal').addEventListener('click', function() { setLineTargetMode('personal'); });
       function loadLineNotifySettings() {
+        showTabLoading_('settingsLineId');
         google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsLineId');
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
@@ -8072,7 +8093,7 @@
               setLineTargetMode(r.settings.lineTargetMode === 'personal' ? 'personal' : 'group');
             }
           } catch (e) {}
-        }).getLineNotifySettings();
+        }).withFailureHandler(function() { hideTabLoading_('settingsLineId'); }).getLineNotifySettings();
       }
       document.getElementById('btnSaveLineNotify').addEventListener('click', function() {
         var btn = this;
@@ -8272,7 +8293,9 @@
       };
 
       function loadInvoiceRequestSettings() {
+        showTabLoading_('settingsInvoiceRequest');
         google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsInvoiceRequest');
           try {
             var r = JSON.parse(jsonStr);
             if (r.success && r.settings) {
@@ -8290,10 +8313,8 @@
               var body = document.getElementById('invoiceRequestBody');
               if (body) body.value = s.body || INVOICE_REQUEST_DEFAULTS.body;
             }
-          } catch (e) {
-            console.error('請求書要請設定読込エラー:', e);
-          }
-        }).getInvoiceRequestSettings();
+          } catch (e) {}
+        }).withFailureHandler(function() { hideTabLoading_('settingsInvoiceRequest'); }).getInvoiceRequestSettings();
       }
 
       document.getElementById('btnSaveInvoiceRequest').addEventListener('click', function() {
@@ -8352,7 +8373,9 @@
       var CONFIRM_SUBJECT_DEFAULT = 'スタッフ確定: {作業日}';
 
       function loadConfirmationTemplate() {
+        showTabLoading_('settingsConfirmTemplate');
         google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsConfirmTemplate');
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
@@ -8361,7 +8384,7 @@
               updateConfirmTemplatePreview();
             }
           } catch (e) {}
-        }).getConfirmationTemplate();
+        }).withFailureHandler(function() { hideTabLoading_('settingsConfirmTemplate'); }).getConfirmationTemplate();
       }
 
       function updateConfirmTemplatePreview() {
@@ -8436,7 +8459,9 @@
       };
 
       function loadReminderEmailSettings() {
+        showTabLoading_('settingsReminderEmail');
         google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsReminderEmail');
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
@@ -8450,19 +8475,17 @@
                 var entry = entries[idx];
                 entry.querySelector('.reminder-enabled').checked = !!rem.enabled;
                 entry.querySelector('.reminder-days').value = rem.daysBefore || '';
-                // 既存データ "HH:MM" → "HH:00" に正規化してselectに反映
                 var t = rem.time || '09:00';
                 var hour = ('0' + parseInt(t.split(':')[0], 10)).slice(-2);
                 entry.querySelector('.reminder-time').value = hour + ':00';
               });
-              // テンプレートフィールド
               document.getElementById('reminderSubject').value = r.reminderSubject || REMINDER_EMAIL_DEFAULTS.subject;
               document.getElementById('reminderBody').value = r.reminderBody || REMINDER_EMAIL_DEFAULTS.body;
               document.getElementById('immediateSubject').value = r.immediateSubject || REMINDER_EMAIL_DEFAULTS.immediateSubject;
               document.getElementById('immediateBody').value = r.immediateBody || REMINDER_EMAIL_DEFAULTS.immediateBody;
             }
           } catch (e) {}
-        }).getReminderEmailSettings();
+        }).withFailureHandler(function() { hideTabLoading_('settingsReminderEmail'); }).getReminderEmailSettings();
       }
 
       document.getElementById('btnSaveReminderEmail').addEventListener('click', function() {
@@ -8966,6 +8989,10 @@
           var _emailNotifyTabs = ['recruitSettings','confirmTemplate','notifyCancel','notifyCancelRequest',
             'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
+          // 個別load関数がないタブにローディング表示
+          var _channelOnlyTabs = ['notifyCancel','notifyCancelRequest','notifyCancelApprove',
+            'notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
+          if (_channelOnlyTabs.indexOf(t) >= 0) showTabLoading_(_settingsPanels[t]);
         });
       });
 
@@ -9004,7 +9031,11 @@
       });
 
       function loadNotifyChannelForTab_(tabKey) {
+        var _channelOnlyTabs = ['notifyCancel','notifyCancelRequest','notifyCancelApprove',
+          'notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
+        var panelId = _channelOnlyTabs.indexOf(tabKey) >= 0 ? 'settings' + tabKey.charAt(0).toUpperCase() + tabKey.slice(1) : '';
         google.script.run.withSuccessHandler(function(jsonStr) {
+          if (panelId) hideTabLoading_(panelId);
           try {
             var r = JSON.parse(jsonStr);
             if (!r.success) return;
@@ -9016,7 +9047,7 @@
               cb.checked = targets.indexOf(cb.value) >= 0;
             });
           } catch (e) {}
-        }).getNotifyChannelSettings();
+        }).withFailureHandler(function() { if (panelId) hideTabLoading_(panelId); }).getNotifyChannelSettings();
       }
 
       // チェックボックス変更時に即保存

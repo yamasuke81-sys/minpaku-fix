@@ -449,6 +449,23 @@ function clearLineWebhookCollected() {
 }
 
 /**
+ * LINE Webhook 収集データから特定のuserIdを削除
+ */
+function deleteLineWebhookEntry(userId) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
+    var props = PropertiesService.getScriptProperties();
+    var collected = [];
+    try { collected = JSON.parse(props.getProperty('lineWebhookCollected') || '[]'); } catch (e) { collected = []; }
+    collected = collected.filter(function(item) { return item.userId !== userId; });
+    props.setProperty('lineWebhookCollected', JSON.stringify(collected));
+    return JSON.stringify({ success: true, list: collected });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
  * index.html のインクルード用（複数HTMLファイルがある場合）
  */
 function include(filename) {

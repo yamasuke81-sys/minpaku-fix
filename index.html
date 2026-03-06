@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0306g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0306h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7278,15 +7278,19 @@
               return;
             }
             var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">';
-            html += '<thead><tr><th>LINE表示名</th><th>ユーザーID</th><th>最終メッセージ</th><th>受信日時</th><th>コピー</th></tr></thead><tbody>';
+            html += '<thead><tr><th>LINE表示名</th><th>ユーザーID</th><th>最終メッセージ</th><th>受信日時</th><th></th></tr></thead><tbody>';
             for (var i = 0; i < res.list.length; i++) {
               var item = res.list[i];
-              html += '<tr>';
-              html += '<td>' + escapeHtml(item.displayName || '(不明)') + '</td>';
-              html += '<td><code style="font-size:0.8rem; user-select:all;">' + escapeHtml(item.userId) + '</code></td>';
+              var safeId = escapeHtml(item.userId);
+              html += '<tr id="lineRow_' + safeId + '">';
+              html += '<td><strong>' + escapeHtml(item.displayName || '(不明)') + '</strong></td>';
+              html += '<td><code style="font-size:0.8rem; user-select:all;">' + safeId + '</code></td>';
               html += '<td class="text-muted">' + escapeHtml(item.lastMessage || '') + '</td>';
               html += '<td class="text-nowrap">' + escapeHtml(item.lastSeen || '') + '</td>';
-              html += '<td><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="copyToClipboard_(\'' + escapeHtml(item.userId) + '\', this)" title="IDをコピー">コピー</button></td>';
+              html += '<td class="text-nowrap">';
+              html += '<button class="btn btn-sm btn-outline-secondary py-0 px-1 me-1" onclick="copyToClipboard_(\'' + safeId + '\', this)" title="IDをコピー">コピー</button>';
+              html += '<button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="deleteLineWebhookEntry_(\'' + safeId + '\')" title="削除">×</button>';
+              html += '</td>';
               html += '</tr>';
             }
             html += '</tbody></table>';
@@ -7307,6 +7311,23 @@
             if (container) container.innerHTML = '<div class="text-muted py-2">クリアしました。</div>';
           }
         }).clearLineWebhookCollected();
+      }
+      function deleteLineWebhookEntry_(userId) {
+        var row = document.getElementById('lineRow_' + userId);
+        if (row) row.style.opacity = '0.4';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          var res = JSON.parse(jsonStr);
+          if (res.success) {
+            if (row) row.remove();
+            // テーブルが空になったらメッセージ表示
+            var tbody = document.querySelector('#lineIdCollectedList tbody');
+            if (tbody && tbody.children.length === 0) {
+              document.getElementById('lineIdCollectedList').innerHTML = '<div class="text-muted py-2">収集データはありません。</div>';
+            }
+          }
+        }).withFailureHandler(function() {
+          if (row) row.style.opacity = '1';
+        }).deleteLineWebhookEntry(userId);
       }
       function copyToClipboard_(text, btn) {
         navigator.clipboard.writeText(text).then(function() {

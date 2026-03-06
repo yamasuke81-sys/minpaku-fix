@@ -249,6 +249,17 @@ function doGet(e) {
   var action = params.action;
   var url = params.url;
   var secret = params.secret;
+  // [DEBUG-DOPOST] doPostの呼び出し状況を確認する診断エンドポイント
+  if (action === 'checkDoPost') {
+    var debugInfo = {};
+    try {
+      var lastDebug = PropertiesService.getScriptProperties().getProperty('doPost_debug') || 'null';
+      debugInfo.doPost_debug = JSON.parse(lastDebug);
+      debugInfo.currentDeployUrl = ScriptApp.getService().getUrl();
+      debugInfo.timestamp = new Date().toISOString();
+    } catch(dbgErr) { debugInfo.error = dbgErr.toString(); }
+    return ContentService.createTextOutput(JSON.stringify(debugInfo, null, 2)).setMimeType(ContentService.MimeType.JSON);
+  }
   if (action === 'setStaffUrl' && url && typeof url === 'string') {
     var storedSecret = PropertiesService.getDocumentProperties().getProperty('urlUpdateSecret');
     if (storedSecret && secret !== storedSecret) {
@@ -346,8 +357,17 @@ function doGet(e) {
  * Webhook URL: オーナー用デプロイURL（https://script.google.com/macros/s/XXXXX/exec）
  */
 function doPost(e) {
+  // [DEBUG-DOPOST] doPostが実際に呼ばれたかを記録
+  var _doPostDebug = { called: true, time: new Date().toISOString(), hasEvent: !!e, hasPostData: !!(e && e.postData) };
+  try {
+    PropertiesService.getScriptProperties().setProperty('doPost_debug', JSON.stringify(_doPostDebug));
+    Logger.log('[DEBUG-DOPOST] called: ' + JSON.stringify(_doPostDebug));
+  } catch(_dbgErr) {
+    // デバッグ記録失敗は無視
+  }
   try {
     if (!e || !e.postData) {
+      Logger.log('[DEBUG-DOPOST] no postData, returning OK');
       return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
     }
     var body = JSON.parse(e.postData.contents);

@@ -370,6 +370,10 @@ function doPost(e) {
         }
       }
     } catch (te) {}
+    var props = PropertiesService.getScriptProperties();
+    var collected = [];
+    try { collected = JSON.parse(props.getProperty('lineWebhookCollected') || '[]'); } catch (pe) { collected = []; }
+    var nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
     for (var i = 0; i < events.length; i++) {
       var ev = events[i];
       var userId = (ev.source && ev.source.userId) ? ev.source.userId : '';
@@ -389,22 +393,59 @@ function doPost(e) {
           }
         } catch (pe) {}
       }
-      // 通知履歴に記録（オーナーが確認できるように）
       var eventType = ev.type || 'unknown';
-      var messageText = '';
-      if (ev.message && ev.message.text) messageText = ev.message.text;
-      var logMsg = 'LINE Webhook: ' + eventType;
-      if (displayName) logMsg += ' / 表示名: ' + displayName;
-      logMsg += ' / userId: ' + userId;
-      if (messageText) logMsg += ' / メッセージ: ' + messageText.substring(0, 50);
-      addNotification_('LINE', logMsg, { type: 'lineWebhook', userId: userId, displayName: displayName, eventType: eventType });
-      Logger.log('[LINE-WEBHOOK] ' + logMsg);
+      var messageText = (ev.message && ev.message.text) ? ev.message.text : '';
+      // 収集リストに追加（同一userIdは最新で上書き）
+      var found = false;
+      for (var ci = 0; ci < collected.length; ci++) {
+        if (collected[ci].userId === userId) {
+          collected[ci].displayName = displayName || collected[ci].displayName;
+          collected[ci].lastMessage = messageText.substring(0, 50);
+          collected[ci].lastSeen = nowStr;
+          collected[ci].eventType = eventType;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        collected.push({ userId: userId, displayName: displayName, lastMessage: messageText.substring(0, 50), lastSeen: nowStr, eventType: eventType });
+      }
+      Logger.log('[LINE-WEBHOOK] ' + eventType + ' / ' + displayName + ' / ' + userId);
     }
+    // 収集データを保存（最大100件）
+    if (collected.length > 100) collected = collected.slice(collected.length - 100);
+    props.setProperty('lineWebhookCollected', JSON.stringify(collected));
   } catch (err) {
     Logger.log('[LINE-WEBHOOK] doPost error: ' + err.toString());
   }
   // LINE Webhookには常に200を返す必要がある
   return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+}
+
+/**
+ * LINE Webhook で収集したユーザーID一覧を取得
+ */
+function getLineWebhookCollected() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
+    var data = PropertiesService.getScriptProperties().getProperty('lineWebhookCollected') || '[]';
+    return JSON.stringify({ success: true, list: JSON.parse(data) });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString(), list: [] });
+  }
+}
+
+/**
+ * LINE Webhook 収集データをクリア
+ */
+function clearLineWebhookCollected() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
+    PropertiesService.getScriptProperties().deleteProperty('lineWebhookCollected');
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
 }
 
 /**

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0306f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0306g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1335,6 +1335,16 @@
       <div id="settingsStaff" style="display:none;">
         <button type="button" class="btn btn-sm btn-primary mb-2" id="btnAddStaff">スタッフ追加</button>
         <div id="staffList"></div>
+        <hr class="my-4">
+        <div id="lineIdCollectionSection">
+          <h6 class="mb-2">LINE ID 収集</h6>
+          <p class="small text-muted mb-2">LINE Webhookで受信したメッセージからユーザーIDを自動収集します。<br>スタッフのLINEユーザーID欄にコピペしてください。</p>
+          <div class="d-flex gap-2 mb-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnLoadLineIds" onclick="loadLineWebhookCollected()">収集データを読み込み</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="btnClearLineIds" onclick="clearLineWebhookCollected_()">収集データをクリア</button>
+          </div>
+          <div id="lineIdCollectedList" class="small" style="max-height:400px; overflow-y:auto;"></div>
+        </div>
       </div>
       <div id="settingsSubOwners" style="display:none;">
         <p class="small text-muted mb-2">サブオーナーはオーナーと同様に設定の閲覧・編集ができます。複数追加可能。表示名はカレンダー上部に表示されます。</p>
@@ -7255,6 +7265,59 @@
           else { errEl.textContent = r.error || '失敗'; errEl.style.display = 'block'; }
         }).withFailureHandler(function(err) { errEl.textContent = err.message || 'エラー'; errEl.style.display = 'block'; }).changeOwnerEmail(newEmail, pw);
       });
+
+      function loadLineWebhookCollected() {
+        var container = document.getElementById('lineIdCollectedList');
+        if (!container) return;
+        container.innerHTML = '<div class="text-center py-2"><span class="spinner-border spinner-border-sm text-primary"></span><span class="text-muted ms-2">読み込み中…</span></div>';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var res = JSON.parse(jsonStr);
+            if (!res.success || !res.list || res.list.length === 0) {
+              container.innerHTML = '<div class="text-muted py-2">収集データはありません。LINEグループでスタッフにメッセージを送ってもらうと、ここに表示されます。</div>';
+              return;
+            }
+            var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">';
+            html += '<thead><tr><th>LINE表示名</th><th>ユーザーID</th><th>最終メッセージ</th><th>受信日時</th><th>コピー</th></tr></thead><tbody>';
+            for (var i = 0; i < res.list.length; i++) {
+              var item = res.list[i];
+              html += '<tr>';
+              html += '<td>' + escapeHtml(item.displayName || '(不明)') + '</td>';
+              html += '<td><code style="font-size:0.8rem; user-select:all;">' + escapeHtml(item.userId) + '</code></td>';
+              html += '<td class="text-muted">' + escapeHtml(item.lastMessage || '') + '</td>';
+              html += '<td class="text-nowrap">' + escapeHtml(item.lastSeen || '') + '</td>';
+              html += '<td><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="copyToClipboard_(\'' + escapeHtml(item.userId) + '\', this)" title="IDをコピー">コピー</button></td>';
+              html += '</tr>';
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+          } catch (e) {
+            container.innerHTML = '<div class="text-danger">読み込みエラー: ' + e.toString() + '</div>';
+          }
+        }).withFailureHandler(function(err) {
+          container.innerHTML = '<div class="text-danger">通信エラー: ' + err.toString() + '</div>';
+        }).getLineWebhookCollected();
+      }
+      function clearLineWebhookCollected_() {
+        if (!confirm('LINE ID収集データをクリアしますか？')) return;
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          var res = JSON.parse(jsonStr);
+          if (res.success) {
+            var container = document.getElementById('lineIdCollectedList');
+            if (container) container.innerHTML = '<div class="text-muted py-2">クリアしました。</div>';
+          }
+        }).clearLineWebhookCollected();
+      }
+      function copyToClipboard_(text, btn) {
+        navigator.clipboard.writeText(text).then(function() {
+          var orig = btn.textContent;
+          btn.textContent = '✓';
+          btn.classList.replace('btn-outline-secondary', 'btn-success');
+          setTimeout(function() { btn.textContent = orig; btn.classList.replace('btn-success', 'btn-outline-secondary'); }, 1500);
+        }).catch(function() {
+          prompt('以下をコピーしてください:', text);
+        });
+      }
 
       function loadStaffList() {
         var _staffList = document.getElementById('staffList');

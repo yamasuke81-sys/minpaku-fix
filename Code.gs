@@ -340,6 +340,74 @@ function doGet(e) {
 }
 
 /**
+ * LINE Webhook受信用エンドポイント
+ * LINEプラットフォームからのイベント（メッセージ送信、友達追加等）を受信し、
+ * スタッフのLINEユーザーIDを自動収集する。
+ * Webhook URL: オーナー用デプロイURL（https://script.google.com/macros/s/XXXXX/exec）
+ */
+function doPost(e) {
+  try {
+    if (!e || !e.postData) {
+      return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+    }
+    var body = JSON.parse(e.postData.contents);
+    var events = body.events || [];
+    if (events.length === 0) {
+      // LINE Webhook検証リクエスト（events空配列）→ 200 OK を返す
+      return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+    }
+    // LINEチャネルアクセストークンを取得（Profile API用）
+    var token = '';
+    try {
+      var settSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+      if (settSheet && settSheet.getLastRow() >= 2) {
+        var sRows = settSheet.getRange(2, 1, settSheet.getLastRow() - 1, 2).getValues();
+        for (var ti = 0; ti < sRows.length; ti++) {
+          if (String(sRows[ti][0] || '').trim() === 'LINEチャネルアクセストークン') {
+            token = String(sRows[ti][1] || '').trim();
+            break;
+          }
+        }
+      }
+    } catch (te) {}
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      var userId = (ev.source && ev.source.userId) ? ev.source.userId : '';
+      if (!userId) continue;
+      // Profile APIで表示名を取得
+      var displayName = '';
+      if (token) {
+        try {
+          var profileResp = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + userId, {
+            method: 'get',
+            headers: { 'Authorization': 'Bearer ' + token },
+            muteHttpExceptions: true
+          });
+          if (profileResp.getResponseCode() === 200) {
+            var profile = JSON.parse(profileResp.getContentText());
+            displayName = profile.displayName || '';
+          }
+        } catch (pe) {}
+      }
+      // 通知履歴に記録（オーナーが確認できるように）
+      var eventType = ev.type || 'unknown';
+      var messageText = '';
+      if (ev.message && ev.message.text) messageText = ev.message.text;
+      var logMsg = 'LINE Webhook: ' + eventType;
+      if (displayName) logMsg += ' / 表示名: ' + displayName;
+      logMsg += ' / userId: ' + userId;
+      if (messageText) logMsg += ' / メッセージ: ' + messageText.substring(0, 50);
+      addNotification_('LINE', logMsg, { type: 'lineWebhook', userId: userId, displayName: displayName, eventType: eventType });
+      Logger.log('[LINE-WEBHOOK] ' + logMsg);
+    }
+  } catch (err) {
+    Logger.log('[LINE-WEBHOOK] doPost error: ' + err.toString());
+  }
+  // LINE Webhookには常に200を返す必要がある
+  return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+}
+
+/**
  * index.html のインクルード用（複数HTMLファイルがある場合）
  */
 function include(filename) {
@@ -5489,9 +5557,8 @@ function checkRosterReminder() {
     var res = JSON.parse(getRosterReminderSettings());
     if (!res.success || !res.settings || !res.settings.rosterReminderEnabled) return;
     var schedules = res.settings.schedules || [];
-    var enabledSchedules = schedules.filter(function(s) { return s.enabled && s.daysBefore > 0; });
+    var enabledSchedules = schedules.filter(function(s) { return s && s.enabled && s.daysBefore > 0; });
     if (enabledSchedules.length === 0) return;
-    var daysBefore = Math.max.apply(null, enabledSchedules.map(function(s) { return s.daysBefore; }));
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) return;
@@ -5502,94 +5569,105 @@ function checkRosterReminder() {
     for (var h = 0; h < headers.length; h++) {
       var hdr = String(headers[h]).trim();
       if (hdr === HEADERS.CHECK_IN) checkInCol = h;
-      // 氏名列は部分一致で全て収集（buildColumnMapと同じ基準）
       if (hdr.indexOf('氏名') > -1 || hdr.indexOf('名前') > -1 || hdr.toLowerCase() === 'full name') guestNameCols.push(h);
       if ((hdr === HEADERS.CANCELLED_AT || hdr === 'キャンセル日時') && cancelledAtCol < 0) cancelledAtCol = h;
       if ((hdr === HEADERS.ICAL_SYNC || (hdr.indexOf('iCal') >= 0 && hdr.indexOf('同期') >= 0)) && icalSyncCol < 0) icalSyncCol = h;
     }
     if (checkInCol < 0) return;
-    if (guestNameCols.length === 0) return; // 氏名列が見つからない場合はスキップ（全予約が誤検知になるため）
+    if (guestNameCols.length === 0) return;
 
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
-    var today = new Date();
-    today.setHours(0, 0, 0, 0);
-    var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
+    var now = new Date();
+    var nowHour = now.getHours();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var todayStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
+    var props = PropertiesService.getScriptProperties();
 
-    // 重複送信防止: 本日分を既に送信済みなら中止
-    var lastSent = PropertiesService.getScriptProperties().getProperty('rosterReminderLastSent');
-    if (lastSent === todayStr) return;
-
-    var targetDate = new Date(today);
-    targetDate.setDate(targetDate.getDate() + daysBefore);
-
-    // 宿泊者名簿未記入の予約を検出
-    var missing = [];
+    // 各予約のチェックイン日・名簿未記入状態を事前計算
+    var bookingInfos = [];
     for (var i = 0; i < rows.length; i++) {
       var checkInDate = rows[i][checkInCol] ? new Date(rows[i][checkInCol]) : null;
       if (!checkInDate) continue;
-      checkInDate.setHours(0, 0, 0, 0);
-      if (checkInDate < today || checkInDate > targetDate) continue;
-      // キャンセル済み予約はスキップ
+      var ciDay = new Date(checkInDate.getFullYear(), checkInDate.getMonth(), checkInDate.getDate());
+      if (ciDay < today) continue;
       if (cancelledAtCol >= 0 && String(rows[i][cancelledAtCol] || '').trim()) continue;
-      // iCal同期で取り込まれた行はスキップ（名簿情報がないため誤検知になる）
       if (icalSyncCol >= 0 && String(rows[i][icalSyncCol] || '').trim()) continue;
-      // いずれかの氏名列に値があれば名簿記入済みとみなす
       var hasGuestName = false;
       for (var g = 0; g < guestNameCols.length; g++) {
         if (String(rows[i][guestNameCols[g]] || '').trim()) { hasGuestName = true; break; }
       }
       if (!hasGuestName) {
-        missing.push({
-          checkIn: formatDateWithDay_(checkInDate),
-          rowNumber: i + 2
-        });
+        bookingInfos.push({ checkinDay: ciDay, checkIn: formatDateWithDay_(checkInDate), rowNumber: i + 2 });
       }
     }
-    if (missing.length === 0) return;
+    if (bookingInfos.length === 0) return;
 
-    // オーナーに通知 + メール
-    var ownerRes = JSON.parse(getOwnerEmail());
-    var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
-    var msgLines = missing.map(function(m) {
-      return 'チェックイン ' + m.checkIn + '（行' + m.rowNumber + '）';
-    });
-    var message = '宿泊者名簿が未記入の予約が ' + missing.length + ' 件あります: ' + msgLines.join(', ');
-    // 本日送信済みとして先に記録（競合条件による重複通知を防止）
-    PropertiesService.getScriptProperties().setProperty('rosterReminderLastSent', todayStr);
-    addNotification_('名簿', message, { type: 'rosterReminder', missing: missing });
+    // スケジュール別にリマインド送信（checkAndSendReminderEmailsと同じパターン）
+    for (var si = 0; si < schedules.length; si++) {
+      var sched = schedules[si];
+      if (!sched || !sched.enabled || !sched.daysBefore || sched.daysBefore <= 0) continue;
+      var propKey = 'rosterReminder_s' + si + '_' + todayStr;
+      if (props.getProperty(propKey)) continue;
+      var triggerHour = parseInt((sched.time || '09:00').split(':')[0], 10) || 9;
+      if (nowHour < triggerHour) continue;
 
-    if (ownerEmail) {
-      try {
-        var rosterOwnerUrl = '';
-        try { rosterOwnerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
-        if (!rosterOwnerUrl) { try { rosterOwnerUrl = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {} }
-        var subjTpl = (res.settings.rosterReminderSubject || '').trim();
-        var bodyTpl = (res.settings.rosterReminderBody || '').trim();
-        var listText = msgLines.join('\n');
-        var subj = subjTpl
-          ? subjTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText).replace(/\{アプリURL\}/g, rosterOwnerUrl)
-          : '宿泊者名簿の未記入通知（' + missing.length + '件）';
-        var body = bodyTpl
-          ? bodyTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText).replace(/\{アプリURL\}/g, rosterOwnerUrl)
-          : '以下の予約について、宿泊者名簿がまだ記入されていません。\n' +
-            '宿泊者への催促をお願いします。\n\n' +
-            listText + '\n\n' +
-            (rosterOwnerUrl ? 'アプリ: ' + rosterOwnerUrl + '\n\n' : '') +
-            '※ アプリの通知にも同じ内容が届いています。';
-        var _ch_roster = getNotifyChannel_('名簿未入力リマインド');
-        var rosterLineText = subj + '\n\n' + body;
-        if (_ch_roster.owner_email) GmailApp.sendEmail(ownerEmail, subj, body);
-        if (_ch_roster.owner_line) { try { sendLineMessage_(rosterLineText, false, 'owner'); } catch (lineErr) {} }
-        if (_ch_roster.group_line) { try { sendLineMessage_(rosterLineText, false, 'group'); } catch (lineErr) {} }
-        if (_ch_roster.staff_email) {
-          var rosterAllStaff = getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet());
-          rosterAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subj, body); } catch (e) {} });
+      // このスケジュールに該当する予約を検出
+      // チェックイン日 - daysBefore <= today の予約が対象（トリガー日以降）
+      var missing = [];
+      for (var bi = 0; bi < bookingInfos.length; bi++) {
+        var b = bookingInfos[bi];
+        var triggerDate = new Date(b.checkinDay);
+        triggerDate.setDate(triggerDate.getDate() - sched.daysBefore);
+        if (today >= triggerDate) {
+          missing.push(b);
         }
-        if (_ch_roster.staff_line) {
-          try { sendLineToStaffMembers_(getAllActiveStaff_(SpreadsheetApp.getActiveSpreadsheet()), rosterLineText); } catch (lineErr) {}
+      }
+      if (missing.length === 0) continue;
+
+      // 重複送信防止フラグを先にセット
+      props.setProperty(propKey, '1');
+
+      var ownerRes = JSON.parse(getOwnerEmail());
+      var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
+      var msgLines = missing.map(function(m) {
+        return 'チェックイン ' + m.checkIn + '（行' + m.rowNumber + '）';
+      });
+      var message = '宿泊者名簿が未記入の予約が ' + missing.length + ' 件あります: ' + msgLines.join(', ');
+      addNotification_('名簿', message, { type: 'rosterReminder', missing: missing });
+
+      if (ownerEmail) {
+        try {
+          var rosterOwnerUrl = '';
+          try { rosterOwnerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}
+          if (!rosterOwnerUrl) { try { rosterOwnerUrl = PropertiesService.getScriptProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {} }
+          var subjTpl = (res.settings.rosterReminderSubject || '').trim();
+          var bodyTpl = (res.settings.rosterReminderBody || '').trim();
+          var listText = msgLines.join('\n');
+          var subj = subjTpl
+            ? subjTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText).replace(/\{アプリURL\}/g, rosterOwnerUrl)
+            : '宿泊者名簿の未記入通知（' + missing.length + '件）';
+          var body = bodyTpl
+            ? bodyTpl.replace(/\{件数\}/g, String(missing.length)).replace(/\{未記入一覧\}/g, listText).replace(/\{アプリURL\}/g, rosterOwnerUrl)
+            : '以下の予約について、宿泊者名簿がまだ記入されていません。\n' +
+              '宿泊者への催促をお願いします。\n\n' +
+              listText + '\n\n' +
+              (rosterOwnerUrl ? 'アプリ: ' + rosterOwnerUrl + '\n\n' : '') +
+              '※ アプリの通知にも同じ内容が届いています。';
+          var _ch_roster = getNotifyChannel_('名簿未入力リマインド');
+          var rosterLineText = subj + '\n\n' + body;
+          if (_ch_roster.owner_email) GmailApp.sendEmail(ownerEmail, subj, body);
+          if (_ch_roster.owner_line) { try { sendLineMessage_(rosterLineText, false, 'owner'); } catch (lineErr) {} }
+          if (_ch_roster.group_line) { try { sendLineMessage_(rosterLineText, false, 'group'); } catch (lineErr) {} }
+          if (_ch_roster.staff_email) {
+            var rosterAllStaff = getAllActiveStaff_(ss);
+            rosterAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subj, body); } catch (e) {} });
+          }
+          if (_ch_roster.staff_line) {
+            try { sendLineToStaffMembers_(getAllActiveStaff_(ss), rosterLineText); } catch (lineErr) {}
+          }
+        } catch (e) {
+          Logger.log('名簿リマインダーメール送信失敗: ' + e.toString());
         }
-      } catch (e) {
-        Logger.log('名簿リマインダーメール送信失敗: ' + e.toString());
       }
     }
   } catch (e) {
@@ -9445,6 +9523,7 @@ function checkAndCreateRecruitments() {
     }
     ensureRecruitNotifyMethodColumn_();
     ensureRecruitDetailColumns_();
+    var newRecruitEntries = [];
     for (var i = 0; i < data.length; i++) {
       // キャンセル済みの予約はスキップ
       if (colMap.cancelledAt >= 0) {
@@ -9476,6 +9555,23 @@ function checkAndCreateRecruitments() {
       const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
       recruitSheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutStr, rowNumber, '', status, assignedStaff, '', now, '', 'メール', '', '', '', '', '', '']]);
       existingRowNums[rowNumber] = true;
+      // 募集中の新規エントリを記録（後で自動通知に使用）
+      if (status === '募集中') {
+        newRecruitEntries.push({ rowIndex: nextRow, checkoutDateStr: checkoutStr, bookingRowNumber: rowNumber });
+      }
+    }
+    // 新規作成された募集中エントリに対して自動で募集開始通知を送信
+    if (newRecruitEntries.length > 0) {
+      try {
+        for (var ni = 0; ni < newRecruitEntries.length; ni++) {
+          var entry = newRecruitEntries[ni];
+          notifyStaffForRecruitment(entry.rowIndex, entry.checkoutDateStr, entry.bookingRowNumber);
+          // 告知日を設定（手動送信と同じ）
+          recruitSheet.getRange(entry.rowIndex, 3).setValue(Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
+        }
+      } catch (notifyErr) {
+        Logger.log('checkAndCreateRecruitments autoNotify: ' + notifyErr.toString());
+      }
     }
   } catch (e) {
     Logger.log('checkAndCreateRecruitments: ' + e.toString());
@@ -9495,99 +9591,122 @@ function checkAndSendReminders() {
     // 募集リマインドが無効ならスキップ
     if (!res.settings.recruitReminderEnabled) return;
     ensureRecruitNotifyMethodColumn_();
+    ensureRecruitReminderSentColumn_();
     const minResp = res.settings.minRespondents || 2;
-    const intervalWeeks = res.settings.reminderIntervalWeeks || 1;
-    // リマインドスケジュールから最大日数を取得（デフォルト7日）
-    // スケジュール設定の最大daysBefore以上先の募集にはリマインドを送らない
-    var maxDaysBefore = 7;
     var schedules = res.settings.schedules || [];
-    for (var si = 0; si < schedules.length; si++) {
-      if (schedules[si].enabled && schedules[si].daysBefore > maxDaysBefore) {
-        maxDaysBefore = schedules[si].daysBefore;
-      }
-    }
-    // 募集開始週数（デフォルト4週）も考慮し、どちらか大きい方を上限とする
-    var recruitStartDays = (res.settings.recruitStartWeeks || 4) * 7;
-    var maxFutureDays = Math.max(maxDaysBefore, recruitStartDays);
+    var enabledSchedules = schedules.filter(function(s) { return s && s.enabled && s.daysBefore > 0; });
+    if (enabledSchedules.length === 0) return;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const recruitSheet = ss.getSheetByName(SHEET_RECRUIT);
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return;
-    const maxCol = Math.max(recruitSheet.getLastColumn(), 9);
-    const rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, maxCol).getValues();
-    const today = new Date();
-    var todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd');
-    // 未来の上限日を計算
-    var futureLimit = new Date(today);
-    futureLimit.setDate(futureLimit.getDate() + maxFutureDays);
+    var rLastCol = Math.max(recruitSheet.getLastColumn(), 9);
+    const rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, rLastCol).getValues();
+    var reminderSentColIdx = getRecruitReminderSentColIndex_(recruitSheet);
+    if (reminderSentColIdx < 0) return;
+    var now = new Date();
+    var nowHour = now.getHours();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // 時刻を00:00:00に正規化
+    var todayStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
     var props = PropertiesService.getScriptProperties();
+    // スタッフ情報を事前取得（ループ外で1回だけ）
+    var staffEmails = [];
+    var staffSheet = ss.getSheetByName(SHEET_STAFF);
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
+      var toSet = {};
+      staffRows.forEach(function(r) {
+        var hidden = String(r[11] || '').trim();
+        if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
+        var e = String(r[2] || '').trim().toLowerCase(); if (e) toSet[e] = 1;
+      });
+      staffEmails = Object.keys(toSet);
+    }
+    if (staffEmails.length === 0) return;
+    // 立候補数を事前取得
+    var volCountMap = {};
+    if (volSheet && volSheet.getLastRow() >= 2) {
+      var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
+      volRows.forEach(function(vr) {
+        var key = String(vr[0]).trim();
+        volCountMap[key] = (volCountMap[key] || 0) + 1;
+      });
+    }
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][3]).trim() !== '募集中') continue;
-      // 過去のチェックアウト日はリマインド不要
+      // チェックアウト日を解析
       var _recruitDate = rows[i][0];
-      var _recruitDateObj = (_recruitDate instanceof Date) ? _recruitDate : new Date(_recruitDate);
-      if (!isNaN(_recruitDateObj.getTime())) {
-        if (_recruitDateObj < today) continue;
-        // 遠い未来（募集開始週数 or リマインドスケジュール最大日数を超える）はスキップ
-        if (_recruitDateObj > futureLimit) continue;
+      var checkoutDay = (_recruitDate instanceof Date) ? new Date(_recruitDate.getFullYear(), _recruitDate.getMonth(), _recruitDate.getDate()) : null;
+      if (!checkoutDay) {
+        var parsed = parseDate(_recruitDate);
+        if (parsed) checkoutDay = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
       }
+      if (!checkoutDay || isNaN(checkoutDay.getTime())) continue;
+      // 過去のチェックアウト日はリマインド不要
+      if (checkoutDay < today) continue;
       if ((String(rows[i][8] || '').trim() || 'メール') === 'LINE') continue;
-      const lastRemind = rows[i][5] ? new Date(rows[i][5]) : null;
-      const rowIndex = i + 2;
-      var volCount = 0;
-      if (volSheet && volSheet.getLastRow() >= 2) {
-        const volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, 1).getValues();
-        volRows.forEach(function(vr) {
-          if (String(vr[0]).trim() === 'r' + rowIndex) volCount++;
-        });
-      }
+      var rowIndex = i + 2;
+      // 立候補数チェック
+      var volCount = volCountMap['r' + rowIndex] || 0;
       if (volCount >= minResp) continue;
-      var shouldRemind = false;
-      if (!lastRemind) shouldRemind = true;
-      else {
-        const nextRemind = new Date(lastRemind);
-        nextRemind.setDate(nextRemind.getDate() + intervalWeeks * 7);
-        if (today >= nextRemind) shouldRemind = true;
+      // 作成日チェック: 募集エントリが本日作成された場合はリマインドをスキップ
+      // （本日は募集開始通知が飛ぶため、リマインドは翌日以降）
+      var createdAt = rows[i][6]; // 列7: 作成日
+      if (createdAt) {
+        var createdStr = (createdAt instanceof Date) ? Utilities.formatDate(createdAt, 'Asia/Tokyo', 'yyyy-MM-dd') : String(createdAt).substring(0, 10);
+        if (createdStr === todayStr) continue;
       }
-      if (shouldRemind) {
-        // 同日重複送信を防止（フラグを送信前にセットして競合を排除）
-        var propKey = 'staffRemind_' + rowIndex + '_' + todayStr;
-        if (props.getProperty(propKey)) continue;
-        props.setProperty(propKey, '1');
-        const staffSheet = ss.getSheetByName(SHEET_STAFF);
-        if (staffSheet && staffSheet.getLastRow() >= 2) {
-          const staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 12).getValues();
-          var toSet = {};
-          staffRows.forEach(function(r) {
-            var hidden = String(r[11] || '').trim();
-            if (hidden === 'TRUE' || hidden === 'true' || hidden === '1') return;
-            var e = String(r[2] || '').trim().toLowerCase(); if (e) toSet[e] = 1;
-          });
-          var to = Object.keys(toSet);
-          if (to.length) {
-            var recruitStaffUrl = getStaffAppUrl_();
-            var recruitDateRaw = rows[i][0];
-            var recruitDateKey = (recruitDateRaw instanceof Date) ? Utilities.formatDate(recruitDateRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(recruitDateRaw || '').trim();
-            var recruitDateDisp = formatDateWithDay_(recruitDateKey) || recruitDateKey;
-            var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateKey) : '';
-            var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '清掃スタッフ募集のリマインド: {チェックアウト}';
-            var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名\n\nWebアプリで回答: {回答URL}';
-            var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
-            var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
-            var _ch_remind = getNotifyChannel_('募集リマインド');
-            var remindLineText = subj + '\n\n' + body;
-            if (_ch_remind.staff_email) { GmailApp.sendEmail(to.join(','), subj, body); }
-            if (_ch_remind.group_line) { try { sendLineMessage_(remindLineText, false, 'group'); } catch (lineErr) {} }
-            if (_ch_remind.owner_line) { try { sendLineMessage_(remindLineText, false, 'owner'); } catch (lineErr) {} }
-            if (_ch_remind.owner_email) {
-              try { var remindOwner = getOwnerEmailAddress_(); if (remindOwner) GmailApp.sendEmail(remindOwner, subj, body); } catch (e) {}
-            }
-            if (_ch_remind.staff_line) {
-              try { sendLineToStaffMembers_(getAllActiveStaff_(ss), remindLineText); } catch (lineErr) {}
-            }
+      // 送信済みスケジュールインデックスを取得
+      var sentStr = String(rows[i][reminderSentColIdx] || '').trim();
+      var sentSet = {};
+      if (sentStr) {
+        sentStr.split(',').forEach(function(s) { var n = parseInt(s.trim(), 10); if (!isNaN(n)) sentSet[n] = true; });
+      }
+      var newSent = [];
+      for (var si = 0; si < schedules.length; si++) {
+        var sched = schedules[si];
+        if (!sched || !sched.enabled || !sched.daysBefore || sched.daysBefore <= 0) continue;
+        if (sentSet[si]) continue;
+        // チェックアウト日のX日前がトリガー日
+        var triggerDate = new Date(checkoutDay);
+        triggerDate.setDate(triggerDate.getDate() - sched.daysBefore);
+        var triggerHour = parseInt((sched.time || '09:00').split(':')[0], 10) || 9;
+        // 現在がトリガー日の指定時刻以降、またはトリガー日を過ぎているかチェック
+        var isOnTriggerDay = today.getTime() === triggerDate.getTime();
+        var isPastTriggerDay = today > triggerDate;
+        if (isOnTriggerDay ? (nowHour >= triggerHour) : isPastTriggerDay) {
+          // PropertiesService による重複送信防止
+          var propKey = 'staffRemind_' + rowIndex + '_s' + si;
+          if (props.getProperty(propKey)) { newSent.push(si); continue; }
+          props.setProperty(propKey, todayStr);
+          var recruitStaffUrl = getStaffAppUrl_();
+          var recruitDateKey = Utilities.formatDate(checkoutDay, 'Asia/Tokyo', 'yyyy-MM-dd');
+          var recruitDateDisp = formatDateWithDay_(recruitDateKey) || recruitDateKey;
+          var recruitAnswerUrl = recruitStaffUrl ? recruitStaffUrl + (recruitStaffUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(recruitDateKey) : '';
+          var subjTpl = (res.settings.recruitReminderSubject || '').trim() || '清掃スタッフ募集のリマインド: {チェックアウト}';
+          var bodyTpl = (res.settings.recruitReminderBody || '').trim() || 'まだ回答が{最少回答者数}名に達していません。\nチェックアウト日: {チェックアウト}\n現在の回答数: {回答数}名\n\nWebアプリで回答: {回答URL}';
+          var subj = subjTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
+          var body = bodyTpl.replace(/\{チェックアウト\}/g, recruitDateDisp).replace(/\{回答数\}/g, String(volCount)).replace(/\{最少回答者数\}/g, String(minResp)).replace(/\{回答URL\}/g, recruitAnswerUrl);
+          var _ch_remind = getNotifyChannel_('募集リマインド');
+          var remindLineText = subj + '\n\n' + body;
+          if (_ch_remind.staff_email) { GmailApp.sendEmail(staffEmails.join(','), subj, body); }
+          if (_ch_remind.group_line) { try { sendLineMessage_(remindLineText, false, 'group'); } catch (lineErr) {} }
+          if (_ch_remind.owner_line) { try { sendLineMessage_(remindLineText, false, 'owner'); } catch (lineErr) {} }
+          if (_ch_remind.owner_email) {
+            try { var remindOwner = getOwnerEmailAddress_(); if (remindOwner) GmailApp.sendEmail(remindOwner, subj, body); } catch (e) {}
           }
+          if (_ch_remind.staff_line) {
+            try { sendLineToStaffMembers_(getAllActiveStaff_(ss), remindLineText); } catch (lineErr) {}
+          }
+          newSent.push(si);
+          // リマインド最終日も更新（既存ロジック互換）
+          recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
         }
-        recruitSheet.getRange(rowIndex, 6).setValue(Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'));
+      }
+      // 送信済みスケジュールインデックスを更新
+      if (newSent.length > 0) {
+        var updatedSent = sentStr ? sentStr + ',' + newSent.join(',') : newSent.join(',');
+        recruitSheet.getRange(rowIndex, reminderSentColIdx + 1).setValue(updatedSent);
       }
     }
   } catch (e) {
@@ -9684,6 +9803,34 @@ function getOwnerReminderColIndex_(sheet) {
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   for (var i = 0; i < headers.length; i++) {
     if (String(headers[i] || '').trim() === 'オーナーリマインド送信済') return i;
+  }
+  return -1;
+}
+
+/**
+ * 募集シートに「募集リマインド送信済」列を保証
+ */
+function ensureRecruitReminderSentColumn_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_RECRUIT);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === '募集リマインド送信済') return;
+    }
+    var nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue('募集リマインド送信済');
+  } catch (e) {}
+}
+
+/**
+ * 募集リマインド送信済み列のインデックスを取得 (0-based)
+ */
+function getRecruitReminderSentColIndex_(sheet) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i] || '').trim() === '募集リマインド送信済') return i;
   }
   return -1;
 }

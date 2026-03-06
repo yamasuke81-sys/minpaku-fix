@@ -9690,8 +9690,17 @@ function checkAndSendReminders() {
         volCountMap[key] = (volCountMap[key] || 0) + 1;
       });
     }
+    // [DEBUG-REMIND-v0306k] 募集シートの全行をダンプ
+    Logger.log('[DEBUG-REMIND] 募集シート行数: ' + rows.length + ', minResp=' + minResp);
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][3]).trim() !== '募集中') continue;
+      var _debugStatus = String(rows[i][3]).trim();
+      var _debugDate = rows[i][0];
+      var _debugDateStr = (_debugDate instanceof Date) ? Utilities.formatDate(_debugDate, 'Asia/Tokyo', 'yyyy-MM-dd') : String(_debugDate);
+      var _debugRowIdx = i + 2;
+      var _debugVolCount = volCountMap['r' + _debugRowIdx] || 0;
+      var _debugSelectedStaff = String(rows[i][4] || '').trim();
+      Logger.log('[DEBUG-REMIND] 行' + _debugRowIdx + ': 日付=' + _debugDateStr + ', ステータス=' + _debugStatus + ', 選定スタッフ=' + _debugSelectedStaff + ', 立候補数=' + _debugVolCount);
+      if (_debugStatus !== '募集中') continue;
       // チェックアウト日を解析
       var _recruitDate = rows[i][0];
       var checkoutDay = (_recruitDate instanceof Date) ? new Date(_recruitDate.getFullYear(), _recruitDate.getMonth(), _recruitDate.getDate()) : null;
@@ -9706,6 +9715,7 @@ function checkAndSendReminders() {
       var rowIndex = i + 2;
       // 立候補数チェック
       var volCount = volCountMap['r' + rowIndex] || 0;
+      Logger.log('[DEBUG-REMIND] → リマインド対象候補: 行' + rowIndex + ', 日付=' + _debugDateStr + ', volCount=' + volCount + '/' + minResp);
       if (volCount >= minResp) continue;
       // 作成日チェック: 募集エントリが本日作成された場合はリマインドをスキップ
       // （本日は募集開始通知が飛ぶため、リマインドは翌日以降）

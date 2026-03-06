@@ -116,6 +116,67 @@ function syncRecruitBookingRowsAfterSort_(ss, formSheet, colMap) {
   }
 }
 
+/**
+ * チェックイン・チェックアウト列の日付表示形式を yyyy-MM-dd に統一
+ * Date型・スラッシュ区切り・時刻付きなど混在するフォーマットを正規化
+ */
+function normalizeDateColumns_(formSheet, colMap) {
+  var lastRow = formSheet.getLastRow();
+  if (lastRow < 2) return;
+  var numRows = lastRow - 1;
+  var changes = 0;
+
+  // CI列の正規化
+  if (colMap.checkIn >= 0) {
+    var ciCol = colMap.checkIn + 1;
+    var ciVals = formSheet.getRange(2, ciCol, numRows, 1).getValues();
+    var ciChanged = false;
+    for (var i = 0; i < ciVals.length; i++) {
+      var raw = ciVals[i][0];
+      if (!raw) continue;
+      var parsed = parseDate(raw);
+      if (!parsed) continue;
+      var norm = toDateKeySafe_(parsed);
+      var current = (raw instanceof Date)
+        ? Utilities.formatDate(raw, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+        : String(raw).trim();
+      if (current !== norm) {
+        Logger.log('[DEBUG-DATEFMT] row=' + (i + 2) + ' CI: "' + current + '" → "' + norm + '"');
+        ciVals[i][0] = norm;
+        ciChanged = true;
+        changes++;
+      }
+    }
+    if (ciChanged) formSheet.getRange(2, ciCol, numRows, 1).setValues(ciVals);
+  }
+
+  // CO列の正規化
+  if (colMap.checkOut >= 0) {
+    var coCol = colMap.checkOut + 1;
+    var coVals = formSheet.getRange(2, coCol, numRows, 1).getValues();
+    var coChanged = false;
+    for (var j = 0; j < coVals.length; j++) {
+      var rawCo = coVals[j][0];
+      if (!rawCo) continue;
+      var parsedCo = parseDate(rawCo);
+      if (!parsedCo) continue;
+      var normCo = toDateKeySafe_(parsedCo);
+      var currentCo = (rawCo instanceof Date)
+        ? Utilities.formatDate(rawCo, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+        : String(rawCo).trim();
+      if (currentCo !== normCo) {
+        Logger.log('[DEBUG-DATEFMT] row=' + (j + 2) + ' CO: "' + currentCo + '" → "' + normCo + '"');
+        coVals[j][0] = normCo;
+        coChanged = true;
+        changes++;
+      }
+    }
+    if (coChanged) formSheet.getRange(2, coCol, numRows, 1).setValues(coVals);
+  }
+
+  Logger.log('[DEBUG-DATEFMT] normalizeDateColumns_: ' + changes + '件の日付を正規化');
+}
+
 /**********************************************
  * 民泊Webアプリ（カレンダー・清掃担当編集）
  **********************************************/
@@ -2757,6 +2818,23 @@ function syncFromICal() {
     // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）
     try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
     invalidateInitDataCache_();
+
+    // ソート（CI降順）+ 日付フォーマット統一
+    try {
+      var formLastRow2 = formSheet.getLastRow();
+      var formLastCol2 = formSheet.getLastColumn();
+      if (formLastRow2 >= 3 && formLastCol2 >= 1) {
+        var headers2 = formSheet.getRange(1, 1, 1, formLastCol2).getValues()[0];
+        var colMap2 = buildColumnMap(headers2);
+        Logger.log('[DEBUG-SORT] syncFromICal: ソート開始 (added=' + added + ', rows=' + (formLastRow2 - 1) + ')');
+        sortFormResponses_();
+        Logger.log('[DEBUG-SORT] syncFromICal: ソート完了');
+        normalizeDateColumns_(formSheet, colMap2);
+      }
+    } catch (sortErr) {
+      Logger.log('[DEBUG-SORT] syncFromICal: エラー: ' + sortErr.toString());
+    }
+
     return JSON.stringify({ success: true, added: added, removed: removed, details: details });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), added: 0, removed: 0, details: [] });
@@ -2933,6 +3011,23 @@ function autoSyncFromICal() {
       try { checkAndCreateRecruitments(); } catch (re) {}
       invalidateInitDataCache_();
     }
+
+    // ソート（CI降順）+ 日付フォーマット統一
+    try {
+      var formLastRow2 = formSheet.getLastRow();
+      var formLastCol2 = formSheet.getLastColumn();
+      if (formLastRow2 >= 3 && formLastCol2 >= 1) {
+        var headers2 = formSheet.getRange(1, 1, 1, formLastCol2).getValues()[0];
+        var colMap2 = buildColumnMap(headers2);
+        Logger.log('[DEBUG-SORT] autoSyncFromICal: ソート開始 (added=' + added + ', rows=' + (formLastRow2 - 1) + ')');
+        sortFormResponses_();
+        Logger.log('[DEBUG-SORT] autoSyncFromICal: ソート完了');
+        normalizeDateColumns_(formSheet, colMap2);
+      }
+    } catch (sortErr) {
+      Logger.log('[DEBUG-SORT] autoSyncFromICal: エラー: ' + sortErr.toString());
+    }
+
     // 既読かつ10日以上経過した通知を自動クリーンアップ
     try { cleanupOldReadNotifications_(); } catch (ce) {}
   } catch (e) {

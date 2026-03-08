@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308q</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308r</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2766,13 +2766,13 @@
             var recStatus = rec.status || '';
             var recStaff = (rec.staff || '').trim();
             var bookStaff = (b.cleaningStaff || '').trim();
-            var isFullyConfirmed = (recStatus === 'スタッフ確定済み');
-            var isSelected = (recStatus === '選定済');
-            var isRecruiting = recStatus && !isFullyConfirmed && !isSelected;
-            // 清掃担当が設定されていれば、募集ステータスに関係なく「確定済み」扱い
-            // ただし選定済（未確定）は確定扱いにしない（背景色・ドットを募集中と同じにする）
-            var isDecided = isFullyConfirmed || (!!bookStaff && !isSelected) || (!!recStaff && !isSelected);
-            var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : (isRecruiting || isSelected) ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
+            var isFullyConfirmed = (recStatus === 'スタッフ確定済み') || (recStatus === '選定済');
+            // 「募集中」でスタッフ選定済み（未確定）= まだ確定していない
+            var isSelectedNotConfirmed = (recStatus === '募集中') && (!!recStaff || !!bookStaff);
+            var isRecruiting = recStatus && !isFullyConfirmed;
+            // 確定済み or 選定済ステータスのみ「決定」扱い。募集中+スタッフ選定済みは未確定
+            var isDecided = isFullyConfirmed || (!isSelectedNotConfirmed && (!!bookStaff || !!recStaff));
+            var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             if (isCancelled) cleaningClasses.push('fc-event-cancelled');
             var curStaff = normalizeName_(window.currentUserName);
             var curEmail = (window.currentUserEmail || '').trim().toLowerCase();
@@ -2796,10 +2796,10 @@
             } else if (window.staffMode && isRejectedByMe) {
               cleaningClasses.push('fc-event-cleaning-rejected-by-me');
             }
-            var cleaningStatus = isCancelled ? 'cancelled' : (isDecided ? 'cleaning-decided' : ((isRecruiting || isSelected) ? 'cleaning-recruiting' : 'cleaning-not-recruiting'));
-            // DEBUG v0308q: 選定済の背景色デバッグ
+            var cleaningStatus = isCancelled ? 'cancelled' : (isDecided ? 'cleaning-decided' : (isRecruiting ? 'cleaning-recruiting' : 'cleaning-not-recruiting'));
+            // DEBUG v0308r: 選定済の背景色デバッグ
             if (recStatus || recStaff || bookStaff) {
-              console.log('[DEBUG-CAL] row=' + b.rowNumber + ' CO=' + checkOut + ' recStatus="' + recStatus + '" recStaff="' + recStaff + '" bookStaff="' + bookStaff + '" isFullyConfirmed=' + isFullyConfirmed + ' isSelected=' + isSelected + ' isRecruiting=' + isRecruiting + ' isDecided=' + isDecided + ' cleaningStatus=' + cleaningStatus + ' classes=' + cleaningClasses.join(','));
+              console.log('[DEBUG-CAL] row=' + b.rowNumber + ' CO=' + checkOut + ' recStatus="' + recStatus + '" recStaff="' + recStaff + '" bookStaff="' + bookStaff + '" isFullyConfirmed=' + isFullyConfirmed + ' isSelectedNotConfirmed=' + isSelectedNotConfirmed + ' isRecruiting=' + isRecruiting + ' isDecided=' + isDecided + ' cleaningStatus=' + cleaningStatus + ' classes=' + cleaningClasses.join(','));
             }
             events.push({
               id: 'c-' + b.rowNumber,
@@ -4368,10 +4368,10 @@
                   var staffSetDates = {};
                   allBookings.forEach(function(b) {
                     var rec = window._recruitFullMap[b.rowNumber] || {};
-                    var isFullyCnf = (rec.status === 'スタッフ確定済み');
-                    var hasDirectStaff = !!(b.cleaningStaff && String(b.cleaningStaff).trim());
-                    var hasRecStaff = !!((rec.staff || '').trim());
-                    if ((isFullyCnf || ((hasDirectStaff || hasRecStaff) && rec.status !== '選定済')) && b.checkOutParsed) {
+                    var rSt = rec.status || '';
+                    var isConfSt = (rSt === 'スタッフ確定済み') || (rSt === '選定済');
+                    var hasStaffNoRec = !rSt && !!(b.cleaningStaff && String(b.cleaningStaff).trim());
+                    if ((isConfSt || hasStaffNoRec) && b.checkOutParsed) {
                       var d2 = new Date(b.checkOutParsed);
                       staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
                     }
@@ -4380,7 +4380,7 @@
                   allBookings.forEach(function(b) {
                     var rec = window._recruitFullMap[b.rowNumber] || {};
                     var rSt = rec.status || '';
-                    if ((rSt === '募集中' || rSt === '選定済') && b.checkOutParsed) {
+                    if (rSt === '募集中' && b.checkOutParsed) {
                       var d = new Date(b.checkOutParsed);
                       var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
                       if (!staffSetDates[key]) recruitDates[key] = true;
@@ -4441,14 +4441,16 @@
           window._recruitFullMap = recruitMap;
           // 先にリセットして古いデータが残らないようにする
           window._recruitDates = {};
-          // スタッフ確定済み（スタッフ確定済み or 直接割当済み）のチェックアウト日を収集
-          // 選定済（未確定）は確定扱いにしない — 黄色背景を維持する
+          // スタッフ確定済み（確定ステータスのみ）のチェックアウト日を収集
+          // 「募集中」+スタッフ選定済み（未確定）は黄色背景を維持する
           var staffSetDates = {};
           (res.data || []).forEach(function(b) {
             var rec = recruitMap[b.rowNumber] || {};
-            var isFullyConfirmed = (rec.status === 'スタッフ確定済み');
-            var hasDirectStaff = !!(b.cleaningStaff && String(b.cleaningStaff).trim());
-            if ((isFullyConfirmed || (hasDirectStaff && rec.status !== '選定済')) && b.checkOutParsed) {
+            var rSt = rec.status || '';
+            // 確定済みステータス or 募集フロー外で直接スタッフ割当
+            var isConfirmedStatus = (rSt === 'スタッフ確定済み') || (rSt === '選定済');
+            var hasStaffNoRecruit = !rSt && !!(b.cleaningStaff && String(b.cleaningStaff).trim());
+            if ((isConfirmedStatus || hasStaffNoRecruit) && b.checkOutParsed) {
               var d2 = new Date(b.checkOutParsed);
               staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
             }
@@ -4457,11 +4459,9 @@
           (res.data || []).forEach(function(b) {
             var rec = recruitMap[b.rowNumber] || {};
             var rStatus = rec.status || '';
-            if ((rStatus === '募集中' || rStatus === '選定済') && b.checkOutParsed) {
+            if (rStatus === '募集中' && b.checkOutParsed) {
               var d = new Date(b.checkOutParsed);
               var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-              // DEBUG v0308q: recruitDates判定
-              console.log('[DEBUG-RDATE] row=' + b.rowNumber + ' status="' + rStatus + '" key=' + key + ' staffSetDates[key]=' + !!staffSetDates[key] + ' cleaningStaff="' + (b.cleaningStaff||'') + '"');
               if (!staffSetDates[key]) recruitDates[key] = true;
             }
           });
@@ -4577,9 +4577,10 @@
           var staffSetDates = {};
           allBookings.forEach(function(b) {
             var rec = window._recruitFullMap[b.rowNumber] || {};
-            var isFullyCnf = (rec.status === 'スタッフ確定済み');
-            var hasDirectStaff = !!(b.cleaningStaff && String(b.cleaningStaff).trim());
-            if ((isFullyCnf || (hasDirectStaff && rec.status !== '選定済')) && b.checkOutParsed) {
+            var rSt2 = rec.status || '';
+            var isConfSt2 = (rSt2 === 'スタッフ確定済み') || (rSt2 === '選定済');
+            var hasStaffNoRec2 = !rSt2 && !!(b.cleaningStaff && String(b.cleaningStaff).trim());
+            if ((isConfSt2 || hasStaffNoRec2) && b.checkOutParsed) {
               var d2 = new Date(b.checkOutParsed);
               staffSetDates[d2.getFullYear() + '-' + (d2.getMonth()+1) + '-' + d2.getDate()] = true;
             }
@@ -4588,7 +4589,7 @@
           allBookings.forEach(function(b) {
             var rec = window._recruitFullMap[b.rowNumber] || {};
             var rSt2 = rec.status || '';
-            if ((rSt2 === '募集中' || rSt2 === '選定済') && b.checkOutParsed) {
+            if (rSt2 === '募集中' && b.checkOutParsed) {
               var d = new Date(b.checkOutParsed);
               var rKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
               if (!staffSetDates[rKey]) recruitDates[rKey] = true;

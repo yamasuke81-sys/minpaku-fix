@@ -3212,6 +3212,21 @@ function autoSyncFromICal() {
             }
             continue;
           }
+          // 重複チェック（日付範囲が重なる既存予約がある場合はスキップ）
+          var overlapsAuto = false;
+          for (var ek in existingPairs) {
+            var parts = ek.split('|');
+            if (parts.length >= 2) {
+              var exCi = parts[0], exCo = parts[1];
+              if (ev.checkIn < exCo && ev.checkOut > exCi) {
+                overlapsAuto = true;
+                break;
+              }
+            }
+          }
+          if (overlapsAuto) {
+            continue;
+          }
           existingPairs[key] = true;
           existingRowByKey[key] = nextRow;
           ensureICalGuestCountColumn_();
@@ -3253,8 +3268,42 @@ function autoSyncFromICal() {
             if (cancelledPairs[autoPairKey] && !isPastAuto && !cancelledValAuto) {
               try { cancelBookingFromICal_(formSheet, ci + 2, colMap, platformName); } catch (e) {}
             } else if (!validPairs[autoPairKey] && !cancelledPairs[autoPairKey] && !isPastAuto) {
-              // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
-              if (!cancelledValAuto) {
+              // フィードから消えた — ただし同じCIで異なるCOのvalidPairがあれば日付変更（延長/短縮）
+              var dateChangedAuto = false;
+              var newCoKeyAuto = '';
+              var vpKeysAuto = Object.keys(validPairs);
+              for (var vpi2 = 0; vpi2 < vpKeysAuto.length; vpi2++) {
+                if (vpKeysAuto[vpi2].indexOf(cik + '|') === 0 && vpKeysAuto[vpi2] !== autoPairKey) {
+                  newCoKeyAuto = vpKeysAuto[vpi2].split('|')[1];
+                  dateChangedAuto = true;
+                  break;
+                }
+              }
+              if (dateChangedAuto && newCoKeyAuto) {
+                // 日付変更検出 → 既存行のCOを更新（キャンセルしない）
+                Logger.log('[EXTEND-AUTO] 日付変更検出: ' + autoPairKey + ' → ' + cik + '|' + newCoKeyAuto);
+                if (colMap.checkOut >= 0) {
+                  formSheet.getRange(ci + 2, colMap.checkOut + 1).setValue(newCoKeyAuto);
+                }
+                delete existingPairs[autoPairKey];
+                existingPairs[cik + '|' + newCoKeyAuto] = true;
+                existingRowByKey[cik + '|' + newCoKeyAuto] = ci + 2;
+                if (cancelledValAuto && colMap.cancelledAt >= 0) {
+                  formSheet.getRange(ci + 2, colMap.cancelledAt + 1).setValue('');
+                }
+                // 旧COの募集ステータスを「キャンセル」に更新
+                var recruitSheet4 = ss.getSheetByName(SHEET_RECRUIT);
+                if (recruitSheet4 && recruitSheet4.getLastRow() >= 2) {
+                  var rData4 = recruitSheet4.getRange(2, 1, recruitSheet4.getLastRow() - 1, 4).getValues();
+                  for (var ri4 = 0; ri4 < rData4.length; ri4++) {
+                    if (parseInt(rData4[ri4][1], 10) === (ci + 2)) {
+                      recruitSheet4.getRange(ri4 + 2, 4).setValue('キャンセル');
+                    }
+                  }
+                }
+                try { notifyDateChange_(formSheet, ci + 2, colMap, cik, cok, newCoKeyAuto, platformName); } catch (dcErr) { Logger.log('[EXTEND-AUTO] notifyDateChange_ error: ' + dcErr); }
+              } else if (!cancelledValAuto) {
+                // 本当にフィードから消えた → キャンセルマーク
                 try { cancelBookingFromICal_(formSheet, ci + 2, colMap, platformName); } catch (e) {}
               }
             } else if (cancelledValAuto && validPairs[autoPairKey]) {

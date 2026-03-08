@@ -126,7 +126,7 @@ function normalizeDateColumns_(formSheet, colMap) {
   var numRows = lastRow - 1;
   var changes = 0;
 
-  // CI列の正規化
+  // CI列の正規化（時刻保持）
   if (colMap.checkIn >= 0) {
     var ciCol = colMap.checkIn + 1;
     var ciVals = formSheet.getRange(2, ciCol, numRows, 1).getValues();
@@ -134,14 +134,12 @@ function normalizeDateColumns_(formSheet, colMap) {
     for (var i = 0; i < ciVals.length; i++) {
       var raw = ciVals[i][0];
       if (!raw) continue;
-      var parsed = parseDate(raw);
-      if (!parsed) continue;
-      var norm = toDateKeySafe_(parsed);
+      var norm = toDateTimeKeySafe_(raw);
+      if (!norm) continue;
       var current = (raw instanceof Date)
         ? Utilities.formatDate(raw, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
         : String(raw).trim();
       if (current !== norm) {
-        Logger.log('[DEBUG-DATEFMT] row=' + (i + 2) + ' CI: "' + current + '" → "' + norm + '"');
         ciVals[i][0] = norm;
         ciChanged = true;
         changes++;
@@ -150,7 +148,7 @@ function normalizeDateColumns_(formSheet, colMap) {
     if (ciChanged) formSheet.getRange(2, ciCol, numRows, 1).setValues(ciVals);
   }
 
-  // CO列の正規化
+  // CO列の正規化（時刻保持）
   if (colMap.checkOut >= 0) {
     var coCol = colMap.checkOut + 1;
     var coVals = formSheet.getRange(2, coCol, numRows, 1).getValues();
@@ -158,14 +156,12 @@ function normalizeDateColumns_(formSheet, colMap) {
     for (var j = 0; j < coVals.length; j++) {
       var rawCo = coVals[j][0];
       if (!rawCo) continue;
-      var parsedCo = parseDate(rawCo);
-      if (!parsedCo) continue;
-      var normCo = toDateKeySafe_(parsedCo);
+      var normCo = toDateTimeKeySafe_(rawCo);
+      if (!normCo) continue;
       var currentCo = (rawCo instanceof Date)
         ? Utilities.formatDate(rawCo, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
         : String(rawCo).trim();
       if (currentCo !== normCo) {
-        Logger.log('[DEBUG-DATEFMT] row=' + (j + 2) + ' CO: "' + currentCo + '" → "' + normCo + '"');
         coVals[j][0] = normCo;
         coChanged = true;
         changes++;
@@ -1062,8 +1058,46 @@ function toDateKeySafe_(val) {
 }
 
 /**
- * 日付文字列を Date オブジェクトに変換
- * 対応: ISO形式、スラッシュ区切り、ハイフン区切り
+ * 日付+時刻を保持したまま統一フォーマットに正規化
+ * 時刻が非0(00:00以外)の場合: "yyyy-MM-dd HH:mm"
+ * 時刻が0(00:00)または日付のみの場合: "yyyy-MM-dd"
+ */
+function toDateTimeKeySafe_(val) {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    var h = val.getHours(), m = val.getMinutes();
+    if (h === 0 && m === 0) return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM-dd');
+    return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+  }
+  var str = String(val).trim();
+  if (!str) return '';
+  // "yyyy-MM-dd HH:mm" or "yyyy/MM/dd HH:mm" 形式
+  var mdt = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+  if (mdt) {
+    var hh = parseInt(mdt[4], 10), mm = parseInt(mdt[5], 10);
+    var dateStr = mdt[1] + '-' + ('0' + mdt[2]).slice(-2) + '-' + ('0' + mdt[3]).slice(-2);
+    if (hh === 0 && mm === 0) return dateStr;
+    return dateStr + ' ' + ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2);
+  }
+  // 日付のみ
+  var md = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (md) return md[1] + '-' + ('0' + md[2]).slice(-2) + '-' + ('0' + md[3]).slice(-2);
+  // Excelシリアル値
+  var num = parseFloat(str);
+  if (!isNaN(num) && num > 0) {
+    try {
+      var d = new Date((num - 25569) * 86400 * 1000);
+      return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd');
+    } catch (e) {}
+  }
+  var d2 = new Date(str);
+  if (isNaN(d2.getTime())) return '';
+  var h2 = d2.getHours(), m2 = d2.getMinutes();
+  if (h2 === 0 && m2 === 0) return Utilities.formatDate(d2, 'Asia/Tokyo', 'yyyy-MM-dd');
+  return Utilities.formatDate(d2, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+}
+
+/**
  */
 function parseDate(str) {
   if (!str && str !== 0) return null;

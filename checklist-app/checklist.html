@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309f</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309h</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1687,6 +1687,55 @@
             </div>
           </div>
           <div id="folderSaveResult" style="display:none;margin-top:8px;font-size:12px;"></div>
+        </div>
+
+        <!-- LINE通知設定 -->
+        <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #ddd;margin-bottom:16px;">
+          <h4 style="font-size:14px;margin-bottom:8px;"><i class="bi bi-line" style="color:#06C755;"></i> LINE通知設定</h4>
+          <p style="font-size:12px;color:#666;margin-bottom:12px;">清掃完了・クリーニング状況をLINEグループに通知します。メインアプリで設定したLINEトークンを使用します。</p>
+
+          <!-- 送信先リスト -->
+          <div style="margin-bottom:16px;">
+            <label style="font-size:13px;font-weight:bold;color:#555;display:block;margin-bottom:6px;">送信先</label>
+            <div id="clLineTargetList" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="clLineNewTargetId" placeholder="グループID or ユーザーID" style="flex:1;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
+              <input type="text" id="clLineNewTargetLabel" placeholder="ラベル（例: グループ1）" style="width:120px;padding:6px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;">
+              <button onclick="addClLineTarget()" style="padding:6px 12px;background:#06C755;color:#fff;border:none;border-radius:4px;font-size:12px;white-space:nowrap;">追加</button>
+            </div>
+          </div>
+
+          <!-- 清掃完了通知 -->
+          <div style="border-top:1px solid #eee;padding-top:12px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <label style="font-size:13px;font-weight:bold;color:#555;">清掃完了通知</label>
+              <div class="toggle-switch" style="--w:40px;--h:22px;">
+                <input type="checkbox" id="clLineCleanCompleteEnabled" checked>
+                <span class="toggle-slider"></span>
+              </div>
+            </div>
+            <textarea id="clLineCleanCompleteMsg" rows="5" placeholder="デフォルト: 🏠 清掃完了&#10;&#10;📅 {チェックアウト日}&#10;👤 {担当者}&#10;⏰ {完了時刻}&#10;&#10;{要補充}&#10;{メモ}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
+            <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {チェックアウト日} {担当者} {完了時刻} {要補充} {メモ}</p>
+          </div>
+
+          <!-- クリーニング状況通知 -->
+          <div style="border-top:1px solid #eee;padding-top:12px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <label style="font-size:13px;font-weight:bold;color:#555;">クリーニング状況通知</label>
+              <div class="toggle-switch" style="--w:40px;--h:22px;">
+                <input type="checkbox" id="clLineLaundryEnabled" checked>
+                <span class="toggle-slider"></span>
+              </div>
+            </div>
+            <textarea id="clLineLaundryMsg" rows="4" placeholder="デフォルト: {絵文字} クリーニング: {ステップ}&#10;&#10;📅 チェックアウト日: {チェックアウト日}&#10;👤 {担当者}&#10;⏰ {時刻}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
+            <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {絵文字} {ステップ} {チェックアウト日} {担当者} {時刻}</p>
+          </div>
+
+          <div style="display:flex;gap:8px;">
+            <button onclick="saveClLineNotifySettings()" style="flex:1;padding:10px;background:#06C755;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">保存</button>
+            <button onclick="resetClLineNotifyDefaults()" style="padding:10px 16px;background:#6c757d;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">リセット</button>
+          </div>
+          <div id="clLineSaveResult" style="display:none;margin-top:8px;font-size:12px;"></div>
         </div>
 
         <!-- 初期データ再インポート -->
@@ -2146,7 +2195,7 @@
       });
       var target = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (target) target.classList.add('active');
-      if (tabName === 'clSettings') loadFolderSettings();
+      if (tabName === 'clSettings') { loadFolderSettings(); loadClLineNotifySettings(); }
     }
 
     // フォルダ設定の読み込み
@@ -2200,6 +2249,103 @@
         else { resEl.textContent = res.error || '保存失敗'; resEl.style.color = '#e74c3c'; }
         setTimeout(function() { resEl.style.display = 'none'; }, 3000);
       }).catch(function() { resEl.textContent = 'エラー'; resEl.style.color = '#e74c3c'; setTimeout(function() { resEl.style.display = 'none'; }, 3000); });
+    }
+
+    // === LINE通知設定 ===
+    var _clLineTargets = [];
+
+    function loadClLineNotifySettings() {
+      callGAS('getClLineNotifySettings', []).then(function(res) {
+        if (!res.success) return;
+        _clLineTargets = res.targets || [];
+        renderClLineTargetList();
+        var ccEn = document.getElementById('clLineCleanCompleteEnabled');
+        if (ccEn) ccEn.checked = res.cleanCompleteEnabled !== false;
+        var ccMsg = document.getElementById('clLineCleanCompleteMsg');
+        if (ccMsg) ccMsg.value = res.cleanCompleteMsg || '';
+        var lEn = document.getElementById('clLineLaundryEnabled');
+        if (lEn) lEn.checked = res.laundryEnabled !== false;
+        var lMsg = document.getElementById('clLineLaundryMsg');
+        if (lMsg) lMsg.value = res.laundryMsg || '';
+      }).catch(function() {});
+    }
+
+    function renderClLineTargetList() {
+      var container = document.getElementById('clLineTargetList');
+      if (!container) return;
+      if (_clLineTargets.length === 0) {
+        container.innerHTML = '<div style="font-size:12px;color:#999;padding:4px 0;">送信先が未登録です（メインアプリのデフォルト送信先が使われます）</div>';
+        return;
+      }
+      var html = '';
+      _clLineTargets.forEach(function(t, idx) {
+        var bg = t.enabled ? '#e8f5e9' : '#f5f5f5';
+        var border = t.enabled ? '#c8e6c9' : '#ddd';
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px;background:' + bg + ';border:1px solid ' + border + ';border-radius:6px;font-size:12px;">';
+        html += '<input type="checkbox" ' + (t.enabled ? 'checked' : '') + ' onchange="toggleClLineTarget(' + idx + ',this.checked)" style="margin:0;">';
+        html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(t.id) + '">' + escapeHtml(t.label || t.id) + '</span>';
+        html += '<span style="color:#999;font-size:10px;">' + escapeHtml(t.id.substring(0, 8)) + '...</span>';
+        html += '<button onclick="testClLineTarget(' + idx + ')" style="padding:2px 6px;background:#06C755;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;">テスト</button>';
+        html += '<button onclick="removeClLineTarget(' + idx + ')" style="padding:2px 6px;background:#dc3545;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;">&times;</button>';
+        html += '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function addClLineTarget() {
+      var idInput = document.getElementById('clLineNewTargetId');
+      var labelInput = document.getElementById('clLineNewTargetLabel');
+      var id = (idInput.value || '').trim();
+      var label = (labelInput.value || '').trim();
+      if (!id) { _showToast('IDを入力してください', 'warning'); return; }
+      if (!label) label = id.substring(0, 10);
+      _clLineTargets.push({ id: id, label: label, enabled: true });
+      idInput.value = ''; labelInput.value = '';
+      renderClLineTargetList();
+    }
+
+    function removeClLineTarget(idx) {
+      _clLineTargets.splice(idx, 1);
+      renderClLineTargetList();
+    }
+
+    function toggleClLineTarget(idx, checked) {
+      if (_clLineTargets[idx]) _clLineTargets[idx].enabled = checked;
+    }
+
+    function testClLineTarget(idx) {
+      var t = _clLineTargets[idx];
+      if (!t || !t.id) return;
+      _showToast('テスト送信中...', 'info');
+      callGAS('testClLineNotify', [t.id]).then(function(res) {
+        if (res.success) { _showToast('テスト送信成功: ' + (t.label || t.id), 'success'); }
+        else { _showToast('テスト送信失敗: ' + (res.error || '不明'), 'danger'); }
+      }).catch(function(e) { _showToast('通信エラー', 'danger'); });
+    }
+
+    function saveClLineNotifySettings() {
+      var settings = {
+        targets: _clLineTargets,
+        cleanCompleteEnabled: document.getElementById('clLineCleanCompleteEnabled').checked,
+        cleanCompleteMsg: document.getElementById('clLineCleanCompleteMsg').value,
+        laundryEnabled: document.getElementById('clLineLaundryEnabled').checked,
+        laundryMsg: document.getElementById('clLineLaundryMsg').value
+      };
+      var resEl = document.getElementById('clLineSaveResult');
+      resEl.style.display = 'block'; resEl.textContent = '保存中...'; resEl.style.color = '#666';
+      callGAS('saveClLineNotifySettings', [settings]).then(function(res) {
+        if (res.success) { resEl.textContent = '保存しました'; resEl.style.color = '#198754'; }
+        else { resEl.textContent = 'エラー: ' + (res.error || ''); resEl.style.color = '#dc3545'; }
+        setTimeout(function() { resEl.style.display = 'none'; }, 3000);
+      }).catch(function() { resEl.textContent = '通信エラー'; resEl.style.color = '#dc3545'; setTimeout(function() { resEl.style.display = 'none'; }, 3000); });
+    }
+
+    function resetClLineNotifyDefaults() {
+      document.getElementById('clLineCleanCompleteMsg').value = '';
+      document.getElementById('clLineLaundryMsg').value = '';
+      document.getElementById('clLineCleanCompleteEnabled').checked = true;
+      document.getElementById('clLineLaundryEnabled').checked = true;
+      _showToast('デフォルトに戻しました（保存を押してください）', 'info');
     }
 
     // フォルダ保存

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -6116,22 +6116,29 @@
             var banner = document.getElementById('notificationBanner');
             var listEl = document.getElementById('notificationBannerList');
             if (!banner || !listEl) return;
-            // [DEBUG-NOTIF] 通知生データをデバッグパネルに表示
+            // [DEBUG-NOTIF] 通知生データをデバッグパネルに表示（全通知を別途取得）
             var debugPanel = document.getElementById('debugNotifPanel');
             var debugData = document.getElementById('debugNotifData');
-            if (debugPanel && debugData && r.success && r.list) {
-              var debugItems = r.list.slice(0, 5).map(function(n) {
-                return {
-                  rowIndex: n.rowIndex,
-                  at: n.at,
-                  kind: n.kind,
-                  message: (n.message || '').substring(0, 80) + ((n.message || '').length > 80 ? '...' : ''),
-                  read: n.read,
-                  hasData: !!n.data
-                };
-              });
-              debugData.textContent = JSON.stringify(debugItems, null, 2);
-              debugPanel.style.display = 'block';
+            if (debugPanel && debugData) {
+              google.script.run.withSuccessHandler(function(allJsonStr) {
+                try {
+                  var allR = JSON.parse(allJsonStr);
+                  if (allR.success && allR.list) {
+                    var debugItems = allR.list.slice(0, 5).map(function(n) {
+                      return {
+                        rowIndex: n.rowIndex,
+                        at: n.at,
+                        kind: n.kind,
+                        message: (n.message || '').substring(0, 100) + ((n.message || '').length > 100 ? '...' : ''),
+                        read: n.read,
+                        hasData: !!n.data
+                      };
+                    });
+                    debugData.textContent = JSON.stringify(debugItems, null, 2);
+                    debugPanel.style.display = 'block';
+                  }
+                } catch (e) {}
+              }).withFailureHandler(function() {}).getNotifications(false);
             }
             if (r.success && r.list && r.list.length) {
               var filtered = r.list.filter(function(n) { return (n.message || '').trim() !== ''; });

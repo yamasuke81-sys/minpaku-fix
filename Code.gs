@@ -9228,18 +9228,22 @@ function getRecruitmentStatusMap() {
           nextReservation: nextRes,
           selectedStaff: staff
         };
-        // [DEBUG-RECRUIT] 重複エントリの詳細ログ
+        // 同じ予約行番号に対する重複エントリが存在する場合の優先ルール
         if (map[currentRowNum]) {
+          var existingCancelled = map[currentRowNum].status === 'キャンセル';
+          var newCancelled = status === 'キャンセル';
           var existingAnswered = (map[currentRowNum].volunteers || []).filter(function(v) { return v.response && v.response !== '未回答'; }).length;
           var newAnswered = volunteers.filter(function(v) { return v.response && v.response !== '未回答'; }).length;
           Logger.log('[DEBUG-RECRUIT] 重複エントリ検出 rowNum=' + currentRowNum +
-            ' | 既存: status=' + map[currentRowNum].status + ' CO=' + map[currentRowNum].checkoutDate + ' answered=' + existingAnswered + ' staff=' + map[currentRowNum].staff +
-            ' | 新規: status=' + status + ' CO=' + checkoutDate + ' answered=' + newAnswered + ' staff=' + staff);
-          if (newAnswered > existingAnswered) {
-            Logger.log('[DEBUG-RECRUIT] → 新規を採用（回答データが多い）');
+            ' | 既存: status=' + map[currentRowNum].status + ' CO=' + map[currentRowNum].checkoutDate + ' answered=' + existingAnswered +
+            ' | 新規: status=' + status + ' CO=' + checkoutDate + ' answered=' + newAnswered);
+          if (existingCancelled && !newCancelled) {
+            // キャンセル済みエントリより非キャンセルを優先（予約延長時の旧募集を排除）
             map[currentRowNum] = newEntry;
-          } else {
-            Logger.log('[DEBUG-RECRUIT] → 既存を保持（回答データが多いか同数）');
+          } else if (!existingCancelled && newCancelled) {
+            // 既存が非キャンセルなら保持
+          } else if (newAnswered > existingAnswered) {
+            map[currentRowNum] = newEntry;
           }
         } else {
           map[currentRowNum] = newEntry;

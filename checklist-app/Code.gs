@@ -1484,7 +1484,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       var clMap = clGetRecruitSettingsMap_();
       var lineEnabled = clMap['CL_LINE_清掃完了有効'] !== 'false';
       if (lineEnabled) {
-        var tmpl = clMap['CL_LINE_清掃完了メッセージ'] || '🏠 清掃完了\n\n📅 {チェックアウト日}\n👤 {担当者}\n⏰ {完了時刻}\n\n{要補充}\n{メモ}';
+        var tmpl = clMap['CL_LINE_清掃完了メッセージ'] || '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
         var nowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
         var supplyText = supplyList.length > 0 ? '【要補充】\n' + supplyList.map(function(s) { return '・' + s; }).join('\n') : '';
         var memoText = memoList.length > 0 ? '【メモ】\n' + memoList.map(function(m) {
@@ -1637,11 +1637,9 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       var clMap = clGetRecruitSettingsMap_();
       var laundryLineEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
       if (laundryLineEnabled) {
-        var stepLabels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
-        var stepEmojis = { sent: '📦', received: '📥', returned: '🏠' };
-        var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{絵文字} クリーニング: {ステップ}\n\n📅 チェックアウト日: {チェックアウト日}\n👤 {担当者}\n⏰ {時刻}';
+        var stepLabels = { sent: 'クリーニング提出しました', received: 'クリーニング受け取りました', returned: 'クリーニング施設に戻しました' };
+        var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{時刻}\n{担当者}';
         var laundryLineMsg = tmpl
-          .replace(/\{絵文字\}/g, stepEmojis[step] || '📦')
           .replace(/\{ステップ\}/g, stepLabels[step] || step)
           .replace(/\{チェックアウト日\}/g, checkoutDate)
           .replace(/\{担当者\}/g, staffName || '不明')

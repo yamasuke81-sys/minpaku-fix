@@ -1059,42 +1059,35 @@ function toDateKeySafe_(val) {
 
 /**
  * 日付+時刻を保持したまま統一フォーマットに正規化
- * 時刻が非0(00:00以外)の場合: "yyyy-MM-dd HH:mm"
- * 時刻が0(00:00)または日付のみの場合: "yyyy-MM-dd"
+ * 常に "yyyy/M/d HH:mm" 形式で返す（時刻がない場合は 00:00）
+ * 例: iCal行 → "2026/3/15 00:00", フォーム行 → "2026/3/8 15:00"
  */
 function toDateTimeKeySafe_(val) {
   if (val === null || val === undefined) return '';
   if (val instanceof Date) {
-    var h = val.getHours(), m = val.getMinutes();
-    if (h === 0 && m === 0) return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM-dd');
-    return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy/M/d HH:mm');
   }
   var str = String(val).trim();
   if (!str) return '';
   // "yyyy-MM-dd HH:mm" or "yyyy/MM/dd HH:mm" 形式
   var mdt = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{2})/);
   if (mdt) {
-    var hh = parseInt(mdt[4], 10), mm = parseInt(mdt[5], 10);
-    var dateStr = mdt[1] + '-' + ('0' + mdt[2]).slice(-2) + '-' + ('0' + mdt[3]).slice(-2);
-    if (hh === 0 && mm === 0) return dateStr;
-    return dateStr + ' ' + ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2);
+    return parseInt(mdt[1], 10) + '/' + parseInt(mdt[2], 10) + '/' + parseInt(mdt[3], 10) + ' ' + ('0' + parseInt(mdt[4], 10)).slice(-2) + ':' + mdt[5];
   }
-  // 日付のみ
+  // 日付のみ → 00:00を付与
   var md = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (md) return md[1] + '-' + ('0' + md[2]).slice(-2) + '-' + ('0' + md[3]).slice(-2);
+  if (md) return parseInt(md[1], 10) + '/' + parseInt(md[2], 10) + '/' + parseInt(md[3], 10) + ' 00:00';
   // Excelシリアル値
   var num = parseFloat(str);
   if (!isNaN(num) && num > 0) {
     try {
       var d = new Date((num - 25569) * 86400 * 1000);
-      return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd');
+      return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/M/d HH:mm');
     } catch (e) {}
   }
   var d2 = new Date(str);
   if (isNaN(d2.getTime())) return '';
-  var h2 = d2.getHours(), m2 = d2.getMinutes();
-  if (h2 === 0 && m2 === 0) return Utilities.formatDate(d2, 'Asia/Tokyo', 'yyyy-MM-dd');
-  return Utilities.formatDate(d2, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+  return Utilities.formatDate(d2, 'Asia/Tokyo', 'yyyy/M/d HH:mm');
 }
 
 /**

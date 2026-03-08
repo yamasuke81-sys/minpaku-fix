@@ -1060,6 +1060,15 @@ function checkDriveStorageStatus() {
 }
 
 /**
+ * 権限テスト用（エディタから実行して再認証を発動させる）
+ * 確認後に削除してOK
+ */
+function testUrlFetchPermission() {
+  var res = UrlFetchApp.fetch('https://www.google.com');
+  Logger.log('HTTP ' + res.getResponseCode() + ' — UrlFetchApp権限OK');
+}
+
+/**
  * LINE通知送信（募集設定シートからLINE設定を読み取る）
  */
 function clSendLineMessage_(text) {

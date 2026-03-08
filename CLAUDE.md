@@ -178,14 +178,34 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 8. **[低]** セッション8のデバッグログ残存箇所のクリーンアップ（`checkAndSendReminders`の[DEBUG-CH]/[DEBUG-REMIND]ログ等）
 
 ## 現在のセッション状態
-- **ブランチ**: `claude/verify-staff-response-display-4aYoF`
-- **最新コミット**: `c48afae`
+- **ブランチ**: `claude/verify-staff-response-display-xbDkI`
+- **最新コミット**: `e8bb627`
 - **Code.gs行数**: ~12,036行（ルール8の検証用）
 - **index.html行数**: ~9,842行
-- **進行中タスク**: v0308m のデプロイ確認待ち
-- **デプロイ済み**: v0308l（v0308mはデプロイ待ち）
-- **デバッグコード残存**: UIデバッグパネル2つ（通知+清掃モーダル）は修正確認用に残存
-- **未修正バグ**: なし（v0308mで予約延長時の表示問題を修正済み、確認待ち）
+- **checklist-app/Code.gs行数**: ~3,010行
+- **checklist-app/checklist.html行数**: ~6,020行
+- **進行中タスク**: v0309e（メモ登録時LINE自動送信）のデプロイ確認待ち
+- **デバッグコード残存**: UIデバッグパネル2つ（通知+清掃モーダル）+ LINE ID収集のデバッグバナー
+- **未修正バグ**: 📤ボタン（手動LINE送信）が反応しない問題（原因未特定、自動送信で代替）
+
+## 2026-03-09（セッション12）修正内容
+1. **LINE Webhook収集機能の実装（v0309a〜c）**: チェックリストアプリからWebhookでLINEユーザーIDを収集する機能。Code.gsに`doPost`/`getLineWebhookCollected`/`clearLineWebhookCollected`追加。index.htmlにLINE ID収集UIタブ追加（診断情報・収集データ一覧・コピーボタン）
+2. **LINE ID収集のデバッグコード削除（v0309d）**: console.log/try-catch/alertを除去、読み込み中スピナーは維持
+3. **メモ登録時のLINE自動送信追加（v0309e）**: `addChecklistMemo`にメモ保存後の`clSendLineMessage_`呼び出しを追加。フロントエンドにLINE送信結果バナー（成功/失敗）を5秒間表示。📤ボタンの手動送信が反応しない問題の調査も兼ねたデバッグコミット
+
+## 2026-03-09（セッション12）コミット履歴（コミットハッシュ付き）
+| コミット | 内容 |
+|---|---|
+| `b629230` | feat: v0309a〜c LINE Webhook収集機能の実装 |
+| `a62df66` | fix: v0309d LINE ID収集のデバッグコード削除 |
+| `27d5710` | debug: v0309e メモ登録時のLINE自動送信を追加+デバッグ情報表示 |
+| `e8bb627` | fix: v0309e チェックリストアプリのバージョンバッジを更新 |
+
+### 変更ファイルと箇所（セッション12）
+- **Code.gs**: `doPost`関数追加（LINE Webhook受信）、`getLineWebhookCollected`/`clearLineWebhookCollected`追加
+- **index.html**: LINE ID収集UIタブ追加（LINE接続設定内）、デバッグコード削除
+- **checklist-app/Code.gs**: `addChecklistMemo`にLINE自動送信追加
+- **checklist-app/checklist.html**: メモ登録後のLINE送信結果バナー追加、バージョンバッジv0223a→v0309e
 
 ## 2026-03-08（セッション11）修正内容
 1. **予約延長時のキャンセル誤判定修正（v0308a〜b）**: 同一CIでCO変更の予約（延長/短縮）がキャンセル扱いされる問題。デバッグ→修正。`syncFromICal`に日付変更検出ロジック追加

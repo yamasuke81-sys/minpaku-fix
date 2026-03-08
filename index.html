@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3355,9 +3355,9 @@
             }
             if (statusEl && cachedRec) {
               var cStatus = cachedRec.status || '';
-              // 募集中はスタッフ選定済みでも未確定とみなす（後で確定フロー対応）
+              // 募集中・キャンセルは確定済みとみなさない
               var cIsConfirmed = (cStatus === 'スタッフ確定済み' || cStatus === '選定済')
-                || (cStatus !== '募集中' && !!((d.cleaningStaff || '').trim()));
+                || (cStatus !== '募集中' && cStatus !== 'キャンセル' && !!((d.cleaningStaff || '').trim()));
               var cIsSelectedNotConfirmed = !cIsConfirmed && cStatus === '募集中' && !!((d.cleaningStaff || '').trim() || (cachedRec.selectedStaff || '').trim());
               statusEl.textContent = cIsConfirmed ? 'スタッフ確定済み' : (cIsSelectedNotConfirmed ? 'スタッフ選定済（未確定）' : 'スタッフ募集中');
               statusEl.className = 'recruit-status-badge ' + (cIsConfirmed ? 'status-decided' : (cIsSelectedNotConfirmed ? 'status-selected' : 'status-recruiting'));
@@ -3719,9 +3719,9 @@
                 }
               }
               var ownerEffectiveStatus = r.status;
-              // 募集中はスタッフ選定済みでも未確定とみなす（後で確定フロー対応）
+              // 募集中・キャンセルは確定済みとみなさない
               var isOwnerConfirmed = (ownerEffectiveStatus === 'スタッフ確定済み' || ownerEffectiveStatus === '選定済')
-                || (ownerEffectiveStatus !== '募集中' && !!ownerResolvedStaff);
+                || (ownerEffectiveStatus !== '募集中' && ownerEffectiveStatus !== 'キャンセル' && !!ownerResolvedStaff);
               var isOwnerSelectedNotConfirmed = !isOwnerConfirmed && ownerEffectiveStatus === '募集中' && !!ownerResolvedStaff;
               // ステータス更新（editBtnAreaを含めてinnerHTMLで再構築）
               if (statusEl && r.success) {

@@ -9414,15 +9414,21 @@ function getRecruitmentForBooking(bookingRowNumber) {
     const volSheet = ss.getSheetByName(SHEET_RECRUIT_VOLUNTEERS);
     if (!recruitSheet || recruitSheet.getLastRow() < 2) return JSON.stringify({ success: true, recruitRowIndex: 0, volunteers: [], status: '', checkoutDate: '' });
     var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 5).getValues();
-    // まず行番号で一致を試みる
+    // まず行番号で一致を試みる（非キャンセル優先）
     var matchIdx = -1;
+    var cancelledMatchIdx = -1;
     for (var i = 0; i < rows.length; i++) {
       if (Number(rows[i][1]) === bookingRowNumber) {
+        var rStatus = String(rows[i][3] || '').trim();
+        if (rStatus === 'キャンセル') {
+          if (cancelledMatchIdx < 0) cancelledMatchIdx = i;
+          continue; // キャンセル済みはスキップして非キャンセルを探す
+        }
         matchIdx = i;
         break;
       }
     }
-    // 行番号で見つからなければ、チェックアウト日で一致を試みる（ソート後の行番号ずれ対策）
+    // 非キャンセルが見つからなければ、チェックアウト日で一致を試みる（ソート後の行番号ずれ対策）
     if (matchIdx < 0) {
       var formSheet = ss.getSheetByName(SHEET_NAME);
       if (formSheet && formSheet.getLastRow() >= bookingRowNumber) {
@@ -9433,18 +9439,28 @@ function getRecruitmentForBooking(bookingRowNumber) {
         var targetCo = fColMap.checkOut >= 0 ? fRow[fColMap.checkOut] : null;
         var targetCoStr = targetCo ? (targetCo instanceof Date ? Utilities.formatDate(targetCo, 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(targetCo) || String(targetCo).trim())) : '';
         if (targetCoStr) {
+          var cancelledCoMatchIdx = -1;
           for (var j = 0; j < rows.length; j++) {
             var rCo = rows[j][0] ? (rows[j][0] instanceof Date ? Utilities.formatDate(rows[j][0], 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(rows[j][0]) || String(rows[j][0]).trim())) : '';
             if (rCo === targetCoStr) {
+              var rStatus2 = String(rows[j][3] || '').trim();
+              if (rStatus2 === 'キャンセル') {
+                if (cancelledCoMatchIdx < 0) cancelledCoMatchIdx = j;
+                continue;
+              }
               matchIdx = j;
               // 募集シートの行番号を現在の値に自動修正（自己修復）
               recruitSheet.getRange(j + 2, 2).setValue(bookingRowNumber);
               break;
             }
           }
+          // CO日マッチでも非キャンセルが見つからなければキャンセル済みを使用
+          if (matchIdx < 0 && cancelledCoMatchIdx >= 0) cancelledMatchIdx = cancelledCoMatchIdx;
         }
       }
     }
+    // 非キャンセルが見つからなければキャンセル済みをフォールバック
+    if (matchIdx < 0 && cancelledMatchIdx >= 0) matchIdx = cancelledMatchIdx;
     if (matchIdx >= 0) {
       var recruitRowIndex = matchIdx + 2;
       var checkoutDate = rows[matchIdx][0] ? (rows[matchIdx][0] instanceof Date ? Utilities.formatDate(rows[matchIdx][0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(rows[matchIdx][0])) : '';
@@ -9902,16 +9918,6 @@ function checkAndCreateRecruitments() {
         }
       }
     }
-    // [DEBUG-RECRUIT] 既存エントリの状態をログ出力
-    Logger.log('[DEBUG-RECRUIT] existingRowNums (non-cancelled): ' + JSON.stringify(existingRowNums));
-    Logger.log('[DEBUG-RECRUIT] existingCheckoutDates (non-cancelled): ' + JSON.stringify(existingCheckoutDates));
-    if (recruitSheet.getLastRow() >= 2) {
-      var debugRData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, Math.max(recruitSheet.getLastColumn(), 5)).getValues();
-      for (var di = 0; di < debugRData.length; di++) {
-        Logger.log('[DEBUG-RECRUIT] 募集行' + (di + 2) + ': date=' + debugRData[di][0] + ', rowNum=' + debugRData[di][1] + ', status=' + debugRData[di][3] + ', staff=' + debugRData[di][4]);
-      }
-    }
-
     ensureRecruitNotifyMethodColumn_();
     ensureRecruitDetailColumns_();
     var newRecruitEntries = [];
@@ -9929,12 +9935,7 @@ function checkAndCreateRecruitments() {
       if (co < cutoff) continue;
       const checkoutStr = toDateKeySafe_(checkOut);
       const rowNumber = i + 2;
-      // [DEBUG-RECRUIT] 各予約行の判定過程をログ出力
-      Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': CO=' + checkoutStr + ', existingRowNums[' + rowNumber + ']=' + existingRowNums[rowNumber]);
-      if (existingRowNums[rowNumber]) {
-        Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': SKIP (existingRowNums match)');
-        continue;
-      }
+      if (existingRowNums[rowNumber]) continue;
       // 同じチェックアウト日の募集エントリが既に存在し、同日の予約が1件のみの場合はスキップ（行番号ずれによる重複防止）
       if (checkoutStr && existingCheckoutDates[checkoutStr]) {
         var sameCoFormRows = 0;
@@ -9942,11 +9943,7 @@ function checkAndCreateRecruitments() {
           var sciCo = parseDate(data[sci][colMap.checkOut]);
           if (sciCo && toDateKeySafe_(sciCo) === checkoutStr) sameCoFormRows++;
         }
-        Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': CO dateCheck — sameCoFormRows=' + sameCoFormRows + ', existingEntries=' + existingCheckoutDates[checkoutStr].length);
-        if (sameCoFormRows <= existingCheckoutDates[checkoutStr].length) {
-          Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': SKIP (existingCheckoutDates match, sameCoFormRows=' + sameCoFormRows + ' <= existingEntries=' + existingCheckoutDates[checkoutStr].length + ')');
-          continue;
-        }
+        if (sameCoFormRows <= existingCheckoutDates[checkoutStr].length) continue;
       }
       // スタッフが既に確定済みか判定
       var assignedStaff = colMap.cleaningStaff >= 0 ? String(data[i][colMap.cleaningStaff] || '').trim() : '';

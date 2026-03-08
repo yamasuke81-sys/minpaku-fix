@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1293,6 +1293,7 @@
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="confirmTemplate">スタッフ確定通知</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="reminderEmail">未決定・直前リマインド</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancel">予約キャンセル通知</a></li>
+        <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyDateChange">予約変更通知</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelRequest">出勤キャンセル要望</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelApprove">キャンセル承認通知</a></li>
         <li class="nav-item notify-sub-item" style="display:none;"><a class="nav-link ps-4" href="#" data-subtab="notifyCancelReject">キャンセル却下通知</a></li>
@@ -1801,6 +1802,22 @@
         <p class="small text-muted">※ この通知はiCal同期でキャンセルを検知した際に自動送信されます。</p>
         <hr class="my-2">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="予約キャンセル">テスト送信</button>
+        <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
+      </div>
+
+      <div id="settingsNotifyDateChange" style="display:none;">
+        <p class="small text-muted mb-2">iCal同期で予約のチェックアウト日が変更（延長・短縮）された際に、<strong>担当スタッフ＋オーナー</strong>へ通知を送信します。確定済みスタッフがいる場合は自動解除し、新しいチェックアウト日で清掃募集が再作成されます。</p>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="notifyDateChangeToggle">
+          <label class="form-check-label" for="notifyDateChangeToggle"><strong>予約変更通知を有効にする</strong></label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">送信先</label>
+          <div class="notify-targets-container" data-notify-key="予約変更"></div>
+        </div>
+        <p class="small text-muted">※ この通知はiCal同期で日付変更を検知した際に自動送信されます。スタッフが確定済みの場合は確定解除の連絡も行われます。</p>
+        <hr class="my-2">
+        <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="予約変更">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
@@ -8960,7 +8977,8 @@
             reminderEmail: 'settingsReminderEmail', rosterReminder: 'settingsRosterReminder',
             invoiceRequest: 'settingsInvoiceRequest', confirmTemplate: 'settingsConfirmTemplate',
             notifications: 'settingsNotifications', maintenance: 'settingsMaintenance',
-            notifyCancel: 'settingsNotifyCancel', notifyCancelRequest: 'settingsNotifyCancelRequest',
+            notifyCancel: 'settingsNotifyCancel', notifyDateChange: 'settingsNotifyDateChange',
+            notifyCancelRequest: 'settingsNotifyCancelRequest',
             notifyCancelApprove: 'settingsNotifyCancelApprove', notifyCancelReject: 'settingsNotifyCancelReject',
             notifyInvoiceSend: 'settingsNotifyInvoiceSend', notifyCleaningDone: 'settingsNotifyCleaningDone'
           };
@@ -8982,15 +9000,15 @@
           if (t === 'confirmTemplate') loadConfirmationTemplate();
           // 通知タブ表示時にチャンネル設定を読み込み
           var _notifyTabs = ['recruitSettings','confirmTemplate','reminderEmail',
-            'notifyCancel','notifyCancelRequest','notifyCancelApprove',
+            'notifyCancel','notifyDateChange','notifyCancelRequest','notifyCancelApprove',
             'notifyCancelReject','rosterReminder','invoiceRequest','notifyInvoiceSend','notifyCleaningDone'];
           if (_notifyTabs.indexOf(t) >= 0) loadNotifyChannelForTab_(t);
           // 新規タブのメール通知設定読み込み
-          var _emailNotifyTabs = ['recruitSettings','confirmTemplate','notifyCancel','notifyCancelRequest',
+          var _emailNotifyTabs = ['recruitSettings','confirmTemplate','notifyCancel','notifyDateChange','notifyCancelRequest',
             'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
           // 個別load関数がないタブにローディング表示
-          var _channelOnlyTabs = ['notifyCancel','notifyCancelRequest','notifyCancelApprove',
+          var _channelOnlyTabs = ['notifyCancel','notifyDateChange','notifyCancelRequest','notifyCancelApprove',
             'notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_channelOnlyTabs.indexOf(t) >= 0) showTabLoading_(_settingsPanels[t]);
         });
@@ -9071,6 +9089,7 @@
         recruitSettings: { id: 'notifyRecruitStartToggle', key: '募集開始通知有効' },
         confirmTemplate: { id: 'notifyStaffConfirmToggle', key: 'スタッフ確定通知有効' },
         notifyCancel: { id: 'notifyCancelToggle', key: 'キャンセル通知有効' },
+        notifyDateChange: { id: 'notifyDateChangeToggle', key: '予約変更通知有効' },
         notifyCancelRequest: { id: 'notifyCancelRequestToggle', key: '辞退申請通知有効' },
         notifyCancelApprove: { id: 'notifyCancelApproveToggle', key: '辞退承認通知有効' },
         notifyCancelReject: { id: 'notifyCancelRejectToggle', key: '辞退却下通知有効' },

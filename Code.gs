@@ -2332,6 +2332,84 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
 }
 
 /**
+ * 予約日付変更時の通知処理（スタッフ解除連絡・オーナー通知・メール/LINE送信）
+ */
+function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoKey, platformName) {
+  var ch = getNotifyChannel_('予約変更');
+  if (!isEmailNotifyEnabled_('予約変更通知有効') && !ch.group_line && !ch.owner_line && !ch.staff_line) return;
+
+  var guestName = colMap.guestName >= 0 ? String(formSheet.getRange(rowNumber, colMap.guestName + 1).getValue() || '').trim() : '';
+  var cleaningStaff = colMap.cleaningStaff >= 0 ? String(formSheet.getRange(rowNumber, colMap.cleaningStaff + 1).getValue() || '').trim() : '';
+  var ciStr = formatDateWithDay_(ciKey) || ciKey;
+  var oldCoStr = formatDateWithDay_(oldCoKey) || oldCoKey;
+  var newCoStr = formatDateWithDay_(newCoKey) || newCoKey;
+  var guestLabel = guestName || platformName || '不明';
+
+  var subject = '【民泊】予約日付変更: ' + oldCoStr + ' → ' + newCoStr;
+  var body = '予約の日付が変更されました。\n\n'
+    + 'ゲスト: ' + guestLabel + '\n'
+    + 'チェックイン: ' + ciStr + '\n'
+    + '変更前チェックアウト: ' + oldCoStr + '\n'
+    + '変更後チェックアウト: ' + newCoStr;
+
+  // スタッフ確定済みの場合は解除通知
+  if (cleaningStaff) {
+    body += '\n\n旧チェックアウト日(' + oldCoStr + ')の清掃スタッフ確定は解除されました。';
+    // 清掃スタッフ列をクリア
+    if (colMap.cleaningStaff >= 0) {
+      formSheet.getRange(rowNumber, colMap.cleaningStaff + 1).setValue('');
+    }
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var staffNames = cleaningStaff.split(/[,、]/).map(function(s) { return s.trim(); }).filter(Boolean);
+    var staffSheet = ss.getSheetByName(SHEET_STAFF);
+    var staffEmails = {};
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      var sData = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 3).getValues();
+      for (var si = 0; si < sData.length; si++) {
+        var sName = String(sData[si][0] || '').trim();
+        var sEmail = String(sData[si][2] || '').trim();
+        if (sName && sEmail) staffEmails[sName] = sEmail;
+      }
+    }
+    // スタッフ個別メール
+    if (ch.staff_email && isEmailNotifyEnabled_('予約変更通知有効')) {
+      for (var sni = 0; sni < staffNames.length; sni++) {
+        var name = staffNames[sni];
+        var email = staffEmails[name] || '';
+        if (email) {
+          try { GmailApp.sendEmail(email, subject, name + ' 様\n\n' + body + '\n\n新しいチェックアウト日の清掃募集が改めて行われます。\nご確認ください。'); } catch (e) {}
+        }
+      }
+    }
+    // スタッフ個別LINE
+    if (ch.staff_line) {
+      var staffList = staffNames.map(function(n) { return { staffName: n, lineUserId: '' }; });
+      var allStaff = getAllActiveStaff_(ss);
+      staffList.forEach(function(cs) { allStaff.forEach(function(as) { if (as.staffName === cs.staffName) cs.lineUserId = as.lineUserId; }); });
+      try { sendLineToStaffMembers_(staffList, subject + '\n\n' + body); } catch (e) {}
+    }
+    addNotification_('予約変更', guestLabel + ' の予約日付が変更されました（' + ciStr + '～' + oldCoStr + ' → ' + ciStr + '～' + newCoStr + '）清掃スタッフ(' + cleaningStaff + ')の確定を解除しました');
+  } else {
+    addNotification_('予約変更', guestLabel + ' の予約日付が変更されました（' + ciStr + '～' + oldCoStr + ' → ' + ciStr + '～' + newCoStr + '）');
+  }
+
+  body += '\n\n新しいチェックアウト日の清掃募集が開始されます。';
+  var lineText = subject + '\n\n' + body;
+
+  // オーナーメール
+  if (ch.owner_email && isEmailNotifyEnabled_('予約変更通知有効')) {
+    try {
+      var ownerEmail = getOwnerEmailAddress_();
+      if (ownerEmail) GmailApp.sendEmail(ownerEmail, subject, body);
+    } catch (e) {}
+  }
+  // LINEグループ
+  if (ch.group_line) { try { sendLineMessage_(lineText, false, 'group'); } catch (e) {} }
+  // オーナーLINE
+  if (ch.owner_line) { try { sendLineMessage_(lineText, false, 'owner'); } catch (e) {} }
+}
+
+/**
  * 予約シートに「iCal同期」列があることを保証（iCal由来行の識別用）
  */
 function ensureICalSyncColumn_() {
@@ -2950,17 +3028,19 @@ function syncFromICal() {
               if (cancelledVal && colMap.cancelledAt >= 0) {
                 formSheet.getRange(ri + 2, colMap.cancelledAt + 1).setValue('');
               }
-              // 募集シートのCO日も更新
-              var recruitSheet3 = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT);
+              // 旧COの募集ステータスを「キャンセル」に更新
+              var ss3 = SpreadsheetApp.getActiveSpreadsheet();
+              var recruitSheet3 = ss3.getSheetByName(SHEET_RECRUIT);
               if (recruitSheet3 && recruitSheet3.getLastRow() >= 2) {
-                var rData3 = recruitSheet3.getRange(2, 1, recruitSheet3.getLastRow() - 1, 2).getValues();
+                var rData3 = recruitSheet3.getRange(2, 1, recruitSheet3.getLastRow() - 1, 4).getValues();
                 for (var ri3 = 0; ri3 < rData3.length; ri3++) {
                   if (parseInt(rData3[ri3][1], 10) === (ri + 2)) {
-                    recruitSheet3.getRange(ri3 + 2, 1).setValue(newCoKey);
+                    recruitSheet3.getRange(ri3 + 2, 4).setValue('キャンセル');
                   }
                 }
               }
-              addNotification_('予約変更', '予約の日付が変更されました（' + ciKey + '～' + coKey + ' → ' + ciKey + '～' + newCoKey + '）');
+              // 日付変更通知（メール・LINE・スタッフ解除）
+              try { notifyDateChange_(formSheet, ri + 2, colMap, ciKey, coKey, newCoKey, platformName); } catch (dcErr) { Logger.log('[EXTEND] notifyDateChange_ error: ' + dcErr); }
             } else if (!cancelledVal) {
               // 本当にフィードから消えた → キャンセルマーク
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
@@ -4584,7 +4664,8 @@ var NOTIFY_DEFAULT_TARGETS_ = {
   '募集リマインド': 'staff_email,group_line',
   'スタッフ未決定リマインド': 'owner_email,owner_line',
   '直前予約リマインド': 'owner_email,owner_line',
-  '清掃完了': 'owner_email,owner_line'
+  '清掃完了': 'owner_email,owner_line',
+  '予約変更': 'owner_email,staff_email,owner_line,group_line'
 };
 
 /** カンマ区切りの送信先文字列を5フラグオブジェクトに変換 */
@@ -4635,7 +4716,8 @@ var NOTIFY_CHANNEL_KEYS_ = [
   { key: '募集リマインド', label: '募集リマインド（定期）' },
   { key: 'スタッフ未決定リマインド', label: 'スタッフ未決定リマインド' },
   { key: '直前予約リマインド', label: '直前予約リマインド' },
-  { key: '清掃完了', label: '清掃完了通知' }
+  { key: '清掃完了', label: '清掃完了通知' },
+  { key: '予約変更', label: '予約日付変更通知' }
 ];
 
 /** 通知チャンネル設定を取得 */
@@ -5040,6 +5122,11 @@ function sendTestNotification(notifyKey, sendTarget) {
         subject = '清掃完了報告: ' + sampleDate;
         body = sampleDate + ' の清掃が完了しました。\n\n担当: テストスタッフ\nチェック項目: 15/15 完了\n撮影枚数: 8枚'
           + (sampleDetailUrl ? '\n\n清掃詳細: ' + sampleDetailUrl : '');
+        break;
+
+      case '予約変更':
+        subject = '【民泊】予約日付変更: ' + sampleDate;
+        body = '予約の日付が変更されました。\n\nチェックイン: ' + sampleDate + '\n変更前チェックアウト: 2026/03/15\n変更後チェックアウト: 2026/03/18\n\n旧チェックアウト日の清掃スタッフ確定は解除されました。\n新しいチェックアウト日の清掃募集が開始されます。';
         break;
 
       default:

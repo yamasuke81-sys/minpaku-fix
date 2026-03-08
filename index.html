@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7309,19 +7309,13 @@
       });
 
       function loadLineWebhookCollected() {
-        console.log('[DEBUG-LINEID] loadLineWebhookCollected called');
         var container = document.getElementById('lineIdCollectedList');
-        console.log('[DEBUG-LINEID] container found:', !!container);
-        if (!container) { alert('エラー: lineIdCollectedList要素が見つかりません'); return; }
+        if (!container) return;
         container.innerHTML = '<div class="text-center py-3 border rounded bg-light"><span class="spinner-border spinner-border-sm text-primary"></span><span class="ms-2">サーバーからデータを取得中…</span></div>';
         container.style.minHeight = '60px';
-        console.log('[DEBUG-LINEID] calling google.script.run.getLineWebhookCollected...');
-        try {
         google.script.run.withSuccessHandler(function(jsonStr) {
-          console.log('[DEBUG-LINEID] successHandler called, response length:', (jsonStr||'').length);
           try {
             var res = JSON.parse(jsonStr);
-            console.log('[DEBUG-LINEID] parsed response:', JSON.stringify(res).substring(0, 300));
             var html = '';
             // デバッグ情報パネル
             if (res.debug) {
@@ -7379,13 +7373,8 @@
             container.innerHTML = '<div class="text-danger">読み込みエラー: ' + e.toString() + '</div>';
           }
         }).withFailureHandler(function(err) {
-          console.error('[DEBUG-LINEID] failureHandler:', err);
           container.innerHTML = '<div class="text-danger">通信エラー: ' + err.toString() + '</div>';
         }).getLineWebhookCollected();
-        } catch (outerErr) {
-          console.error('[DEBUG-LINEID] google.script.run呼び出しエラー:', outerErr);
-          container.innerHTML = '<div class="text-danger">関数呼び出しエラー: ' + outerErr.toString() + '</div>';
-        }
       }
       function clearLineWebhookCollected_() {
         if (!confirm('LINE ID収集データをクリアしますか？')) return;

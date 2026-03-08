@@ -9228,14 +9228,19 @@ function getRecruitmentStatusMap() {
           nextReservation: nextRes,
           selectedStaff: staff
         };
-        // 同じ予約行番号に対する重複エントリが存在する場合、回答データが多い方を優先
+        // [DEBUG-RECRUIT] 重複エントリの詳細ログ
         if (map[currentRowNum]) {
           var existingAnswered = (map[currentRowNum].volunteers || []).filter(function(v) { return v.response && v.response !== '未回答'; }).length;
           var newAnswered = volunteers.filter(function(v) { return v.response && v.response !== '未回答'; }).length;
+          Logger.log('[DEBUG-RECRUIT] 重複エントリ検出 rowNum=' + currentRowNum +
+            ' | 既存: status=' + map[currentRowNum].status + ' CO=' + map[currentRowNum].checkoutDate + ' answered=' + existingAnswered + ' staff=' + map[currentRowNum].staff +
+            ' | 新規: status=' + status + ' CO=' + checkoutDate + ' answered=' + newAnswered + ' staff=' + staff);
           if (newAnswered > existingAnswered) {
+            Logger.log('[DEBUG-RECRUIT] → 新規を採用（回答データが多い）');
             map[currentRowNum] = newEntry;
+          } else {
+            Logger.log('[DEBUG-RECRUIT] → 既存を保持（回答データが多いか同数）');
           }
-          // else: 既存エントリの方が回答データが多いので保持
         } else {
           map[currentRowNum] = newEntry;
         }

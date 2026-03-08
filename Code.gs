@@ -3073,6 +3073,10 @@ function syncFromICal() {
               if (cancelledVal && colMap.cancelledAt >= 0) {
                 formSheet.getRange(ri + 2, colMap.cancelledAt + 1).setValue('');
               }
+              // 旧COの連絡事項をクリア（新しいCO清掃には旧メモを引き継がない）
+              if (colMap.cleaningNotice >= 0) {
+                formSheet.getRange(ri + 2, colMap.cleaningNotice + 1).setValue('');
+              }
               // 旧COの募集ステータスを「キャンセル」に更新
               var ss3 = SpreadsheetApp.getActiveSpreadsheet();
               var recruitSheet3 = ss3.getSheetByName(SHEET_RECRUIT);
@@ -3317,6 +3321,10 @@ function autoSyncFromICal() {
                 existingRowByKey[cik + '|' + newCoKeyAuto] = ci + 2;
                 if (cancelledValAuto && colMap.cancelledAt >= 0) {
                   formSheet.getRange(ci + 2, colMap.cancelledAt + 1).setValue('');
+                }
+                // 旧COの連絡事項をクリア（新しいCO清掃には旧メモを引き継がない）
+                if (colMap.cleaningNotice >= 0) {
+                  formSheet.getRange(ci + 2, colMap.cleaningNotice + 1).setValue('');
                 }
                 // 旧COの募集ステータスを「キャンセル」に更新
                 var recruitSheet4 = ss.getSheetByName(SHEET_RECRUIT);

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5624,13 +5624,17 @@
         document.getElementById('recruitSelectError').style.display = 'none';
         var sel = document.getElementById('recruitSelectStaffDropdown');
         sel.innerHTML = '<option value="">スタッフを選択</option>';
-        volList.forEach(function(v) {
+        // 回答状態でソート: ◎→△→未回答→× の順
+        var respOrder = { '◎': 0, '△': 1, '未回答': 2, '×': 3 };
+        var sorted = volList.slice().sort(function(a, b) {
+          return (respOrder[a.response] !== undefined ? respOrder[a.response] : 2) - (respOrder[b.response] !== undefined ? respOrder[b.response] : 2);
+        });
+        sorted.forEach(function(v) {
           var name = (v.staffName || v.email || '').trim();
-          var resp = (v.response || '').trim();
-          if (name && (resp === '◎' || resp === '△')) {
-            var respLabel = resp === '◎' ? ' [対応可]' : ' [条件付]';
-            sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
-          }
+          var resp = (v.response || '').trim() || '未回答';
+          if (!name) return;
+          var respLabel = resp === '◎' ? ' ● 対応可' : (resp === '△' ? ' ▲ 条件付' : (resp === '×' ? ' ✖ 対応不可' : ' — 未回答'));
+          sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
         });
         sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
         var rsOtherArea = document.getElementById('recruitSelectOtherArea');

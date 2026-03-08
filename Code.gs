@@ -1255,11 +1255,11 @@ function updateCleaningStaff(rowNumber, staffName) {
       var newNames = value ? value.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean) : [];
       var removedNames = prevNames.filter(function(n) { return newNames.indexOf(n) < 0; });
       if (removedNames.length > 0) {
-        addNotification_('清掃変更', removedNames.join(', ') + ' が清掃担当から外れました（' + coDateStr + '）', { bookingRowNumber: rowNumber, checkoutDate: coDateStr, removedStaff: removedNames });
+        addNotification_('清掃変更', removedNames.join(', ') + ' が清掃担当から外れました（' + formatDateForNotif_(coDateStr) + '）', { bookingRowNumber: rowNumber, checkoutDate: coDateStr, removedStaff: removedNames });
       }
       // スタッフが全削除され募集再開 → 募集開始通知
       if (!value && previousStaff) {
-        addNotification_('清掃募集開始', '清掃募集が再開されました（' + coDateStr + '）', { bookingRowNumber: rowNumber, checkoutDate: coDateStr });
+        addNotification_('清掃募集開始', '清掃募集が再開されました（' + formatDateForNotif_(coDateStr) + '）', { bookingRowNumber: rowNumber, checkoutDate: coDateStr });
       }
     }
 
@@ -1963,10 +1963,10 @@ function ensureSheetsExist() {
 function formatNotificationMessage_(kind, message) {
   if (!message) return message;
   var s = String(message);
-  // 日付を読みやすい形式(M/d)に変換するヘルパー
+  // 日付を読みやすい形式(M/d(曜日))に変換するヘルパー
   function fmtDate(isoDate) {
-    var dm = String(isoDate).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    return dm ? (parseInt(dm[2], 10) + '/' + parseInt(dm[3], 10)) : isoDate;
+    var r = formatDateForNotif_(isoDate);
+    return (r && r !== String(isoDate)) ? r : isoDate;
   }
   // 新形式: 「名前 が ◎ と回答（メモ）（2026-02-23）」
   var m = s.match(/^(.+?)\s+が\s*([◎△×])\s*と回答(?:（[^）]*?）)?（(\d{4}-\d{1,2}-\d{1,2})\）$/);
@@ -2278,8 +2278,8 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
     var coVal = newMap.checkOut >= 0 ? formSheet.getRange(rowNumber, newMap.checkOut + 1).getValue() : '';
     var ciRaw = ciVal ? (ciVal instanceof Date ? Utilities.formatDate(ciVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(ciVal).trim()) : '';
     var coRaw = coVal ? (coVal instanceof Date ? Utilities.formatDate(coVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(coVal).trim()) : '';
-    var ciStr = formatDateWithDay_(ciRaw) || ciRaw;
-    var coStr = formatDateWithDay_(coRaw) || coRaw;
+    var ciStr = formatDateForNotif_(ciRaw) || ciRaw;
+    var coStr = formatDateForNotif_(coRaw) || coRaw;
     var dateRange = ciStr + '～' + coStr;
 
     // 募集ステータスを「キャンセル」に更新
@@ -2374,9 +2374,9 @@ function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoK
 
   var guestName = colMap.guestName >= 0 ? String(formSheet.getRange(rowNumber, colMap.guestName + 1).getValue() || '').trim() : '';
   var cleaningStaff = colMap.cleaningStaff >= 0 ? String(formSheet.getRange(rowNumber, colMap.cleaningStaff + 1).getValue() || '').trim() : '';
-  var ciStr = formatDateWithDay_(ciKey) || ciKey;
-  var oldCoStr = formatDateWithDay_(oldCoKey) || oldCoKey;
-  var newCoStr = formatDateWithDay_(newCoKey) || newCoKey;
+  var ciStr = formatDateForNotif_(ciKey) || ciKey;
+  var oldCoStr = formatDateForNotif_(oldCoKey) || oldCoKey;
+  var newCoStr = formatDateForNotif_(newCoKey) || newCoKey;
   var guestLabel = guestName || platformName || '不明';
 
   // テンプレート読み込み
@@ -2615,7 +2615,7 @@ function mergeFormResponseToExistingBooking_(e) {
         if (colMap.parking >= 0) updates.push({ col: colMap.parking + 1, val: String(newRowData[colMap.parking] || '').trim() });
         updates.forEach(function(u) { sheet.getRange(r, u.col).setValue(u.val); });
         sheet.deleteRow(newRow);
-        addNotification_('フォーム回答', 'フォームの回答が入力されました（' + newCheckInStr + '～' + newCheckOutStr + '）');
+        addNotification_('フォーム回答', 'フォームの回答が入力されました（' + formatDateForNotif_(newCheckInStr) + '～' + formatDateForNotif_(newCheckOutStr) + '）');
         break;
       }
     }
@@ -3112,7 +3112,7 @@ function syncFromICal() {
                 }
               }
             }
-            addNotification_('予約復活', '予約が復活しました（' + ciKey + '～' + coKey + '）');
+            addNotification_('予約復活', '予約が復活しました（' + formatDateForNotif_(ciKey) + '～' + formatDateForNotif_(coKey) + '）');
           }
         }
       }
@@ -3121,7 +3121,7 @@ function syncFromICal() {
       if (platformCancelled > 0) statusStr += ' キャンセル' + platformCancelled;
       syncSheet.getRange(si + 2, 4).setValue(statusStr);
       if (platformAdded > 0) {
-        var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
+        var ciList = platformCheckIns.map(function(d) { return formatDateForNotif_(d); }).join(', ');
         addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました（チェックイン: ' + ciList + '）');
       }
       // [DEBUG-SYNC] 追加・キャンセルの有無にかかわらず、iCalフィード全体の概要をログ
@@ -3352,7 +3352,7 @@ function autoSyncFromICal() {
                   }
                 }
               }
-              addNotification_('予約復活', '予約が復活しました（' + cik + '～' + cok + '）');
+              addNotification_('予約復活', '予約が復活しました（' + formatDateForNotif_(cik) + '～' + formatDateForNotif_(cok) + '）');
             }
           }
         }
@@ -3361,7 +3361,7 @@ function autoSyncFromICal() {
         if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
         syncSheet.getRange(si + 2, 4).setValue(statusStr);
         if (platformAdded > 0) {
-          var ciList = platformCheckIns.map(function(d) { return d.replace(/^\d{4}-/, '').replace('-', '/'); }).join(', ');
+          var ciList = platformCheckIns.map(function(d) { return formatDateForNotif_(d); }).join(', ');
           addNotification_('予約追加', platformName + 'から' + platformAdded + '件の予約が自動追加されました（チェックイン: ' + ciList + '）');
         }
       } catch (platformErr) {
@@ -3713,7 +3713,7 @@ function addBookingManually(checkIn, checkOut, guestName, bookingSite, guestCoun
 
     sheet.getRange(nextRow, 1, 1, lastCol).setValues([rowData]);
     sortFormResponses_();
-    addNotification_('予約追加', '予約が追加されました' + (guestName ? ' (' + String(guestName).trim() + ')' : '') + '（' + ciStr + '～' + coStr + '）');
+    addNotification_('予約追加', '予約が追加されました' + (guestName ? ' (' + String(guestName).trim() + ')' : '') + '（' + formatDateForNotif_(ciStr) + '～' + formatDateForNotif_(coStr) + '）');
     invalidateInitDataCache_();
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
@@ -5414,6 +5414,29 @@ function formatDateWithDay_(dateInput) {
 }
 
 /**
+ * 通知メッセージ用の短い日付フォーマット: "M/d(曜日)"
+ * 例: "2026-03-08" → "3/8(日)"
+ */
+function formatDateForNotif_(dateInput) {
+  var DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+  try {
+    var d;
+    if (dateInput instanceof Date) {
+      d = dateInput;
+    } else {
+      var s = String(dateInput || '').trim();
+      var m = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (!m) return s;
+      d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    }
+    if (isNaN(d.getTime())) return String(dateInput);
+    return (d.getMonth() + 1) + '/' + d.getDate() + '(' + DAY_NAMES[d.getDay()] + ')';
+  } catch (e) {
+    return String(dateInput);
+  }
+}
+
+/**
  * LINEグループにメッセージを送信（内部ヘルパー）
  * トークン・送信先IDが設定されていれば送信する（設定不足の場合は何もしない）
  */
@@ -6575,7 +6598,7 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
       } else if (prevStaff) {
         // スタッフが全削除 → 募集再開
         sheet.getRange(recruitRowIndexOrNull, 4).setValue('募集中');
-        addNotification_('清掃募集開始', '清掃募集が再開されました（' + checkoutDateStr + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr });
+        addNotification_('清掃募集開始', '清掃募集が再開されました（' + formatDateForNotif_(checkoutDateStr) + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr });
       }
       // 以前のスタッフが外された場合に通知
       if (prevStaff && prevStaff !== staffVal) {
@@ -6583,7 +6606,7 @@ function saveRecruitmentDetail(recruitRowIndexOrNull, bookingRowNumber, checkout
         var newNames = staffVal ? staffVal.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean) : [];
         var removedNames = prevNames.filter(function(n) { return newNames.indexOf(n) < 0; });
         if (removedNames.length > 0) {
-          addNotification_('清掃変更', removedNames.join(', ') + ' が清掃担当から外れました（' + checkoutDateStr + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr, removedStaff: removedNames });
+          addNotification_('清掃変更', removedNames.join(', ') + ' が清掃担当から外れました（' + formatDateForNotif_(checkoutDateStr) + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr, removedStaff: removedNames });
         }
       }
       var formSheet = ss.getSheetByName(SHEET_NAME);
@@ -6936,7 +6959,7 @@ function createRecruitmentForBooking(bookingRowNumber, checkoutDateStr) {
     const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
     ensureRecruitDetailColumns_();
     sheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutDateStr, bookingRowNumber, '', '募集中', '', '', now, '', 'メール', '', '', '', '', '', '']]);
-    addNotification_('清掃募集開始', '清掃募集が開始されました（' + checkoutDateStr + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr });
+    addNotification_('清掃募集開始', '清掃募集が開始されました（' + formatDateForNotif_(checkoutDateStr) + '）', { bookingRowNumber: bookingRowNumber, checkoutDate: checkoutDateStr });
     return JSON.stringify({ success: true, rowIndex: nextRow });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -7023,7 +7046,7 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
     ensureSheetsExist();
     var staff = (staffName || '').trim() || (staffEmail || '').trim() || 'スタッフ';
     var dateStr = (checkoutDateStr || '').toString().trim() || '';
-    var dateDisp = formatDateWithDay_(dateStr) || dateStr;
+    var dateDisp = formatDateForNotif_(dateStr) || dateStr;
     var rid = 'r' + recruitRowIndex;
     var sName = (staffName || staff).trim();
     var sEmail = (staffEmail || '').trim().toLowerCase();
@@ -7173,7 +7196,7 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
 
     // 通知を追加（フォームシートの最新日付を優先）
     var checkoutStr = getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss);
-    var checkoutDisp = formatDateWithDay_(checkoutStr) || checkoutStr;
+    var checkoutDisp = formatDateForNotif_(checkoutStr) || checkoutStr;
     addNotification_('キャンセル承認', (sName || sEmail) + ' のキャンセルを承認しました（' + checkoutDisp + '）');
 
     // スタッフ・オーナーに通知
@@ -7232,7 +7255,7 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     }
 
     var checkoutStr = recruitSheet ? getCheckoutForRecruit_(recruitSheet, recruitRowIndex, ss) : '';
-    var checkoutDisp = formatDateWithDay_(checkoutStr) || checkoutStr;
+    var checkoutDisp = formatDateForNotif_(checkoutStr) || checkoutStr;
     addNotification_('キャンセル却下', (sName || sEmail) + ' のキャンセル申請を却下しました（' + checkoutDisp + '）');
 
     // スタッフ・オーナーに通知
@@ -9567,12 +9590,7 @@ function confirmRecruitment(recruitRowIndex) {
     var staff = String(recruitSheet.getRange(recruitRowIndex, 5).getValue() || '').trim();
     if (!staff) return JSON.stringify({ success: false, error: 'スタッフが選定されていません。先にスタッフを選定してください。' });
     var coDateVal = recruitSheet.getRange(recruitRowIndex, 1).getValue();
-    var coDateStr = '';
-    if (coDateVal instanceof Date) {
-      coDateStr = coDateVal.getFullYear() + '/' + (coDateVal.getMonth() + 1) + '/' + coDateVal.getDate();
-    } else if (coDateVal) {
-      coDateStr = String(coDateVal);
-    }
+    var coDateStr = formatDateForNotif_(coDateVal) || String(coDateVal || '');
     recruitSheet.getRange(recruitRowIndex, 4).setValue('スタッフ確定済み');
     var notifMsg = staff + ' をスタッフとして確定しました';
     if (coDateStr) notifMsg += '（' + coDateStr + '）';
@@ -10728,7 +10746,7 @@ function sendImmediateReminderIfNeeded_(ss, checkInStr, checkOutStr, platformNam
     if (_ch_immediate.staff_line) {
       try { sendLineToStaffMembers_(getAllActiveStaff_(ss), immediateLineText); } catch (lineErr) {}
     }
-    addNotification_('即時リマインド', '直前予約（' + checkInStr + '〜' + checkOutStr + '）のリマインドメールを送信しました');
+    addNotification_('即時リマインド', '直前予約（' + formatDateForNotif_(checkInStr) + '〜' + formatDateForNotif_(checkOutStr) + '）のリマインドメールを送信しました');
   } catch (e) {
     Logger.log('sendImmediateReminderIfNeeded_: ' + e.toString());
   }
@@ -11173,7 +11191,7 @@ function notifyCleaningComplete(checkoutDate) {
     var ownerRes = JSON.parse(getOwnerEmail());
     var ownerEmail = (ownerRes.email || '').trim();
 
-    var fmtDate = formatDateWithDay_(dateKey) || dateKey;
+    var fmtDate = formatDateForNotif_(dateKey) || dateKey;
 
     addNotification_('清掃完了', fmtDate + ' の清掃が完了しました（' + clRes.checkedCount + '/' + clRes.totalItems + '項目）');
 
@@ -11928,15 +11946,15 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     if (step === 'sent') {
       sheet.getRange(rowIndex, 2).setValue(staffName);
       sheet.getRange(rowIndex, 3).setValue(now);
-      addNotification_('クリーニング出し', staffName + ' がクリーニングに出しました（' + dateKey + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('クリーニング出し', staffName + ' がクリーニングに出しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else if (step === 'received') {
       sheet.getRange(rowIndex, 4).setValue(staffName);
       sheet.getRange(rowIndex, 5).setValue(now);
-      addNotification_('クリーニング受取', staffName + ' がクリーニングを受け取りました（' + dateKey + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('クリーニング受取', staffName + ' がクリーニングを受け取りました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else if (step === 'returned') {
       sheet.getRange(rowIndex, 6).setValue(staffName);
       sheet.getRange(rowIndex, 7).setValue(now);
-      addNotification_('クリーニング戻し', staffName + ' がクリーニングを施設に戻しました（' + dateKey + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('クリーニング戻し', staffName + ' がクリーニングを施設に戻しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }

@@ -2855,6 +2855,7 @@ function syncFromICal() {
           }
         }
         if (overlaps) {
+          Logger.log('[DEBUG-EXTEND] OVERLAP BLOCKED: new=' + key + ' overlapping with=' + ek + ' guest="' + (ev.guestName || '') + '" platform=' + (ev.platform || ''));
           continue;
         }
         existingPairs[key] = true;
@@ -2926,6 +2927,14 @@ function syncFromICal() {
             }
           } else if (!validPairs[pairKey] && !cancelledPairs[pairKey] && !isPast) {
             // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
+            Logger.log('[DEBUG-EXTEND] MISSING FROM FEED: pairKey=' + pairKey + ' platform=' + platformName + ' cancelledVal=' + cancelledVal);
+            // validPairsの中身をログ出力（日付変更の手がかり）
+            var vpKeys = Object.keys(validPairs);
+            for (var vpi = 0; vpi < vpKeys.length; vpi++) {
+              if (vpKeys[vpi].indexOf(ciKey) === 0) {
+                Logger.log('[DEBUG-EXTEND]   同じCI持つvalidPair: ' + vpKeys[vpi]);
+              }
+            }
             if (!cancelledVal) {
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;

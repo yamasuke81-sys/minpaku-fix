@@ -2855,7 +2855,6 @@ function syncFromICal() {
           }
         }
         if (overlaps) {
-          Logger.log('[DEBUG-EXTEND] OVERLAP BLOCKED: new=' + key + ' overlapping with=' + ek + ' guest="' + (ev.guestName || '') + '" platform=' + (ev.platform || ''));
           continue;
         }
         existingPairs[key] = true;
@@ -2926,16 +2925,44 @@ function syncFromICal() {
               platformCancelled++; removed++;
             }
           } else if (!validPairs[pairKey] && !cancelledPairs[pairKey] && !isPast) {
-            // フィードから消えた（未来の予約のみ・明示的キャンセルでもない） → キャンセルマーク
-            Logger.log('[DEBUG-EXTEND] MISSING FROM FEED: pairKey=' + pairKey + ' platform=' + platformName + ' cancelledVal=' + cancelledVal);
-            // validPairsの中身をログ出力（日付変更の手がかり）
+            // フィードから消えた — ただし同じCIで異なるCOのvalidPairがあれば日付変更（延長/短縮）
+            var dateChanged = false;
+            var newCoKey = '';
             var vpKeys = Object.keys(validPairs);
             for (var vpi = 0; vpi < vpKeys.length; vpi++) {
-              if (vpKeys[vpi].indexOf(ciKey) === 0) {
-                Logger.log('[DEBUG-EXTEND]   同じCI持つvalidPair: ' + vpKeys[vpi]);
+              if (vpKeys[vpi].indexOf(ciKey + '|') === 0 && vpKeys[vpi] !== pairKey) {
+                newCoKey = vpKeys[vpi].split('|')[1];
+                dateChanged = true;
+                break;
               }
             }
-            if (!cancelledVal) {
+            if (dateChanged && newCoKey) {
+              // 日付変更検出 → 既存行のCOを更新（キャンセルしない）
+              Logger.log('[EXTEND] 日付変更検出: ' + pairKey + ' → ' + ciKey + '|' + newCoKey);
+              if (colMap.checkOut >= 0) {
+                formSheet.getRange(ri + 2, colMap.checkOut + 1).setValue(newCoKey);
+              }
+              // existingPairsも更新（重複チェック用）
+              delete existingPairs[pairKey];
+              existingPairs[ciKey + '|' + newCoKey] = true;
+              existingRowByKey[ciKey + '|' + newCoKey] = ri + 2;
+              // キャンセル済みだった場合はキャンセル解除
+              if (cancelledVal && colMap.cancelledAt >= 0) {
+                formSheet.getRange(ri + 2, colMap.cancelledAt + 1).setValue('');
+              }
+              // 募集シートのCO日も更新
+              var recruitSheet3 = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT);
+              if (recruitSheet3 && recruitSheet3.getLastRow() >= 2) {
+                var rData3 = recruitSheet3.getRange(2, 1, recruitSheet3.getLastRow() - 1, 2).getValues();
+                for (var ri3 = 0; ri3 < rData3.length; ri3++) {
+                  if (parseInt(rData3[ri3][1], 10) === (ri + 2)) {
+                    recruitSheet3.getRange(ri3 + 2, 1).setValue(newCoKey);
+                  }
+                }
+              }
+              addNotification_('予約変更', '予約の日付が変更されました（' + ciKey + '～' + coKey + ' → ' + ciKey + '～' + newCoKey + '）');
+            } else if (!cancelledVal) {
+              // 本当にフィードから消えた → キャンセルマーク
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;
               }

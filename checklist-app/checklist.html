@@ -4110,6 +4110,19 @@
           renderMemos();
           input.value = '';
           clearMemoPhotoPreview();
+          // LINE送信結果を表示
+          var lineMsg = document.createElement('div');
+          lineMsg.style.cssText = 'padding:6px 10px;margin:4px 0;border-radius:4px;font-size:13px;';
+          if (res.lineSent) {
+            lineMsg.style.background = '#d4edda'; lineMsg.style.color = '#155724';
+            lineMsg.textContent = '✅ LINEに送信しました';
+          } else {
+            lineMsg.style.background = '#fff3cd'; lineMsg.style.color = '#856404';
+            lineMsg.textContent = '⚠️ LINE送信失敗: ' + (res.lineDebug || '不明');
+          }
+          var memoList = document.getElementById('memoList');
+          memoList.parentNode.insertBefore(lineMsg, memoList);
+          setTimeout(function() { lineMsg.remove(); }, 5000);
         } else {
           alert('メモの追加に失敗しました: ' + res.error);
         }

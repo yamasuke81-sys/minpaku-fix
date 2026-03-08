@@ -1115,11 +1115,25 @@ function sendMemoToLine(checkoutDate, text, staffName) {
 function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
+  var lineResult = null;
   try {
     var sheet = clSheet_(SHEET_CL_MEMOS);
     var nextRow = sheet.getLastRow() + 1;
     sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, text, staffName || '', new Date(), photoFileId || '']]);
-    return JSON.stringify({ success: true });
+    // メモ登録時にLINE自動送信
+    try {
+      var msgParts = ['📝 特記事項・備品不足', ''];
+      msgParts.push('📅 チェックアウト日: ' + checkoutDate);
+      msgParts.push('👤 記入者: ' + (staffName || '不明'));
+      if (text) { msgParts.push(''); msgParts.push(text); }
+      if (photoFileId) { msgParts.push(''); msgParts.push('📷 写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
+      lineResult = clSendLineMessage_(msgParts.join('\n'));
+      Logger.log('[MEMO-LINE] 自動送信結果: ' + JSON.stringify(lineResult));
+    } catch (lineErr) {
+      Logger.log('[MEMO-LINE] 自動送信エラー: ' + lineErr.toString());
+      lineResult = { ok: false, reason: lineErr.toString() };
+    }
+    return JSON.stringify({ success: true, lineSent: lineResult ? lineResult.ok : false, lineDebug: JSON.stringify(lineResult) });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   } finally {

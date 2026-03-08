@@ -322,6 +322,9 @@ function doGet(e) {
     } catch(e) {}
   }
   template.baseUrl = baseUrl;
+  // GASエディタ・スプシ直リンク用
+  template.scriptId = ScriptApp.getScriptId();
+  template.spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
   // オーナーが保存したURLをテンプレートに渡す（リロード時の即座表示用）
   var savedOwnerUrl = '';
   try { savedOwnerUrl = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''; } catch(e) {}

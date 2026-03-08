@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308p</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308q</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2797,6 +2797,10 @@
               cleaningClasses.push('fc-event-cleaning-rejected-by-me');
             }
             var cleaningStatus = isCancelled ? 'cancelled' : (isDecided ? 'cleaning-decided' : ((isRecruiting || isSelected) ? 'cleaning-recruiting' : 'cleaning-not-recruiting'));
+            // DEBUG v0308q: 選定済の背景色デバッグ
+            if (recStatus || recStaff || bookStaff) {
+              console.log('[DEBUG-CAL] row=' + b.rowNumber + ' CO=' + checkOut + ' recStatus="' + recStatus + '" recStaff="' + recStaff + '" bookStaff="' + bookStaff + '" isFullyConfirmed=' + isFullyConfirmed + ' isSelected=' + isSelected + ' isRecruiting=' + isRecruiting + ' isDecided=' + isDecided + ' cleaningStatus=' + cleaningStatus + ' classes=' + cleaningClasses.join(','));
+            }
             events.push({
               id: 'c-' + b.rowNumber,
               title: (isCancelled ? '[キャンセル] ' : '') + formatCleaningTitle(b),
@@ -4456,6 +4460,8 @@
             if ((rStatus === '募集中' || rStatus === '選定済') && b.checkOutParsed) {
               var d = new Date(b.checkOutParsed);
               var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+              // DEBUG v0308q: recruitDates判定
+              console.log('[DEBUG-RDATE] row=' + b.rowNumber + ' status="' + rStatus + '" key=' + key + ' staffSetDates[key]=' + !!staffSetDates[key] + ' cleaningStaff="' + (b.cleaningStaff||'') + '"');
               if (!staffSetDates[key]) recruitDates[key] = true;
             }
           });
@@ -4819,6 +4825,8 @@
             var ds = window._recruitDates || {};
             var d = arg.date;
             var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+            // DEBUG v0308q: dayCellClassNames
+            if (ds[key]) console.log('[DEBUG-DAYCELL] key=' + key + ' → fc-day-recruiting');
             return ds[key] ? ['fc-day-recruiting'] : [];
           },
           eventClick: function(info) {

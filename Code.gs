@@ -9230,7 +9230,8 @@ function getRecruitmentStatusMap() {
       }
 
       // 正しい行番号からフォームシートの最新チェックアウト日を取得
-      if (currentRowNum >= 2 && formData && currentRowNum - 2 < formData.length && formColMap && formColMap.checkOut >= 0) {
+      // ただしキャンセル済みエントリのCO日は更新しない（新規募集エントリと競合するため）
+      if (status !== 'キャンセル' && currentRowNum >= 2 && formData && currentRowNum - 2 < formData.length && formColMap && formColMap.checkOut >= 0) {
         var actualCo = parseDate(formData[currentRowNum - 2][formColMap.checkOut]);
         if (actualCo) {
           var actualCoStr = toDateKeySafe_(actualCo);
@@ -9872,8 +9873,12 @@ function checkAndCreateRecruitments() {
     var existingRowNums = {};
     var existingCheckoutDates = {};
     if (recruitSheet.getLastRow() >= 2) {
-      var existData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 2).getValues();
+      var rLastCol = Math.max(recruitSheet.getLastColumn(), 4);
+      var existData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, rLastCol).getValues();
       for (var ei = 0; ei < existData.length; ei++) {
+        var eStatus = String(existData[ei][3] || '').trim();
+        // キャンセル済みの募集エントリは「既存」としてカウントしない（新規募集を作成可能にする）
+        if (eStatus === 'キャンセル') continue;
         existingRowNums[Number(existData[ei][1])] = true;
         // チェックアウト日+行番号の組み合わせで既存エントリを追跡
         var eCo = parseDate(existData[ei][0]);

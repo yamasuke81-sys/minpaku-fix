@@ -9909,6 +9909,16 @@ function checkAndCreateRecruitments() {
         }
       }
     }
+    // [DEBUG-RECRUIT] 既存エントリの状態をログ出力
+    Logger.log('[DEBUG-RECRUIT] existingRowNums (non-cancelled): ' + JSON.stringify(existingRowNums));
+    Logger.log('[DEBUG-RECRUIT] existingCheckoutDates (non-cancelled): ' + JSON.stringify(existingCheckoutDates));
+    if (recruitSheet.getLastRow() >= 2) {
+      var debugRData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, Math.max(recruitSheet.getLastColumn(), 5)).getValues();
+      for (var di = 0; di < debugRData.length; di++) {
+        Logger.log('[DEBUG-RECRUIT] 募集行' + (di + 2) + ': date=' + debugRData[di][0] + ', rowNum=' + debugRData[di][1] + ', status=' + debugRData[di][3] + ', staff=' + debugRData[di][4]);
+      }
+    }
+
     ensureRecruitNotifyMethodColumn_();
     ensureRecruitDetailColumns_();
     var newRecruitEntries = [];
@@ -9926,7 +9936,12 @@ function checkAndCreateRecruitments() {
       if (co < cutoff) continue;
       const checkoutStr = toDateKeySafe_(checkOut);
       const rowNumber = i + 2;
-      if (existingRowNums[rowNumber]) continue;
+      // [DEBUG-RECRUIT] 各予約行の判定過程をログ出力
+      Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': CO=' + checkoutStr + ', existingRowNums[' + rowNumber + ']=' + existingRowNums[rowNumber]);
+      if (existingRowNums[rowNumber]) {
+        Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': SKIP (existingRowNums match)');
+        continue;
+      }
       // 同じチェックアウト日の募集エントリが既に存在し、同日の予約が1件のみの場合はスキップ（行番号ずれによる重複防止）
       if (checkoutStr && existingCheckoutDates[checkoutStr]) {
         var sameCoFormRows = 0;
@@ -9934,7 +9949,11 @@ function checkAndCreateRecruitments() {
           var sciCo = parseDate(data[sci][colMap.checkOut]);
           if (sciCo && toDateKeySafe_(sciCo) === checkoutStr) sameCoFormRows++;
         }
-        if (sameCoFormRows <= existingCheckoutDates[checkoutStr].length) continue;
+        Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': CO dateCheck — sameCoFormRows=' + sameCoFormRows + ', existingEntries=' + existingCheckoutDates[checkoutStr].length);
+        if (sameCoFormRows <= existingCheckoutDates[checkoutStr].length) {
+          Logger.log('[DEBUG-RECRUIT] row' + rowNumber + ': SKIP (existingCheckoutDates match, sameCoFormRows=' + sameCoFormRows + ' <= existingEntries=' + existingCheckoutDates[checkoutStr].length + ')');
+          continue;
+        }
       }
       // スタッフが既に確定済みか判定
       var assignedStaff = colMap.cleaningStaff >= 0 ? String(data[i][colMap.cleaningStaff] || '').trim() : '';

@@ -2345,12 +2345,30 @@ function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoK
   var newCoStr = formatDateWithDay_(newCoKey) || newCoKey;
   var guestLabel = guestName || platformName || '不明';
 
-  var subject = '【民泊】予約日付変更: ' + oldCoStr + ' → ' + newCoStr;
-  var body = '予約の日付が変更されました。\n\n'
-    + 'ゲスト: ' + guestLabel + '\n'
-    + 'チェックイン: ' + ciStr + '\n'
-    + '変更前チェックアウト: ' + oldCoStr + '\n'
-    + '変更後チェックアウト: ' + newCoStr;
+  // テンプレート読み込み
+  var DEFAULT_DC_SUBJECT_ = '【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}';
+  var DEFAULT_DC_BODY_ = '予約の日付が変更されました。\n\nゲスト: {ゲスト名}\nチェックイン: {チェックイン}\n変更前チェックアウト: {旧チェックアウト}\n変更後チェックアウト: {新チェックアウト}';
+  var tplSubject = DEFAULT_DC_SUBJECT_;
+  var tplBody = DEFAULT_DC_BODY_;
+  try {
+    var settingsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (settingsSheet && settingsSheet.getLastRow() >= 2) {
+      var sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
+      sRows.forEach(function(r) {
+        var k = String(r[0] || '').trim();
+        if (k === '予約変更件名' && String(r[1] || '').trim()) tplSubject = String(r[1]).trim();
+        if (k === '予約変更本文' && String(r[1] || '').trim()) tplBody = String(r[1]).trim();
+      });
+    }
+  } catch (e) {}
+  var replacePlaceholders = function(text) {
+    return text.replace(/\{ゲスト名\}/g, guestLabel)
+      .replace(/\{チェックイン\}/g, ciStr)
+      .replace(/\{旧チェックアウト\}/g, oldCoStr)
+      .replace(/\{新チェックアウト\}/g, newCoStr);
+  };
+  var subject = replacePlaceholders(tplSubject);
+  var body = replacePlaceholders(tplBody);
 
   // スタッフ確定済みの場合は解除通知
   if (cleaningStaff) {
@@ -4479,11 +4497,13 @@ function setRecruitmentSettings(settings) {
 
 var EMAIL_NOTIFY_KEYS_ = [
   '募集開始通知有効', 'スタッフ確定通知有効', 'キャンセル通知有効',
+  '予約変更通知有効',
   '辞退申請通知有効', '辞退承認通知有効', '辞退却下通知有効',
   '清掃完了通知有効', '請求書送信通知有効'
 ];
 var EMAIL_NOTIFY_JS_KEYS_ = [
   'notifyRecruitStart', 'notifyStaffConfirm', 'notifyCancel',
+  'notifyDateChange',
   'notifyCancelRequest', 'notifyCancelApprove', 'notifyCancelReject',
   'notifyCleaningDone', 'notifyInvoice'
 ];
@@ -4557,6 +4577,55 @@ function saveEmailNotifySettings(settingsOrJson) {
           sheet.getRange(nr, 2).setValue(val);
           rowMap[sheetKey] = nr;
         }
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** 予約変更通知テンプレートの取得 */
+function getDateChangeNotifySettings() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var map = {};
+    if (sheet && sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+      rows.forEach(function(r) { var k = String(r[0] || '').trim(); if (k) map[k] = r[1]; });
+    }
+    return JSON.stringify({
+      success: true,
+      subject: String(map['予約変更件名'] || ''),
+      body: String(map['予約変更本文'] || '')
+    });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** 予約変更通知テンプレートの保存 */
+function saveDateChangeNotifySettings(subject, body) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    ensureSheetsExist();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var rowMap = {};
+    rows.forEach(function(r, i) { var k = String(r[0] || '').trim(); if (k) rowMap[k] = i + 2; });
+    var entries = [['予約変更件名', String(subject || '')], ['予約変更本文', String(body || '')]];
+    for (var i = 0; i < entries.length; i++) {
+      var eKey = entries[i][0], eVal = entries[i][1];
+      if (rowMap[eKey]) {
+        sheet.getRange(rowMap[eKey], 2).setValue(eVal);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(eKey);
+        sheet.getRange(nr, 2).setValue(eVal);
+        rowMap[eKey] = nr;
       }
     }
     return JSON.stringify({ success: true });
@@ -5125,8 +5194,11 @@ function sendTestNotification(notifyKey, sendTarget) {
         break;
 
       case '予約変更':
-        subject = '【民泊】予約日付変更: ' + sampleDate;
-        body = '予約の日付が変更されました。\n\nチェックイン: ' + sampleDate + '\n変更前チェックアウト: 2026/03/15\n変更後チェックアウト: 2026/03/18\n\n旧チェックアウト日の清掃スタッフ確定は解除されました。\n新しいチェックアウト日の清掃募集が開始されます。';
+        var dcSubj = (settingsMap['予約変更件名'] || '').trim() || '【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}';
+        var dcBody = (settingsMap['予約変更本文'] || '').trim() || '予約の日付が変更されました。\n\nゲスト: {ゲスト名}\nチェックイン: {チェックイン}\n変更前チェックアウト: {旧チェックアウト}\n変更後チェックアウト: {新チェックアウト}';
+        var dcReplace = function(t) { return t.replace(/\{ゲスト名\}/g, 'テストゲスト').replace(/\{チェックイン\}/g, sampleDate).replace(/\{旧チェックアウト\}/g, '3/15(日)').replace(/\{新チェックアウト\}/g, '3/18(水)'); };
+        subject = dcReplace(dcSubj);
+        body = dcReplace(dcBody) + '\n\n旧チェックアウト日の清掃スタッフ確定は解除されました。\n新しいチェックアウト日の清掃募集が開始されます。';
         break;
 
       default:

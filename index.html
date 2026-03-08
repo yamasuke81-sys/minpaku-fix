@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308c</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308d</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1815,8 +1815,15 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="予約変更"></div>
         </div>
-        <p class="small text-muted">※ この通知はiCal同期で日付変更を検知した際に自動送信されます。スタッフが確定済みの場合は確定解除の連絡も行われます。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <label class="form-label small fw-bold">メール文面テンプレート</label>
+        <p class="small text-muted mb-1">プレースホルダー: <code>{ゲスト名}</code> <code>{チェックイン}</code> <code>{旧チェックアウト}</code> <code>{新チェックアウト}</code></p>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="dateChangeSubject" placeholder="【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}"></div>
+        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="dateChangeBody" rows="5" placeholder="予約の日付が変更されました。&#10;&#10;ゲスト: {ゲスト名}&#10;チェックイン: {チェックイン}&#10;変更前チェックアウト: {旧チェックアウト}&#10;変更後チェックアウト: {新チェックアウト}"></textarea></div>
+        <button type="button" class="btn btn-sm btn-primary" id="btnSaveDateChangeTemplate">テンプレートを保存</button>
+        <span id="dateChangeSaveResult" class="small text-success ms-2" style="display:none;">保存しました</span>
+        <p class="small text-muted mt-2">※ 空欄の場合はデフォルト文面が使われます。スタッフ確定済みの場合は「確定解除」の文面が自動で追加されます。</p>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="予約変更">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
@@ -8002,6 +8009,46 @@
         });
       })();
 
+      // 予約変更通知テンプレート読み込み＋保存
+      function loadDateChangeTemplate_() {
+        showTabLoading_('settingsNotifyDateChange');
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          hideTabLoading_('settingsNotifyDateChange');
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              document.getElementById('dateChangeSubject').value = r.subject || '';
+              document.getElementById('dateChangeBody').value = r.body || '';
+            }
+          } catch (e) {}
+        }).withFailureHandler(function() { hideTabLoading_('settingsNotifyDateChange'); }).getDateChangeNotifySettings();
+      }
+      document.getElementById('btnSaveDateChangeTemplate').addEventListener('click', function() {
+        var btn = this;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        var origText = btn.textContent;
+        btn.textContent = '保存中...';
+        var subj = document.getElementById('dateChangeSubject').value;
+        var body = document.getElementById('dateChangeBody').value;
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = origText;
+          var r = JSON.parse(jsonStr);
+          if (r.success) {
+            var msg = document.getElementById('dateChangeSaveResult');
+            msg.style.display = 'inline';
+            setTimeout(function() { msg.style.display = 'none'; }, 3000);
+          } else {
+            alert(r.error || '保存に失敗しました。');
+          }
+        }).withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = origText;
+          alert('保存に失敗しました。');
+        }).saveDateChangeNotifySettings(subj, body);
+      });
+
       var ROSTER_REMINDER_DEFAULTS = {
         subject: '宿泊者名簿の未記入通知（{件数}件）',
         body: '以下の予約について、宿泊者名簿がまだ記入されていません。\n宿泊者への催促をお願いします。\n\n{未記入一覧}\n\n※ アプリの通知にも同じ内容が届いています。'
@@ -8951,6 +8998,7 @@
         btnSaveRosterReminder: 'rosterReminder',
         btnSaveInvoiceRequest: 'invoiceRequest',
         btnSaveConfirmTemplate: 'confirmTemplate',
+        btnSaveDateChangeTemplate: 'notifyDateChange',
         btnSaveLineNotify: 'lineId',
         btnSaveSyncForm: 'sync',
         btnSaveAutoSync: 'sync'
@@ -8998,6 +9046,7 @@
           if (t === 'lineId') { loadLineNotifySettings(); }
           if (t === 'invoiceRequest') loadInvoiceRequestSettings();
           if (t === 'confirmTemplate') loadConfirmationTemplate();
+          if (t === 'notifyDateChange') loadDateChangeTemplate_();
           // 通知タブ表示時にチャンネル設定を読み込み
           var _notifyTabs = ['recruitSettings','confirmTemplate','reminderEmail',
             'notifyCancel','notifyDateChange','notifyCancelRequest','notifyCancelApprove',
@@ -9008,7 +9057,7 @@
             'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
           // 個別load関数がないタブにローディング表示
-          var _channelOnlyTabs = ['notifyCancel','notifyDateChange','notifyCancelRequest','notifyCancelApprove',
+          var _channelOnlyTabs = ['notifyCancel','notifyCancelRequest','notifyCancelApprove',
             'notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_channelOnlyTabs.indexOf(t) >= 0) showTabLoading_(_settingsPanels[t]);
         });

@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -4913,13 +4913,12 @@
             document.querySelectorAll('#mainTabs .nav-link').forEach(function(l) { l.classList.remove('active'); });
             var activeLink = document.querySelector('#mainTabs [data-tab="' + tab + '"]');
             if (activeLink) activeLink.classList.add('active');
-            document.getElementById('panelCalendar').style.display = tab === 'calendar' ? 'block' : 'none';
-            document.getElementById('panelRecruit').style.display = tab === 'recruit' ? 'block' : 'none';
-            document.getElementById('panelStaffSchedule').style.display = tab === 'staffSchedule' ? 'block' : 'none';
-            document.getElementById('panelInvoice').style.display = tab === 'invoice' ? 'block' : 'none';
-            document.getElementById('panelNotifications').style.display = tab === 'notifications' ? 'block' : 'none';
-            document.getElementById('panelSettings').style.display = tab === 'settings' ? 'block' : 'none';
-            document.getElementById('panelStaffTest').style.display = tab === 'staffTest' ? 'block' : 'none';
+            var panelIds = ['panelCalendar','panelRecruit','panelStaffSchedule','panelInvoice','panelNotifications','panelSettings','panelStaffTest'];
+            var tabMap = {'panelCalendar':'calendar','panelRecruit':'recruit','panelStaffSchedule':'staffSchedule','panelInvoice':'invoice','panelNotifications':'notifications','panelSettings':'settings','panelStaffTest':'staffTest'};
+            panelIds.forEach(function(id) {
+              var el = document.getElementById(id);
+              if (el) el.style.display = tab === tabMap[id] ? 'block' : 'none';
+            });
             if (tab === 'calendar' && calendar) {
               // display:none→block後、ブラウザの再レイアウトを待ってからサイズ再計算＋再描画
               requestAnimationFrame(function() {
@@ -5011,7 +5010,7 @@
             document.getElementById('panelInvoice').style.display = 'none';
             document.getElementById('panelNotifications').style.display = 'block';
             document.getElementById('panelSettings').style.display = 'none';
-            document.getElementById('panelStaffTest').style.display = 'none';
+            var pst = document.getElementById('panelStaffTest'); if (pst) pst.style.display = 'none';
             loadNotificationListMain();
           }
         });

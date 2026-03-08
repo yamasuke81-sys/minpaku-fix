@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308m</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308n</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1127,11 +1127,6 @@
       </div>
       <div id="notificationBannerList" class="mt-1"></div>
       <a href="#" id="notificationBannerLink" class="alert-link mt-1 d-block">すべて見る</a>
-    </div>
-    <!-- [DEBUG-NOTIF] 通知生データデバッグパネル -->
-    <div id="debugNotifPanel" class="alert alert-secondary py-2 mb-2 small" style="display:none;">
-      <div class="fw-bold mb-1">[DEBUG] 通知生データ（最新5件）:</div>
-      <pre id="debugNotifData" style="font-size:0.7rem;max-height:200px;overflow:auto;white-space:pre-wrap;"></pre>
     </div>
     <div id="coMismatchBanner" class="alert alert-warning py-2 mb-2 small" style="display:none;">
       <div class="d-flex justify-content-between align-items-center">
@@ -3198,26 +3193,6 @@
               html += '<div id="eventModalBookingActions" class="mt-3"></div>';
             }
           }
-        }
-        // [DEBUG-RECRUIT] 募集データのデバッグ情報をモーダル末尾に追加
-        if (type === 'cleaning' && !isStaffView) {
-          var _dbgRec = (window._recruitFullMap || {})[props.rowNumber];
-          var _dbgInfo = {
-            rowNumber: props.rowNumber,
-            mergedRowNumbers: d.mergedRowNumbers || [],
-            recruitMapEntry: _dbgRec ? {
-              status: _dbgRec.status,
-              staff: _dbgRec.staff,
-              checkoutDate: _dbgRec.checkoutDate,
-              recruitRowIndex: _dbgRec.recruitRowIndex,
-              volunteersCount: (_dbgRec.volunteers || []).length,
-              answeredCount: (_dbgRec.volunteers || []).filter(function(v) { return v.response && v.response !== '未回答'; }).length
-            } : 'なし'
-          };
-          html += '<div class="mt-2 p-2 bg-light border rounded" style="font-size:0.7rem;">';
-          html += '<div class="fw-bold">[DEBUG] 募集データ:</div>';
-          html += '<pre style="white-space:pre-wrap;margin:0;">' + escapeHtml(JSON.stringify(_dbgInfo, null, 2)) + '</pre>';
-          html += '</div>';
         }
         document.getElementById('eventModalBody').innerHTML = html || '<p>データがありません。</p>';
 
@@ -6116,30 +6091,6 @@
             var banner = document.getElementById('notificationBanner');
             var listEl = document.getElementById('notificationBannerList');
             if (!banner || !listEl) return;
-            // [DEBUG-NOTIF] 通知生データをデバッグパネルに表示（全通知を別途取得）
-            var debugPanel = document.getElementById('debugNotifPanel');
-            var debugData = document.getElementById('debugNotifData');
-            if (debugPanel && debugData) {
-              google.script.run.withSuccessHandler(function(allJsonStr) {
-                try {
-                  var allR = JSON.parse(allJsonStr);
-                  if (allR.success && allR.list) {
-                    var debugItems = allR.list.slice(0, 5).map(function(n) {
-                      return {
-                        rowIndex: n.rowIndex,
-                        at: n.at,
-                        kind: n.kind,
-                        message: (n.message || '').substring(0, 100) + ((n.message || '').length > 100 ? '...' : ''),
-                        read: n.read,
-                        hasData: !!n.data
-                      };
-                    });
-                    debugData.textContent = JSON.stringify(debugItems, null, 2);
-                    debugPanel.style.display = 'block';
-                  }
-                } catch (e) {}
-              }).withFailureHandler(function() {}).getNotifications(false);
-            }
             if (r.success && r.list && r.list.length) {
               var filtered = r.list.filter(function(n) { return (n.message || '').trim() !== ''; });
               // スタッフモード: 自分に関係ある通知のみ表示（自分が行ったアクションは除外）

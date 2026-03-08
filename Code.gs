@@ -444,8 +444,39 @@ function doPost(e) {
 function getLineWebhookCollected() {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
-    var data = PropertiesService.getScriptProperties().getProperty('lineWebhookCollected') || '[]';
-    return JSON.stringify({ success: true, list: JSON.parse(data) });
+    var props = PropertiesService.getScriptProperties();
+    var data = props.getProperty('lineWebhookCollected') || '[]';
+    var list = JSON.parse(data);
+    // デバッグ情報: Webhook動作状況
+    var doPostDebug = null;
+    try { doPostDebug = JSON.parse(props.getProperty('doPost_debug') || 'null'); } catch(e) {}
+    var webhookUrl = '';
+    try { webhookUrl = ScriptApp.getService().getUrl(); } catch(e) {}
+    // LINE設定情報
+    var lineToken = '', lineGroupId = '';
+    try {
+      var settSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+      if (settSheet && settSheet.getLastRow() >= 2) {
+        var sRows = settSheet.getRange(2, 1, settSheet.getLastRow() - 1, 2).getValues();
+        for (var i = 0; i < sRows.length; i++) {
+          var k = String(sRows[i][0] || '').trim();
+          if (k === 'LINEチャネルアクセストークン') lineToken = String(sRows[i][1] || '').trim() ? '設定済み (' + String(sRows[i][1] || '').trim().length + '文字)' : '未設定';
+          if (k === 'LINEグループID') lineGroupId = String(sRows[i][1] || '').trim() || '未設定';
+        }
+      }
+    } catch(e) {}
+    return JSON.stringify({
+      success: true,
+      list: list,
+      debug: {
+        collectedCount: list.length,
+        rawDataLength: data.length,
+        doPostLastCalled: doPostDebug,
+        webhookUrl: webhookUrl,
+        lineTokenStatus: lineToken || '未確認',
+        lineGroupId: lineGroupId || '未確認'
+      }
+    });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString(), list: [] });
   }

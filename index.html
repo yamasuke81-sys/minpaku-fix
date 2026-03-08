@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308r</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0308s</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7316,11 +7316,42 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var res = JSON.parse(jsonStr);
-            if (!res.success || !res.list || res.list.length === 0) {
-              container.innerHTML = '<div class="text-muted py-2">収集データはありません。LINEグループでスタッフにメッセージを送ってもらうと、ここに表示されます。</div>';
+            var html = '';
+            // デバッグ情報パネル
+            if (res.debug) {
+              var d = res.debug;
+              var doPostInfo = d.doPostLastCalled;
+              var webhookStatus = doPostInfo && doPostInfo.called ? '✅ 最終呼出: ' + escapeHtml(doPostInfo.time || '不明') : '❌ doPostが一度も呼ばれていません';
+              html += '<div class="card mb-2 border-info"><div class="card-body p-2" style="font-size:0.8rem;">';
+              html += '<strong>🔍 LINE Webhook診断</strong><br>';
+              html += '<table class="table table-sm mb-0" style="font-size:0.8rem;"><tbody>';
+              html += '<tr><td class="text-muted" style="width:160px;">Webhook状態</td><td>' + webhookStatus + '</td></tr>';
+              html += '<tr><td class="text-muted">収集データ件数</td><td>' + d.collectedCount + '件 (raw: ' + d.rawDataLength + 'bytes)</td></tr>';
+              html += '<tr><td class="text-muted">LINEトークン</td><td>' + escapeHtml(d.lineTokenStatus) + '</td></tr>';
+              html += '<tr><td class="text-muted">LINEグループID</td><td><code style="font-size:0.75rem;user-select:all;">' + escapeHtml(d.lineGroupId) + '</code></td></tr>';
+              html += '<tr><td class="text-muted">Webhook URL</td><td style="word-break:break-all;"><code style="font-size:0.7rem;user-select:all;">' + escapeHtml(d.webhookUrl) + '</code></td></tr>';
+              html += '</tbody></table>';
+              if (!doPostInfo || !doPostInfo.called) {
+                html += '<div class="alert alert-warning py-1 px-2 mt-1 mb-0" style="font-size:0.75rem;">';
+                html += '<strong>Webhook未受信:</strong> LINE Developers ConsoleでWebhook URLに上記URLを設定してください。<br>';
+                html += '設定後、LINEグループでメッセージを送るとここにデータが表示されます。';
+                html += '</div>';
+              }
+              html += '</div></div>';
+            }
+            // エラー表示
+            if (!res.success) {
+              html += '<div class="text-danger">エラー: ' + escapeHtml(res.error || '不明') + '</div>';
+              container.innerHTML = html;
               return;
             }
-            var html = '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">';
+            // データ表示
+            if (!res.list || res.list.length === 0) {
+              html += '<div class="text-muted py-2">収集データはありません。LINEグループでスタッフにメッセージを送ってもらうと、ここに表示されます。</div>';
+              container.innerHTML = html;
+              return;
+            }
+            html += '<table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">';
             html += '<thead><tr><th>LINE表示名</th><th>ユーザーID</th><th>最終メッセージ</th><th>受信日時</th><th></th></tr></thead><tbody>';
             for (var i = 0; i < res.list.length; i++) {
               var item = res.list[i];

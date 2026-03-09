@@ -1094,13 +1094,15 @@ function clSendLineToTarget_(text, targetId, token) {
     var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', options);
     var code = resp.getResponseCode();
     if (code !== 200) {
-      var respBody = resp.getContentText();
-      var respHeaders = resp.getAllHeaders();
-      Logger.log('[DEBUG-LINE] HTTP ' + code + ' body=' + respBody);
-      Logger.log('[DEBUG-LINE] headers=' + JSON.stringify(respHeaders));
-      Logger.log('[DEBUG-LINE] Retry-After=' + (respHeaders['Retry-After'] || respHeaders['retry-after'] || 'なし'));
-      Logger.log('[DEBUG-LINE] X-Line-Request-Id=' + (respHeaders['X-Line-Request-Id'] || respHeaders['x-line-request-id'] || 'なし'));
-      return { ok: false, httpCode: code, body: respBody, retryAfter: respHeaders['Retry-After'] || respHeaders['retry-after'] || '' };
+      var errMsg = 'HTTP ' + code;
+      if (code === 429) {
+        errMsg = '月間送信上限（200通）に達しました。来月1日にリセットされます';
+      } else if (code === 401) {
+        errMsg = 'チャネルアクセストークンが無効です';
+      } else if (code === 400) {
+        errMsg = '送信先IDが無効です';
+      }
+      return { ok: false, httpCode: code, message: errMsg };
     }
     return { ok: true, httpCode: code };
   } catch (e) {
@@ -1299,7 +1301,15 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     } catch (lineErr) {
       lineResult = { ok: false, reason: lineErr.toString() };
     }
-    return JSON.stringify({ success: true, lineSent: lineResult ? lineResult.ok : false, lineDebug: JSON.stringify(lineResult) });
+    var lineError = '';
+    if (lineResult && !lineResult.ok) {
+      if (lineResult.reason) { lineError = lineResult.reason; }
+      else if (lineResult.details) {
+        var failDetail = lineResult.details.filter(function(r) { return !r.ok; })[0];
+        lineError = failDetail ? (failDetail.message || 'HTTP ' + failDetail.httpCode) : '送信失敗';
+      }
+    }
+    return JSON.stringify({ success: true, lineSent: lineResult ? lineResult.ok : false, lineError: lineError });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   } finally {

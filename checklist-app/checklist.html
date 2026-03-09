@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309q</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309r</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -4271,7 +4271,7 @@
             lineMsg.textContent = '✅ LINEに送信しました';
           } else {
             lineMsg.style.background = '#fff3cd'; lineMsg.style.color = '#856404';
-            lineMsg.textContent = '⚠️ LINE送信失敗: ' + (res.lineDebug || '不明');
+            lineMsg.textContent = '⚠️ LINE送信失敗: ' + (res.lineError || '不明なエラー');
           }
           var memoList = document.getElementById('memoList');
           memoList.parentNode.insertBefore(lineMsg, memoList);

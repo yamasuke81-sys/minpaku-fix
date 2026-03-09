@@ -151,8 +151,8 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 3. シグネチャの差異に注意（`addChecklistMemo`と`getChecklistForDate`は引数が異なる）
 4. 新機能追加時は `grep -n '関数名' Code.gs checklist-app/Code.gs` で両方の存在を確認すること
 
-### 募集開始通知はiCal同期後に自動送信されない
-`autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。
+### 募集開始通知はiCal同期後に自動送信される（v0310iで修正完了）
+`syncFromICal` → `checkAndCreateRecruitments` で募集エントリ自動作成＋`notifyStaffForRecruitment`で自動通知。v0310iで`syncFromICal`内の重複エントリ作成（通知なし）を削除し、`checkAndCreateRecruitments`に一本化した。
 
 ### 請求書要請のLINEメッセージがサマリーのみ
 `sendInvoiceRequestEmails`(4617行)のLINEメッセージは「X名に送信しました」というサマリーのみ。他の12通知はメールと同内容（件名+本文）をLINEに送信しているが、請求書要請だけ異なる。

@@ -3063,22 +3063,7 @@ function syncFromICal() {
         formSheet.getRange(nextRow, 1, 1, formLastCol).setValues([rowData]);
         // [DEBUG-SYNC] 追加された予約の詳細をログ
         Logger.log('[DEBUG-SYNC] ADDED: platform=' + ev.platform + ' CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + ev.guestName + '" row=' + nextRow);
-        // 自動で清掃募集を開始
-        try {
-          var coKey = ev.checkOut;
-          if (coKey) {
-            var rSheet = ss.getSheetByName(SHEET_RECRUIT);
-            if (rSheet) {
-              ensureRecruitDetailColumns_();
-              ensureRecruitNotifyMethodColumn_();
-              var rNextRow = rSheet.getLastRow() + 1;
-              var nowStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
-              rSheet.getRange(rNextRow, 1, 1, 15).setValues([[coKey, nextRow, '', '募集中', '', '', nowStr, '', 'メール', '', '', '', '', '', '']]);
-            }
-          }
-        } catch (autoRecruitErr) {
-          Logger.log('Auto-recruit error: ' + autoRecruitErr.toString());
-        }
+        // 募集エントリ作成＋通知は syncFromICal 末尾の checkAndCreateRecruitments() で一括処理
         // 1週間以内のチェックインなら即時リマインドメール送信
         try {
           sendImmediateReminderIfNeeded_(ss, ev.checkIn, ev.checkOut, platformName);
@@ -3195,7 +3180,9 @@ function syncFromICal() {
       details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length, skipReasons: parseResult.skipReasons, blockedSummaries: parseResult.blockedSummaries || [] });
     }
 
-    // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）
+    // 予約追加のsetValues()をスプレッドシートに即座反映（checkAndCreateRecruitmentsが新規行を確実に読めるようにする）
+    try { SpreadsheetApp.flush(); } catch (flushErr) {}
+    // 同期後に募集レコードを自動作成＋通知送信（既存予約の漏れ分も含めて常に実行）
     try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
     invalidateInitDataCache_();
 

@@ -115,6 +115,24 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### isEmailNotifyEnabled_ と getNotifyChannel_ の二重構造
 旧来の`isEmailNotifyEnabled_(sheetKey)`は各通知のON/OFFトグル。セッション5で追加した`getNotifyChannel_(notifyKey)`はメール/LINE/両方の選択。両方が混在しており、一部の関数で片方しかチェックしていない。全通知関数で統一が必要。
 
+### 【重要】メインApp と チェックリストApp の関数重複問題
+チェックリストHTML（`checklist.html`）から `google.script.run` で呼ばれる関数は、**チェックリストAppではなくメインApp（Code.gs）側で実行される**。これはチェックリストHTMLがメインAppのウェブアプリとして配信されているため。
+
+**結果**: `Code.gs` と `checklist-app/Code.gs` の両方に同名関数が存在する場合、**実際に実行されるのはメインApp版（Code.gs）**。チェックリストApp版（checklist-app/Code.gs）は実行されない。
+
+**影響を受ける関数の例**:
+- `recordCleaningLaundryStep` — v0309kでメインApp版にLINE送信を追加して修正
+- `cancelCleaningLaundryStep`
+- `getCleaningLaundryStatus`
+- `notifyCleaningComplete`
+- その他 `checklist-app/Code.gs` と `Code.gs` の両方に存在する関数すべて
+
+**修正・機能追加時の必須チェック**:
+1. チェックリスト関連の関数を修正する際は、**必ず `Code.gs`（メインApp）側を修正**する
+2. `checklist-app/Code.gs` にしか修正を入れても、実行時には反映されない
+3. `grep -n '関数名' Code.gs checklist-app/Code.gs` で両方の存在を確認すること
+4. GAS実行ログで確認する際は、**メインApp側の実行数**を確認する（チェックリストApp側には表示されない）
+
 ### 募集開始通知はiCal同期後に自動送信されない
 `autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。
 

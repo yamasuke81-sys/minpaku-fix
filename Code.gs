@@ -2860,9 +2860,15 @@ function parseICal_(icalText, platformName) {
         var isBlockedEntry = /^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)
           || sumLower.indexOf('not available') >= 0
           || (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum)));
-        if (isBlockedEntry) { skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue; }
+        // Booking.comはiCalフィードで予約もブロック日も全て "CLOSED - Not available" として
+        // 出力する仕様のため、ブロック日フィルタをバイパスして予約として取り込む。
+        // スプシに既存エントリがあれば syncFromICal 側で重複除外される。
+        var isBooking = (platformName || '').toLowerCase().indexOf('booking') >= 0;
+        if (isBlockedEntry && !isBooking) { skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue; }
         // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
-        var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
+        var guestName = isBooking && isBlockedEntry
+          ? (platformName || 'Booking.com') + '予約'
+          : (sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '');
         // "Reserved"のみ → ゲスト名不明だがブロック日ではない実予約
         if (/^reserved$/i.test(guestName)) {
           guestName = (platformName || '予約') + '予約';

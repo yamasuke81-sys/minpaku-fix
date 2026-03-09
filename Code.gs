@@ -12061,7 +12061,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     } else if (step === 'returned') {
       sheet.getRange(rowIndex, 6).setValue(staffName);
       sheet.getRange(rowIndex, 7).setValue(now);
-      addNotification_('リネン戻し', staffName + ' がクリーニング済みリネンを施設に戻しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('コインランドリー戻し', staffName + ' がコインランドリーから回収したリネンを施設に戻しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
@@ -12069,7 +12069,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     // LINE送信（コインランドリー状況）— 清掃完了チャンネルの設定に従う
     try {
       var _ch_laundry = getNotifyChannel_('清掃完了');
-      var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'クリーニング済みリネンを施設に戻しました' };
+      var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
       // 募集設定シートからテンプレートを読み込み
       var laundryLineMsg;
       try {

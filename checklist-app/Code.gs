@@ -1671,7 +1671,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       Logger.log('[コインランドリーLINE] CL_LINE送信先=' + (clMap['CL_LINE送信先'] || '(未設定)'));
       var laundryLineEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
       if (laundryLineEnabled) {
-        var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'クリーニング済みリネンを施設に戻しました' };
+        var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
         var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{時刻}\n{担当者}';
         var laundryLineMsg = tmpl
           .replace(/\{ステップ\}/g, stepLabels[step] || step)

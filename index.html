@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309x</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309y</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -9765,6 +9765,25 @@
             try {
               var res = JSON.parse(resStr);
               if (res.success) {
+                // [DEBUG] デバッグ情報をバナー表示（30秒後に自動消去）
+                if (res._debug) {
+                  var d = res._debug;
+                  var dbgLines = [
+                    'メール: ' + (d.mail || '不明'),
+                    '  ch_owner_email=' + d.ch_owner_email + ', ownerAddr=' + d.ownerAddr,
+                    'LINE owner: ' + (d.line_owner || '不明'),
+                    'LINE group: ' + (d.line_group || '不明'),
+                    '  ch_owner_line=' + d.ch_owner_line + ', ch_group_line=' + d.ch_group_line,
+                    'assignedStaff=' + (d.assignedStaff || '(空)')
+                  ];
+                  var dbgDiv = document.createElement('div');
+                  dbgDiv.className = 'alert alert-info small py-2 mt-2';
+                  dbgDiv.style.cssText = 'white-space:pre-wrap;font-family:monospace;font-size:0.75rem;';
+                  dbgDiv.textContent = '[DEBUG 通知送信結果]\n' + dbgLines.join('\n');
+                  var dbgArea = document.getElementById('laundryCardArea');
+                  if (dbgArea) dbgArea.appendChild(dbgDiv);
+                  setTimeout(function() { dbgDiv.remove(); }, 30000);
+                }
                 var area = document.getElementById('laundryCardArea');
                 if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
               } else {

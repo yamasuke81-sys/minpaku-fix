@@ -12067,9 +12067,14 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
 
+    // デバッグ情報を収集（フロントに返す）
+    var _debugInfo = { assignedStaff: assignedStaff, dateKey: dateKey, step: step, staffName: staffName };
+
     // LINE送信（コインランドリー状況）— 清掃完了チャンネルの設定に従う
     try {
       var _ch_laundry = getNotifyChannel_('清掃完了');
+      _debugInfo.ch_owner_line = _ch_laundry.owner_line;
+      _debugInfo.ch_group_line = _ch_laundry.group_line;
       var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
       // 募集設定シートからテンプレートを読み込み
       var laundryLineMsg;
@@ -12096,37 +12101,38 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
         if (tmplErr.message === 'disabled') throw tmplErr;
         laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n' + (now.split(' ')[1] || now) + '\n担当: ' + (staffName || '不明');
       }
-      Logger.log('[DEBUG-LAUNDRY-LINE] owner_line=' + _ch_laundry.owner_line + ', group_line=' + _ch_laundry.group_line);
-      if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); Logger.log('[DEBUG-LAUNDRY-LINE] owner送信成功'); } catch (e2) { Logger.log('[DEBUG-LAUNDRY-LINE] owner送信エラー: ' + e2.toString()); } }
-      if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); Logger.log('[DEBUG-LAUNDRY-LINE] group送信成功'); } catch (e2) { Logger.log('[DEBUG-LAUNDRY-LINE] group送信エラー: ' + e2.toString()); } }
+      if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); _debugInfo.line_owner = '送信成功'; } catch (e2) { _debugInfo.line_owner = 'エラー: ' + e2.toString(); } }
+      else { _debugInfo.line_owner = 'チャンネル設定で無効'; }
+      if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); _debugInfo.line_group = '送信成功'; } catch (e2) { _debugInfo.line_group = 'エラー: ' + e2.toString(); } }
+      else { _debugInfo.line_group = 'チャンネル設定で無効'; }
     } catch (lineErr) {
-      Logger.log('[コインランドリーLINE] エラー: ' + lineErr.toString());
+      _debugInfo.line_error = lineErr.toString();
     }
 
     // メール送信（コインランドリー状況）— LINE送信とは独立
     try {
       var _ch_laundry_m = getNotifyChannel_('清掃完了');
       var laundryOwnerEmail = getOwnerEmailAddress_();
-      Logger.log('[DEBUG-LAUNDRY-MAIL] owner_email=' + _ch_laundry_m.owner_email + ', ownerAddr=' + (laundryOwnerEmail || '(空)') + ', step=' + step);
+      _debugInfo.ch_owner_email = _ch_laundry_m.owner_email;
+      _debugInfo.ownerAddr = laundryOwnerEmail || '(空)';
       if (_ch_laundry_m.owner_email) {
         if (laundryOwnerEmail) {
           var stepLabels2 = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
           var laundryEmailSubject = 'コインランドリー: ' + stepLabels2[step] + ' - ' + formatDateForNotif_(dateKey);
           var laundryEmailBody = laundryLineMsg || ((stepLabels2[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n担当: ' + (staffName || '不明'));
-          Logger.log('[DEBUG-LAUNDRY-MAIL] 送信実行: to=' + laundryOwnerEmail + ', subject=' + laundryEmailSubject);
           GmailApp.sendEmail(laundryOwnerEmail, laundryEmailSubject, laundryEmailBody);
-          Logger.log('[DEBUG-LAUNDRY-MAIL] 送信成功');
+          _debugInfo.mail = '送信成功: ' + laundryOwnerEmail;
         } else {
-          Logger.log('[DEBUG-LAUNDRY-MAIL] オーナーメールアドレスが空のためスキップ');
+          _debugInfo.mail = 'オーナーメールアドレスが空';
         }
       } else {
-        Logger.log('[DEBUG-LAUNDRY-MAIL] チャンネル設定でメール無効のためスキップ');
+        _debugInfo.mail = 'チャンネル設定でメール無効';
       }
     } catch (mailErr) {
-      Logger.log('[DEBUG-LAUNDRY-MAIL] エラー: ' + mailErr.toString());
+      _debugInfo.mail = 'エラー: ' + mailErr.toString();
     }
 
-    return JSON.stringify({ success: true });
+    return JSON.stringify({ success: true, _debug: _debugInfo });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

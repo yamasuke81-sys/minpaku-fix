@@ -11223,7 +11223,7 @@ function addChecklistMemo(checkoutDate, text, staffName) {
 
 // --- 清掃完了通知（予約管理スプシの通知シート + メールに送信） ---
 
-function notifyCleaningComplete(checkoutDate) {
+function notifyCleaningComplete(checkoutDate, staffName) {
   try {
     var dateKey = String(checkoutDate || '').trim();
     if (!dateKey) return JSON.stringify({ success: false, error: 'チェックアウト日が指定されていません。' });
@@ -11244,6 +11244,25 @@ function notifyCleaningComplete(checkoutDate) {
 
     var fmtDate = formatDateForNotif_(dateKey) || dateKey;
 
+    // 要補充・メモ情報を収集
+    var supplyList = [];
+    var memoList = [];
+    try {
+      var ss_ = SpreadsheetApp.getActiveSpreadsheet();
+      var supSheet = ss_.getSheetByName('要補充記録');
+      if (supSheet && supSheet.getLastRow() >= 2) {
+        supSheet.getRange(2, 1, supSheet.getLastRow() - 1, 5).getValues().forEach(function(r) {
+          if (normDateStr_(r[0]) === normDateStr_(dateKey)) supplyList.push(String(r[2] || ''));
+        });
+      }
+      var memoSheet = ss_.getSheetByName('チェックリストメモ');
+      if (memoSheet && memoSheet.getLastRow() >= 2) {
+        memoSheet.getRange(2, 1, memoSheet.getLastRow() - 1, 5).getValues().forEach(function(r) {
+          if (normDateStr_(r[0]) === normDateStr_(dateKey)) memoList.push({ text: String(r[1] || ''), by: String(r[2] || ''), photoFileId: String(r[4] || '') });
+        });
+      }
+    } catch (e_sup) {}
+
     addNotification_('清掃完了', fmtDate + ' の清掃が完了しました（' + clRes.checkedCount + '/' + clRes.totalItems + '項目）');
 
     if (ownerEmail) {
@@ -11258,7 +11277,44 @@ function notifyCleaningComplete(checkoutDate) {
       }
       if (completeDetailUrl) body += '\n清掃詳細: ' + completeDetailUrl + '\n';
       var _ch_complete = getNotifyChannel_('清掃完了');
-      var completeLineText = subject + '\n\n' + body;
+
+      // LINE送信: テンプレートがあればそれを使う
+      var completeLineText;
+      try {
+        var settSheet_ = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+        var clCompleteTmpl = '';
+        var clCompleteEnabled = true;
+        if (settSheet_ && settSheet_.getLastRow() >= 2) {
+          var sRows = settSheet_.getRange(2, 1, settSheet_.getLastRow() - 1, 2).getValues();
+          for (var si = 0; si < sRows.length; si++) {
+            var sk = String(sRows[si][0] || '').trim();
+            if (sk === 'CL_LINE_清掃完了メッセージ') clCompleteTmpl = String(sRows[si][1] || '');
+            if (sk === 'CL_LINE_清掃完了有効') clCompleteEnabled = String(sRows[si][1] || '') !== 'false';
+          }
+        }
+        if (clCompleteTmpl) {
+          var nowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
+          var supplyText = supplyList.length > 0 ? '【要補充】\n' + supplyList.map(function(s) { return '・' + s; }).join('\n') : '';
+          var memoText = memoList.length > 0 ? '【メモ】\n' + memoList.map(function(m) {
+            var line = '・' + (m.text || '');
+            if (m.photoFileId) line += ' [写真]';
+            line += '(' + m.by + ')';
+            return line;
+          }).join('\n') : '';
+          completeLineText = clCompleteTmpl
+            .replace(/\{チェックアウト日\}/g, fmtDate)
+            .replace(/\{担当者\}/g, staffName || '不明')
+            .replace(/\{完了時刻\}/g, nowTime)
+            .replace(/\{要補充\}/g, supplyText)
+            .replace(/\{メモ\}/g, memoText);
+          completeLineText = completeLineText.replace(/\n{3,}/g, '\n\n').trim();
+        } else {
+          completeLineText = subject + '\n\n' + body;
+        }
+      } catch (tmplErr) {
+        completeLineText = subject + '\n\n' + body;
+      }
+
       if (_ch_complete.owner_email && isEmailNotifyEnabled_('清掃完了通知有効')) {
         GmailApp.sendEmail(ownerEmail, subject, body);
       }
@@ -12014,7 +12070,31 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     try {
       var _ch_laundry = getNotifyChannel_('清掃完了');
       var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'クリーニング済みリネンを施設に戻しました' };
-      var laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n担当: ' + (staffName || '不明') + '\n時刻: ' + now.split(' ')[1];
+      // 募集設定シートからテンプレートを読み込み
+      var laundryLineMsg;
+      try {
+        var settSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+        var clLaundryTmpl = '';
+        var clLaundryEnabled = true;
+        if (settSheet && settSheet.getLastRow() >= 2) {
+          var settRows = settSheet.getRange(2, 1, settSheet.getLastRow() - 1, 2).getValues();
+          for (var si = 0; si < settRows.length; si++) {
+            var sk = String(settRows[si][0] || '').trim();
+            if (sk === 'CL_LINE_クリーニングメッセージ') clLaundryTmpl = String(settRows[si][1] || '');
+            if (sk === 'CL_LINE_クリーニング有効') clLaundryEnabled = String(settRows[si][1] || '') !== 'false';
+          }
+        }
+        if (!clLaundryEnabled) { /* スキップ */ throw new Error('disabled'); }
+        var tmpl = clLaundryTmpl || '{ステップ}\n{チェックアウト日}\n{担当者}\n{時刻}';
+        laundryLineMsg = tmpl
+          .replace(/\{ステップ\}/g, stepLabels[step] || step)
+          .replace(/\{チェックアウト日\}/g, formatDateForNotif_(dateKey))
+          .replace(/\{担当者\}/g, staffName || '不明')
+          .replace(/\{時刻\}/g, now.split(' ')[1] || now);
+      } catch (tmplErr) {
+        if (tmplErr.message === 'disabled') throw tmplErr;
+        laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n担当: ' + (staffName || '不明') + '\n時刻: ' + now.split(' ')[1];
+      }
       if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); } catch (e2) {} }
       if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); } catch (e2) {} }
     } catch (lineErr) {

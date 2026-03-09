@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309l</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309m</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -2254,19 +2254,26 @@
     // === LINE通知設定 ===
     var _clLineTargets = [];
 
+    var _CL_DEFAULT_CLEAN_COMPLETE_MSG = '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
+    var _CL_DEFAULT_LAUNDRY_MSG = '{ステップ}\n{チェックアウト日}\n{担当者}\n{時刻}';
+
     function loadClLineNotifySettings() {
+      // まずデフォルト値を入れておく
+      var ccMsg = document.getElementById('clLineCleanCompleteMsg');
+      if (ccMsg && !ccMsg.value) ccMsg.value = _CL_DEFAULT_CLEAN_COMPLETE_MSG;
+      var lMsg = document.getElementById('clLineLaundryMsg');
+      if (lMsg && !lMsg.value) lMsg.value = _CL_DEFAULT_LAUNDRY_MSG;
+
       callGAS('getClLineNotifySettings', []).then(function(res) {
         if (!res.success) return;
         _clLineTargets = res.targets || [];
         renderClLineTargetList();
         var ccEn = document.getElementById('clLineCleanCompleteEnabled');
         if (ccEn) ccEn.checked = res.cleanCompleteEnabled !== false;
-        var ccMsg = document.getElementById('clLineCleanCompleteMsg');
-        if (ccMsg) ccMsg.value = res.cleanCompleteMsg || '';
+        if (ccMsg) ccMsg.value = res.cleanCompleteMsg || _CL_DEFAULT_CLEAN_COMPLETE_MSG;
         var lEn = document.getElementById('clLineLaundryEnabled');
         if (lEn) lEn.checked = res.laundryEnabled !== false;
-        var lMsg = document.getElementById('clLineLaundryMsg');
-        if (lMsg) lMsg.value = res.laundryMsg || '';
+        if (lMsg) lMsg.value = res.laundryMsg || _CL_DEFAULT_LAUNDRY_MSG;
       }).catch(function() {});
     }
 
@@ -2341,8 +2348,8 @@
     }
 
     function resetClLineNotifyDefaults() {
-      document.getElementById('clLineCleanCompleteMsg').value = '';
-      document.getElementById('clLineLaundryMsg').value = '';
+      document.getElementById('clLineCleanCompleteMsg').value = _CL_DEFAULT_CLEAN_COMPLETE_MSG;
+      document.getElementById('clLineLaundryMsg').value = _CL_DEFAULT_LAUNDRY_MSG;
       document.getElementById('clLineCleanCompleteEnabled').checked = true;
       document.getElementById('clLineLaundryEnabled').checked = true;
       _showToast('デフォルトに戻しました（保存を押してください）', 'info');

@@ -2810,6 +2810,7 @@ function parseICal_(icalText, platformName) {
   var allDatePairs = {};  // キャンセル以外の全日付ペア（ブロック日含む）→ 誤キャンセル防止用
   var cancelledDatePairs = {};  // 明示的キャンセル（STATUS:CANCELLED or SUMMARYに"cancel"）の日付ペア
   var skipReasons = { blocked: 0, platformName: 0, emptyName: 0, cancelled: 0 };
+  var blockedSummaries = []; // [DEBUG] ブロック日としてスキップされたSUMMARY一覧
   var raw = (icalText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   var unfolded = raw.replace(/\n[ \t]/g, '');
   var lines = unfolded.split('\n');
@@ -2859,7 +2860,7 @@ function parseICal_(icalText, platformName) {
         var isBlockedEntry = /^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)
           || sumLower.indexOf('not available') >= 0
           || (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum)));
-        if (isBlockedEntry) { skipReasons.blocked++; current = null; continue; }
+        if (isBlockedEntry) { skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue; }
         // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
         var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         // "Reserved"のみ → ゲスト名不明だがブロック日ではない実予約
@@ -2903,7 +2904,7 @@ function parseICal_(icalText, platformName) {
     }
   }
   Logger.log('parseICal ' + platformName + ' summary: events=' + events.length + ' skip: blocked=' + skipReasons.blocked + ' platformName=' + skipReasons.platformName + ' emptyName=' + skipReasons.emptyName + ' cancelled=' + skipReasons.cancelled);
-  return { events: events, allDatePairs: allDatePairs, cancelledDatePairs: cancelledDatePairs, skipReasons: skipReasons };
+  return { events: events, allDatePairs: allDatePairs, cancelledDatePairs: cancelledDatePairs, skipReasons: skipReasons, blockedSummaries: blockedSummaries };
 }
 
 /**
@@ -3176,7 +3177,7 @@ function syncFromICal() {
       }
       // [DEBUG-SYNC] 追加・キャンセルの有無にかかわらず、iCalフィード全体の概要をログ
       Logger.log('[DEBUG-SYNC] ' + platformName + ': events(pass filter)=' + events.length + ' added=' + platformAdded + ' cancelled=' + platformCancelled + ' existingPairs=' + Object.keys(existingPairs).length + ' allDatePairs=' + Object.keys(validPairs).length);
-      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length, skipReasons: parseResult.skipReasons });
+      details.push({ platform: platformName, fetched: events.length, added: platformAdded, removed: platformCancelled, error: '', feedLength: icalLen, veventCount: veventCount, allDatePairs: Object.keys(validPairs).length, cancelledPairs: Object.keys(cancelledPairs).length, skipReasons: parseResult.skipReasons, blockedSummaries: parseResult.blockedSummaries || [] });
     }
 
     // 同期後に募集レコードを自動作成（既存予約の漏れ分も含めて常に実行）

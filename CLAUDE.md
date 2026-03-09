@@ -115,23 +115,38 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### isEmailNotifyEnabled_ と getNotifyChannel_ の二重構造
 旧来の`isEmailNotifyEnabled_(sheetKey)`は各通知のON/OFFトグル。セッション5で追加した`getNotifyChannel_(notifyKey)`はメール/LINE/両方の選択。両方が混在しており、一部の関数で片方しかチェックしていない。全通知関数で統一が必要。
 
-### 【重要】メインApp と チェックリストApp の関数重複問題
-チェックリストHTML（`checklist.html`）から `google.script.run` で呼ばれる関数は、**チェックリストAppではなくメインApp（Code.gs）側で実行される**。これはチェックリストHTMLがメインAppのウェブアプリとして配信されているため。
+### 【重要】メインApp と チェックリストApp の関数実行先問題（要検証）
 
-**結果**: `Code.gs` と `checklist-app/Code.gs` の両方に同名関数が存在する場合、**実際に実行されるのはメインApp版（Code.gs）**。チェックリストApp版（checklist-app/Code.gs）は実行されない。
+**従来の理解（セッション12以前）**:
+チェックリストHTML（`checklist.html`）から `google.script.run` で呼ばれる関数は、メインApp（Code.gs）側で実行される。これはチェックリストHTMLがメインAppのウェブアプリとして配信されているため。
 
-**影響を受ける関数の例**:
-- `recordCleaningLaundryStep` — v0309kでメインApp版にLINE送信を追加して修正
+**セッション12で判明した矛盾**:
+- `addChecklistMemo` に `[DEBUG-LINE]` ログを `checklist-app/Code.gs` にのみ追加
+- しかし**メインApp側のGAS実行ログに `addChecklistMemo` の実行記録が出ていない**
+- これは**チェックリストアプリが独自デプロイ（別プロジェクト）で実行されている可能性**を示唆
+
+**現在の仮説**: チェックリストHTMLはチェックリストApp（別GASプロジェクト）の独自デプロイURLで配信されており、`google.script.run` で呼ばれる関数は**チェックリストApp側の Code.gs で実行される**。
+
+**検証方法**:
+1. チェックリストAppのGASエディタ（別プロジェクト）を開き、実行数のログを確認
+2. そこに `addChecklistMemo` の実行と `[DEBUG-LINE]` ログが表示されるはず
+3. メインApp側の実行ログに `addChecklistMemo` が**出ていない**ことを再確認
+
+**検証結果が確定するまでの暫定ルール**:
+- チェックリスト関連の関数修正は、**念のため両方（Code.gs と checklist-app/Code.gs）に入れる**
+- 特にLINE送信等の新機能追加時は、どちらで実行されても動作するようにする
+
+**両方に存在する同名関数の例（シグネチャ差異あり）**:
+- `addChecklistMemo` — Code.gs: `(checkoutDate, text, staffName)` / checklist-app: `(checkoutDate, text, staffName, photoFileId)`
+- `recordCleaningLaundryStep` — v0309kでメインApp版にLINE送信を追加
 - `cancelCleaningLaundryStep`
 - `getCleaningLaundryStatus`
 - `notifyCleaningComplete`
-- その他 `checklist-app/Code.gs` と `Code.gs` の両方に存在する関数すべて
 
 **修正・機能追加時の必須チェック**:
-1. チェックリスト関連の関数を修正する際は、**必ず `Code.gs`（メインApp）側を修正**する
-2. `checklist-app/Code.gs` にしか修正を入れても、実行時には反映されない
-3. `grep -n '関数名' Code.gs checklist-app/Code.gs` で両方の存在を確認すること
-4. GAS実行ログで確認する際は、**メインApp側の実行数**を確認する（チェックリストApp側には表示されない）
+1. `grep -n '関数名' Code.gs checklist-app/Code.gs` で両方の存在を確認すること
+2. 検証確定まで、**両方のファイルに修正を入れる**こと
+3. シグネチャの差異がないか確認すること（上記の`addChecklistMemo`のように引数が異なる場合あり）
 
 ### 募集開始通知はiCal同期後に自動送信されない
 `autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。

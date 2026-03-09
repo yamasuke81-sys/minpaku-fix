@@ -1439,21 +1439,35 @@ function saveOwnerUrl(ownerUrl) {
 function getLatestStaffUrl_() {
   // 保存済みスタッフURLを最優先（ユーザーがWebアプリにアクセスした時に保存された正しいURL）
   var url = '';
+  var source = '';
   try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
-  if (url) return url;
+  if (url) { source = 'staffDeployUrl'; }
   // 次にAPP_BASE_URL（doGetで保存されたベースURL）
-  try { url = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
+  if (!url) {
+    try { url = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
+    if (url) source = 'APP_BASE_URL';
+  }
   if (!url) {
     try {
       var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || '';
-      if (depId) url = 'https://script.google.com/macros/s/' + depId + '/exec';
+      if (depId) { url = 'https://script.google.com/macros/s/' + depId + '/exec'; source = 'deploymentId'; }
     } catch (e) {}
   }
   // 最終フォールバック: ScriptApp.getService().getUrl()
   // ※トリガー実行時に古いデプロイIDを返すことがあるため最後の手段
   if (!url) {
-    try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+    try { url = ScriptApp.getService().getUrl() || ''; source = 'ScriptApp.getService()'; } catch (e) {}
   }
+  // デバッグ: どのソースからURLを取得したか記録
+  Logger.log('[DEBUG-URL] source=' + source + ', url=' + url);
+  try {
+    var _allSources = {
+      staffDeployUrl: PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || '(未設定)',
+      APP_BASE_URL: PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '(未設定)',
+      deploymentId: PropertiesService.getDocumentProperties().getProperty('deploymentId') || '(未設定)'
+    };
+    Logger.log('[DEBUG-URL] 全ソース: ' + JSON.stringify(_allSources));
+  } catch (e2) {}
   if (!url) return '';
   if (url.indexOf('staff=1') < 0 && url.indexOf('staff=true') < 0) {
     url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
@@ -3203,9 +3217,11 @@ function getICalSyncDebug() {
     }
     // URL情報もデバッグ用に返す
     result['_urls'] = {
-      staffDeployUrl: PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || '',
-      APP_BASE_URL: PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '',
-      ownerBaseUrl: PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''
+      staffDeployUrl: PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || '(未設定)',
+      APP_BASE_URL: PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '(未設定)',
+      deploymentId: PropertiesService.getDocumentProperties().getProperty('deploymentId') || '(未設定)',
+      ownerBaseUrl: PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || '(未設定)',
+      getLatestStaffUrl: getLatestStaffUrl_()
     };
   } catch (e) { result._error = e.toString(); }
   return JSON.stringify(result);
@@ -12119,11 +12135,30 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     // デバッグ情報を収集（フロントに返す）
     var _debugInfo = { assignedStaff: assignedStaff, dateKey: dateKey, step: step, staffName: staffName };
 
-    // LINE送信（コインランドリー状況）— 清掃完了チャンネルの設定に従う
+    // コインランドリー専用のチャンネル設定を募集設定シートから読み込み（CL_CH_コインランドリー）
+    // ※ getNotifyChannel_('清掃完了') ではなく、チェックリストアプリと同じキーを参照する
+    var _ch_laundry = parseNotifyTargets_('owner_line,group_line'); // デフォルト
     try {
-      var _ch_laundry = getNotifyChannel_('清掃完了');
-      _debugInfo.ch_owner_line = _ch_laundry.owner_line;
-      _debugInfo.ch_group_line = _ch_laundry.group_line;
+      var chSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+      if (chSheet && chSheet.getLastRow() >= 2) {
+        var chRows = chSheet.getRange(2, 1, chSheet.getLastRow() - 1, 2).getValues();
+        for (var ci = 0; ci < chRows.length; ci++) {
+          if (String(chRows[ci][0] || '').trim() === 'CL_CH_コインランドリー') {
+            _ch_laundry = parseNotifyTargets_(String(chRows[ci][1] || ''));
+            break;
+          }
+        }
+      }
+    } catch (chErr) { Logger.log('[LAUNDRY-CH] チャンネル読み込みエラー: ' + chErr); }
+    _debugInfo.ch_key = 'CL_CH_コインランドリー';
+    _debugInfo.ch_owner_email = _ch_laundry.owner_email;
+    _debugInfo.ch_owner_line = _ch_laundry.owner_line;
+    _debugInfo.ch_group_line = _ch_laundry.group_line;
+    _debugInfo.ch_staff_email = _ch_laundry.staff_email;
+    _debugInfo.ch_staff_line = _ch_laundry.staff_line;
+
+    // LINE送信（コインランドリー状況）
+    try {
       var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
       // 募集設定シートからテンプレートを読み込み
       var laundryLineMsg;
@@ -12160,11 +12195,9 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
 
     // メール送信（コインランドリー状況）— LINE送信とは独立
     try {
-      var _ch_laundry_m = getNotifyChannel_('清掃完了');
       var laundryOwnerEmail = getOwnerEmailAddress_();
-      _debugInfo.ch_owner_email = _ch_laundry_m.owner_email;
       _debugInfo.ownerAddr = laundryOwnerEmail || '(空)';
-      if (_ch_laundry_m.owner_email) {
+      if (_ch_laundry.owner_email) {
         if (laundryOwnerEmail) {
           var stepLabels2 = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
           var laundryEmailSubject = 'コインランドリー: ' + stepLabels2[step] + ' - ' + formatDateForNotif_(dateKey);

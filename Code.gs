@@ -2862,8 +2862,17 @@ function parseICal_(icalText, platformName) {
           || (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum)));
         // Booking.comはiCalフィードで予約もブロック日も全て "CLOSED - Not available" として
         // 出力する仕様のため、ブロック日フィルタをバイパスして予約として取り込む。
+        // ただし1年以上先のエントリはブロック日の可能性が高いためスキップする。
         // スプシに既存エントリがあれば syncFromICal 側で重複除外される。
         var isBooking = (platformName || '').toLowerCase().indexOf('booking') >= 0;
+        if (isBlockedEntry && isBooking) {
+          var ciDate = new Date(checkIn.replace(/\//g, '-'));
+          var oneYearLater = new Date();
+          oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+          if (ciDate > oneYearLater) {
+            skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ') [Booking遠未来]'); current = null; continue;
+          }
+        }
         if (isBlockedEntry && !isBooking) { skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue; }
         // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
         var guestName = isBooking && isBlockedEntry

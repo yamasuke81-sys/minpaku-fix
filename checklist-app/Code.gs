@@ -1181,7 +1181,7 @@ function clSendLineByChannel_(text, ch) {
       var targetsJson = map['CL_LINE送信先'] || '';
       var allTargets = [];
       if (targetsJson) { try { allTargets = JSON.parse(targetsJson); } catch (e) {} }
-      allTargets.filter(function(t) { return t.enabled && t.id; }).forEach(function(t) {
+      allTargets.filter(function(t) { return t.id; }).forEach(function(t) {
         // owner_line/group_lineで既に送信済みのIDはスキップ
         var ownerId2 = map['LINEユーザーID'] || '';
         var groupId2 = map['LINEグループID'] || '';
@@ -1259,7 +1259,7 @@ function clSendLineToAll_(text) {
       try { targets = JSON.parse(targetsJson); } catch (e) { targets = []; }
     }
     // 有効な送信先のみ
-    var enabledTargets = targets.filter(function(t) { return t.enabled && t.id; });
+    var enabledTargets = targets.filter(function(t) { return t.id; });
 
     if (enabledTargets.length === 0) {
       // フォールバック: 従来のデフォルト送信先

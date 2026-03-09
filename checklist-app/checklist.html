@@ -2369,10 +2369,7 @@
       }
       var html = '';
       _clLineTargets.forEach(function(t, idx) {
-        var bg = t.enabled ? '#e8f5e9' : '#f5f5f5';
-        var border = t.enabled ? '#c8e6c9' : '#ddd';
-        html += '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px;background:' + bg + ';border:1px solid ' + border + ';border-radius:6px;font-size:12px;">';
-        html += '<input type="checkbox" ' + (t.enabled ? 'checked' : '') + ' onchange="toggleClLineTarget(' + idx + ',this.checked)" style="margin:0;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:6px;font-size:12px;">';
         html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(t.id) + '">' + escapeHtml(t.label || t.id) + '</span>';
         html += '<span style="color:#999;font-size:10px;">' + escapeHtml(t.id.substring(0, 8)) + '...</span>';
         html += '<button onclick="testClLineTarget(' + idx + ')" style="padding:2px 6px;background:#06C755;color:#fff;border:none;border-radius:3px;font-size:10px;cursor:pointer;">テスト</button>';
@@ -2400,9 +2397,6 @@
       renderClLineTargetList();
     }
 
-    function toggleClLineTarget(idx, checked) {
-      if (_clLineTargets[idx]) _clLineTargets[idx].enabled = checked;
-    }
 
     function testClLineTarget(idx) {
       var t = _clLineTargets[idx];

@@ -12095,10 +12095,24 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
         if (tmplErr.message === 'disabled') throw tmplErr;
         laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n' + (now.split(' ')[1] || now) + '\n担当: ' + (staffName || '不明');
       }
-      if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); } catch (e2) {} }
-      if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); } catch (e2) {} }
+      if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); } catch (e2) { Logger.log('[コインランドリーLINE] owner送信エラー: ' + e2.toString()); } }
+      if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); } catch (e2) { Logger.log('[コインランドリーLINE] group送信エラー: ' + e2.toString()); } }
     } catch (lineErr) {
       Logger.log('[コインランドリーLINE] エラー: ' + lineErr.toString());
+    }
+
+    // メール送信（コインランドリー状況）— LINE送信とは独立
+    try {
+      var _ch_laundry_m = getNotifyChannel_('清掃完了');
+      if (_ch_laundry_m.owner_email) {
+        var laundryOwnerEmail = getOwnerEmailAddress_();
+        if (laundryOwnerEmail) {
+          var laundryEmailSubject = 'コインランドリー: ' + stepLabels[step] + ' - ' + formatDateForNotif_(dateKey);
+          GmailApp.sendEmail(laundryOwnerEmail, laundryEmailSubject, laundryLineMsg);
+        }
+      }
+    } catch (mailErr) {
+      Logger.log('[コインランドリーメール] エラー: ' + mailErr.toString());
     }
 
     return JSON.stringify({ success: true });

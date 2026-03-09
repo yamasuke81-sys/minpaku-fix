@@ -12032,6 +12032,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
         }
       }
     } catch (e2) {}
+    Logger.log('[DEBUG-LAUNDRY-NOTIF] dateKey=' + dateKey + ', assignedStaff=' + JSON.stringify(assignedStaff) + ', staffName=' + staffName);
 
     // 既存行を検索
     var lastRow = sheet.getLastRow();

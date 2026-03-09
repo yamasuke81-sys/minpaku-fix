@@ -2436,10 +2436,16 @@
     }
 
     function resetClLineNotifyDefaults() {
-      document.getElementById('clLineCleanCompleteMsg').value = _CL_DEFAULT_CLEAN_COMPLETE_MSG;
-      document.getElementById('clLineLaundryMsg').value = _CL_DEFAULT_LAUNDRY_MSG;
+      document.getElementById('clLineMemoEnabled').checked = true;
       document.getElementById('clLineCleanCompleteEnabled').checked = true;
+      document.getElementById('clLineCleanCompleteMsg').value = _CL_DEFAULT_CLEAN_COMPLETE_MSG;
       document.getElementById('clLineLaundryEnabled').checked = true;
+      document.getElementById('clLineLaundryMsg').value = _CL_DEFAULT_LAUNDRY_MSG;
+      // 送信先を全選択にリセット
+      _clLineMemoTargetIds = [];
+      _clLineCleanTargetIds = [];
+      _clLineLaundryTargetIds = [];
+      refreshAllNotifyTargetCheckboxes();
       _showToast('デフォルトに戻しました（保存を押してください）', 'info');
     }
 

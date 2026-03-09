@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309o</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309p</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1727,8 +1727,8 @@
                 <span class="toggle-slider"></span>
               </div>
             </div>
-            <textarea id="clLineLaundryMsg" rows="3" placeholder="デフォルト:&#10;{ステップ}&#10;{時刻}&#10;{担当者}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
-            <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {ステップ}=提出/受取/戻し {時刻}=2026/3/4(金) 10:00 {担当者} {チェックアウト日}</p>
+            <textarea id="clLineLaundryMsg" rows="3" placeholder="デフォルト:&#10;{ステップ}&#10;{チェックアウト日}&#10;{時刻}&#10;{担当者}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
+            <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {ステップ}=提出/受取/戻し {チェックアウト日} {時刻}=15:29 {担当者}</p>
           </div>
 
           <div style="display:flex;gap:8px;">
@@ -2255,7 +2255,7 @@
     var _clLineTargets = [];
 
     var _CL_DEFAULT_CLEAN_COMPLETE_MSG = '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
-    var _CL_DEFAULT_LAUNDRY_MSG = '{ステップ}\n{チェックアウト日}\n{担当者}\n{時刻}';
+    var _CL_DEFAULT_LAUNDRY_MSG = '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
 
     function loadClLineNotifySettings() {
       // まずデフォルト値を入れておく

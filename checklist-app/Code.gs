@@ -1252,9 +1252,11 @@ function testClLineNotify(targetId) {
 function sendMemoToLine(checkoutDate, text, staffName) {
   try {
     var fmtDate = clFormatDateForNotif_(checkoutDate);
-    var msg = '📝 特記事項・備品不足\n\n'
-      + '📅 チェックアウト日: ' + fmtDate + '\n'
-      + '👤 記入者: ' + (staffName || '不明') + '\n\n'
+    var nowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
+    var msg = '特記事項・備品不足\n'
+      + fmtDate + '\n'
+      + nowTime + '\n'
+      + (staffName || '不明') + '\n\n'
       + text;
     var result = clSendLineMessage_(msg);
     return JSON.stringify({ success: result.ok, error: result.ok ? '' : (result.reason || 'LINE送信失敗') });
@@ -1276,11 +1278,13 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, text, staffName || '', new Date(), photoFileId || '']]);
     // メモ登録時にLINE自動送信（全送信先へ）
     try {
-      var msgParts = ['📝 特記事項・備品不足', ''];
-      msgParts.push('📅 チェックアウト日: ' + clFormatDateForNotif_(checkoutDate));
-      msgParts.push('👤 記入者: ' + (staffName || '不明'));
+      var memoNowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
+      var msgParts = ['特記事項・備品不足'];
+      msgParts.push(clFormatDateForNotif_(checkoutDate));
+      msgParts.push(memoNowTime);
+      msgParts.push(staffName || '不明');
       if (text) { msgParts.push(''); msgParts.push(text); }
-      if (photoFileId) { msgParts.push(''); msgParts.push('📷 写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
+      if (photoFileId) { msgParts.push(''); msgParts.push('写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
       var allResults = clSendLineToAll_(msgParts.join('\n'));
       var anyOk = allResults.some(function(r) { return r.ok; });
       lineResult = { ok: anyOk, details: allResults };
@@ -1672,7 +1676,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       var laundryLineEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
       if (laundryLineEnabled) {
         var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
-        var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{時刻}\n{担当者}';
+        var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
         var laundryLineMsg = tmpl
           .replace(/\{ステップ\}/g, stepLabels[step] || step)
           .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))

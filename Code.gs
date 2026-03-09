@@ -12085,15 +12085,15 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
           }
         }
         if (!clLaundryEnabled) { /* スキップ */ throw new Error('disabled'); }
-        var tmpl = clLaundryTmpl || '{ステップ}\n{チェックアウト日}\n{担当者}\n{時刻}';
+        var tmpl = clLaundryTmpl || '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
         laundryLineMsg = tmpl
           .replace(/\{ステップ\}/g, stepLabels[step] || step)
           .replace(/\{チェックアウト日\}/g, formatDateForNotif_(dateKey))
           .replace(/\{担当者\}/g, staffName || '不明')
-          .replace(/\{時刻\}/g, formatDateForNotif_(now.split(' ')[0]) + ' ' + (now.split(' ')[1] || ''));
+          .replace(/\{時刻\}/g, now.split(' ')[1] || now);
       } catch (tmplErr) {
         if (tmplErr.message === 'disabled') throw tmplErr;
-        laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n担当: ' + (staffName || '不明') + '\n時刻: ' + formatDateForNotif_(now.split(' ')[0]) + ' ' + (now.split(' ')[1] || '');
+        laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n' + (now.split(' ')[1] || now) + '\n担当: ' + (staffName || '不明');
       }
       if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); } catch (e2) {} }
       if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); } catch (e2) {} }

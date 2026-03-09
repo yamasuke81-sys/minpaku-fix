@@ -1251,8 +1251,9 @@ function testClLineNotify(targetId) {
  */
 function sendMemoToLine(checkoutDate, text, staffName) {
   try {
+    var fmtDate = clFormatDateForNotif_(checkoutDate);
     var msg = '📝 特記事項・備品不足\n\n'
-      + '📅 チェックアウト日: ' + checkoutDate + '\n'
+      + '📅 チェックアウト日: ' + fmtDate + '\n'
       + '👤 記入者: ' + (staffName || '不明') + '\n\n'
       + text;
     var result = clSendLineMessage_(msg);
@@ -1276,7 +1277,7 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     // メモ登録時にLINE自動送信（全送信先へ）
     try {
       var msgParts = ['📝 特記事項・備品不足', ''];
-      msgParts.push('📅 チェックアウト日: ' + checkoutDate);
+      msgParts.push('📅 チェックアウト日: ' + clFormatDateForNotif_(checkoutDate));
       msgParts.push('👤 記入者: ' + (staffName || '不明'));
       if (text) { msgParts.push(''); msgParts.push(text); }
       if (photoFileId) { msgParts.push(''); msgParts.push('📷 写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
@@ -1402,9 +1403,10 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       });
     }
 
-    var subject = '清掃完了報告 - ' + checkoutDate;
+    var fmtCODate = clFormatDateForNotif_(checkoutDate);
+    var subject = '清掃完了報告 - ' + fmtCODate;
     var body = '清掃が完了しました。\n\n';
-    body += 'チェックアウト日: ' + checkoutDate + '\n';
+    body += 'チェックアウト日: ' + fmtCODate + '\n';
     body += '清掃担当: ' + (staffName || '不明') + '\n';
     body += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '\n\n';
 
@@ -1443,7 +1445,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     // HTML版メール（写真インライン表示）
     var htmlBody = '<div style="font-family:sans-serif;font-size:14px;">';
     htmlBody += '<p>清掃が完了しました。</p>';
-    htmlBody += '<p>チェックアウト日: ' + checkoutDate + '<br>';
+    htmlBody += '<p>チェックアウト日: ' + fmtCODate + '<br>';
     htmlBody += '清掃担当: ' + (staffName || '不明') + '<br>';
     htmlBody += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '</p>';
 
@@ -1491,7 +1493,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
           return line;
         }).join('\n') : '';
         var lineMsg = tmpl
-          .replace(/\{チェックアウト日\}/g, checkoutDate)
+          .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
           .replace(/\{担当者\}/g, staffName || '不明')
           .replace(/\{完了時刻\}/g, nowTime)
           .replace(/\{要補充\}/g, supplyText)
@@ -1564,6 +1566,28 @@ function getCleaningCompletionStatus(checkoutDate) {
   }
 }
 
+/**
+ * 日付を yyyy/M/d(曜日) 形式にフォーマット
+ */
+function clFormatDateForNotif_(dateInput) {
+  var DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+  try {
+    var d;
+    if (dateInput instanceof Date) {
+      d = dateInput;
+    } else {
+      var s = String(dateInput || '').trim();
+      var m = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (!m) return s;
+      d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+    }
+    if (isNaN(d.getTime())) return String(dateInput);
+    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + '(' + DAY_NAMES[d.getDay()] + ')';
+  } catch (e) {
+    return String(dateInput);
+  }
+}
+
 // ============================================
 // コインランドリー状況（メインappと同じスプレッドシートを参照）
 // ============================================
@@ -1612,7 +1636,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     var sheet = ss.getSheetByName(CL_SHEET_LAUNDRY);
     if (!sheet) {
       sheet = ss.insertSheet(CL_SHEET_LAUNDRY);
-      sheet.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '出した人', '出した日時', '受け取った人', '受け取った日時', '施設に戻した人', '施設に戻した日時']]);
+      sheet.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '持っていった人', '持っていった日時', '回収した人', '回収した日時', '施設に戻した人', '施設に戻した日時']]);
     }
     var lastRow = sheet.getLastRow();
     var rowIndex = -1;
@@ -1639,29 +1663,29 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
 
-    // LINE送信（クリーニング状況）
+    // LINE送信（コインランドリー状況）
     var laundryLineResults = [];
     try {
       var clMap = clGetRecruitSettingsMap_();
-      Logger.log('[クリーニングLINE] CL_LINE_クリーニング有効=' + (clMap['CL_LINE_クリーニング有効'] || '(未設定)'));
-      Logger.log('[クリーニングLINE] CL_LINE送信先=' + (clMap['CL_LINE送信先'] || '(未設定)'));
+      Logger.log('[コインランドリーLINE] CL_LINE_クリーニング有効=' + (clMap['CL_LINE_クリーニング有効'] || '(未設定)'));
+      Logger.log('[コインランドリーLINE] CL_LINE送信先=' + (clMap['CL_LINE送信先'] || '(未設定)'));
       var laundryLineEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
       if (laundryLineEnabled) {
-        var stepLabels = { sent: 'クリーニング提出しました', received: 'クリーニング受け取りました', returned: 'クリーニング施設に戻しました' };
+        var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'クリーニング済みリネンを施設に戻しました' };
         var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{時刻}\n{担当者}';
         var laundryLineMsg = tmpl
           .replace(/\{ステップ\}/g, stepLabels[step] || step)
-          .replace(/\{チェックアウト日\}/g, checkoutDate)
+          .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
           .replace(/\{担当者\}/g, staffName || '不明')
           .replace(/\{時刻\}/g, now.split(' ')[1] || now);
-        Logger.log('[クリーニングLINE] 送信メッセージ: ' + laundryLineMsg);
+        Logger.log('[コインランドリーLINE] 送信メッセージ: ' + laundryLineMsg);
         laundryLineResults = clSendLineToAll_(laundryLineMsg);
-        Logger.log('[クリーニングLINE] 送信結果: ' + JSON.stringify(laundryLineResults));
+        Logger.log('[コインランドリーLINE] 送信結果: ' + JSON.stringify(laundryLineResults));
       } else {
-        Logger.log('[クリーニングLINE] 無効のためスキップ');
+        Logger.log('[コインランドリーLINE] 無効のためスキップ');
       }
     } catch (lineErr) {
-      Logger.log('[クリーニングLINE] エラー: ' + lineErr.toString());
+      Logger.log('[コインランドリーLINE] エラー: ' + lineErr.toString());
       laundryLineResults = [{ ok: false, reason: 'exception: ' + lineErr.toString() }];
     }
 

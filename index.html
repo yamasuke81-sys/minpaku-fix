@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3073,7 +3073,7 @@
 
             // チェックリストボタンはヘッダーに表示（checklistBtnHeaderArea）
 
-            // クリーニング連絡カード
+            // コインランドリー連絡カード
             html += '<div class="mt-2 mb-2" id="laundryCardArea"></div>';
 
             // LINE用テキスト（オーナーのみ）
@@ -3277,7 +3277,7 @@
           }
         }
 
-        // クリーニング状況 + 募集データをバッチ読み込み
+        // コインランドリー状況 + 募集データをバッチ読み込み
         if (type === 'cleaning') {
           var _batchCheckoutDate = (d && d.checkOut) ? (d.checkOutParsed || String(d.checkOut).slice(0,10)) : '';
           var _batchLaundryArea = document.getElementById('laundryCardArea');
@@ -6122,7 +6122,7 @@
                 var myName = (window.currentUserName || '').trim();
                 var myEmail = (window.currentUserEmail || '').trim().toLowerCase();
                 var bannerSelfKinds = ['回答', '回答取消', '出勤キャンセル要望', '保留', '回答変更要請'];
-                var cleaningKinds = ['クリーニング出し', 'クリーニング受取', 'クリーニング戻し'];
+                var cleaningKinds = ['コインランドリー出し', 'コインランドリー回収', 'リネン戻し'];
                 filtered = filtered.filter(function(n) {
                   var msg = (n.message || '');
                   var kind = (n.kind || '');
@@ -6135,7 +6135,7 @@
                   if (kind === 'スタッフ確定' && myName && msg.indexOf(myName) >= 0) return true;
                   // キャンセル承認/却下: 自分の名前が含まれていれば表示
                   if ((kind === 'キャンセル承認' || kind === 'キャンセル却下') && myName && msg.indexOf(myName) >= 0) return true;
-                  // クリーニング出し/受取/戻し: 担当スタッフかつ自分が操作していない場合のみ表示
+                  // コインランドリー出し/回収/戻し: 担当スタッフかつ自分が操作していない場合のみ表示
                   if (cleaningKinds.indexOf(kind) >= 0 && myName) {
                     var assigned = (data.assignedStaff || '');
                     var actionBy = (data.actionBy || '');
@@ -9621,10 +9621,10 @@
 
 
       // ==========================================
-      // クリーニング連絡カード
+      // コインランドリー連絡カード
       // ==========================================
       function renderCleaningLaundryCard(container, checkoutDate, isStaffView) {
-        container.innerHTML = '<div class="modal-next-res-card" style="margin-top:0.5rem;"><span class="recruit-status-badge status-laundry"><i class="bi bi-basket2"></i> クリーニング状況</span><div class="text-muted small text-center"><span class="spinner-border spinner-border-sm me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div>';
+        container.innerHTML = '<div class="modal-next-res-card" style="margin-top:0.5rem;"><span class="recruit-status-badge status-laundry"><i class="bi bi-basket2"></i> コインランドリー状況</span><div class="text-muted small text-center"><span class="spinner-border spinner-border-sm me-1" style="width:0.7rem;height:0.7rem;border-width:0.12em;" role="status"></span>読み込み中…</div></div>';
         google.script.run
           .withSuccessHandler(function(resStr) {
             try {
@@ -9644,7 +9644,7 @@
         var hasReturned = !!d.returnedBy;
 
         var html = '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
-        html += '<span class="recruit-status-badge status-laundry"><i class="bi bi-basket2"></i> クリーニング状況</span>';
+        html += '<span class="recruit-status-badge status-laundry"><i class="bi bi-basket2"></i> コインランドリー状況</span>';
 
         // 最後に完了したステップを判定（そのステップのみ取消可能）
         var lastCompletedStep = hasReturned ? 'returned' : (hasReceived ? 'received' : (hasSent ? 'sent' : null));
@@ -9658,7 +9658,7 @@
             html += '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem;" onclick="cancelLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)">取消</button>';
           }
         } else {
-          html += '<button type="button" class="btn btn-sm btn-warning flex-grow-1" id="btnLaundrySent" style="color:#000;font-weight:600;" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)"><i class="bi bi-box-arrow-up-right me-1"></i>クリーニングに出した</button>';
+          html += '<button type="button" class="btn btn-sm btn-warning flex-grow-1" id="btnLaundrySent" style="color:#000;font-weight:600;" onclick="confirmLaundryStep(\'' + escapeHtml(checkoutDate) + '\', \'sent\', this)"><i class="bi bi-box-arrow-up-right me-1"></i>コインランドリーに出した</button>';
         }
         html += '</div>';
 
@@ -9729,7 +9729,7 @@
           }
           return;
         }
-        var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
+        var labels = { sent: 'コインランドリーに出した', received: 'コインランドリーから回収した', returned: 'リネンを施設に戻した' };
         // confirm()はiOS SafariのGASフレーム内でブロックされることがあるため
         // 1回目タップで確認表示、2回目で実行する方式に変更
         if (!btn._confirmReady) {
@@ -9808,7 +9808,7 @@
       };
 
       window.cancelLaundryStep = function(checkoutDate, step, btn) {
-        var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
+        var labels = { sent: 'コインランドリーに出した', received: 'コインランドリーから回収した', returned: 'リネンを施設に戻した' };
         if (!btn._confirmReady) {
           btn._confirmReady = true;
           btn._origText = btn.innerHTML;

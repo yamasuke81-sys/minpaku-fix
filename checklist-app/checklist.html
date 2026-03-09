@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309j</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309l</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1569,9 +1569,9 @@
         <div id="completionInfo" style="display:none;margin-top:8px;padding:8px 10px;background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;font-size:13px;color:#155724;text-align:center;"></div>
       </div>
 
-      <!-- クリーニング状況（清掃完了ボタンの下） -->
+      <!-- コインランドリー状況（清掃完了ボタンの下） -->
       <div id="laundrySection" class="laundry-section" style="margin:8px 12px 16px;padding:12px;background:#e2e3e5;border-radius:10px;border:1px solid #c4c8cb;">
-        <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;"><i class="bi bi-basket2"></i> クリーニング状況</div>
+        <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;"><i class="bi bi-basket2"></i> コインランドリー状況</div>
         <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
       </div>
     </div>
@@ -1692,7 +1692,7 @@
         <!-- LINE通知設定 -->
         <div style="background:#fff;border-radius:8px;padding:16px;border:1px solid #ddd;margin-bottom:16px;">
           <h4 style="font-size:14px;margin-bottom:8px;"><i class="bi bi-line" style="color:#06C755;"></i> LINE通知設定</h4>
-          <p style="font-size:12px;color:#666;margin-bottom:12px;">清掃完了・クリーニング状況をLINEグループに通知します。メインアプリで設定したLINEトークンを使用します。</p>
+          <p style="font-size:12px;color:#666;margin-bottom:12px;">清掃完了・コインランドリー状況をLINEグループに通知します。メインアプリで設定したLINEトークンを使用します。</p>
 
           <!-- 送信先リスト -->
           <div style="margin-bottom:16px;">
@@ -1721,7 +1721,7 @@
           <!-- クリーニング状況通知 -->
           <div style="border-top:1px solid #eee;padding-top:12px;margin-bottom:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <label style="font-size:13px;font-weight:bold;color:#555;">クリーニング状況通知</label>
+              <label style="font-size:13px;font-weight:bold;color:#555;">コインランドリー状況通知</label>
               <div class="toggle-switch" style="--w:40px;--h:22px;">
                 <input type="checkbox" id="clLineLaundryEnabled" checked>
                 <span class="toggle-slider"></span>
@@ -5942,7 +5942,7 @@
     })();
 
     // ==========================================
-    // クリーニング状況
+    // コインランドリー状況
     // ==========================================
     function loadLaundryStatus() {
       var container = document.getElementById('laundryContent');
@@ -5971,7 +5971,7 @@
         html += '<span style="flex:1;font-size:13px;">' + formatLaundryTime(d.sentAt) + '　' + escapeHtml(d.sentBy) + '</span>';
         if (lastStep === 'sent') html += laundryCancelBtn('sent');
       } else {
-        html += '<button onclick="doLaundryStep(\'sent\',this)" class="laundry-action-btn" style="flex:1;"><i class="bi bi-box-arrow-up-right" style="margin-right:4px;"></i>クリーニングに出した</button>';
+        html += '<button onclick="doLaundryStep(\'sent\',this)" class="laundry-action-btn" style="flex:1;"><i class="bi bi-box-arrow-up-right" style="margin-right:4px;"></i>コインランドリーに出した</button>';
       }
       html += '</div>';
 
@@ -6028,7 +6028,7 @@
     function doLaundryStep(step, btn) {
       var sName = getSelectedStaffName_() || staffName || '';
       if (!sName) { alert('スタッフを選択してください'); return; }
-      var labels = { sent: 'クリーニングに出した', received: '受け取った', returned: '施設に戻した' };
+      var labels = { sent: 'コインランドリーに出した', received: 'コインランドリーから回収した', returned: 'リネンを施設に戻した' };
       // confirm()はiOS Safariでブロックされるため2タップ方式
       if (!btn._confirmReady) {
         btn._confirmReady = true;

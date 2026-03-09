@@ -217,7 +217,7 @@ const SHEET_CL_PHOTOS = 'チェックリスト写真';
 const SHEET_CL_MEMOS = 'チェックリストメモ';
 const SHEET_CL_SUPPLIES = '要補充記録';
 
-// クリーニング連絡用シート名
+// コインランドリー連絡用シート名
 const SHEET_LAUNDRY = 'クリーニング連絡';
 
 // 請求書履歴用シート名
@@ -1970,7 +1970,7 @@ function ensureSheetsExist() {
   });
 
   safeInsert(SHEET_LAUNDRY, function(s) {
-    s.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '出した人', '出した日時', '受け取った人', '受け取った日時', '施設に戻した人', '施設に戻した日時']]);
+    s.getRange(1, 1, 1, 7).setValues([['チェックアウト日', '持っていった人', '持っていった日時', '回収した人', '回収した日時', '施設に戻した人', '施設に戻した日時']]);
   });
 
   safeInsert(SHEET_INVOICE_HISTORY, function(s) {
@@ -4140,7 +4140,7 @@ function propagateStaffNameChange_(ss, oldName, newName) {
     replaceInColumn(SHEET_INVOICE_HISTORY, 1);
     replaceInColumn(SHEET_INVOICE_EXTRA, 1);
     replaceInColumn(SHEET_INVOICE_EXCLUDED, 1);
-    // クリーニング連絡: B列(出した人), D列(受け取った人), F列(施設に戻した人)
+    // コインランドリー連絡: B列(出した人), D列(受け取った人), F列(施設に戻した人)
     replaceInColumn(SHEET_LAUNDRY, 2);
     replaceInColumn(SHEET_LAUNDRY, 4);
     replaceInColumn(SHEET_LAUNDRY, 6);
@@ -5465,7 +5465,7 @@ function formatDateForNotif_(dateInput) {
       d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
     }
     if (isNaN(d.getTime())) return String(dateInput);
-    return (d.getMonth() + 1) + '/' + d.getDate() + '(' + DAY_NAMES[d.getDay()] + ')';
+    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + '(' + DAY_NAMES[d.getDay()] + ')';
   } catch (e) {
     return String(dateInput);
   }
@@ -10833,7 +10833,7 @@ function getCleaningModalData(checkoutDate, rowNumber) {
     // 1. チェックリストURL（Script Propertiesから）
     result.checklistUrl = PropertiesService.getScriptProperties().getProperty('CHECKLIST_APP_URL') || '';
 
-    // 2. クリーニング状況
+    // 2. コインランドリー状況
     try {
       result.laundry = JSON.parse(getCleaningLaundryStatus(checkoutDate));
     } catch (e) {
@@ -11906,12 +11906,12 @@ function myFunction() {
 }
 
 /**********************************************
- * クリーニング連絡機能
+ * コインランドリー連絡機能
  * シート「クリーニング連絡」に出し/受取/施設戻しを記録
  **********************************************/
 
 /**
- * クリーニング連絡の現在ステータスを取得
+ * コインランドリー連絡の現在ステータスを取得
  * @param {string} checkoutDate yyyy-MM-dd
  * @return {string} JSON { success, data: { sentBy, sentAt, receivedBy, receivedAt, returnedBy, returnedAt } }
  */
@@ -11950,7 +11950,7 @@ function getCleaningLaundryStatus(checkoutDate) {
 }
 
 /**
- * クリーニング連絡のステップを記録
+ * コインランドリー連絡のステップを記録
  * @param {string} checkoutDate yyyy-MM-dd
  * @param {string} step 'sent' | 'received' | 'returned'
  * @param {string} staffName スタッフ名
@@ -11997,28 +11997,28 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     if (step === 'sent') {
       sheet.getRange(rowIndex, 2).setValue(staffName);
       sheet.getRange(rowIndex, 3).setValue(now);
-      addNotification_('クリーニング出し', staffName + ' がクリーニングに出しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('コインランドリー出し', staffName + ' がコインランドリーに持っていきました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else if (step === 'received') {
       sheet.getRange(rowIndex, 4).setValue(staffName);
       sheet.getRange(rowIndex, 5).setValue(now);
-      addNotification_('クリーニング受取', staffName + ' がクリーニングを受け取りました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('コインランドリー回収', staffName + ' がコインランドリーから回収しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else if (step === 'returned') {
       sheet.getRange(rowIndex, 6).setValue(staffName);
       sheet.getRange(rowIndex, 7).setValue(now);
-      addNotification_('クリーニング戻し', staffName + ' がクリーニングを施設に戻しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
+      addNotification_('リネン戻し', staffName + ' がクリーニング済みリネンを施設に戻しました（' + formatDateForNotif_(dateKey) + '）', { checkoutDate: dateKey, assignedStaff: assignedStaff, actionBy: staffName });
     } else {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
 
-    // LINE送信（クリーニング状況）— 清掃完了チャンネルの設定に従う
+    // LINE送信（コインランドリー状況）— 清掃完了チャンネルの設定に従う
     try {
       var _ch_laundry = getNotifyChannel_('清掃完了');
-      var stepLabels = { sent: 'クリーニング提出しました', received: 'クリーニング受け取りました', returned: 'クリーニング施設に戻しました' };
+      var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'クリーニング済みリネンを施設に戻しました' };
       var laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n担当: ' + (staffName || '不明') + '\n時刻: ' + now.split(' ')[1];
       if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); } catch (e2) {} }
       if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); } catch (e2) {} }
     } catch (lineErr) {
-      Logger.log('[クリーニングLINE] エラー: ' + lineErr.toString());
+      Logger.log('[コインランドリーLINE] エラー: ' + lineErr.toString());
     }
 
     return JSON.stringify({ success: true });
@@ -12028,7 +12028,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
 }
 
 /**
- * クリーニングステップを個別キャンセル
+ * コインランドリーステップを個別キャンセル
  * 該当ステップ以降のデータをクリアする（例: sentキャンセル→received,returnedもクリア）
  */
 function cancelCleaningLaundryStep(checkoutDate, step) {
@@ -12061,7 +12061,7 @@ function cancelCleaningLaundryStep(checkoutDate, step) {
 }
 
 /**
- * クリーニング連絡をリセット（オーナーのみ）
+ * コインランドリー連絡をリセット（オーナーのみ）
  * @param {string} checkoutDate yyyy-MM-dd
  * @return {string} JSON { success }
  */

@@ -1419,36 +1419,41 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     var nextRow = sheet.getLastRow() + 1;
     sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, text, staffName || '', new Date(), photoFileId || '']]);
     // メモ登録時に通知（チャンネル設定に従ってメール/LINE送信）
-    try {
-      var clMap = clGetRecruitSettingsMap_();
-      var memoEnabled = clMap['CL_LINE_メモ有効'] !== 'false';
-      if (memoEnabled) {
-        var ch = clGetNotifyChannel_('memo');
-        var memoNowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
-        var msgParts = ['特記事項・備品不足'];
-        msgParts.push(clFormatDateForNotif_(checkoutDate));
-        msgParts.push(memoNowTime);
-        msgParts.push(staffName || '不明');
-        if (text) { msgParts.push(''); msgParts.push(text); }
-        if (photoFileId) { msgParts.push(''); msgParts.push('写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
-        var msgText = msgParts.join('\n');
-        // LINE送信
+    // LINE送信とメール送信を独立try-catchにし、一方の失敗が他方をブロックしないようにする
+    var clMap = clGetRecruitSettingsMap_();
+    var memoEnabled = clMap['CL_LINE_メモ有効'] !== 'false';
+    if (memoEnabled) {
+      var ch = clGetNotifyChannel_('memo');
+      var memoNowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
+      var msgParts = ['特記事項・備品不足'];
+      msgParts.push(clFormatDateForNotif_(checkoutDate));
+      msgParts.push(memoNowTime);
+      msgParts.push(staffName || '不明');
+      if (text) { msgParts.push(''); msgParts.push(text); }
+      if (photoFileId) { msgParts.push(''); msgParts.push('写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
+      var msgText = msgParts.join('\n');
+      // LINE送信（独立try-catch）
+      try {
         if (ch.owner_line || ch.group_line || ch.staff_line) {
           var allResults = clSendLineByChannel_(msgText, ch);
           var anyOk = allResults.some(function(r) { return r.ok; });
           lineResult = { ok: anyOk, details: allResults };
         }
-        // メール送信
+      } catch (lineErr) {
+        lineResult = { ok: false, reason: lineErr.toString() };
+      }
+      // メール送信（独立try-catch — LINE失敗でもメールは送る）
+      try {
         if (ch.owner_email || ch.staff_email) {
           var emailSubject = '特記事項・備品不足メモ - ' + clFormatDateForNotif_(checkoutDate);
           clSendEmailByChannel_(emailSubject, msgText, ch, {});
         }
-        if (!lineResult) lineResult = { ok: true, reason: 'メール送信のみ' };
-      } else {
-        lineResult = { ok: false, reason: 'メモ通知は無効' };
+      } catch (mailErr) {
+        Logger.log('[メモメール] エラー: ' + mailErr.toString());
       }
-    } catch (lineErr) {
-      lineResult = { ok: false, reason: lineErr.toString() };
+      if (!lineResult) lineResult = { ok: true, reason: 'メール送信のみ' };
+    } else {
+      lineResult = { ok: false, reason: 'メモ通知は無効' };
     }
     var lineError = '';
     if (lineResult && !lineResult.ok) {
@@ -1836,29 +1841,34 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     }
 
     // チャンネル設定に従って送信（コインランドリー状況）
+    // LINE送信とメール送信を独立try-catchにし、一方の失敗が他方をブロックしないようにする
     var laundryLineResults = [];
-    try {
-      var clMap = clGetRecruitSettingsMap_();
-      var laundryEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
-      Logger.log('[DEBUG-LAUNDRY-CH] enabled=' + laundryEnabled + ' CL_CH_コインランドリー=' + (clMap['CL_CH_コインランドリー'] || '(未設定)'));
-      if (laundryEnabled) {
-        var ch = clGetNotifyChannel_('laundry');
-        Logger.log('[DEBUG-LAUNDRY-CH] channel=' + JSON.stringify(ch));
-        var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
-        var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
-        var laundryLineMsg = tmpl
-          .replace(/\{ステップ\}/g, stepLabels[step] || step)
-          .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
-          .replace(/\{担当者\}/g, staffName || '不明')
-          .replace(/\{時刻\}/g, now.split(' ')[1] || now);
-        // LINE送信
+    var clMap2 = clGetRecruitSettingsMap_();
+    var laundryEnabled = clMap2['CL_LINE_クリーニング有効'] !== 'false';
+    Logger.log('[DEBUG-LAUNDRY-CH] enabled=' + laundryEnabled + ' CL_CH_コインランドリー=' + (clMap2['CL_CH_コインランドリー'] || '(未設定)'));
+    if (laundryEnabled) {
+      var ch = clGetNotifyChannel_('laundry');
+      Logger.log('[DEBUG-LAUNDRY-CH] channel=' + JSON.stringify(ch));
+      var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
+      var tmpl = clMap2['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
+      var laundryLineMsg = tmpl
+        .replace(/\{ステップ\}/g, stepLabels[step] || step)
+        .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
+        .replace(/\{担当者\}/g, staffName || '不明')
+        .replace(/\{時刻\}/g, now.split(' ')[1] || now);
+      // LINE送信（独立try-catch）
+      try {
         if (ch.owner_line || ch.group_line || ch.staff_line) {
           laundryLineResults = clSendLineByChannel_(laundryLineMsg, ch);
           Logger.log('[DEBUG-LAUNDRY-CH] LINE送信結果=' + JSON.stringify(laundryLineResults));
         } else {
           Logger.log('[DEBUG-LAUNDRY-CH] LINEフラグ全OFF → LINE送信スキップ');
         }
-        // メール送信
+      } catch (lineErr) {
+        Logger.log('[コインランドリーLINE] エラー: ' + lineErr.toString());
+      }
+      // メール送信（独立try-catch — LINE失敗でもメールは送る）
+      try {
         if (ch.owner_email || ch.staff_email) {
           Logger.log('[DEBUG-LAUNDRY-CH] メール送信開始 owner_email=' + ch.owner_email + ' staff_email=' + ch.staff_email);
           var emailSubject = 'コインランドリー: ' + (stepLabels[step] || step) + ' - ' + clFormatDateForNotif_(checkoutDate);
@@ -1867,12 +1877,11 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
         } else {
           Logger.log('[DEBUG-LAUNDRY-CH] メールフラグ全OFF → メール送信スキップ');
         }
-      } else {
-        Logger.log('[DEBUG-LAUNDRY-CH] 通知無効のためスキップ');
+      } catch (mailErr) {
+        Logger.log('[コインランドリーメール] エラー: ' + mailErr.toString());
       }
-    } catch (lineErr) {
-      Logger.log('[コインランドリー通知] エラー: ' + lineErr.toString());
-      laundryLineResults = [{ ok: false, reason: lineErr.toString() }];
+    } else {
+      Logger.log('[DEBUG-LAUNDRY-CH] 通知無効のためスキップ');
     }
 
     // カレンダー通知欄に常に記録（通知 OFF でも）

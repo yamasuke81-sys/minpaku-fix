@@ -1602,6 +1602,7 @@ function getCleaningLaundryStatus(checkoutDate) {
 }
 
 function recordCleaningLaundryStep(checkoutDate, step, staffName) {
+  Logger.log('[DEBUG-LAUNDRY] recordCleaningLaundryStep 呼び出し: date=' + checkoutDate + ', step=' + step + ', staff=' + staffName);
   var lock = LockService.getScriptLock();
   try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
@@ -1661,10 +1662,13 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       }
     } catch (lineErr) {
       Logger.log('[クリーニングLINE] エラー: ' + lineErr.toString());
+      laundryLineResults = [{ ok: false, reason: 'exception: ' + lineErr.toString() }];
     }
 
-    return JSON.stringify({ success: true });
+    Logger.log('[DEBUG-LAUNDRY] 完了。LINE結果=' + JSON.stringify(laundryLineResults));
+    return JSON.stringify({ success: true, _debug_line: { enabled: (typeof laundryLineEnabled !== 'undefined' ? laundryLineEnabled : 'N/A'), results: laundryLineResults, step: step, msg: (typeof laundryLineMsg !== 'undefined' ? laundryLineMsg : 'N/A') } });
   } catch (e) {
+    Logger.log('[DEBUG-LAUNDRY] エラー: ' + e.toString());
     return JSON.stringify({ success: false, error: e.toString() });
   } finally {
     lock.releaseLock();

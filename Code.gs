@@ -12010,6 +12010,17 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
 
+    // LINE送信（クリーニング状況）— 清掃完了チャンネルの設定に従う
+    try {
+      var _ch_laundry = getNotifyChannel_('清掃完了');
+      var stepLabels = { sent: 'クリーニング提出しました', received: 'クリーニング受け取りました', returned: 'クリーニング施設に戻しました' };
+      var laundryLineMsg = (stepLabels[step] || step) + '\n' + formatDateForNotif_(dateKey) + '\n担当: ' + (staffName || '不明') + '\n時刻: ' + now.split(' ')[1];
+      if (_ch_laundry.owner_line) { try { sendLineMessage_(laundryLineMsg, false, 'owner'); } catch (e2) {} }
+      if (_ch_laundry.group_line) { try { sendLineMessage_(laundryLineMsg, false, 'group'); } catch (e2) {} }
+    } catch (lineErr) {
+      Logger.log('[クリーニングLINE] エラー: ' + lineErr.toString());
+    }
+
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

@@ -1129,62 +1129,114 @@ function clSendLineMessage_(text) {
 }
 
 /**
- * 通知種別ごとに個別送信先設定を参照してLINE送信
- * notifyType: 'memo' | 'cleanComplete' | 'laundry'
- * 個別設定キー: CL_LINE_メモ送信先, CL_LINE_清掃完了送信先, CL_LINE_クリーニング送信先
- * 値は送信先IDのJSON配列（例: ["Cxxx","Uxxx"]）。未設定=全有効送信先
+ * チャンネル設定を読み取って5フラグオブジェクトを返す（メインappと同形式）
+ * @param {string} notifyType - 'memo' | 'cleanComplete' | 'laundry'
+ * @return {{ owner_email:boolean, owner_line:boolean, staff_email:boolean, staff_line:boolean, group_line:boolean }}
  */
-function clSendLineToFiltered_(text, notifyType) {
+function clGetNotifyChannel_(notifyType) {
+  var defaults = { memo: 'owner_line,group_line', cleanComplete: 'owner_email,owner_line', laundry: 'owner_line,group_line' };
+  var keyMap = { memo: 'CL_CH_メモ', cleanComplete: 'CL_CH_清掃完了', laundry: 'CL_CH_コインランドリー' };
+  try {
+    var map = clGetRecruitSettingsMap_();
+    var val = map[keyMap[notifyType]] || '';
+    if (!val) val = defaults[notifyType] || 'owner_line';
+    var parts = val.split(',').map(function(s) { return s.trim(); });
+    return {
+      owner_email: parts.indexOf('owner_email') >= 0,
+      owner_line: parts.indexOf('owner_line') >= 0,
+      staff_email: parts.indexOf('staff_email') >= 0,
+      staff_line: parts.indexOf('staff_line') >= 0,
+      group_line: parts.indexOf('group_line') >= 0
+    };
+  } catch (e) {
+    return { owner_email: false, owner_line: true, staff_email: false, staff_line: false, group_line: true };
+  }
+}
+
+/**
+ * チャンネル設定に従ってLINE送信（owner_line, group_line, staff_line対応）
+ * @param {string} text - 送信メッセージ
+ * @param {object} ch - clGetNotifyChannel_の返値
+ * @return {Array} 送信結果配列
+ */
+function clSendLineByChannel_(text, ch) {
   var results = [];
   try {
     var map = clGetRecruitSettingsMap_();
     var token = map['LINEチャネルアクセストークン'] || '';
     if (!token) return [{ ok: false, reason: 'トークンが空' }];
 
-    // 全送信先リスト
-    var targetsJson = map['CL_LINE送信先'] || '';
-    var allTargets = [];
-    if (targetsJson) { try { allTargets = JSON.parse(targetsJson); } catch (e) {} }
-    var enabledTargets = allTargets.filter(function(t) { return t.enabled && t.id; });
-
-    // 個別送信先フィルタ
-    var keyMap = { memo: 'CL_LINE_メモ送信先', cleanComplete: 'CL_LINE_清掃完了送信先', laundry: 'CL_LINE_クリーニング送信先' };
-    var filterKey = keyMap[notifyType] || '';
-    var filterJson = filterKey ? (map[filterKey] || '') : '';
-    var filterIds = [];
-    if (filterJson) { try { filterIds = JSON.parse(filterJson); } catch (e) {} }
-
-    // 全未選択（__none__）ならどこにも送らない
-    if (filterIds.length === 1 && filterIds[0] === '__none__') {
-      return [{ ok: false, reason: '送信先が選択されていません' }];
+    // owner_line: メインappのオーナーLINE（ユーザーID）
+    if (ch.owner_line) {
+      var ownerId = map['LINEユーザーID'] || '';
+      if (ownerId) results.push(clSendLineToTarget_(text, ownerId, token));
     }
-    // フィルタが設定されていれば該当IDのみ、未設定なら全有効送信先
-    var sendTargets = enabledTargets;
-    if (filterIds.length > 0) {
-      sendTargets = enabledTargets.filter(function(t) {
-        return filterIds.indexOf(t.id) >= 0;
-      });
+    // group_line: メインappのLINEグループ
+    if (ch.group_line) {
+      var groupId = map['LINEグループID'] || '';
+      if (groupId) results.push(clSendLineToTarget_(text, groupId, token));
     }
-
-    if (sendTargets.length === 0) {
-      // フォールバック: 従来のデフォルト送信先
-      var targetMode = map['LINE送信先モード'] || 'group';
-      var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
-      if (targetId && filterIds.length === 0) {
-        results.push(clSendLineToTarget_(text, targetId, token));
-      } else {
-        results.push({ ok: false, reason: '送信先が未設定または選択されていません' });
-      }
-    } else {
-      sendTargets.forEach(function(t) {
+    // staff_line: CL_LINE送信先のうちスタッフ個別（将来拡張）
+    if (ch.staff_line) {
+      var targetsJson = map['CL_LINE送信先'] || '';
+      var allTargets = [];
+      if (targetsJson) { try { allTargets = JSON.parse(targetsJson); } catch (e) {} }
+      allTargets.filter(function(t) { return t.enabled && t.id; }).forEach(function(t) {
+        // owner_line/group_lineで既に送信済みのIDはスキップ
+        var ownerId2 = map['LINEユーザーID'] || '';
+        var groupId2 = map['LINEグループID'] || '';
+        if ((ch.owner_line && t.id === ownerId2) || (ch.group_line && t.id === groupId2)) return;
         results.push(clSendLineToTarget_(text, t.id, token));
       });
     }
+    if (results.length === 0) results.push({ ok: false, reason: 'LINE送信先なし' });
   } catch (e) {
-    Logger.log('clSendLineToFiltered_: ' + e.toString());
     results.push({ ok: false, reason: e.toString() });
   }
   return results;
+}
+
+/**
+ * チャンネル設定に従ってメール送信（owner_email, staff_email対応）
+ * @param {string} subject - 件名
+ * @param {string} body - 本文
+ * @param {object} ch - clGetNotifyChannel_の返値
+ * @param {object} opts - { htmlBody: string, staffName: string, checkoutDate: string }
+ */
+function clSendEmailByChannel_(subject, body, ch, opts) {
+  opts = opts || {};
+  try {
+    if (ch.owner_email) {
+      var bookingSs = getBookingSpreadsheet_();
+      var ownerSheet = bookingSs.getSheetByName(CL_OWNER_SHEET);
+      if (ownerSheet && ownerSheet.getLastRow() >= 2) {
+        var ownerEmail = String(ownerSheet.getRange(2, 1).getValue() || '').trim();
+        if (ownerEmail) {
+          var mailOpts = {};
+          if (opts.htmlBody) mailOpts.htmlBody = opts.htmlBody;
+          GmailApp.sendEmail(ownerEmail, subject, body, mailOpts);
+        }
+      }
+    }
+    if (ch.staff_email) {
+      // スタッフのメールアドレスを取得して送信
+      var bookingSs2 = getBookingSpreadsheet_();
+      var staffSheet = bookingSs2.getSheetByName(CL_STAFF_SHEET);
+      if (staffSheet && staffSheet.getLastRow() >= 2) {
+        var staffRows = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, Math.min(staffSheet.getLastColumn(), 12)).getValues();
+        staffRows.forEach(function(row) {
+          var hidden = String(row[11] || '').trim();
+          if (hidden === 'TRUE' || hidden === 'true') return;
+          var email = String(row[1] || '').trim();
+          if (email) {
+            try { GmailApp.sendEmail(email, subject, body, opts.htmlBody ? { htmlBody: opts.htmlBody } : {}); } catch (e) {}
+          }
+        });
+      }
+    }
+  } catch (e) {
+    Logger.log('clSendEmailByChannel_: ' + e.toString());
+  }
 }
 
 /**
@@ -1247,22 +1299,22 @@ function getClLineNotifySettings() {
     var laundryEnabled = map['CL_LINE_クリーニング有効'] !== 'false';
     var memoEnabled = map['CL_LINE_メモ有効'] !== 'false';
 
-    // 個別送信先設定
-    var memoTargetIds = []; try { memoTargetIds = JSON.parse(map['CL_LINE_メモ送信先'] || ''); } catch (e) {}
-    var cleanTargetIds = []; try { cleanTargetIds = JSON.parse(map['CL_LINE_清掃完了送信先'] || ''); } catch (e) {}
-    var laundryTargetIds = []; try { laundryTargetIds = JSON.parse(map['CL_LINE_クリーニング送信先'] || ''); } catch (e) {}
+    // チャンネル設定（メインappと同じ5フラグ形式: owner_email,owner_line,staff_email,staff_line,group_line）
+    var memoChannel = map['CL_CH_メモ'] || '';
+    var cleanChannel = map['CL_CH_清掃完了'] || '';
+    var laundryChannel = map['CL_CH_コインランドリー'] || '';
 
     return JSON.stringify({
       success: true,
       targets: targets,
       memoEnabled: memoEnabled,
-      memoTargetIds: memoTargetIds,
+      memoChannel: memoChannel,
       cleanCompleteEnabled: cleanCompleteEnabled,
       cleanCompleteMsg: cleanCompleteMsg,
-      cleanTargetIds: cleanTargetIds,
+      cleanChannel: cleanChannel,
       laundryEnabled: laundryEnabled,
       laundryMsg: laundryMsg,
-      laundryTargetIds: laundryTargetIds
+      laundryChannel: laundryChannel
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -1283,13 +1335,13 @@ function saveClLineNotifySettings(settings) {
     var keysToSave = {
       'CL_LINE送信先': JSON.stringify(settings.targets || []),
       'CL_LINE_メモ有効': settings.memoEnabled === false ? 'false' : 'true',
-      'CL_LINE_メモ送信先': JSON.stringify(settings.memoTargetIds || []),
       'CL_LINE_清掃完了有効': settings.cleanCompleteEnabled === false ? 'false' : 'true',
       'CL_LINE_清掃完了メッセージ': settings.cleanCompleteMsg || '',
-      'CL_LINE_清掃完了送信先': JSON.stringify(settings.cleanTargetIds || []),
       'CL_LINE_クリーニング有効': settings.laundryEnabled === false ? 'false' : 'true',
       'CL_LINE_クリーニングメッセージ': settings.laundryMsg || '',
-      'CL_LINE_クリーニング送信先': JSON.stringify(settings.laundryTargetIds || [])
+      'CL_CH_メモ': settings.memoChannel || '',
+      'CL_CH_清掃完了': settings.cleanChannel || '',
+      'CL_CH_コインランドリー': settings.laundryChannel || ''
     };
 
     Object.keys(keysToSave).forEach(function(key) {
@@ -1359,11 +1411,12 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     var sheet = clSheet_(SHEET_CL_MEMOS);
     var nextRow = sheet.getLastRow() + 1;
     sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, text, staffName || '', new Date(), photoFileId || '']]);
-    // メモ登録時にLINE自動送信（ON/OFF + 個別送信先対応）
+    // メモ登録時に通知（チャンネル設定に従ってメール/LINE送信）
     try {
       var clMap = clGetRecruitSettingsMap_();
-      var memoLineEnabled = clMap['CL_LINE_メモ有効'] !== 'false';
-      if (memoLineEnabled) {
+      var memoEnabled = clMap['CL_LINE_メモ有効'] !== 'false';
+      if (memoEnabled) {
+        var ch = clGetNotifyChannel_('memo');
         var memoNowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
         var msgParts = ['特記事項・備品不足'];
         msgParts.push(clFormatDateForNotif_(checkoutDate));
@@ -1371,11 +1424,21 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
         msgParts.push(staffName || '不明');
         if (text) { msgParts.push(''); msgParts.push(text); }
         if (photoFileId) { msgParts.push(''); msgParts.push('写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
-        var allResults = clSendLineToFiltered_(msgParts.join('\n'), 'memo');
-        var anyOk = allResults.some(function(r) { return r.ok; });
-        lineResult = { ok: anyOk, details: allResults };
+        var msgText = msgParts.join('\n');
+        // LINE送信
+        if (ch.owner_line || ch.group_line || ch.staff_line) {
+          var allResults = clSendLineByChannel_(msgText, ch);
+          var anyOk = allResults.some(function(r) { return r.ok; });
+          lineResult = { ok: anyOk, details: allResults };
+        }
+        // メール送信
+        if (ch.owner_email || ch.staff_email) {
+          var emailSubject = '特記事項・備品不足メモ - ' + clFormatDateForNotif_(checkoutDate);
+          clSendEmailByChannel_(emailSubject, msgText, ch, {});
+        }
+        if (!lineResult) lineResult = { ok: true, reason: 'メール送信のみ' };
       } else {
-        lineResult = { ok: false, reason: 'メモLINE通知は無効' };
+        lineResult = { ok: false, reason: 'メモ通知は無効' };
       }
     } catch (lineErr) {
       lineResult = { ok: false, reason: lineErr.toString() };
@@ -1578,42 +1641,43 @@ function notifyCleaningComplete(checkoutDate, staffName) {
 
     ccProps.setProperty(ccPropKey, '1');
 
-    // LINE送信（全送信先へ）— メール送信より先に実行
-    var lineResults = [];
-    try {
-      var clMap = clGetRecruitSettingsMap_();
-      var lineEnabled = clMap['CL_LINE_清掃完了有効'] !== 'false';
-      if (lineEnabled) {
-        var tmpl = clMap['CL_LINE_清掃完了メッセージ'] || '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
-        var nowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
-        var supplyText = supplyList.length > 0 ? '【要補充】\n' + supplyList.map(function(s) { return '・' + s; }).join('\n') : '';
-        var memoText = memoList.length > 0 ? '【メモ】\n' + memoList.map(function(m) {
-          var line = '・' + (m.text || '');
-          if (m.photoFileId) line += ' [写真]';
-          line += '(' + m.by + ')';
-          return line;
-        }).join('\n') : '';
-        var lineMsg = tmpl
-          .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
-          .replace(/\{担当者\}/g, staffName || '不明')
-          .replace(/\{完了時刻\}/g, nowTime)
-          .replace(/\{要補充\}/g, supplyText)
-          .replace(/\{メモ\}/g, memoText);
-        lineMsg = lineMsg.replace(/\n{3,}/g, '\n\n').trim();
-        lineResults = clSendLineToFiltered_(lineMsg, 'cleanComplete');
-        Logger.log('[清掃完了LINE] 送信結果: ' + JSON.stringify(lineResults));
+    // チャンネル設定に従って送信
+    var clMap = clGetRecruitSettingsMap_();
+    var cleanEnabled = clMap['CL_LINE_清掃完了有効'] !== 'false';
+    if (cleanEnabled) {
+      var ch = clGetNotifyChannel_('cleanComplete');
+      // LINE送信
+      try {
+        if (ch.owner_line || ch.group_line || ch.staff_line) {
+          var tmpl = clMap['CL_LINE_清掃完了メッセージ'] || '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
+          var nowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
+          var supplyText = supplyList.length > 0 ? '【要補充】\n' + supplyList.map(function(s) { return '・' + s; }).join('\n') : '';
+          var memoText = memoList.length > 0 ? '【メモ】\n' + memoList.map(function(m) {
+            var line = '・' + (m.text || '');
+            if (m.photoFileId) line += ' [写真]';
+            line += '(' + m.by + ')';
+            return line;
+          }).join('\n') : '';
+          var lineMsg = tmpl
+            .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
+            .replace(/\{担当者\}/g, staffName || '不明')
+            .replace(/\{完了時刻\}/g, nowTime)
+            .replace(/\{要補充\}/g, supplyText)
+            .replace(/\{メモ\}/g, memoText);
+          lineMsg = lineMsg.replace(/\n{3,}/g, '\n\n').trim();
+          clSendLineByChannel_(lineMsg, ch);
+        }
+      } catch (lineErr) {
+        Logger.log('[清掃完了LINE] エラー: ' + lineErr.toString());
       }
-    } catch (lineErr) {
-      Logger.log('[清掃完了LINE] エラー: ' + lineErr.toString());
-    }
-
-    // メール送信
-    try {
-      if (isEmailNotifyEnabled_('清掃完了通知有効')) {
-        GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
+      // メール送信
+      try {
+        if (ch.owner_email || ch.staff_email) {
+          clSendEmailByChannel_(subject, body, ch, { htmlBody: htmlBody });
+        }
+      } catch (mailErr) {
+        Logger.log('[清掃完了メール] エラー: ' + mailErr.toString());
       }
-    } catch (mailErr) {
-      Logger.log('[清掃完了メール] エラー: ' + mailErr.toString());
     }
 
     // メインアプリの通知にも追加
@@ -1764,14 +1828,13 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
 
-    // LINE送信（コインランドリー状況）
+    // チャンネル設定に従って送信（コインランドリー状況）
     var laundryLineResults = [];
     try {
       var clMap = clGetRecruitSettingsMap_();
-      Logger.log('[コインランドリーLINE] CL_LINE_クリーニング有効=' + (clMap['CL_LINE_クリーニング有効'] || '(未設定)'));
-      Logger.log('[コインランドリーLINE] CL_LINE送信先=' + (clMap['CL_LINE送信先'] || '(未設定)'));
-      var laundryLineEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
-      if (laundryLineEnabled) {
+      var laundryEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
+      if (laundryEnabled) {
+        var ch = clGetNotifyChannel_('laundry');
         var stepLabels = { sent: 'コインランドリーに持っていきました', received: 'コインランドリーから回収しました', returned: 'コインランドリーから回収したリネンを施設に戻しました' };
         var tmpl = clMap['CL_LINE_クリーニングメッセージ'] || '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
         var laundryLineMsg = tmpl
@@ -1779,18 +1842,22 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
           .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
           .replace(/\{担当者\}/g, staffName || '不明')
           .replace(/\{時刻\}/g, now.split(' ')[1] || now);
-        Logger.log('[コインランドリーLINE] 送信メッセージ: ' + laundryLineMsg);
-        laundryLineResults = clSendLineToFiltered_(laundryLineMsg, 'laundry');
-        Logger.log('[コインランドリーLINE] 送信結果: ' + JSON.stringify(laundryLineResults));
-      } else {
-        Logger.log('[コインランドリーLINE] 無効のためスキップ');
+        // LINE送信
+        if (ch.owner_line || ch.group_line || ch.staff_line) {
+          laundryLineResults = clSendLineByChannel_(laundryLineMsg, ch);
+        }
+        // メール送信
+        if (ch.owner_email || ch.staff_email) {
+          var emailSubject = 'コインランドリー: ' + (stepLabels[step] || step) + ' - ' + clFormatDateForNotif_(checkoutDate);
+          clSendEmailByChannel_(emailSubject, laundryLineMsg, ch, {});
+        }
       }
     } catch (lineErr) {
-      Logger.log('[コインランドリーLINE] エラー: ' + lineErr.toString());
-      laundryLineResults = [{ ok: false, reason: 'exception: ' + lineErr.toString() }];
+      Logger.log('[コインランドリー通知] エラー: ' + lineErr.toString());
+      laundryLineResults = [{ ok: false, reason: lineErr.toString() }];
     }
 
-    // カレンダー通知欄に常に記録（LINE OFF でも）
+    // カレンダー通知欄に常に記録（通知 OFF でも）
     try {
       var bookingSs = getBookingSpreadsheet_();
       var notifSheet = bookingSs.getSheetByName('通知履歴');
@@ -1804,8 +1871,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       }
     } catch (ne) { /* 通知追加失敗は無視 */ }
 
-    Logger.log('[DEBUG-LAUNDRY] 完了。LINE結果=' + JSON.stringify(laundryLineResults));
-    return JSON.stringify({ success: true, _debug_line: { enabled: (typeof laundryLineEnabled !== 'undefined' ? laundryLineEnabled : 'N/A'), results: laundryLineResults, step: step, msg: (typeof laundryLineMsg !== 'undefined' ? laundryLineMsg : 'N/A') } });
+    return JSON.stringify({ success: true });
   } catch (e) {
     Logger.log('[DEBUG-LAUNDRY] エラー: ' + e.toString());
     return JSON.stringify({ success: false, error: e.toString() });

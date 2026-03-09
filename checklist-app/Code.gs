@@ -1129,6 +1129,61 @@ function clSendLineMessage_(text) {
 }
 
 /**
+ * 通知種別ごとに個別送信先設定を参照してLINE送信
+ * notifyType: 'memo' | 'cleanComplete' | 'laundry'
+ * 個別設定キー: CL_LINE_メモ送信先, CL_LINE_清掃完了送信先, CL_LINE_クリーニング送信先
+ * 値は送信先IDのJSON配列（例: ["Cxxx","Uxxx"]）。未設定=全有効送信先
+ */
+function clSendLineToFiltered_(text, notifyType) {
+  var results = [];
+  try {
+    var map = clGetRecruitSettingsMap_();
+    var token = map['LINEチャネルアクセストークン'] || '';
+    if (!token) return [{ ok: false, reason: 'トークンが空' }];
+
+    // 全送信先リスト
+    var targetsJson = map['CL_LINE送信先'] || '';
+    var allTargets = [];
+    if (targetsJson) { try { allTargets = JSON.parse(targetsJson); } catch (e) {} }
+    var enabledTargets = allTargets.filter(function(t) { return t.enabled && t.id; });
+
+    // 個別送信先フィルタ
+    var keyMap = { memo: 'CL_LINE_メモ送信先', cleanComplete: 'CL_LINE_清掃完了送信先', laundry: 'CL_LINE_クリーニング送信先' };
+    var filterKey = keyMap[notifyType] || '';
+    var filterJson = filterKey ? (map[filterKey] || '') : '';
+    var filterIds = [];
+    if (filterJson) { try { filterIds = JSON.parse(filterJson); } catch (e) {} }
+
+    // フィルタが設定されていれば該当IDのみ、未設定なら全有効送信先
+    var sendTargets = enabledTargets;
+    if (filterIds.length > 0) {
+      sendTargets = enabledTargets.filter(function(t) {
+        return filterIds.indexOf(t.id) >= 0;
+      });
+    }
+
+    if (sendTargets.length === 0) {
+      // フォールバック: 従来のデフォルト送信先
+      var targetMode = map['LINE送信先モード'] || 'group';
+      var targetId = targetMode === 'personal' ? (map['LINEユーザーID'] || '') : (map['LINEグループID'] || '');
+      if (targetId && filterIds.length === 0) {
+        results.push(clSendLineToTarget_(text, targetId, token));
+      } else {
+        results.push({ ok: false, reason: '送信先が未設定または選択されていません' });
+      }
+    } else {
+      sendTargets.forEach(function(t) {
+        results.push(clSendLineToTarget_(text, t.id, token));
+      });
+    }
+  } catch (e) {
+    Logger.log('clSendLineToFiltered_: ' + e.toString());
+    results.push({ ok: false, reason: e.toString() });
+  }
+  return results;
+}
+
+/**
  * LINE通知を設定された全送信先に送信
  * 募集設定シートの CL_LINE送信先 に JSON配列で送信先リストが保存されている
  * 形式: [{"id":"Cxxx","label":"グループ1","enabled":true},{"id":"Uxxx","label":"オーナー","enabled":true}]
@@ -1186,14 +1241,24 @@ function getClLineNotifySettings() {
     var laundryMsg = map['CL_LINE_クリーニングメッセージ'] || '';
     var cleanCompleteEnabled = map['CL_LINE_清掃完了有効'] !== 'false';
     var laundryEnabled = map['CL_LINE_クリーニング有効'] !== 'false';
+    var memoEnabled = map['CL_LINE_メモ有効'] !== 'false';
+
+    // 個別送信先設定
+    var memoTargetIds = []; try { memoTargetIds = JSON.parse(map['CL_LINE_メモ送信先'] || ''); } catch (e) {}
+    var cleanTargetIds = []; try { cleanTargetIds = JSON.parse(map['CL_LINE_清掃完了送信先'] || ''); } catch (e) {}
+    var laundryTargetIds = []; try { laundryTargetIds = JSON.parse(map['CL_LINE_クリーニング送信先'] || ''); } catch (e) {}
 
     return JSON.stringify({
       success: true,
       targets: targets,
+      memoEnabled: memoEnabled,
+      memoTargetIds: memoTargetIds,
       cleanCompleteEnabled: cleanCompleteEnabled,
       cleanCompleteMsg: cleanCompleteMsg,
+      cleanTargetIds: cleanTargetIds,
       laundryEnabled: laundryEnabled,
-      laundryMsg: laundryMsg
+      laundryMsg: laundryMsg,
+      laundryTargetIds: laundryTargetIds
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -1213,10 +1278,14 @@ function saveClLineNotifySettings(settings) {
 
     var keysToSave = {
       'CL_LINE送信先': JSON.stringify(settings.targets || []),
+      'CL_LINE_メモ有効': settings.memoEnabled === false ? 'false' : 'true',
+      'CL_LINE_メモ送信先': JSON.stringify(settings.memoTargetIds || []),
       'CL_LINE_清掃完了有効': settings.cleanCompleteEnabled === false ? 'false' : 'true',
       'CL_LINE_清掃完了メッセージ': settings.cleanCompleteMsg || '',
+      'CL_LINE_清掃完了送信先': JSON.stringify(settings.cleanTargetIds || []),
       'CL_LINE_クリーニング有効': settings.laundryEnabled === false ? 'false' : 'true',
-      'CL_LINE_クリーニングメッセージ': settings.laundryMsg || ''
+      'CL_LINE_クリーニングメッセージ': settings.laundryMsg || '',
+      'CL_LINE_クリーニング送信先': JSON.stringify(settings.laundryTargetIds || [])
     };
 
     Object.keys(keysToSave).forEach(function(key) {
@@ -1286,18 +1355,24 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
     var sheet = clSheet_(SHEET_CL_MEMOS);
     var nextRow = sheet.getLastRow() + 1;
     sheet.getRange(nextRow, 1, 1, 5).setValues([[checkoutDate, text, staffName || '', new Date(), photoFileId || '']]);
-    // メモ登録時にLINE自動送信（全送信先へ）
+    // メモ登録時にLINE自動送信（ON/OFF + 個別送信先対応）
     try {
-      var memoNowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
-      var msgParts = ['特記事項・備品不足'];
-      msgParts.push(clFormatDateForNotif_(checkoutDate));
-      msgParts.push(memoNowTime);
-      msgParts.push(staffName || '不明');
-      if (text) { msgParts.push(''); msgParts.push(text); }
-      if (photoFileId) { msgParts.push(''); msgParts.push('写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
-      var allResults = clSendLineToAll_(msgParts.join('\n'));
-      var anyOk = allResults.some(function(r) { return r.ok; });
-      lineResult = { ok: anyOk, details: allResults };
+      var clMap = clGetRecruitSettingsMap_();
+      var memoLineEnabled = clMap['CL_LINE_メモ有効'] !== 'false';
+      if (memoLineEnabled) {
+        var memoNowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
+        var msgParts = ['特記事項・備品不足'];
+        msgParts.push(clFormatDateForNotif_(checkoutDate));
+        msgParts.push(memoNowTime);
+        msgParts.push(staffName || '不明');
+        if (text) { msgParts.push(''); msgParts.push(text); }
+        if (photoFileId) { msgParts.push(''); msgParts.push('写真: https://drive.google.com/file/d/' + photoFileId + '/view'); }
+        var allResults = clSendLineToFiltered_(msgParts.join('\n'), 'memo');
+        var anyOk = allResults.some(function(r) { return r.ok; });
+        lineResult = { ok: anyOk, details: allResults };
+      } else {
+        lineResult = { ok: false, reason: 'メモLINE通知は無効' };
+      }
     } catch (lineErr) {
       lineResult = { ok: false, reason: lineErr.toString() };
     }
@@ -1521,7 +1596,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
           .replace(/\{要補充\}/g, supplyText)
           .replace(/\{メモ\}/g, memoText);
         lineMsg = lineMsg.replace(/\n{3,}/g, '\n\n').trim();
-        lineResults = clSendLineToAll_(lineMsg);
+        lineResults = clSendLineToFiltered_(lineMsg, 'cleanComplete');
         Logger.log('[清掃完了LINE] 送信結果: ' + JSON.stringify(lineResults));
       }
     } catch (lineErr) {
@@ -1701,7 +1776,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
           .replace(/\{担当者\}/g, staffName || '不明')
           .replace(/\{時刻\}/g, now.split(' ')[1] || now);
         Logger.log('[コインランドリーLINE] 送信メッセージ: ' + laundryLineMsg);
-        laundryLineResults = clSendLineToAll_(laundryLineMsg);
+        laundryLineResults = clSendLineToFiltered_(laundryLineMsg, 'laundry');
         Logger.log('[コインランドリーLINE] 送信結果: ' + JSON.stringify(laundryLineResults));
       } else {
         Logger.log('[コインランドリーLINE] 無効のためスキップ');

@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309r</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309s</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -1705,6 +1705,19 @@
             </div>
           </div>
 
+          <!-- メモ登録通知 -->
+          <div style="border-top:1px solid #eee;padding-top:12px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <label style="font-size:13px;font-weight:bold;color:#555;">メモ登録通知</label>
+              <div class="toggle-switch" style="--w:40px;--h:22px;">
+                <input type="checkbox" id="clLineMemoEnabled" checked>
+                <span class="toggle-slider"></span>
+              </div>
+            </div>
+            <p style="font-size:11px;color:#999;margin-bottom:6px;">特記事項・備品不足メモ登録時にLINE送信</p>
+            <div id="clLineMemoTargets" style="margin-bottom:4px;"></div>
+          </div>
+
           <!-- 清掃完了通知 -->
           <div style="border-top:1px solid #eee;padding-top:12px;margin-bottom:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -1714,6 +1727,7 @@
                 <span class="toggle-slider"></span>
               </div>
             </div>
+            <div id="clLineCleanTargets" style="margin-bottom:6px;"></div>
             <textarea id="clLineCleanCompleteMsg" rows="5" placeholder="デフォルト:&#10;清掃完了通知&#10;{チェックアウト日}&#10;{完了時刻}&#10;{担当者}&#10;-------------------&#10;{要補充}&#10;{メモ}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
             <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {チェックアウト日} {完了時刻} {担当者} {要補充} {メモ}</p>
           </div>
@@ -1727,6 +1741,7 @@
                 <span class="toggle-slider"></span>
               </div>
             </div>
+            <div id="clLineLaundryTargets" style="margin-bottom:6px;"></div>
             <textarea id="clLineLaundryMsg" rows="3" placeholder="デフォルト:&#10;{ステップ}&#10;{チェックアウト日}&#10;{時刻}&#10;{担当者}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
             <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {ステップ}=提出/受取/戻し {チェックアウト日} {時刻}=15:29 {担当者}</p>
           </div>
@@ -2253,9 +2268,56 @@
 
     // === LINE通知設定 ===
     var _clLineTargets = [];
+    // 各通知の個別送信先ID配列（空=全送信先）
+    var _clLineMemoTargetIds = [];
+    var _clLineCleanTargetIds = [];
+    var _clLineLaundryTargetIds = [];
 
     var _CL_DEFAULT_CLEAN_COMPLETE_MSG = '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
     var _CL_DEFAULT_LAUNDRY_MSG = '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
+
+    /** 通知ごとの送信先チェックボックスを描画 */
+    function renderNotifyTargetCheckboxes(containerId, selectedIds) {
+      var container = document.getElementById(containerId);
+      if (!container) return;
+      var enabledTargets = _clLineTargets.filter(function(t) { return t.enabled && t.id; });
+      if (enabledTargets.length === 0) {
+        container.innerHTML = '<span style="font-size:11px;color:#999;">送信先が未登録です</span>';
+        return;
+      }
+      // 未設定（空配列）=全選択として扱う
+      var allSelected = !selectedIds || selectedIds.length === 0;
+      var html = '<div style="font-size:11px;color:#888;margin-bottom:4px;">送信先:</div>';
+      enabledTargets.forEach(function(t) {
+        var checked = allSelected || selectedIds.indexOf(t.id) >= 0;
+        html += '<label style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:12px;cursor:pointer;">';
+        html += '<input type="checkbox" data-container="' + containerId + '" data-target-id="' + escapeHtml(t.id) + '" ' + (checked ? 'checked' : '') + ' onchange="updateNotifyTargetIds(\'' + containerId + '\')" style="margin:0;">';
+        html += escapeHtml(t.label || t.id);
+        html += '</label>';
+      });
+      container.innerHTML = html;
+    }
+
+    /** チェックボックスの状態から選択されたIDを取得 */
+    function getNotifyTargetIds(containerId) {
+      var container = document.getElementById(containerId);
+      if (!container) return [];
+      var checkboxes = container.querySelectorAll('input[type=checkbox]');
+      var ids = [];
+      var allChecked = true;
+      checkboxes.forEach(function(cb) {
+        if (cb.checked) { ids.push(cb.getAttribute('data-target-id')); }
+        else { allChecked = false; }
+      });
+      // 全選択なら空配列を返す（=フィルタなし=全送信先）
+      return allChecked ? [] : ids;
+    }
+
+    function updateNotifyTargetIds(containerId) {
+      if (containerId === 'clLineMemoTargets') _clLineMemoTargetIds = getNotifyTargetIds(containerId);
+      else if (containerId === 'clLineCleanTargets') _clLineCleanTargetIds = getNotifyTargetIds(containerId);
+      else if (containerId === 'clLineLaundryTargets') _clLineLaundryTargetIds = getNotifyTargetIds(containerId);
+    }
 
     function loadClLineNotifySettings() {
       // まずデフォルト値を入れておく
@@ -2268,12 +2330,24 @@
         if (!res.success) return;
         _clLineTargets = res.targets || [];
         renderClLineTargetList();
+        // メモ通知
+        var memoEn = document.getElementById('clLineMemoEnabled');
+        if (memoEn) memoEn.checked = res.memoEnabled !== false;
+        _clLineMemoTargetIds = res.memoTargetIds || [];
+        // 清掃完了
         var ccEn = document.getElementById('clLineCleanCompleteEnabled');
         if (ccEn) ccEn.checked = res.cleanCompleteEnabled !== false;
         if (ccMsg) ccMsg.value = res.cleanCompleteMsg || _CL_DEFAULT_CLEAN_COMPLETE_MSG;
+        _clLineCleanTargetIds = res.cleanTargetIds || [];
+        // コインランドリー
         var lEn = document.getElementById('clLineLaundryEnabled');
         if (lEn) lEn.checked = res.laundryEnabled !== false;
         if (lMsg) lMsg.value = res.laundryMsg || _CL_DEFAULT_LAUNDRY_MSG;
+        _clLineLaundryTargetIds = res.laundryTargetIds || [];
+        // 各通知の送信先チェックボックスを描画
+        renderNotifyTargetCheckboxes('clLineMemoTargets', _clLineMemoTargetIds);
+        renderNotifyTargetCheckboxes('clLineCleanTargets', _clLineCleanTargetIds);
+        renderNotifyTargetCheckboxes('clLineLaundryTargets', _clLineLaundryTargetIds);
       }).catch(function() {});
     }
 
@@ -2299,6 +2373,13 @@
       container.innerHTML = html;
     }
 
+    /** 送信先リスト変更後に全通知の送信先チェックボックスも再描画 */
+    function refreshAllNotifyTargetCheckboxes() {
+      renderNotifyTargetCheckboxes('clLineMemoTargets', _clLineMemoTargetIds);
+      renderNotifyTargetCheckboxes('clLineCleanTargets', _clLineCleanTargetIds);
+      renderNotifyTargetCheckboxes('clLineLaundryTargets', _clLineLaundryTargetIds);
+    }
+
     function addClLineTarget() {
       var idInput = document.getElementById('clLineNewTargetId');
       var labelInput = document.getElementById('clLineNewTargetLabel');
@@ -2309,15 +2390,18 @@
       _clLineTargets.push({ id: id, label: label, enabled: true });
       idInput.value = ''; labelInput.value = '';
       renderClLineTargetList();
+      refreshAllNotifyTargetCheckboxes();
     }
 
     function removeClLineTarget(idx) {
       _clLineTargets.splice(idx, 1);
       renderClLineTargetList();
+      refreshAllNotifyTargetCheckboxes();
     }
 
     function toggleClLineTarget(idx, checked) {
       if (_clLineTargets[idx]) _clLineTargets[idx].enabled = checked;
+      refreshAllNotifyTargetCheckboxes();
     }
 
     function testClLineTarget(idx) {
@@ -2333,10 +2417,14 @@
     function saveClLineNotifySettings() {
       var settings = {
         targets: _clLineTargets,
+        memoEnabled: document.getElementById('clLineMemoEnabled').checked,
+        memoTargetIds: getNotifyTargetIds('clLineMemoTargets'),
         cleanCompleteEnabled: document.getElementById('clLineCleanCompleteEnabled').checked,
         cleanCompleteMsg: document.getElementById('clLineCleanCompleteMsg').value,
+        cleanTargetIds: getNotifyTargetIds('clLineCleanTargets'),
         laundryEnabled: document.getElementById('clLineLaundryEnabled').checked,
-        laundryMsg: document.getElementById('clLineLaundryMsg').value
+        laundryMsg: document.getElementById('clLineLaundryMsg').value,
+        laundryTargetIds: getNotifyTargetIds('clLineLaundryTargets')
       };
       var resEl = document.getElementById('clLineSaveResult');
       resEl.style.display = 'block'; resEl.textContent = '保存中...'; resEl.style.color = '#666';

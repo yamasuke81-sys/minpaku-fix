@@ -2828,6 +2828,8 @@ function parseICal_(icalText, platformName) {
         var days = parseICalDurationToDays_(current.duration);
         if (days > 0) checkOut = addDaysToDateKey_(checkIn, days);
       }
+      // [DEBUG-ICAL] 全VEVENTの生データをログ出力（ブロック日判定前）
+      Logger.log('[DEBUG-ICAL] ' + (platformName||'?') + ' VEVENT: SUMMARY="' + (current.summary||'') + '", CI=' + checkIn + ', CO=' + checkOut + ', STATUS=' + (current.status||'') + ', UID=' + (current.uid||'').substring(0,30));
       // STATUS:CANCELLED → cancelledDatePairsに記録してスキップ
       if (/^CANCELLED$/i.test(String(current.status || '').trim())) {
         if (checkIn && checkOut) cancelledDatePairs[checkIn + '|' + checkOut] = true;
@@ -2860,7 +2862,13 @@ function parseICal_(icalText, platformName) {
         var isBlockedEntry = /^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)
           || sumLower.indexOf('not available') >= 0
           || (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum)));
-        if (isBlockedEntry) { skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue; }
+        // [DEBUG-ICAL] ブロック日判定の詳細
+        if (isBlockedEntry) {
+          Logger.log('[DEBUG-ICAL] BLOCKED: "' + sum + '" (' + checkIn + '→' + checkOut + ') matchedBy: notAvailExact=' + /^not\s*available$/i.test(sum) + ' closedExact=' + /^closed$/i.test(sum) + ' notAvailPartial=' + (sumLower.indexOf('not available') >= 0) + ' closedCombo=' + (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum))));
+          skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue;
+        } else {
+          Logger.log('[DEBUG-ICAL] PASS: "' + sum + '" (' + checkIn + '→' + checkOut + ') → guestName will be extracted');
+        }
         // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
         var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
         // "Reserved"のみ → ゲスト名不明だがブロック日ではない実予約
@@ -2990,6 +2998,13 @@ function syncFromICal() {
       var icalLen = (icalText || '').length;
       var veventCount = ((icalText || '').match(/BEGIN:VEVENT/g) || []).length;
       Logger.log('iCal ' + platformName + ': fetch OK, length=' + icalLen + ', VEVENTs=' + veventCount);
+      // [DEBUG-ICAL] 2026-03-22付近の予約がフィードに含まれているか確認
+      if (platformName.toLowerCase().indexOf('booking') >= 0) {
+        Logger.log('[DEBUG-ICAL] Booking.com フィード全文（先頭3000文字）:');
+        Logger.log('[DEBUG-ICAL-RAW] ' + (icalText || '').substring(0, 3000));
+        if (icalLen > 3000) Logger.log('[DEBUG-ICAL-RAW2] ' + (icalText || '').substring(3000, 6000));
+        if (icalLen > 6000) Logger.log('[DEBUG-ICAL-RAW3] ' + (icalText || '').substring(6000, 9000));
+      }
       if (veventCount === 0) {
         Logger.log('iCal ' + platformName + ' feed preview: ' + (icalText || '').substring(0, 500));
       }

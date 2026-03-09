@@ -1093,8 +1093,16 @@ function clSendLineToTarget_(text, targetId, token) {
     };
     var resp = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', options);
     var code = resp.getResponseCode();
-    if (code !== 200) Logger.log('LINE送信エラー: HTTP ' + code + ' ' + resp.getContentText());
-    return { ok: code === 200, httpCode: code };
+    if (code !== 200) {
+      var respBody = resp.getContentText();
+      var respHeaders = resp.getAllHeaders();
+      Logger.log('[DEBUG-LINE] HTTP ' + code + ' body=' + respBody);
+      Logger.log('[DEBUG-LINE] headers=' + JSON.stringify(respHeaders));
+      Logger.log('[DEBUG-LINE] Retry-After=' + (respHeaders['Retry-After'] || respHeaders['retry-after'] || 'なし'));
+      Logger.log('[DEBUG-LINE] X-Line-Request-Id=' + (respHeaders['X-Line-Request-Id'] || respHeaders['x-line-request-id'] || 'なし'));
+      return { ok: false, httpCode: code, body: respBody, retryAfter: respHeaders['Retry-After'] || respHeaders['retry-after'] || '' };
+    }
+    return { ok: true, httpCode: code };
   } catch (e) {
     Logger.log('clSendLineToTarget_: ' + e.toString());
     return { ok: false, reason: e.toString() };

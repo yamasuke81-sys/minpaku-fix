@@ -1473,13 +1473,10 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     }
     htmlBody += '<p style="color:#888;font-size:12px;">詳細はチェックリストをご確認ください。</p></div>';
 
-    // メール送信
-    if (isEmailNotifyEnabled_('清掃完了通知有効')) {
-      GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
-    }
     ccProps.setProperty(ccPropKey, '1');
 
-    // LINE送信（全送信先へ）
+    // LINE送信（全送信先へ）— メール送信より先に実行
+    var lineResults = [];
     try {
       var clMap = clGetRecruitSettingsMap_();
       var lineEnabled = clMap['CL_LINE_清掃完了有効'] !== 'false';
@@ -1499,12 +1496,21 @@ function notifyCleaningComplete(checkoutDate, staffName) {
           .replace(/\{完了時刻\}/g, nowTime)
           .replace(/\{要補充\}/g, supplyText)
           .replace(/\{メモ\}/g, memoText);
-        // 空行の整理（連続する改行を2つまでに）
         lineMsg = lineMsg.replace(/\n{3,}/g, '\n\n').trim();
-        clSendLineToAll_(lineMsg);
+        lineResults = clSendLineToAll_(lineMsg);
+        Logger.log('[清掃完了LINE] 送信結果: ' + JSON.stringify(lineResults));
       }
     } catch (lineErr) {
-      Logger.log('清掃完了LINE送信エラー: ' + lineErr.toString());
+      Logger.log('[清掃完了LINE] エラー: ' + lineErr.toString());
+    }
+
+    // メール送信
+    try {
+      if (isEmailNotifyEnabled_('清掃完了通知有効')) {
+        GmailApp.sendEmail(ownerEmail, subject, body, { htmlBody: htmlBody });
+      }
+    } catch (mailErr) {
+      Logger.log('[清掃完了メール] エラー: ' + mailErr.toString());
     }
 
     // メインアプリの通知にも追加
@@ -1633,8 +1639,11 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
     }
 
     // LINE送信（クリーニング状況）
+    var laundryLineResults = [];
     try {
       var clMap = clGetRecruitSettingsMap_();
+      Logger.log('[クリーニングLINE] CL_LINE_クリーニング有効=' + (clMap['CL_LINE_クリーニング有効'] || '(未設定)'));
+      Logger.log('[クリーニングLINE] CL_LINE送信先=' + (clMap['CL_LINE送信先'] || '(未設定)'));
       var laundryLineEnabled = clMap['CL_LINE_クリーニング有効'] !== 'false';
       if (laundryLineEnabled) {
         var stepLabels = { sent: 'クリーニング提出しました', received: 'クリーニング受け取りました', returned: 'クリーニング施設に戻しました' };
@@ -1644,10 +1653,14 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
           .replace(/\{チェックアウト日\}/g, checkoutDate)
           .replace(/\{担当者\}/g, staffName || '不明')
           .replace(/\{時刻\}/g, now.split(' ')[1] || now);
-        clSendLineToAll_(laundryLineMsg);
+        Logger.log('[クリーニングLINE] 送信メッセージ: ' + laundryLineMsg);
+        laundryLineResults = clSendLineToAll_(laundryLineMsg);
+        Logger.log('[クリーニングLINE] 送信結果: ' + JSON.stringify(laundryLineResults));
+      } else {
+        Logger.log('[クリーニングLINE] 無効のためスキップ');
       }
     } catch (lineErr) {
-      Logger.log('クリーニングLINE送信エラー: ' + lineErr.toString());
+      Logger.log('[クリーニングLINE] エラー: ' + lineErr.toString());
     }
 
     return JSON.stringify({ success: true });

@@ -115,38 +115,41 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 ### isEmailNotifyEnabled_ と getNotifyChannel_ の二重構造
 旧来の`isEmailNotifyEnabled_(sheetKey)`は各通知のON/OFFトグル。セッション5で追加した`getNotifyChannel_(notifyKey)`はメール/LINE/両方の選択。両方が混在しており、一部の関数で片方しかチェックしていない。全通知関数で統一が必要。
 
-### 【重要】メインApp と チェックリストApp の関数実行先問題（要検証）
+### 【確定】メインApp と チェックリストApp の関数実行先（セッション13で検証完了）
 
-**従来の理解（セッション12以前）**:
-チェックリストHTML（`checklist.html`）から `google.script.run` で呼ばれる関数は、メインApp（Code.gs）側で実行される。これはチェックリストHTMLがメインAppのウェブアプリとして配信されているため。
+**結論**: 各HTMLは**自分のGASプロジェクトの関数を実行する**。
 
-**セッション12で判明した矛盾**:
-- `addChecklistMemo` に `[DEBUG-LINE]` ログを `checklist-app/Code.gs` にのみ追加
-- しかし**メインApp側のGAS実行ログに `addChecklistMemo` の実行記録が出ていない**
-- これは**チェックリストアプリが独自デプロイ（別プロジェクト）で実行されている可能性**を示唆
+| 呼び出し元 | 実行先 | 根拠 |
+|---|---|---|
+| **index.html** → `google.script.run` | **メインApp（Code.gs）** | メインApp実行ログにランドリー関数あり |
+| **checklist.html** → `callGAS()` | **チェックリストApp（checklist-app/Code.gs）** | チェックリストApp実行ログに`getChecklistForDate`等あり、メインApp側に`addChecklistMemo`の実行記録なし |
 
-**現在の仮説**: チェックリストHTMLはチェックリストApp（別GASプロジェクト）の独自デプロイURLで配信されており、`google.script.run` で呼ばれる関数は**チェックリストApp側の Code.gs で実行される**。
+**検証結果（2026-03-09 セッション13）**:
+- チェックリストApp実行ログ: `getChecklistForDate`, `getCLLineNotifySettings`, `getPhotoFolderSettings` が多数実行。`recordCleaningLaundryStep`はフィルタで**0件**
+- メインApp実行ログ: `recordCleaningLaundryStep`, `getCleaningLaundryStatus`, `cancelCleaningLaundryStep` が17:00/17:08/17:13等に実行
+- → ランドリー関数はindex.htmlの清掃モーダルから呼ばれてメインAppで実行されたもの
 
-**検証方法**:
-1. チェックリストAppのGASエディタ（別プロジェクト）を開き、実行数のログを確認
-2. そこに `addChecklistMemo` の実行と `[DEBUG-LINE]` ログが表示されるはず
-3. メインApp側の実行ログに `addChecklistMemo` が**出ていない**ことを再確認
+**両方のUIから呼ばれる関数（両方のCode.gsに必要）**:
+| 関数名 | index.html | checklist.html | シグネチャ差異 |
+|---|---|---|---|
+| `recordCleaningLaundryStep` | ✅ 9770行 | ✅ 6147行 | なし |
+| `getCleaningLaundryStatus` | ✅ 9636行 | ✅ 6045行 | なし |
+| `cancelCleaningLaundryStep` | ✅ 9843行 | ✅ 6174行 | なし |
 
-**検証結果が確定するまでの暫定ルール**:
-- チェックリスト関連の関数修正は、**念のため両方（Code.gs と checklist-app/Code.gs）に入れる**
-- 特にLINE送信等の新機能追加時は、どちらで実行されても動作するようにする
+**checklist.htmlからのみ呼ばれる関数（checklist-app/Code.gsが本体）**:
+| 関数名 | Code.gsにも存在 | シグネチャ差異 |
+|---|---|---|
+| `addChecklistMemo` | ✅ 11210行 | **あり**: Code.gs `(checkoutDate, text, staffName)` / checklist-app `(checkoutDate, text, staffName, photoFileId)` |
+| `notifyCleaningComplete` | ✅ 11226行 | なし |
+| `getChecklistForDate` | ✅ 11026行 | **あり**: Code.gs `(checkoutDate)` / checklist-app `(checkoutDate, deviceId)` |
+| `sendMemoToLine` | ❌ | — |
+| その他60+関数 | ❌ | — |
 
-**両方に存在する同名関数の例（シグネチャ差異あり）**:
-- `addChecklistMemo` — Code.gs: `(checkoutDate, text, staffName)` / checklist-app: `(checkoutDate, text, staffName, photoFileId)`
-- `recordCleaningLaundryStep` — v0309kでメインApp版にLINE送信を追加
-- `cancelCleaningLaundryStep`
-- `getCleaningLaundryStatus`
-- `notifyCleaningComplete`
-
-**修正・機能追加時の必須チェック**:
-1. `grep -n '関数名' Code.gs checklist-app/Code.gs` で両方の存在を確認すること
-2. 検証確定まで、**両方のファイルに修正を入れる**こと
-3. シグネチャの差異がないか確認すること（上記の`addChecklistMemo`のように引数が異なる場合あり）
+**修正・機能追加時のルール**:
+1. **ランドリー3関数**: 両方のUIから呼ばれるため、**必ず両方のCode.gsを修正**すること
+2. **その他のチェックリスト関数**: 基本は**checklist-app/Code.gsのみ修正**でOK。ただしCode.gsにも同名関数がある場合は、念のため両方に修正を入れる
+3. シグネチャの差異に注意（`addChecklistMemo`と`getChecklistForDate`は引数が異なる）
+4. 新機能追加時は `grep -n '関数名' Code.gs checklist-app/Code.gs` で両方の存在を確認すること
 
 ### 募集開始通知はiCal同期後に自動送信されない
 `autoSyncFromICal` → `checkAndCreateRecruitments` で募集エントリは自動作成されるが、スタッフへの通知（`notifyStaffForRecruitment`）は手動（オーナーが送信ボタン押下）。自動通知を実現するには`autoSyncFromICal`内で通知関数を呼ぶ修正が必要。

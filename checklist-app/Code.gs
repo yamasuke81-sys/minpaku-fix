@@ -1790,6 +1790,20 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       laundryLineResults = [{ ok: false, reason: 'exception: ' + lineErr.toString() }];
     }
 
+    // カレンダー通知欄に常に記録（LINE OFF でも）
+    try {
+      var bookingSs = getBookingSpreadsheet_();
+      var notifSheet = bookingSs.getSheetByName('通知履歴');
+      if (notifSheet) {
+        var stepLabelsNotif = { sent: '持っていきました', received: '回収しました', returned: '施設に戻しました' };
+        var notifNow = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+        var notifMsg = 'コインランドリー: ' + (stepLabelsNotif[step] || step) + ' ' + clFormatDateForNotif_(checkoutDate) + ' 担当: ' + (staffName || '不明');
+        var notifData = JSON.stringify({ type: 'laundry', checkoutDate: checkoutDate, step: step, staff: staffName });
+        var nRow = notifSheet.getLastRow() + 1;
+        notifSheet.getRange(nRow, 1, 1, 5).setValues([[notifNow, 'コインランドリー', notifMsg, '', notifData]]);
+      }
+    } catch (ne) { /* 通知追加失敗は無視 */ }
+
     Logger.log('[DEBUG-LAUNDRY] 完了。LINE結果=' + JSON.stringify(laundryLineResults));
     return JSON.stringify({ success: true, _debug_line: { enabled: (typeof laundryLineEnabled !== 'undefined' ? laundryLineEnabled : 'N/A'), results: laundryLineResults, step: step, msg: (typeof laundryLineMsg !== 'undefined' ? laundryLineMsg : 'N/A') } });
   } catch (e) {

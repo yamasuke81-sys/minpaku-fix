@@ -2303,14 +2303,19 @@
       var container = document.getElementById(containerId);
       if (!container) return [];
       var checkboxes = container.querySelectorAll('input[type=checkbox]');
+      if (checkboxes.length === 0) return [];
       var ids = [];
       var allChecked = true;
+      var noneChecked = true;
       checkboxes.forEach(function(cb) {
-        if (cb.checked) { ids.push(cb.getAttribute('data-target-id')); }
+        if (cb.checked) { ids.push(cb.getAttribute('data-target-id')); noneChecked = false; }
         else { allChecked = false; }
       });
       // 全選択なら空配列を返す（=フィルタなし=全送信先）
-      return allChecked ? [] : ids;
+      if (allChecked) return [];
+      // 全未選択なら特殊値を返す（=どこにも送らない）
+      if (noneChecked) return ['__none__'];
+      return ids;
     }
 
     function updateNotifyTargetIds(containerId) {

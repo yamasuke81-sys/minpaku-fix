@@ -1154,6 +1154,10 @@ function clSendLineToFiltered_(text, notifyType) {
     var filterIds = [];
     if (filterJson) { try { filterIds = JSON.parse(filterJson); } catch (e) {} }
 
+    // 全未選択（__none__）ならどこにも送らない
+    if (filterIds.length === 1 && filterIds[0] === '__none__') {
+      return [{ ok: false, reason: '送信先が選択されていません' }];
+    }
     // フィルタが設定されていれば該当IDのみ、未設定なら全有効送信先
     var sendTargets = enabledTargets;
     if (filterIds.length > 0) {

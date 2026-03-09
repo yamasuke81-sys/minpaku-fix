@@ -1437,25 +1437,28 @@ function saveOwnerUrl(ownerUrl) {
  * ScriptApp.getService().getUrl() を優先し、保存値にフォールバック
  */
 function getLatestStaffUrl_() {
+  // 保存済みスタッフURLを最優先（ユーザーがWebアプリにアクセスした時に保存された正しいURL）
   var url = '';
-  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
-  if (!url) {
-    try { url = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
-  }
+  try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
+  if (url) return url;
+  // 次にAPP_BASE_URL（doGetで保存されたベースURL）
+  try { url = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
   if (!url) {
     try {
       var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || '';
       if (depId) url = 'https://script.google.com/macros/s/' + depId + '/exec';
     } catch (e) {}
   }
+  // 最終フォールバック: ScriptApp.getService().getUrl()
+  // ※トリガー実行時に古いデプロイIDを返すことがあるため最後の手段
   if (!url) {
-    try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
-    return url;
+    try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
   }
-  if (url && url.indexOf('staff=1') < 0 && url.indexOf('staff=true') < 0) {
+  if (!url) return '';
+  if (url.indexOf('staff=1') < 0 && url.indexOf('staff=true') < 0) {
     url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
   }
-  try { PropertiesService.getDocumentProperties().setProperty('staffDeployUrl', url); } catch (e) {}
+  // ※トリガー経由で取得した可能性があるURLは保存しない（古いURLで上書きされるのを防止）
   return url;
 }
 
@@ -3187,6 +3190,28 @@ function syncFromICal() {
 }
 
 /**
+ * [DEBUG] 自動同期のデバッグ情報を取得（フロントから呼び出し用）
+ */
+function getICalSyncDebug() {
+  var result = {};
+  try {
+    var props = PropertiesService.getDocumentProperties().getProperties();
+    for (var key in props) {
+      if (key.indexOf('_debug_ical_') === 0) {
+        result[key.replace('_debug_ical_', '')] = JSON.parse(props[key]);
+      }
+    }
+    // URL情報もデバッグ用に返す
+    result['_urls'] = {
+      staffDeployUrl: PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || '',
+      APP_BASE_URL: PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '',
+      ownerBaseUrl: PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || ''
+    };
+  } catch (e) { result._error = e.toString(); }
+  return JSON.stringify(result);
+}
+
+/**
  * 自動iCal同期（トリガーから呼ばれる版 - requireOwner不要）
  */
 function autoSyncFromICal() {
@@ -3252,6 +3277,21 @@ function autoSyncFromICal() {
           continue;
         }
         var icalText = resp.getContentText();
+        // [DEBUG] Booking.comフィードのデバッグ情報をプロパティに保存（フロント確認用）
+        var icalLen = (icalText || '').length;
+        var autoVeventCount = ((icalText || '').match(/BEGIN:VEVENT/g) || []).length;
+        try {
+          PropertiesService.getDocumentProperties().setProperty(
+            '_debug_ical_' + platformName,
+            JSON.stringify({
+              ts: Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm:ss'),
+              len: icalLen,
+              vevents: autoVeventCount,
+              preview: (icalText || '').substring(0, 800),
+              httpCode: resp.getResponseCode()
+            })
+          );
+        } catch (dp) {}
 
         var parseResult = parseICal_(icalText, platformName);
         var events = parseResult.events;
@@ -3392,8 +3432,12 @@ function autoSyncFromICal() {
           }
         }
 
+        var veventCountAuto = ((icalText || '').match(/BEGIN:VEVENT/g) || []).length;
+        var sr = parseResult.skipReasons || {};
         var statusStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'M/d HH:mm') + ' (自動) 取得' + events.length + '件';
         if (platformAdded > 0) statusStr += ' 追加' + platformAdded;
+        // [DEBUG] VEVENT数とスキップ内訳を最終同期欄に表示
+        statusStr += ' [VEVENT=' + veventCountAuto + ' blk=' + (sr.blocked||0) + ' pf=' + (sr.platformName||0) + ' cn=' + (sr.cancelled||0) + ']';
         syncSheet.getRange(si + 2, 4).setValue(statusStr);
         if (platformAdded > 0) {
           var ciList = platformCheckIns.map(function(d) { return formatDateForNotif_(d); }).join(', ');
@@ -10402,10 +10446,15 @@ function getStaffAppUrl_() {
  * 清掃詳細のディープリンクURLを生成
  */
 function buildCleaningDetailUrl_(checkoutDateStr) {
+  // 保存済みスタッフURLを最優先（ScriptApp.getService().getUrl()はトリガー時に古いデプロイIDを返すため）
   var base = '';
-  try { base = ScriptApp.getService().getUrl() || ''; } catch (e) {}
-  if (!base) { try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {} }
+  try { base = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
+  // staffDeployUrlは既にstaff=1付きなので、dateパラメータだけ追加
+  if (base) return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(checkoutDateStr);
+  // フォールバック: APP_BASE_URL → deploymentId → ScriptApp
+  try { base = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
   if (!base) { try { var depId = PropertiesService.getDocumentProperties().getProperty('deploymentId') || ''; if (depId) base = 'https://script.google.com/macros/s/' + depId + '/exec'; } catch (e) {} }
+  if (!base) { try { base = ScriptApp.getService().getUrl() || ''; } catch (e) {} }
   if (!base) return '';
   return base + (base.indexOf('?') >= 0 ? '&' : '?') + 'date=' + encodeURIComponent(checkoutDateStr);
 }

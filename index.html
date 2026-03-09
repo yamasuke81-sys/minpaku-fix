@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0309z</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1584,6 +1584,9 @@
         </div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveAutoSync">自動同期設定を保存</button>
         <div id="autoSyncSaveResult" class="small mt-1" style="display:none;"></div>
+        <hr>
+        <button type="button" class="btn btn-sm btn-outline-info" id="btnICalDebug" onclick="loadICalSyncDebug()">同期デバッグ情報を取得</button>
+        <div id="icalDebugResult" class="small mt-2" style="display:none;"></div>
       </div>
       <div id="settingsNotifications" style="display:none;">
         <p class="small text-muted mb-2">回答・回答取消・予約追加・予約削除・フォーム回答などの通知履歴です。</p>
@@ -8836,6 +8839,59 @@
           btn.disabled = false;
         }).saveAutoSyncSettings(interval);
       });
+
+      // [DEBUG] iCal同期デバッグ情報取得
+      window.loadICalSyncDebug = function() {
+        var resEl = document.getElementById('icalDebugResult');
+        var btn = document.getElementById('btnICalDebug');
+        btn.disabled = true;
+        btn.textContent = '取得中...';
+        resEl.style.display = 'none';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false;
+          btn.textContent = '同期デバッグ情報を取得';
+          resEl.style.display = 'block';
+          try {
+            var data = JSON.parse(jsonStr);
+            var html = '<div class="alert alert-info p-2" style="white-space:pre-wrap;font-family:monospace;font-size:0.75rem;max-height:400px;overflow:auto;">';
+            // URL情報
+            if (data._urls) {
+              html += '<strong>[保存済みURL]</strong>\n';
+              html += 'staffDeployUrl: ' + (data._urls.staffDeployUrl || '(空)') + '\n';
+              html += 'APP_BASE_URL: ' + (data._urls.APP_BASE_URL || '(空)') + '\n';
+              html += 'ownerBaseUrl: ' + (data._urls.ownerBaseUrl || '(空)') + '\n\n';
+              delete data._urls;
+            }
+            if (data._error) {
+              html += '<strong>[エラー]</strong> ' + escapeHtml(data._error) + '\n';
+              delete data._error;
+            }
+            // プラットフォーム別情報
+            for (var pf in data) {
+              var d = data[pf];
+              html += '<strong>[' + escapeHtml(pf) + ']</strong>\n';
+              html += '同期時刻: ' + (d.ts || '不明') + '\n';
+              html += 'HTTP: ' + (d.httpCode || '不明') + ', フィード長: ' + (d.len || 0) + '文字\n';
+              html += 'VEVENT数: ' + (d.vevents || 0) + '\n';
+              html += 'フィード先頭:\n' + escapeHtml(d.preview || '(空)') + '\n\n';
+            }
+            if (Object.keys(data).length === 0) {
+              html += '(自動同期のデバッグ情報がまだありません。自動同期が1回実行された後に再度取得してください。)';
+            }
+            html += '</div>';
+            resEl.innerHTML = html;
+          } catch (e) {
+            resEl.className = 'small mt-2 text-danger';
+            resEl.textContent = 'パースエラー: ' + e.message;
+          }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '同期デバッグ情報を取得';
+          resEl.style.display = 'block';
+          resEl.className = 'small mt-2 text-danger';
+          resEl.textContent = '取得失敗: ' + (err.message || err);
+        }).getICalSyncDebug();
+      };
 
       function doReloadData() {
         var btnSync = document.getElementById('btnReloadDataSync');

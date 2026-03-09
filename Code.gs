@@ -1437,11 +1437,23 @@ function saveOwnerUrl(ownerUrl) {
  * ScriptApp.getService().getUrl() を優先し、保存値にフォールバック
  */
 function getLatestStaffUrl_() {
-  // 保存済みスタッフURLを最優先（ユーザーがWebアプリにアクセスした時に保存された正しいURL）
+  // ownerBaseUrl（ユーザーが設定画面で保存した正しいURL）を最優先
+  // staffDeployUrlはdeploy-all.jsで設定されるが、古いデプロイIDが残ることがある
   var url = '';
   var source = '';
-  try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
-  if (url) { source = 'staffDeployUrl'; }
+  try {
+    var ownerBase = PropertiesService.getDocumentProperties().getProperty('ownerBaseUrl') || '';
+    if (ownerBase) {
+      // ownerBaseUrlからstaff=1パラメータ付きURLを生成
+      url = ownerBase;
+      source = 'ownerBaseUrl';
+    }
+  } catch (e) {}
+  // 次にstaffDeployUrl（deploy-all.jsで設定）
+  if (!url) {
+    try { url = PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || ''; } catch (e) {}
+    if (url) source = 'staffDeployUrl';
+  }
   // 次にAPP_BASE_URL（doGetで保存されたベースURL）
   if (!url) {
     try { url = PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || ''; } catch (e) {}
@@ -1458,21 +1470,11 @@ function getLatestStaffUrl_() {
   if (!url) {
     try { url = ScriptApp.getService().getUrl() || ''; source = 'ScriptApp.getService()'; } catch (e) {}
   }
-  // デバッグ: どのソースからURLを取得したか記録
   Logger.log('[DEBUG-URL] source=' + source + ', url=' + url);
-  try {
-    var _allSources = {
-      staffDeployUrl: PropertiesService.getDocumentProperties().getProperty('staffDeployUrl') || '(未設定)',
-      APP_BASE_URL: PropertiesService.getScriptProperties().getProperty('APP_BASE_URL') || '(未設定)',
-      deploymentId: PropertiesService.getDocumentProperties().getProperty('deploymentId') || '(未設定)'
-    };
-    Logger.log('[DEBUG-URL] 全ソース: ' + JSON.stringify(_allSources));
-  } catch (e2) {}
   if (!url) return '';
   if (url.indexOf('staff=1') < 0 && url.indexOf('staff=true') < 0) {
     url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'staff=1';
   }
-  // ※トリガー経由で取得した可能性があるURLは保存しない（古いURLで上書きされるのを防止）
   return url;
 }
 

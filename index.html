@@ -39,6 +39,10 @@
     .fc-col-header-cell {
       border: 1px solid #adb5bd !important;
     }
+    .fc .fc-col-header-cell-cushion {
+      color: #212529 !important;
+      text-decoration: none !important;
+    }
     body {
       font-size: 14px;
       -webkit-tap-highlight-color: transparent;
@@ -123,7 +127,10 @@
       .fc .fc-day-other .fc-daygrid-day-frame {
         background-color: #0d0d0d !important;
       }
-      .fc .fc-col-header-cell-cushion,
+      .fc .fc-col-header-cell-cushion {
+        color: #e0e0e0 !important;
+        text-decoration: none !important;
+      }
       .fc .fc-daygrid-day-number {
         color: #e0e0e0 !important;
       }
@@ -1168,7 +1175,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1223,7 +1230,7 @@
             <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
           </div>
         </div>
-        <a href="#" target="_blank" class="btn btn-warning" id="btnTodayChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.3;text-decoration:none;color:#212529;display:none;">清掃✓リスト</a>
+        <a href="#" target="_blank" class="btn btn-warning" id="btnTodayChecklist" style="white-space:normal;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.1;text-decoration:none;color:#212529;display:none;text-align:center;width:3.2em;">清掃✓<br>リスト</a>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>

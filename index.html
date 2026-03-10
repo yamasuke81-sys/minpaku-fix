@@ -1163,7 +1163,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310o</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2640,13 +2640,13 @@
         return '大' + adults + '幼' + infants + '、BQ' + bbqMark;
       }
 
-      // 清掃イベントタイトル（スタッフ名は頭1文字ずつ）
+      // 清掃イベントタイトル（スタッフ名は先頭2文字ずつ）
       function formatCleaningTitle(b) {
         if (window.readOnly) return '清掃';
         var raw = (b.cleaningStaff && String(b.cleaningStaff).trim()) ? String(b.cleaningStaff).trim() : '';
-        if (!raw) return '掃/未定';
-        var initials = raw.split(/[,、]/).map(function(s) { return s.trim().charAt(0); }).filter(Boolean).join(',');
-        return '掃/' + initials;
+        if (!raw) return '未定';
+        var names = raw.split(/[,、]/).map(function(s) { return s.trim().substring(0, 2); }).filter(Boolean).join('、');
+        return names;
       }
 
       // データ取得

@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1453,7 +1453,8 @@
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">プレースホルダー: <code>{作業日}</code> <code>{日付}</code> <code>{人数}</code> <code>{ベッド}</code> <code>{BBQ}</code> <code>{国籍}</code> <code>{回答URL}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitStartSubject" placeholder="例: 清掃スタッフ募集: {作業日}"></div>
-        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitStartBody" rows="8" placeholder="例: 清掃募集&#10;&#10;作業日: {作業日}&#10;&#10;次回予約（変更の可能性あり）&#10;日付：　　{日付}&#10;人数：　　{人数}&#10;ベッド：　{ベッド}&#10;BBQ：　　{BBQ}&#10;国籍：　　{国籍}&#10;&#10;※予約状況次第では変更となる場合があります。&#10;&#10;Webアプリで回答: {回答URL}"></textarea></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm etpl-body" data-etpl="recruitStart" id="recruitStartBody" rows="8" placeholder="例: 清掃募集&#10;&#10;作業日: {作業日}&#10;&#10;次回予約（変更の可能性あり）&#10;日付：　　{日付}&#10;人数：　　{人数}&#10;ベッド：　{ベッド}&#10;BBQ：　　{BBQ}&#10;国籍：　　{国籍}&#10;&#10;※予約状況次第では変更となる場合があります。&#10;&#10;Webアプリで回答: {回答URL}"></textarea></div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="recruitStart" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
         <p class="small text-muted mb-1">※ 空欄の場合はデフォルト文面が使われます。清掃詳細画面の「テキストコピー」ではこのテンプレートが初期表示され、その場で編集もできます（テンプレート本体は変更されません）。</p>
 
         <hr class="my-3">
@@ -1485,7 +1486,8 @@
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{チェックアウト}</code> <code>{回答数}</code> <code>{最少回答者数}</code> <code>{回答URL}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="recruitReminderSubject" placeholder="例: 清掃募集リマインド: {チェックアウト}"></div>
-        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="recruitReminderBody" rows="4" placeholder="例: 清掃スタッフの回答がまだ{最少回答者数}名に達していません。&#10;チェックアウト: {チェックアウト}&#10;現在の回答数: {回答数}名"></textarea></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm etpl-body" data-etpl="recruitReminder" id="recruitReminderBody" rows="4" placeholder="例: 清掃スタッフの回答がまだ{最少回答者数}名に達していません。&#10;チェックアウト: {チェックアウト}&#10;現在の回答数: {回答数}名"></textarea></div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="recruitReminder" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRecruitSettings">募集設定を保存</button>
         <p class="small text-muted mt-2">※ 募集リマインドのトリガーは「未決定・直前リマインド」タブの「トリガーをセットアップ」で設定できます。</p>
         <hr class="my-3">
@@ -1561,8 +1563,9 @@
         </div>
         <div class="mb-3">
           <label class="form-label small">本文</label>
-          <textarea class="form-control form-control-sm" id="reminderBody" rows="5" placeholder="例: 清掃スタッフがまだ確定していません。&#10;チェックイン: {チェックイン}&#10;残り日数: {残り日数}日&#10;詳細: {清掃詳細リンク}"></textarea>
+          <textarea class="form-control form-control-sm etpl-body" data-etpl="reminder" id="reminderBody" rows="5" placeholder="例: 清掃スタッフがまだ確定していません。&#10;チェックイン: {チェックイン}&#10;残り日数: {残り日数}日&#10;詳細: {清掃詳細リンク}"></textarea>
         </div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="reminder" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
         <hr class="my-3">
         <h6 class="fw-bold mb-2" style="font-size:0.9rem;">直前予約リマインド（即時）</h6>
         <div class="form-check form-switch mb-2">
@@ -1582,8 +1585,9 @@
         </div>
         <div class="mb-3">
           <label class="form-label small">本文</label>
-          <textarea class="form-control form-control-sm" id="immediateBody" rows="5" placeholder="例: 直前予約が追加されました。&#10;チェックイン: {チェックイン}&#10;プラットフォーム: {プラットフォーム}&#10;詳細: {清掃詳細リンク}"></textarea>
+          <textarea class="form-control form-control-sm etpl-body" data-etpl="immediate" id="immediateBody" rows="5" placeholder="例: 直前予約が追加されました。&#10;チェックイン: {チェックイン}&#10;プラットフォーム: {プラットフォーム}&#10;詳細: {清掃詳細リンク}"></textarea>
         </div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="immediate" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveReminderEmail">リマインド設定を保存</button>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="btnSetupTriggers">トリガーをセットアップ</button>
         <p class="small text-muted mt-2">※ 「トリガーをセットアップ」を押すと、リマインド関連のトリガーが自動で設定されます（重複があれば自動整理）。</p>
@@ -1622,7 +1626,8 @@
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">空欄の場合はデフォルト文面が使われます。プレースホルダー: <code>{件数}</code> 未記入件数 <code>{未記入一覧}</code> 未記入予約の一覧 <code>{アプリURL}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="rosterReminderSubject" placeholder="例: 宿泊者名簿の未記入通知（{件数}件）"></div>
-        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="rosterReminderBody" rows="4" placeholder="例: 宿泊者名簿が未記入の予約が{件数}件あります。&#10;宿泊者への催促をお願いします。&#10;&#10;{未記入一覧}&#10;&#10;※ アプリの通知にも同じ内容が届いています。"></textarea></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm etpl-body" data-etpl="rosterReminder" id="rosterReminderBody" rows="4" placeholder="例: 宿泊者名簿が未記入の予約が{件数}件あります。&#10;宿泊者への催促をお願いします。&#10;&#10;{未記入一覧}&#10;&#10;※ アプリの通知にも同じ内容が届いています。"></textarea></div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="rosterReminder" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveRosterReminder">名簿未入力リマインド設定を保存</button>
         <p class="small text-muted mt-2">※ 名簿リマインドのトリガーは保存時に自動設定されます。</p>
         <hr class="my-3">
@@ -1800,8 +1805,9 @@
         </div>
         <div class="mb-3">
           <label class="form-label small">本文</label>
-          <textarea class="form-control form-control-sm" id="invoiceRequestBody" rows="8" placeholder="例: {スタッフ名} さん&#10;&#10;お疲れ様です。&#10;{対象年月}分の請求書のご提出をお願いいたします。&#10;&#10;締切: {締切日}&#10;&#10;Webアプリ: {アプリURL}&#10;&#10;よろしくお願いいたします。"></textarea>
+          <textarea class="form-control form-control-sm etpl-body" data-etpl="invoiceRequest" id="invoiceRequestBody" rows="8" placeholder="例: {スタッフ名} さん&#10;&#10;お疲れ様です。&#10;{対象年月}分の請求書のご提出をお願いいたします。&#10;&#10;締切: {締切日}&#10;&#10;Webアプリ: {アプリURL}&#10;&#10;よろしくお願いいたします。"></textarea>
         </div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="invoiceRequest" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
 
         <div class="d-flex gap-2 flex-wrap">
           <button type="button" class="btn btn-sm btn-primary" id="btnSaveInvoiceRequest">設定を保存</button>
@@ -1915,7 +1921,8 @@
         <label class="form-label small fw-bold">メール文面テンプレート</label>
         <p class="small text-muted mb-1">プレースホルダー: <code>{ゲスト名}</code> <code>{チェックイン}</code> <code>{旧チェックアウト}</code> <code>{新チェックアウト}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="dateChangeSubject" placeholder="【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}"></div>
-        <div class="mb-3"><label class="form-label small">本文</label><textarea class="form-control form-control-sm" id="dateChangeBody" rows="5" placeholder="予約の日付が変更されました。&#10;&#10;ゲスト: {ゲスト名}&#10;チェックイン: {チェックイン}&#10;変更前チェックアウト: {旧チェックアウト}&#10;変更後チェックアウト: {新チェックアウト}"></textarea></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm etpl-body" data-etpl="dateChange" id="dateChangeBody" rows="5" placeholder="予約の日付が変更されました。&#10;&#10;ゲスト: {ゲスト名}&#10;チェックイン: {チェックイン}&#10;変更前チェックアウト: {旧チェックアウト}&#10;変更後チェックアウト: {新チェックアウト}"></textarea></div>
+        <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="dateChange" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
         <button type="button" class="btn btn-sm btn-primary" id="btnSaveDateChangeTemplate">テンプレートを保存</button>
         <span id="dateChangeSaveResult" class="small text-success ms-2" style="display:none;">保存しました</span>
         <p class="small text-muted mt-2">※ 空欄の場合はデフォルト文面が使われます。スタッフ確定済みの場合は「確定解除」の文面が自動で追加されます。</p>
@@ -8709,7 +8716,7 @@
           .replace(/\{次回予約_ベッド\}/g, 'シングル2、ダブル1')
           .replace(/\{次回予約_BBQ\}/g, 'あり')
           .replace(/\{次回予約_国籍\}/g, 'アメリカ')
-          .replace(/\{アプリURL\}/g, 'Webアプリを確認: https://example.com/exec?staff=1&date=2026-03-01');
+          .replace(/\{アプリURL\}/g, 'https://example.com/exec?staff=1&date=2026-03-01');
         document.getElementById('confirmTemplatePreview').textContent = preview;
       }
 
@@ -8747,6 +8754,154 @@
           document.getElementById('confirmTemplateText').value = CONFIRM_TEMPLATE_DEFAULT;
           updateConfirmTemplatePreview();
         });
+      });
+
+      // ======================================================================
+      // 汎用通知テンプレート管理（6通知分）
+      // ======================================================================
+      var _ntplCache = {}; // 読み込んだテンプレートのキャッシュ
+      var NTPL_SAMPLE_VALUES = {
+        '予約キャンセル': { '{チェックアウト}': '3/15(土)', '{日付範囲}': '3/13(木)～3/15(土)', '{ゲスト名}': 'John Smith', '{清掃担当}': '田中太郎', '{清掃詳細URL}': '清掃詳細: https://example.com/exec?date=2026-03-15' },
+        '出勤キャンセル要望': { '{日付}': '3/15(土)', '{スタッフ名}': '田中太郎', '{清掃詳細URL}': '清掃詳細: https://example.com/exec?date=2026-03-15' },
+        'キャンセル承認': { '{日付}': '3/15(土)', '{スタッフ名}': '田中太郎', '{清掃詳細URL}': '清掃詳細: https://example.com/exec?date=2026-03-15' },
+        'キャンセル却下': { '{日付}': '3/15(土)', '{スタッフ名}': '田中太郎', '{清掃詳細URL}': '清掃詳細: https://example.com/exec?date=2026-03-15' },
+        '清掃完了': { '{日付}': '3/15(土)', '{チェック数}': '45', '{全項目数}': '50', '{撮影数}': '8', '{全撮影箇所数}': '10', '{特記事項}': '--- 特記事項 ---\n・トイレのタオル補充済み（田中 15:30）', '{清掃詳細URL}': '清掃詳細: https://example.com/exec?date=2026-03-15' },
+        '請求書送信': { '{スタッフ名}': '田中太郎', '{対象月}': '2026年3月', '{合計金額}': '50,000', '{対象期間}': '2026/3/1 ～ 2026/3/31', '{支払期限}': '2026/4/30', '{PDF_URL}': 'https://drive.google.com/file/d/xxx', '{フォルダURL}': 'https://drive.google.com/drive/folders/xxx' }
+      };
+
+      function ntplApplySample_(text, notifyName) {
+        var samples = NTPL_SAMPLE_VALUES[notifyName] || {};
+        var result = text || '';
+        Object.keys(samples).forEach(function(ph) {
+          result = result.replace(new RegExp(ph.replace(/[{}]/g, '\\$&'), 'g'), samples[ph]);
+        });
+        return result;
+      }
+
+      function ntplUpdatePreview_(notifyName) {
+        var bodyEl = document.querySelector('.ntpl-body[data-ntpl="' + notifyName + '"]');
+        var previewEl = document.querySelector('.ntpl-preview[data-ntpl="' + notifyName + '"]');
+        if (bodyEl && previewEl) previewEl.textContent = ntplApplySample_(bodyEl.value, notifyName);
+        // オーナー用プレビュー（予約キャンセルのみ）
+        var oBodyEl = document.querySelector('.ntpl-owner-body[data-ntpl="' + notifyName + '"]');
+        var oPreviewEl = document.querySelector('.ntpl-owner-preview[data-ntpl="' + notifyName + '"]');
+        if (oBodyEl && oPreviewEl) oPreviewEl.textContent = ntplApplySample_(oBodyEl.value, notifyName);
+      }
+
+      function loadNotifyTemplates_() {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (!r.success || !r.templates) return;
+            _ntplCache = r.templates;
+            Object.keys(r.templates).forEach(function(name) {
+              var t = r.templates[name];
+              var subEl = document.querySelector('.ntpl-subject[data-ntpl="' + name + '"]');
+              var bodyEl = document.querySelector('.ntpl-body[data-ntpl="' + name + '"]');
+              if (subEl) subEl.value = t.subject || t.defaultSubject || '';
+              if (bodyEl) bodyEl.value = t.body || t.defaultBody || '';
+              // オーナー用（予約キャンセル）
+              var oSubEl = document.querySelector('.ntpl-owner-subject[data-ntpl="' + name + '"]');
+              var oBodyEl = document.querySelector('.ntpl-owner-body[data-ntpl="' + name + '"]');
+              if (oSubEl) oSubEl.value = t.ownerSubject || t.defaultOwnerSubject || '';
+              if (oBodyEl) oBodyEl.value = t.ownerBody || t.defaultOwnerBody || '';
+              ntplUpdatePreview_(name);
+            });
+          } catch (e) {}
+        }).getNotifyTemplates();
+      }
+
+      // テンプレート入力時にリアルタイムプレビュー更新
+      document.querySelectorAll('.ntpl-body, .ntpl-owner-body').forEach(function(el) {
+        el.addEventListener('input', function() { ntplUpdatePreview_(this.getAttribute('data-ntpl')); });
+      });
+
+      // 保存ボタン
+      document.querySelectorAll('.ntpl-save').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var name = this.getAttribute('data-ntpl');
+          if (!name || this.disabled) return;
+          var subEl = document.querySelector('.ntpl-subject[data-ntpl="' + name + '"]');
+          var bodyEl = document.querySelector('.ntpl-body[data-ntpl="' + name + '"]');
+          var oSubEl = document.querySelector('.ntpl-owner-subject[data-ntpl="' + name + '"]');
+          var oBodyEl = document.querySelector('.ntpl-owner-body[data-ntpl="' + name + '"]');
+          var subject = subEl ? subEl.value : '';
+          var body = bodyEl ? bodyEl.value : '';
+          var oSub = oSubEl ? oSubEl.value : undefined;
+          var oBody = oBodyEl ? oBodyEl.value : undefined;
+          this.disabled = true;
+          this.textContent = '保存中...';
+          var self = this;
+          google.script.run.withSuccessHandler(function(jsonStr) {
+            self.disabled = false;
+            self.textContent = '保存';
+            var r = JSON.parse(jsonStr);
+            var msgEl = document.querySelector('.ntpl-save-msg[data-ntpl="' + name + '"]');
+            if (r.success && msgEl) {
+              msgEl.style.display = 'inline';
+              setTimeout(function() { msgEl.style.display = 'none'; }, 3000);
+            } else if (!r.success) {
+              alert(r.error || '保存に失敗しました');
+            }
+          }).withFailureHandler(function(e) {
+            self.disabled = false;
+            self.textContent = '保存';
+            alert(e.message || '保存に失敗しました');
+          }).saveNotifyTemplate(name, subject, body, oSub, oBody);
+        });
+      });
+
+      // デフォルトに戻すボタン
+      document.querySelectorAll('.ntpl-reset').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var name = this.getAttribute('data-ntpl');
+          var t = _ntplCache[name];
+          if (!t) return;
+          customConfirm('テンプレートをデフォルトに戻しますか？').then(function(ok) {
+            if (!ok) return;
+            var subEl = document.querySelector('.ntpl-subject[data-ntpl="' + name + '"]');
+            var bodyEl = document.querySelector('.ntpl-body[data-ntpl="' + name + '"]');
+            if (subEl) subEl.value = t.defaultSubject || '';
+            if (bodyEl) bodyEl.value = t.defaultBody || '';
+            var oSubEl = document.querySelector('.ntpl-owner-subject[data-ntpl="' + name + '"]');
+            var oBodyEl = document.querySelector('.ntpl-owner-body[data-ntpl="' + name + '"]');
+            if (oSubEl) oSubEl.value = t.defaultOwnerSubject || '';
+            if (oBodyEl) oBodyEl.value = t.defaultOwnerBody || '';
+            ntplUpdatePreview_(name);
+          });
+        });
+      });
+
+      // ======================================================================
+      // 既存テンプレートのプレビュー（募集・リマインド・名簿・請求書要請・予約変更）
+      // ======================================================================
+      var ETPL_SAMPLE_VALUES = {
+        recruitStart: { '{作業日}': '2026年03月15日', '{日付}': '2026/3/16 ～ 2026/3/18', '{人数}': '4', '{ベッド}': 'シングル2、ダブル1', '{BBQ}': 'あり', '{国籍}': 'アメリカ', '{回答URL}': 'https://example.com/exec?staff=1' },
+        recruitReminder: { '{チェックアウト}': '3/15(土)', '{回答数}': '1', '{最少回答者数}': '2', '{回答URL}': 'https://example.com/exec?staff=1' },
+        reminder: { '{チェックイン}': '3/14(金)', '{チェックアウト}': '3/15(土)', '{残り日数}': '3', '{清掃詳細リンク}': 'https://example.com/exec?date=2026-03-15' },
+        immediate: { '{チェックイン}': '3/14(金)', '{チェックアウト}': '3/15(土)', '{プラットフォーム}': 'Airbnb', '{残り日数}': '2', '{清掃詳細リンク}': 'https://example.com/exec?date=2026-03-15' },
+        rosterReminder: { '{件数}': '3', '{未記入一覧}': '・3/15 John Smith\n・3/18 未入力\n・3/20 未入力' },
+        invoiceRequest: { '{スタッフ名}': '田中太郎', '{対象年月}': '2026年3月', '{締切日}': '2026年4月5日', '{アプリURL}': 'https://example.com/exec?staff=1' },
+        dateChange: { '{ゲスト名}': 'John Smith', '{チェックイン}': '3/14(金)', '{旧チェックアウト}': '3/16(日)', '{新チェックアウト}': '3/18(火)' }
+      };
+
+      function etplUpdatePreview_(key) {
+        var bodyEl = document.querySelector('.etpl-body[data-etpl="' + key + '"]');
+        var previewEl = document.querySelector('.etpl-preview[data-etpl="' + key + '"]');
+        if (!bodyEl || !previewEl) return;
+        var text = bodyEl.value || bodyEl.placeholder || '';
+        var samples = ETPL_SAMPLE_VALUES[key] || {};
+        Object.keys(samples).forEach(function(ph) {
+          text = text.replace(new RegExp(ph.replace(/[{}]/g, '\\$&'), 'g'), samples[ph]);
+        });
+        previewEl.textContent = text;
+      }
+
+      // 既存テンプレートの入力時にリアルタイムプレビュー更新
+      document.querySelectorAll('.etpl-body').forEach(function(el) {
+        el.addEventListener('input', function() { etplUpdatePreview_(this.getAttribute('data-etpl')); });
+        // 初期プレビュー表示（placeholder or value）
+        setTimeout(function() { etplUpdatePreview_(el.getAttribute('data-etpl')); }, 100);
       });
 
       // リマインド時刻selectに0〜23時のオプションを生成
@@ -9360,10 +9515,10 @@
           var _emailNotifyTabs = ['recruitSettings','confirmTemplate','notifyCancel','notifyDateChange','notifyCancelRequest',
             'notifyCancelApprove','notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
           if (_emailNotifyTabs.indexOf(t) >= 0) loadEmailNotifyForTab_(t);
-          // 個別load関数がないタブにローディング表示
-          var _channelOnlyTabs = ['notifyCancel','notifyCancelRequest','notifyCancelApprove',
+          // 6通知テンプレート読み込み
+          var _ntplTabs = ['notifyCancel','notifyCancelRequest','notifyCancelApprove',
             'notifyCancelReject','notifyInvoiceSend','notifyCleaningDone'];
-          if (_channelOnlyTabs.indexOf(t) >= 0) showTabLoading_(_settingsPanels[t]);
+          if (_ntplTabs.indexOf(t) >= 0) loadNotifyTemplates_();
         });
       });
 

@@ -2359,11 +2359,16 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
           if (sName && sEmail) staffEmails[sName] = sEmail;
         }
       }
-      // 各スタッフにメール通知
+      // 各スタッフにメール通知（テンプレート対応）
       var cancelDetailUrl = buildCleaningDetailUrl_(coStr);
-      var cancelSubject = '予約キャンセルのお知らせ: ' + coStr;
-      var cancelBody = dateRange + ' の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。'
-        + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
+      var cancelTpl = getNotifyTemplate_('予約キャンセル');
+      var cancelReplace = function(s) {
+        return s.replace(/\{チェックアウト\}/g, coStr).replace(/\{日付範囲\}/g, dateRange)
+          .replace(/\{ゲスト名\}/g, guestLabel).replace(/\{清掃担当\}/g, cleaningStaff)
+          .replace(/\{清掃詳細URL\}/g, cancelDetailUrl ? '清掃詳細: ' + cancelDetailUrl : '');
+      };
+      var cancelSubject = cancelReplace(cancelTpl.subject);
+      var cancelBody = cancelReplace(cancelTpl.body);
       var _ch_cancel = getNotifyChannel_('予約キャンセル');
       var cancelLineText = cancelSubject + '\n\n' + cancelBody;
       // スタッフ個別メール
@@ -2376,18 +2381,13 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
           }
         }
       }
-      // オーナーメール
+      // オーナーメール（テンプレート対応）
       if (_ch_cancel.owner_email && isEmailNotifyEnabled_('キャンセル通知有効')) {
         try {
           var ownerEmail = getOwnerEmailAddress_();
           if (ownerEmail) {
-            var oSubject = '予約キャンセル - 清掃スタッフへの連絡をお願いします: ' + dateRange;
-            var oBody = '以下の予約がキャンセルされました。\n\n' +
-              '期間: ' + dateRange + '\n' +
-              'ゲスト: ' + guestLabel + '\n' +
-              '清掃担当: ' + cleaningStaff + '\n\n' +
-              '清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。'
-              + (cancelDetailUrl ? '\n\n清掃詳細: ' + cancelDetailUrl : '');
+            var oSubject = cancelReplace(cancelTpl.ownerSubject);
+            var oBody = cancelReplace(cancelTpl.ownerBody);
             GmailApp.sendEmail(ownerEmail, oSubject, oBody);
           }
         } catch (ownerMailErr) {}
@@ -7210,9 +7210,13 @@ function submitStaffCancelRequest(recruitRowIndex, bookingRowNumber, checkoutDat
       var ownerRes = JSON.parse(getOwnerEmail());
       var ownerEmail = (ownerRes && ownerRes.email) ? String(ownerRes.email).trim() : '';
       var detailUrl = buildCleaningDetailUrl_(dateStr);
-      var subject = '清掃スタッフの出勤キャンセル要望: ' + dateDisp;
-      var body = '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: ' + dateDisp + '\nスタッフ: ' + staff + '\n\n折り返しご連絡ください。'
-        + (detailUrl ? '\n\n清掃詳細: ' + detailUrl : '');
+      var crTpl = getNotifyTemplate_('出勤キャンセル要望');
+      var crReplace = function(s) {
+        return s.replace(/\{日付\}/g, dateDisp).replace(/\{スタッフ名\}/g, staff)
+          .replace(/\{清掃詳細URL\}/g, detailUrl ? '清掃詳細: ' + detailUrl : '');
+      };
+      var subject = crReplace(crTpl.subject);
+      var body = crReplace(crTpl.body);
       var _ch_cancelReq = getNotifyChannel_('出勤キャンセル要望');
       var cancelReqLineText = subject + '\n\n' + body;
       var emailEnabled = isEmailNotifyEnabled_('辞退申請通知有効');
@@ -7317,9 +7321,13 @@ function approveCancelRequest(recruitRowIndex, staffName, staffEmail) {
     // スタッフ・オーナーに通知
     try {
       var approveDetailUrl = buildCleaningDetailUrl_(checkoutStr);
-      var subject = '出勤キャンセルが承認されました: ' + checkoutDisp;
-      var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。'
-        + (approveDetailUrl ? '\n\n清掃詳細: ' + approveDetailUrl : '');
+      var appTpl = getNotifyTemplate_('キャンセル承認');
+      var appReplace = function(s) {
+        return s.replace(/\{日付\}/g, checkoutDisp).replace(/\{スタッフ名\}/g, sName)
+          .replace(/\{清掃詳細URL\}/g, approveDetailUrl ? '清掃詳細: ' + approveDetailUrl : '');
+      };
+      var subject = appReplace(appTpl.subject);
+      var body = appReplace(appTpl.body);
       var _ch_approve = getNotifyChannel_('キャンセル承認');
       var approveLineText = subject + '\n\n' + body;
       var approveEmailEnabled = isEmailNotifyEnabled_('辞退承認通知有効');
@@ -7376,9 +7384,13 @@ function rejectCancelRequest(recruitRowIndex, staffName, staffEmail) {
     // スタッフ・オーナーに通知
     try {
       var rejectDetailUrl = buildCleaningDetailUrl_(checkoutStr);
-      var subject = '出勤キャンセルが却下されました: ' + checkoutDisp;
-      var body = sName + ' 様\n\n' + checkoutDisp + ' の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。'
-        + (rejectDetailUrl ? '\n\n清掃詳細: ' + rejectDetailUrl : '');
+      var rejTpl = getNotifyTemplate_('キャンセル却下');
+      var rejReplace = function(s) {
+        return s.replace(/\{日付\}/g, checkoutDisp).replace(/\{スタッフ名\}/g, sName)
+          .replace(/\{清掃詳細URL\}/g, rejectDetailUrl ? '清掃詳細: ' + rejectDetailUrl : '');
+      };
+      var subject = rejReplace(rejTpl.subject);
+      var body = rejReplace(rejTpl.body);
       var _ch_reject = getNotifyChannel_('キャンセル却下');
       var rejectLineText = subject + '\n\n' + body;
       var rejectEmailEnabled = isEmailNotifyEnabled_('辞退却下通知有効');
@@ -8376,16 +8388,16 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     var ownerSheet = ss.getSheetByName(SHEET_OWNER);
     var ownerEmail = ownerSheet ? String(ownerSheet.getRange(2, 1).getValue() || '').trim() : '';
     if (ownerEmail && /@/.test(ownerEmail)) {
-      var subject = '【請求書】' + staffName + ' - ' + ymText;
-      var bodyText =
-        staffName + ' さんから' + ymText + 'の請求書が届きました。\n\n' +
-        '合計金額：¥' + total.toLocaleString('ja-JP') + '\n' +
-        '対象期間：' + periodText + '\n' +
-        '支払期限：' + dueText + '\n\n' +
-        'PDFを添付しておりますのでご確認ください。\n' +
-        '請求書はGoogleドライブにも保存されています。\n' +
-        'PDF: ' + pdfFile.getUrl() + '\n' +
-        '保存先フォルダ: https://drive.google.com/drive/folders/1ucWQQtv8xYsblcWiSSg1gcpgC9dfa5kh\n';
+      var invTpl = getNotifyTemplate_('請求書送信');
+      var invFolderUrl = 'https://drive.google.com/drive/folders/1ucWQQtv8xYsblcWiSSg1gcpgC9dfa5kh';
+      var invReplace = function(s) {
+        return s.replace(/\{スタッフ名\}/g, staffName).replace(/\{対象月\}/g, ymText)
+          .replace(/\{合計金額\}/g, total.toLocaleString('ja-JP'))
+          .replace(/\{対象期間\}/g, periodText).replace(/\{支払期限\}/g, dueText)
+          .replace(/\{PDF_URL\}/g, pdfFile.getUrl()).replace(/\{フォルダURL\}/g, invFolderUrl);
+      };
+      var subject = invReplace(invTpl.subject);
+      var bodyText = invReplace(invTpl.body);
       var emailNotifyEnabled = isEmailNotifyEnabled_('請求書送信通知有効');
       try {
         var _ch_invoice = getNotifyChannel_('請求書送信');
@@ -9733,6 +9745,168 @@ function confirmRecruitment(recruitRowIndex) {
   }
 }
 
+// ======================================================================
+// 汎用通知テンプレート管理（6通知分）
+// ======================================================================
+
+/**
+ * 6通知のデフォルトテンプレート定義
+ * キー名は募集設定シートのA列に保存される
+ */
+var NOTIFY_TEMPLATES_ = {
+  '予約キャンセル': {
+    subjectKey: '予約キャンセル_件名',
+    bodyKey: '予約キャンセル_本文',
+    defaultSubject: '予約キャンセルのお知らせ: {チェックアウト}',
+    defaultBody: '{日付範囲} の予約がキャンセルされました。\nこの予約に割り当てられていた清掃業務はキャンセルとなります。\n\n{清掃詳細URL}',
+    ownerSubjectKey: '予約キャンセル_オーナー件名',
+    ownerBodyKey: '予約キャンセル_オーナー本文',
+    defaultOwnerSubject: '予約キャンセル - 清掃スタッフへの連絡をお願いします: {日付範囲}',
+    defaultOwnerBody: '以下の予約がキャンセルされました。\n\n期間: {日付範囲}\nゲスト: {ゲスト名}\n清掃担当: {清掃担当}\n\n清掃スタッフにはメールで自動通知済みですが、念のため直接ご連絡ください。\n\n{清掃詳細URL}',
+    placeholders: ['{チェックアウト}', '{日付範囲}', '{ゲスト名}', '{清掃担当}', '{清掃詳細URL}']
+  },
+  '出勤キャンセル要望': {
+    subjectKey: '出勤キャンセル要望_件名',
+    bodyKey: '出勤キャンセル要望_本文',
+    defaultSubject: '清掃スタッフの出勤キャンセル要望: {日付}',
+    defaultBody: '以下のスタッフが出勤キャンセルの要望を提出しました。\n\n日付: {日付}\nスタッフ: {スタッフ名}\n\n折り返しご連絡ください。\n\n{清掃詳細URL}',
+    placeholders: ['{日付}', '{スタッフ名}', '{清掃詳細URL}']
+  },
+  'キャンセル承認': {
+    subjectKey: 'キャンセル承認_件名',
+    bodyKey: 'キャンセル承認_本文',
+    defaultSubject: '出勤キャンセルが承認されました: {日付}',
+    defaultBody: '{スタッフ名} 様\n\n{日付} の出勤キャンセルが承認されました。\n清掃担当は解除されています。\n\nご確認ください。\n\n{清掃詳細URL}',
+    placeholders: ['{日付}', '{スタッフ名}', '{清掃詳細URL}']
+  },
+  'キャンセル却下': {
+    subjectKey: 'キャンセル却下_件名',
+    bodyKey: 'キャンセル却下_本文',
+    defaultSubject: '出勤キャンセルが却下されました: {日付}',
+    defaultBody: '{スタッフ名} 様\n\n{日付} の出勤キャンセルは承認されませんでした。\n予定通りご出勤ください。\n\nご不明な点がございましたらご連絡ください。\n\n{清掃詳細URL}',
+    placeholders: ['{日付}', '{スタッフ名}', '{清掃詳細URL}']
+  },
+  '清掃完了': {
+    subjectKey: '清掃完了_件名',
+    bodyKey: '清掃完了_本文',
+    defaultSubject: '清掃完了: {日付}',
+    defaultBody: '{日付} の清掃が完了しました。\n\nチェックリスト: {チェック数}/{全項目数} 項目完了\n写真: {撮影数}/{全撮影箇所数} 箇所撮影済み\n\n{特記事項}\n\n{清掃詳細URL}',
+    placeholders: ['{日付}', '{チェック数}', '{全項目数}', '{撮影数}', '{全撮影箇所数}', '{特記事項}', '{清掃詳細URL}']
+  },
+  '請求書送信': {
+    subjectKey: '請求書送信_件名',
+    bodyKey: '請求書送信_本文',
+    defaultSubject: '【請求書】{スタッフ名} - {対象月}',
+    defaultBody: '{スタッフ名} さんから{対象月}の請求書が届きました。\n\n合計金額：¥{合計金額}\n対象期間：{対象期間}\n支払期限：{支払期限}\n\nPDFを添付しておりますのでご確認ください。\n請求書はGoogleドライブにも保存されています。\nPDF: {PDF_URL}\n保存先フォルダ: {フォルダURL}',
+    placeholders: ['{スタッフ名}', '{対象月}', '{合計金額}', '{対象期間}', '{支払期限}', '{PDF_URL}', '{フォルダURL}']
+  }
+};
+
+/**
+ * 通知テンプレートを取得（フロントエンド用 — 全6通知分まとめて返す）
+ */
+function getNotifyTemplates() {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ閲覧できます。' });
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    var saved = {};
+    if (sheet && sheet.getLastRow() >= 2) {
+      var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        var k = String(rows[i][0] || '').trim();
+        if (k) saved[k] = String(rows[i][1] || '');
+      }
+    }
+    var result = {};
+    var keys = Object.keys(NOTIFY_TEMPLATES_);
+    for (var n = 0; n < keys.length; n++) {
+      var name = keys[n];
+      var def = NOTIFY_TEMPLATES_[name];
+      var entry = {
+        subject: saved[def.subjectKey] || def.defaultSubject,
+        body: saved[def.bodyKey] || def.defaultBody,
+        defaultSubject: def.defaultSubject,
+        defaultBody: def.defaultBody,
+        placeholders: def.placeholders
+      };
+      if (def.ownerSubjectKey) {
+        entry.ownerSubject = saved[def.ownerSubjectKey] || def.defaultOwnerSubject;
+        entry.ownerBody = saved[def.ownerBodyKey] || def.defaultOwnerBody;
+        entry.defaultOwnerSubject = def.defaultOwnerSubject;
+        entry.defaultOwnerBody = def.defaultOwnerBody;
+      }
+      result[name] = entry;
+    }
+    return JSON.stringify({ success: true, templates: result });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 通知テンプレートを保存（1通知ずつ）
+ */
+function saveNotifyTemplate(notifyName, subject, body, ownerSubject, ownerBody) {
+  try {
+    if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ編集できます。' });
+    var def = NOTIFY_TEMPLATES_[notifyName];
+    if (!def) return JSON.stringify({ success: false, error: '不明な通知名: ' + notifyName });
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet) return JSON.stringify({ success: false, error: '募集設定シートが見つかりません。' });
+    var lastRow = Math.max(sheet.getLastRow(), 1);
+    var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    var rowMap = {};
+    for (var i = 0; i < rows.length; i++) {
+      var k = String(rows[i][0] || '').trim();
+      if (k) rowMap[k] = i + 2;
+    }
+    var entries = [[def.subjectKey, subject || ''], [def.bodyKey, body || '']];
+    if (def.ownerSubjectKey && ownerSubject !== undefined) {
+      entries.push([def.ownerSubjectKey, ownerSubject || '']);
+      entries.push([def.ownerBodyKey, ownerBody || '']);
+    }
+    entries.forEach(function(e) {
+      if (rowMap[e[0]]) {
+        sheet.getRange(rowMap[e[0]], 2).setValue(e[1]);
+      } else {
+        var nr = sheet.getLastRow() + 1;
+        sheet.getRange(nr, 1).setValue(e[0]);
+        sheet.getRange(nr, 2).setValue(e[1]);
+      }
+    });
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 通知テンプレートを読み込む（内部用）
+ * @return {{ subject: string, body: string, ownerSubject?: string, ownerBody?: string }}
+ */
+function getNotifyTemplate_(notifyName) {
+  var def = NOTIFY_TEMPLATES_[notifyName];
+  if (!def) return { subject: '', body: '' };
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RECRUIT_SETTINGS);
+    if (!sheet || sheet.getLastRow() < 2) return { subject: def.defaultSubject, body: def.defaultBody, ownerSubject: def.defaultOwnerSubject || '', ownerBody: def.defaultOwnerBody || '' };
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    var saved = {};
+    for (var i = 0; i < rows.length; i++) {
+      var k = String(rows[i][0] || '').trim();
+      if (k) saved[k] = String(rows[i][1] || '');
+    }
+    return {
+      subject: saved[def.subjectKey] || def.defaultSubject,
+      body: saved[def.bodyKey] || def.defaultBody,
+      ownerSubject: saved[def.ownerSubjectKey] || def.defaultOwnerSubject || '',
+      ownerBody: saved[def.ownerBodyKey] || def.defaultOwnerBody || ''
+    };
+  } catch (e) {
+    return { subject: def.defaultSubject, body: def.defaultBody, ownerSubject: def.defaultOwnerSubject || '', ownerBody: def.defaultOwnerBody || '' };
+  }
+}
+
 /**
  * 確定通知テンプレートのデフォルト値
  */
@@ -9859,11 +10033,10 @@ function buildConfirmationCopyText_(checkoutDateStr, selectedStaffNames, volunte
     + '国籍:\u3000\u3000' + natDisp + '\n\n'
     + '※予約状況次第では変更となる場合があります。';
 
-  // アプリURL
+  // アプリURL（URLのみ出力、プレフィックスなし）
   var appUrlText = '';
   if (appUrl) {
-    var deepUrl = appUrl + (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + (checkoutDateStr || '');
-    appUrlText = 'Webアプリを確認: ' + deepUrl;
+    appUrlText = appUrl + (appUrl.indexOf('?') >= 0 ? '&' : '?') + 'date=' + (checkoutDateStr || '');
   }
 
   // テンプレートを読み込んでプレースホルダーを置換
@@ -11352,15 +11525,22 @@ function notifyCleaningComplete(checkoutDate, staffName) {
 
     if (ownerEmail) {
       var completeDetailUrl = buildCleaningDetailUrl_(dateKey);
-      var subject = '清掃完了: ' + fmtDate;
-      var body = fmtDate + ' の清掃が完了しました。\n\n'
-        + 'チェックリスト: ' + clRes.checkedCount + '/' + clRes.totalItems + ' 項目完了\n'
-        + '写真: ' + clRes.photoSpotsDone + '/' + clRes.totalPhotoSpots + ' 箇所撮影済み\n';
+      // 特記事項テキスト生成
+      var memoBlock = '';
       if (clRes.memos && clRes.memos.length > 0) {
-        body += '\n--- 特記事項 ---\n';
-        clRes.memos.forEach(function(m) { body += '・' + m.text + '（' + m.author + ' ' + m.timestamp + '）\n'; });
+        memoBlock = '--- 特記事項 ---\n';
+        clRes.memos.forEach(function(m) { memoBlock += '・' + m.text + '（' + m.author + ' ' + m.timestamp + '）\n'; });
       }
-      if (completeDetailUrl) body += '\n清掃詳細: ' + completeDetailUrl + '\n';
+      var compTpl = getNotifyTemplate_('清掃完了');
+      var compReplace = function(s) {
+        return s.replace(/\{日付\}/g, fmtDate)
+          .replace(/\{チェック数\}/g, clRes.checkedCount).replace(/\{全項目数\}/g, clRes.totalItems)
+          .replace(/\{撮影数\}/g, clRes.photoSpotsDone).replace(/\{全撮影箇所数\}/g, clRes.totalPhotoSpots)
+          .replace(/\{特記事項\}/g, memoBlock)
+          .replace(/\{清掃詳細URL\}/g, completeDetailUrl ? '清掃詳細: ' + completeDetailUrl : '');
+      };
+      var subject = compReplace(compTpl.subject);
+      var body = compReplace(compTpl.body);
       var _ch_complete = getNotifyChannel_('清掃完了');
 
       // LINE送信: テンプレートがあればそれを使う

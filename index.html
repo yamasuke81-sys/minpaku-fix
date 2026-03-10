@@ -1168,7 +1168,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1181,6 +1181,7 @@
       <div class="d-flex gap-1">
         <a href="https://script.google.com/d/<?= scriptId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="GASエディタを開く">GAS</a>
         <a href="https://docs.google.com/spreadsheets/d/<?= spreadsheetId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="スプレッドシートを開く">スプシ</a>
+        <a href="#" id="btnOpenStaffView" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="スタッフ画面を開く" onclick="openStaffView(); return false;">スタッフ画面</a>
       </div>
 <? } ?>
     </div>
@@ -4515,6 +4516,13 @@
             .withFailureHandler(function() { alert('チェックリストアプリのURLが取得できません'); })
             .getChecklistAppUrl();
         }
+      }
+
+      function openStaffView() {
+        var ownerUrl = window.savedOwnerUrl || '';
+        if (!ownerUrl) { alert('オーナーURLが未設定です。設定タブでURLを保存してください。'); return; }
+        var sep = ownerUrl.indexOf('?') >= 0 ? '&' : '?';
+        window.open(ownerUrl + sep + 'staff=1', '_blank');
       }
 
       function loadAndRender() {

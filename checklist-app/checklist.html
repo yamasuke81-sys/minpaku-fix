@@ -27,11 +27,19 @@
     .header-top {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      gap: 8px;
+      justify-content: space-between;
+      gap: 4px;
     }
-    .header-title { font-size: 14px; font-weight: bold; }
-    .header-date { font-size: 14px; opacity: 0.9; }
+    .header-title { font-size: 14px; font-weight: bold; white-space: nowrap; }
+    .header-date { font-size: 14px; opacity: 0.9; white-space: nowrap; }
+    .header-left { display: flex; align-items: center; gap: 6px; }
+    .date-nav { display: flex; align-items: center; gap: 2px; }
+    .date-nav-btn {
+      background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.4);
+      color: #fff; border-radius: 4px; padding: 1px 7px; font-size: 13px; cursor: pointer;
+      line-height: 1.4;
+    }
+    .date-nav-btn:active { background: rgba(255,255,255,0.45); }
     .progress-bar {
       height: 6px;
       background: rgba(255,255,255,0.2);
@@ -1503,8 +1511,15 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0310a</span></div>
-      <div class="header-date" id="headerDate"></div>
+      <div class="header-left">
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0310b</span></div>
+        <div class="header-date" id="headerDate"></div>
+      </div>
+      <div class="date-nav">
+        <button class="date-nav-btn" onclick="navigateDate(-1)" title="前日">＜</button>
+        <button class="date-nav-btn" onclick="navigateDate(0)" title="今日">今日</button>
+        <button class="date-nav-btn" onclick="navigateDate(1)" title="翌日">＞</button>
+      </div>
     </div>
     <div class="progress-bar">
       <div class="progress-fill" id="progressFill" style="width: 0%"></div>
@@ -1867,6 +1882,26 @@
     // グローバル変数
     var checkoutDate = '<?= checkoutDate ?>' || '';
     var staffName = '<?= staffName ?>' || '';
+    var baseUrl = '<?= baseUrl ?>' || '';
+
+    // 日付ナビゲーション（-1=前日, 0=今日, 1=翌日）
+    function navigateDate(offset) {
+      var target;
+      if (offset === 0) {
+        target = new Date();
+      } else {
+        var parts = checkoutDate.split('-');
+        if (parts.length !== 3) return;
+        target = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        target.setDate(target.getDate() + offset);
+      }
+      var dateStr = target.getFullYear() + '-' + String(target.getMonth() + 1).padStart(2, '0') + '-' + String(target.getDate()).padStart(2, '0');
+      if (baseUrl) {
+        var url = baseUrl + '?date=' + encodeURIComponent(dateStr);
+        if (staffName) url += '&staff=' + encodeURIComponent(staffName);
+        window.top.location.href = url;
+      }
+    }
     var checklistData = null;
     // ローカルで要補充を外した項目を追跡（リフレッシュ時の復活を防止）
     var localSupplyRemoved = {};

@@ -1168,7 +1168,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1208,17 +1208,20 @@
       <li class="nav-item" id="navSettings" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
     </ul>
     <div id="panelCalendar">
-      <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex flex-column gap-1">
-        <div class="d-flex flex-wrap gap-3 align-items-center">
-          <span style="background:linear-gradient(90deg,#ff5a5f 50%,#003b95 50%);color:#fff;padding:1px 8px;border-radius:4px;font-weight:bold;">宿泊</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>内容詳細なし</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#28a745;border:1px solid #fff;"></span>内容詳細あり</span>
+      <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex justify-content-between align-items-start">
+        <div class="d-flex flex-column gap-1">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <span style="background:linear-gradient(90deg,#ff5a5f 50%,#003b95 50%);color:#fff;padding:1px 8px;border-radius:4px;font-weight:bold;">宿泊</span>
+            <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>内容詳細なし</span>
+            <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#28a745;border:1px solid #fff;"></span>内容詳細あり</span>
+          </div>
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <span style="background:#ffc107;color:#212529;padding:1px 8px;border-radius:4px;font-weight:bold;">清掃</span>
+            <span><span class="d-inline-block me-1" style="position:relative;width:14px;height:14px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#dc3545;display:block;"></span></span>募集中</span>
+            <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
+          </div>
         </div>
-        <div class="d-flex flex-wrap gap-3 align-items-center">
-          <span style="background:#ffc107;color:#212529;padding:1px 8px;border-radius:4px;font-weight:bold;">清掃</span>
-          <span><span class="d-inline-block me-1" style="position:relative;width:14px;height:14px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#dc3545;display:block;"></span></span>募集中</span>
-          <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
-        </div>
+        <button type="button" class="btn btn-warning btn-sm" id="btnTodayChecklist" style="white-space:nowrap;font-weight:600;font-size:0.8rem;" onclick="openTodayChecklist()"><i class="bi bi-check2-square"></i> 本日の清掃チェックリスト</button>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
@@ -4489,6 +4492,29 @@
             document.getElementById('btnSaveStaff').disabled = false;
           })
           .updateCleaningStaff(rowNumber, staffName);
+      }
+
+      function openTodayChecklist() {
+        var today = new Date();
+        var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+        if (window._checklistAppUrl) {
+          window.open(window._checklistAppUrl + '?date=' + encodeURIComponent(dateStr), '_blank');
+        } else {
+          google.script.run
+            .withSuccessHandler(function(resStr) {
+              try {
+                var res = JSON.parse(resStr);
+                if (res.success && res.url) {
+                  window._checklistAppUrl = res.url;
+                  window.open(res.url + '?date=' + encodeURIComponent(dateStr), '_blank');
+                } else {
+                  alert('チェックリストアプリのURLが取得できません');
+                }
+              } catch (e) { alert('チェックリストアプリのURLが取得できません'); }
+            })
+            .withFailureHandler(function() { alert('チェックリストアプリのURLが取得できません'); })
+            .getChecklistAppUrl();
+        }
       }
 
       function loadAndRender() {

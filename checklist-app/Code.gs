@@ -108,6 +108,7 @@ function doGet(e) {
   var template = HtmlService.createTemplateFromFile('checklist');
   template.checkoutDate = e.parameter.date || '';
   template.staffName = e.parameter.staff || '';
+  try { template.baseUrl = ScriptApp.getService().getUrl(); } catch (ue) { template.baseUrl = ''; }
   return template.evaluate()
     .setTitle('清掃チェックリスト')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)

@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311p</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311q</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1919,7 +1919,7 @@
         </div>
         <hr class="my-3">
         <label class="form-label small fw-bold">メール文面テンプレート</label>
-        <p class="small text-muted mb-1">プレースホルダー: <code>{ゲスト名}</code> <code>{チェックイン}</code> <code>{旧チェックアウト}</code> <code>{新チェックアウト}</code></p>
+        <p class="small text-muted mb-1">プレースホルダー: <code>{ゲスト名}</code> <code>{チェックイン}</code> <code>{旧チェックアウト}</code> <code>{新チェックアウト}</code> <code>{清掃詳細URL}</code></p>
         <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm" id="dateChangeSubject" placeholder="【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}"></div>
         <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm etpl-body" data-etpl="dateChange" id="dateChangeBody" rows="5" placeholder="予約の日付が変更されました。&#10;&#10;ゲスト: {ゲスト名}&#10;チェックイン: {チェックイン}&#10;変更前チェックアウト: {旧チェックアウト}&#10;変更後チェックアウト: {新チェックアウト}"></textarea></div>
         <div class="mt-1 mb-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light etpl-preview" data-etpl="dateChange" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
@@ -8887,7 +8887,7 @@
         immediate: { '{チェックイン}': '3/14(金)', '{チェックアウト}': '3/15(土)', '{プラットフォーム}': 'Airbnb', '{残り日数}': '2', '{清掃詳細リンク}': 'https://example.com/exec?date=2026-03-15' },
         rosterReminder: { '{件数}': '3', '{未記入一覧}': '・3/15 John Smith\n・3/18 未入力\n・3/20 未入力' },
         invoiceRequest: { '{スタッフ名}': '田中太郎', '{対象年月}': '2026年3月', '{締切日}': '2026年4月5日', '{アプリURL}': 'https://example.com/exec?staff=1' },
-        dateChange: { '{ゲスト名}': 'John Smith', '{チェックイン}': '3/14(金)', '{旧チェックアウト}': '3/16(日)', '{新チェックアウト}': '3/18(火)' }
+        dateChange: { '{ゲスト名}': 'John Smith', '{チェックイン}': '3/14(金)', '{旧チェックアウト}': '3/16(日)', '{新チェックアウト}': '3/18(火)', '{清掃詳細URL}': '清掃詳細: https://example.com/exec?date=2026-03-18' }
       };
 
       function etplUpdatePreview_(key) {

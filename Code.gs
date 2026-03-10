@@ -2442,10 +2442,12 @@ function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoK
     }
   } catch (e) {}
   var replacePlaceholders = function(text) {
+    var dcDetailUrl = buildCleaningDetailUrl_(newCoKey) || '';
     return text.replace(/\{ゲスト名\}/g, guestLabel)
       .replace(/\{チェックイン\}/g, ciStr)
       .replace(/\{旧チェックアウト\}/g, oldCoStr)
-      .replace(/\{新チェックアウト\}/g, newCoStr);
+      .replace(/\{新チェックアウト\}/g, newCoStr)
+      .replace(/\{清掃詳細URL\}/g, dcDetailUrl ? '清掃詳細: ' + dcDetailUrl : '');
   };
   var subject = replacePlaceholders(tplSubject);
   var body = replacePlaceholders(tplBody);

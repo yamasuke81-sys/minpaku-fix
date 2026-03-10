@@ -1168,7 +1168,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1181,7 +1181,8 @@
       <div class="d-flex gap-1">
         <a href="https://script.google.com/d/<?= scriptId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="GASエディタを開く">GAS</a>
         <a href="https://docs.google.com/spreadsheets/d/<?= spreadsheetId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="スプレッドシートを開く">スプシ</a>
-        <a href="#" id="btnOpenStaffView" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="スタッフ画面を開く" onclick="openStaffView(); return false;">スタッフ画面</a>
+<? var _staffViewUrl = (savedOwnerUrl || baseUrl) ? ((savedOwnerUrl || baseUrl) + ((savedOwnerUrl || baseUrl).indexOf('?') >= 0 ? '&' : '?') + 'staff=1') : ''; ?>
+        <a href="<?= _staffViewUrl ?>" target="_blank" id="btnOpenStaffView" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;<%= _staffViewUrl ? '' : 'display:none;' %>" title="スタッフ画面を開く">スタッフ画面</a>
       </div>
 <? } ?>
     </div>
@@ -1222,7 +1223,7 @@
             <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
           </div>
         </div>
-        <button type="button" class="btn btn-warning" id="btnTodayChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.3;" onclick="openTodayChecklist()"><i class="bi bi-check2-square"></i> 本日の清掃チェックリスト</button>
+        <a href="#" target="_blank" class="btn btn-warning" id="btnTodayChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.3;text-decoration:none;display:none;"><i class="bi bi-check2-square"></i> 本日の清掃チェックリスト</a>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
@@ -2478,6 +2479,13 @@
                   _ownerInp.value = r.url;
                   if (typeof generateUrlsFromOwnerUrl === 'function') generateUrlsFromOwnerUrl(r.url);
                 }
+                // スタッフ画面ボタンのhrefを更新
+                var _staffBtn = document.getElementById('btnOpenStaffView');
+                if (_staffBtn) {
+                  var _sep = r.url.indexOf('?') >= 0 ? '&' : '?';
+                  _staffBtn.href = r.url + _sep + 'staff=1';
+                  _staffBtn.style.display = '';
+                }
               }
             } else if (r.success && !r.url && window.appBaseUrl) {
               // サーバーにURLが未保存 → appBaseUrl(デプロイURL)を自動保存
@@ -2495,10 +2503,19 @@
           } catch(e) {}
         }).withFailureHandler(function(err) {}).getOwnerBaseUrl();
       } catch(e) {}
-      // チェックリストアプリURLをプリフェッチ（ボタン押下時のポップアップブロック回避）
+      // チェックリストアプリURLをプリフェッチ → ボタンのhrefに設定（ポップアップブロック回避）
       try {
         google.script.run.withSuccessHandler(function(resStr) {
-          try { var r = JSON.parse(resStr); if (r.success && r.url) window._checklistAppUrl = r.url; } catch(e) {}
+          try {
+            var r = JSON.parse(resStr);
+            if (r.success && r.url) {
+              window._checklistAppUrl = r.url;
+              var today = new Date();
+              var ds = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+              var clBtn = document.getElementById('btnTodayChecklist');
+              if (clBtn) { clBtn.href = r.url + '?date=' + encodeURIComponent(ds); clBtn.style.display = ''; }
+            }
+          } catch(e) {}
         }).withFailureHandler(function() {}).getChecklistAppUrl();
       } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
@@ -4501,38 +4518,6 @@
           .updateCleaningStaff(rowNumber, staffName);
       }
 
-      function openTodayChecklist() {
-        var today = new Date();
-        var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-        if (window._checklistAppUrl) {
-          window.open(window._checklistAppUrl + '?date=' + encodeURIComponent(dateStr), '_blank');
-        } else {
-          // ポップアップブロック回避: ユーザー操作の同期タイミングでウィンドウを先に開く
-          var w = window.open('about:blank', '_blank');
-          google.script.run
-            .withSuccessHandler(function(resStr) {
-              try {
-                var res = JSON.parse(resStr);
-                if (res.success && res.url) {
-                  window._checklistAppUrl = res.url;
-                  w.location.href = res.url + '?date=' + encodeURIComponent(dateStr);
-                } else {
-                  w.close();
-                  alert('チェックリストアプリのURLが取得できません');
-                }
-              } catch (e) { w.close(); alert('チェックリストアプリのURLが取得できません'); }
-            })
-            .withFailureHandler(function() { w.close(); alert('チェックリストアプリのURLが取得できません'); })
-            .getChecklistAppUrl();
-        }
-      }
-
-      function openStaffView() {
-        var ownerUrl = window.savedOwnerUrl || '';
-        if (!ownerUrl) { alert('オーナーURLが未設定です。設定タブでURLを保存してください。'); return; }
-        var sep = ownerUrl.indexOf('?') >= 0 ? '&' : '?';
-        window.open(ownerUrl + sep + 'staff=1', '_blank');
-      }
 
       function loadAndRender() {
         document.getElementById('loadingOverlay').style.display = 'flex';

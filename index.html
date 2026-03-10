@@ -1037,9 +1037,14 @@
       .btn-change-request-ng:hover, .btn-change-request-ng:focus {
         background-color: #b02a37 !important;
       }
-      /* ダークモード: 見出し文字色改善 */
+      /* ダークモード: 募集ステータスバッジ文字色改善 */
+      .recruit-status-badge.status-undecided { color: #f5a3ad !important; }
+      .recruit-status-badge.status-recruiting { color: #ffd866 !important; }
+      .recruit-status-badge.status-selected { color: #6dd5ed !important; }
       .recruit-status-badge.status-decided { color: #8cffb5 !important; }
       .recruit-status-badge.status-laundry { color: #c0c8d0 !important; }
+      /* ダークモード: インラインstyleの#f8f9fa/#e9ecef背景を上書き */
+      .dm-bg-subtle { background: #2d2d2d !important; color: #e0e0e0 !important; border-color: #495057 !important; }
     }
     .modal-memo-area {
       padding: 0.4rem 0;
@@ -1163,7 +1168,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3099,9 +3104,9 @@
             } else {
               var noticeText = (d.cleaningNotice || '').trim();
               if (noticeText) {
-                html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + escapeHtml(noticeText) + '</div>';
+                html += '<div class="form-control form-control-sm dm-bg-subtle" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + escapeHtml(noticeText) + '</div>';
               } else {
-                html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;color:#adb5bd;">連絡事項なし</div>';
+                html += '<div class="form-control form-control-sm dm-bg-subtle" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;color:#adb5bd;">連絡事項なし</div>';
               }
             }
             html += '</div>';
@@ -3115,7 +3120,7 @@
             // 清掃募集状況カード: 募集状況→清掃担当→ボタン/アクション→回答状況
             html += '<div class="modal-next-res-card" style="margin-top:0.5rem;">';
             // 1. 募集状況（バッジ内に編集ボタンエリアを含む）
-            html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted" style="background:#e9ecef;position:relative;">読み込み中…<span id="eventModalEditStaffBtnArea" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);"></span></span>';
+            html += '<span id="eventModalStaffRecruitStatus" class="recruit-status-badge text-muted dm-bg-subtle" style="background:#e9ecef;position:relative;">読み込み中…<span id="eventModalEditStaffBtnArea" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);"></span></span>';
             // 1b. ステータス見出し直下のボタンエリア
             html += '<div id="eventModalStatusBtnArea" class="mt-1"></div>';
             // 2. 清掃担当
@@ -3186,7 +3191,7 @@
             if (!isStaffView) {
               var curAdults = d.guestCountAdults || '';
               var curInfants = d.guestCountInfants || '';
-              html += '<div id="guestCountEditArea" style="display:none; margin: 4px 0 8px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">';
+              html += '<div id="guestCountEditArea" class="dm-bg-subtle" style="display:none; margin: 4px 0 8px 0; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">';
               html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
               html += '<label style="font-size:0.85rem; white-space:nowrap;">大人</label>';
               html += '<input type="number" id="guestCountAdultsInput" class="form-control form-control-sm" style="width:70px;" min="0" value="' + escapeHtml(curAdults) + '" placeholder="0">';
@@ -3255,7 +3260,7 @@
                 html += '<textarea id="bookingMemoTextarea" class="form-control form-control-sm" rows="3" data-row="' + props.rowNumber + '">' + fmt(d.memo || '') + '</textarea>';
                 html += '<div class="text-end mt-1"><button id="btnSaveMemo" class="btn btn-sm btn-primary" onclick="saveBookingMemoUI()">メモを保存</button></div>';
               } else {
-                html += '<div class="form-control form-control-sm" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.memo || '') + '</div>';
+                html += '<div class="form-control form-control-sm dm-bg-subtle" style="min-height:2.5rem;background:#f8f9fa;white-space:pre-wrap;">' + fmt(d.memo || '') + '</div>';
               }
               html += '</div>';
             }
@@ -6045,7 +6050,8 @@
                 var btnHtml = '<button type="button" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0 btn-open-cleaning" data-row="' + item.rowNumber + '" data-checkout="' + escapeHtml(item.checkoutDate || '') + '" data-recruit-row="' + (item.recruitRowIndex || 0) + '">詳細</button>';
                 var borderClass = isConfirmed ? 'border' : 'border border-dashed';
                 var bgStyle = isConfirmed ? '' : ' style="background:#f8f9fa;"';
-                return '<div class="' + borderClass + ' rounded p-2 mb-2 small d-flex justify-content-between align-items-center gap-2"' + bgStyle + '><div><strong>' + escapeHtml(item.checkoutDisplay) + '</strong> ' + partnersHtml + selfHtml + statusHtml + '</div>' + btnHtml + '</div>';
+                var bgClass = isConfirmed ? '' : ' dm-bg-subtle';
+                return '<div class="' + borderClass + bgClass + ' rounded p-2 mb-2 small d-flex justify-content-between align-items-center gap-2"' + bgStyle + '><div><strong>' + escapeHtml(item.checkoutDisplay) + '</strong> ' + partnersHtml + selfHtml + statusHtml + '</div>' + btnHtml + '</div>';
               }).join('');
               el.querySelectorAll('.btn-open-cleaning').forEach(function(btn) {
                 btn.onclick = function() {

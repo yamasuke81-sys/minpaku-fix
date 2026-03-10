@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311o</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311p</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -8208,6 +8208,8 @@
               document.getElementById('recruitStartBody').value = r.settings.recruitStartBody || RECRUIT_START_DEFAULTS.body;
               document.getElementById('recruitReminderSubject').value = r.settings.recruitReminderSubject || RECRUIT_REMINDER_DEFAULTS.subject;
               document.getElementById('recruitReminderBody').value = r.settings.recruitReminderBody || RECRUIT_REMINDER_DEFAULTS.body;
+              etplUpdatePreview_('recruitStart');
+              etplUpdatePreview_('recruitReminder');
             }
           } catch (e) {}
         }).withFailureHandler(function() { hideTabLoading_('settingsRecruitSettings'); }).getRecruitmentSettings();
@@ -8273,6 +8275,7 @@
             if (r.success) {
               document.getElementById('dateChangeSubject').value = r.subject || '';
               document.getElementById('dateChangeBody').value = r.body || '';
+              etplUpdatePreview_('dateChange');
             }
           } catch (e) {}
         }).withFailureHandler(function() { hideTabLoading_('settingsNotifyDateChange'); }).getDateChangeNotifySettings();
@@ -8329,6 +8332,7 @@
               document.getElementById('rosterReminderRecipients').value = r.settings.recipients || '';
               document.getElementById('rosterReminderSubject').value = r.settings.rosterReminderSubject || ROSTER_REMINDER_DEFAULTS.subject;
               document.getElementById('rosterReminderBody').value = r.settings.rosterReminderBody || ROSTER_REMINDER_DEFAULTS.body;
+              etplUpdatePreview_('rosterReminder');
             }
           } catch (e) {}
         }).withFailureHandler(function() { hideTabLoading_('settingsRosterReminder'); }).getRosterReminderSettings();
@@ -8630,6 +8634,7 @@
               if (subj) subj.value = s.subject || INVOICE_REQUEST_DEFAULTS.subject;
               var body = document.getElementById('invoiceRequestBody');
               if (body) body.value = s.body || INVOICE_REQUEST_DEFAULTS.body;
+              etplUpdatePreview_('invoiceRequest');
             }
           } catch (e) {}
         }).withFailureHandler(function() { hideTabLoading_('settingsInvoiceRequest'); }).getInvoiceRequestSettings();
@@ -8949,6 +8954,8 @@
               document.getElementById('reminderBody').value = r.reminderBody || REMINDER_EMAIL_DEFAULTS.body;
               document.getElementById('immediateSubject').value = r.immediateSubject || REMINDER_EMAIL_DEFAULTS.immediateSubject;
               document.getElementById('immediateBody').value = r.immediateBody || REMINDER_EMAIL_DEFAULTS.immediateBody;
+              etplUpdatePreview_('reminder');
+              etplUpdatePreview_('immediate');
             }
           } catch (e) {}
         }).withFailureHandler(function() { hideTabLoading_('settingsReminderEmail'); }).getReminderEmailSettings();

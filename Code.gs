@@ -2862,12 +2862,27 @@ function parseICal_(icalText, platformName) {
         var isBlockedEntry = /^not\s*available$/i.test(sum) || /^closed$/i.test(sum) || /^blocked$/i.test(sum)
           || sumLower.indexOf('not available') >= 0
           || (sumLower.indexOf('closed') >= 0 && (sumLower.indexOf('not available') >= 0 || /^closed\s*[-–—]/i.test(sum)));
-        // ブロック日エントリは全プラットフォーム共通でスキップする。
-        // Booking.comの "CLOSED - Not available" も含め、実予約は他のiCalフィード（Airbnb等）から取得する。
-        if (isBlockedEntry) { skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue; }
+        // ブロック日フィルタ:
+        // - Booking.com以外: ブロック日エントリは全てスキップ
+        // - Booking.com: 予約もブロック日も "CLOSED - Not available" で区別不能なため、
+        //   宿泊数60泊超のものだけスキップ（ブロック日は長期、実予約は通常数日〜数週間）
+        var isBooking = (platformName || '').toLowerCase().indexOf('booking') >= 0;
+        if (isBlockedEntry && !isBooking) {
+          skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ')'); current = null; continue;
+        }
+        if (isBlockedEntry && isBooking) {
+          var ciDate = new Date(checkIn.replace(/\//g, '-'));
+          var coDate = new Date(checkOut.replace(/\//g, '-'));
+          var nights = Math.round((coDate - ciDate) / 86400000);
+          if (nights > 60) {
+            skipReasons.blocked++; blockedSummaries.push(sum + ' (' + checkIn + '→' + checkOut + ') [Booking ' + nights + '泊>60]'); current = null; continue;
+          }
+        }
         // ゲスト名の抽出: "Reserved"やプラットフォーム名のみの場合はプレースホルダ名を使う
-        // ※ isBlockedEntry は上でスキップ済みなので、ここに到達するのは非ブロック日のみ
-        var guestName = sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '';
+        // Booking.comの "CLOSED - Not available" で60泊以下の場合はここに到達（実予約として扱う）
+        var guestName = isBooking && isBlockedEntry
+          ? (platformName || 'Booking.com') + '予約'
+          : (sum.replace(/^CLOSED[^a-zA-Z]*/i, '').replace(/Not available/gi, '').trim() || '');
         // "Reserved"のみ → ゲスト名不明だがブロック日ではない実予約
         if (/^reserved$/i.test(guestName)) {
           guestName = (platformName || '予約') + '予約';

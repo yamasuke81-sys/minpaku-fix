@@ -1168,7 +1168,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2494,6 +2494,12 @@
             }
           } catch(e) {}
         }).withFailureHandler(function(err) {}).getOwnerBaseUrl();
+      } catch(e) {}
+      // チェックリストアプリURLをプリフェッチ（ボタン押下時のポップアップブロック回避）
+      try {
+        google.script.run.withSuccessHandler(function(resStr) {
+          try { var r = JSON.parse(resStr); if (r.success && r.url) window._checklistAppUrl = r.url; } catch(e) {}
+        }).withFailureHandler(function() {}).getChecklistAppUrl();
       } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
@@ -4501,19 +4507,22 @@
         if (window._checklistAppUrl) {
           window.open(window._checklistAppUrl + '?date=' + encodeURIComponent(dateStr), '_blank');
         } else {
+          // ポップアップブロック回避: ユーザー操作の同期タイミングでウィンドウを先に開く
+          var w = window.open('about:blank', '_blank');
           google.script.run
             .withSuccessHandler(function(resStr) {
               try {
                 var res = JSON.parse(resStr);
                 if (res.success && res.url) {
                   window._checklistAppUrl = res.url;
-                  window.open(res.url + '?date=' + encodeURIComponent(dateStr), '_blank');
+                  w.location.href = res.url + '?date=' + encodeURIComponent(dateStr);
                 } else {
+                  w.close();
                   alert('チェックリストアプリのURLが取得できません');
                 }
-              } catch (e) { alert('チェックリストアプリのURLが取得できません'); }
+              } catch (e) { w.close(); alert('チェックリストアプリのURLが取得できません'); }
             })
-            .withFailureHandler(function() { alert('チェックリストアプリのURLが取得できません'); })
+            .withFailureHandler(function() { w.close(); alert('チェックリストアプリのURLが取得できません'); })
             .getChecklistAppUrl();
         }
       }

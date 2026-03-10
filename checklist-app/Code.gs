@@ -1437,10 +1437,10 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
         if (ch.owner_line || ch.group_line || ch.staff_line) {
           var allResults = clSendLineByChannel_(msgText, ch);
           var anyOk = allResults.some(function(r) { return r.ok; });
-          lineResult = { ok: anyOk, details: allResults };
+          lineResult = { ok: anyOk, attempted: true, details: allResults };
         }
       } catch (lineErr) {
-        lineResult = { ok: false, reason: lineErr.toString() };
+        lineResult = { ok: false, attempted: true, reason: lineErr.toString() };
       }
       // メール送信（独立try-catch — LINE失敗でもメールは送る）
       try {
@@ -1451,19 +1451,20 @@ function addChecklistMemo(checkoutDate, text, staffName, photoFileId) {
       } catch (mailErr) {
         Logger.log('[メモメール] エラー: ' + mailErr.toString());
       }
-      if (!lineResult) lineResult = { ok: true, reason: 'メール送信のみ' };
+      if (!lineResult) lineResult = { ok: true, attempted: false };
     } else {
-      lineResult = { ok: false, reason: 'メモ通知は無効' };
+      lineResult = { ok: false, attempted: false };
     }
     var lineError = '';
-    if (lineResult && !lineResult.ok) {
+    var lineAttempted = lineResult.attempted !== false;
+    if (lineAttempted && !lineResult.ok) {
       if (lineResult.reason) { lineError = lineResult.reason; }
       else if (lineResult.details) {
         var failDetail = lineResult.details.filter(function(r) { return !r.ok; })[0];
         lineError = failDetail ? (failDetail.message || 'HTTP ' + failDetail.httpCode) : '送信失敗';
       }
     }
-    return JSON.stringify({ success: true, lineSent: lineResult ? lineResult.ok : false, lineError: lineError });
+    return JSON.stringify({ success: true, lineSent: lineResult ? lineResult.ok : false, lineAttempted: lineAttempted, lineError: lineError });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   } finally {

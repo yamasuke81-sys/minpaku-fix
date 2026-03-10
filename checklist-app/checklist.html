@@ -1503,7 +1503,7 @@
 <body>
   <div class="header">
     <div class="header-top">
-      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0309u</span></div>
+      <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0310a</span></div>
       <div class="header-date" id="headerDate"></div>
     </div>
     <div class="progress-bar">
@@ -4350,19 +4350,21 @@
           renderMemos();
           input.value = '';
           clearMemoPhotoPreview();
-          // LINE送信結果を表示
-          var lineMsg = document.createElement('div');
-          lineMsg.style.cssText = 'padding:6px 10px;margin:4px 0;border-radius:4px;font-size:13px;';
-          if (res.lineSent) {
-            lineMsg.style.background = '#d4edda'; lineMsg.style.color = '#155724';
-            lineMsg.textContent = '✅ LINEに送信しました';
-          } else {
-            lineMsg.style.background = '#fff3cd'; lineMsg.style.color = '#856404';
-            lineMsg.textContent = '⚠️ LINE送信失敗: ' + (res.lineError || '不明なエラー');
+          // LINE送信結果を表示（実際にLINE送信を試みた場合のみ）
+          if (res.lineAttempted) {
+            var lineMsg = document.createElement('div');
+            lineMsg.style.cssText = 'padding:6px 10px;margin:4px 0;border-radius:4px;font-size:13px;';
+            if (res.lineSent) {
+              lineMsg.style.background = '#d4edda'; lineMsg.style.color = '#155724';
+              lineMsg.textContent = '✅ LINEに送信しました';
+            } else {
+              lineMsg.style.background = '#fff3cd'; lineMsg.style.color = '#856404';
+              lineMsg.textContent = '⚠️ LINE送信失敗: ' + (res.lineError || '不明なエラー');
+            }
+            var memoList = document.getElementById('memoList');
+            memoList.parentNode.insertBefore(lineMsg, memoList);
+            setTimeout(function() { lineMsg.remove(); }, 5000);
           }
-          var memoList = document.getElementById('memoList');
-          memoList.parentNode.insertBefore(lineMsg, memoList);
-          setTimeout(function() { lineMsg.remove(); }, 5000);
         } else {
           alert('メモの追加に失敗しました: ' + res.error);
         }

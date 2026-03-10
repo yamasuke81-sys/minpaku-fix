@@ -39,7 +39,8 @@
     .fc-col-header-cell {
       border: 1px solid #adb5bd !important;
     }
-    .fc .fc-col-header-cell-cushion {
+    .fc .fc-col-header-cell-cushion,
+    .fc .fc-col-header-cell a {
       color: #212529 !important;
       text-decoration: none !important;
     }
@@ -1175,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311m</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311n</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1230,7 +1231,7 @@
             <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
           </div>
         </div>
-        <a href="#" target="_blank" class="btn btn-warning" id="btnTodayChecklist" style="white-space:normal;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.1;text-decoration:none;color:#212529;display:none;text-align:center;width:3.2em;">清掃✓<br>リスト</a>
+        <a href="#" target="_blank" class="btn btn-warning" id="btnTodayChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.2;text-decoration:none;color:#212529 !important;display:none;text-align:center;">清掃✓<br>リスト</a>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
       <div id="calendar"></div>
@@ -1869,7 +1870,7 @@
 
 
       <div id="settingsNotifyCancel" style="display:none;">
-        <p class="small text-muted mb-2">iCal同期で予約キャンセルを検知した際に、<strong>担当スタッフ＋オーナー</strong>へ通知を送信します。「予約がキャンセルされました。清掃業務はキャンセルとなります」という内容です。</p>
+        <p class="small text-muted mb-2">iCal同期で予約キャンセルを検知した際に、<strong>担当スタッフ＋オーナー</strong>へ通知を送信します。</p>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="notifyCancelToggle">
           <label class="form-check-label" for="notifyCancelToggle"><strong>予約キャンセル通知を有効にする</strong></label>
@@ -1878,8 +1879,24 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="予約キャンセル"></div>
         </div>
-        <p class="small text-muted">※ この通知はiCal同期でキャンセルを検知した際に自動送信されます。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <div class="mb-2"><label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1"><code>{チェックアウト}</code> チェックアウト日<br><code>{日付範囲}</code> CI～CO<br><code>{ゲスト名}</code> ゲスト名<br><code>{清掃担当}</code> 清掃担当スタッフ名<br><code>{清掃詳細URL}</code> 清掃詳細画面URL</div>
+        </div>
+        <h6 class="fw-bold mb-2" style="font-size:0.85rem;">スタッフ宛テンプレート</h6>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-subject" data-ntpl="予約キャンセル"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-body" data-ntpl="予約キャンセル" rows="5" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-preview" data-ntpl="予約キャンセル" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <h6 class="fw-bold mt-3 mb-2" style="font-size:0.85rem;">オーナー宛テンプレート</h6>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-owner-subject" data-ntpl="予約キャンセル"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-owner-body" data-ntpl="予約キャンセル" rows="6" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-owner-preview" data-ntpl="予約キャンセル" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-primary ntpl-save" data-ntpl="予約キャンセル">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary ntpl-reset" data-ntpl="予約キャンセル">デフォルトに戻す</button>
+          <span class="small text-success ntpl-save-msg" data-ntpl="予約キャンセル" style="display:none;">保存しました</span>
+        </div>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="予約キャンセル">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
@@ -1908,7 +1925,7 @@
       </div>
 
       <div id="settingsNotifyCancelRequest" style="display:none;">
-        <p class="small text-muted mb-2">スタッフが出勤キャンセル（辞退）を申請した際に、<strong>オーナー</strong>へ通知を送信します。「スタッフが出勤キャンセルの要望を提出しました」という内容です。</p>
+        <p class="small text-muted mb-2">スタッフが出勤キャンセル（辞退）を申請した際に、<strong>オーナー</strong>へ通知を送信します。</p>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="notifyCancelRequestToggle">
           <label class="form-check-label" for="notifyCancelRequestToggle"><strong>出勤キャンセル要望通知を有効にする</strong></label>
@@ -1917,14 +1934,25 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="出勤キャンセル要望"></div>
         </div>
-        <p class="small text-muted">※ この通知はスタッフがアプリから辞退申請した際に自動送信されます。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <div class="mb-2"><label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1"><code>{日付}</code> チェックアウト日<br><code>{スタッフ名}</code> 申請スタッフ名<br><code>{清掃詳細URL}</code> 清掃詳細画面URL</div>
+        </div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-subject" data-ntpl="出勤キャンセル要望"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-body" data-ntpl="出勤キャンセル要望" rows="5" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-preview" data-ntpl="出勤キャンセル要望" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-primary ntpl-save" data-ntpl="出勤キャンセル要望">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary ntpl-reset" data-ntpl="出勤キャンセル要望">デフォルトに戻す</button>
+          <span class="small text-success ntpl-save-msg" data-ntpl="出勤キャンセル要望" style="display:none;">保存しました</span>
+        </div>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="出勤キャンセル要望">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCancelApprove" style="display:none;">
-        <p class="small text-muted mb-2">オーナーが辞退申請を承認した際に、申請した<strong>スタッフ</strong>へ通知を送信します。「出勤キャンセルが承認されました。清掃担当は解除されています」という内容です。</p>
+        <p class="small text-muted mb-2">オーナーが辞退申請を承認した際に、申請した<strong>スタッフ</strong>へ通知を送信します。</p>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="notifyCancelApproveToggle">
           <label class="form-check-label" for="notifyCancelApproveToggle"><strong>キャンセル承認通知を有効にする</strong></label>
@@ -1933,14 +1961,25 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="キャンセル承認"></div>
         </div>
-        <p class="small text-muted">※ この通知はオーナーがキャンセル申請を承認した際に自動送信されます。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <div class="mb-2"><label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1"><code>{日付}</code> チェックアウト日<br><code>{スタッフ名}</code> 対象スタッフ名<br><code>{清掃詳細URL}</code> 清掃詳細画面URL</div>
+        </div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-subject" data-ntpl="キャンセル承認"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-body" data-ntpl="キャンセル承認" rows="5" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-preview" data-ntpl="キャンセル承認" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-primary ntpl-save" data-ntpl="キャンセル承認">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary ntpl-reset" data-ntpl="キャンセル承認">デフォルトに戻す</button>
+          <span class="small text-success ntpl-save-msg" data-ntpl="キャンセル承認" style="display:none;">保存しました</span>
+        </div>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="キャンセル承認">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCancelReject" style="display:none;">
-        <p class="small text-muted mb-2">オーナーが辞退申請を却下した際に、申請した<strong>スタッフ</strong>へ通知を送信します。「出勤キャンセルは承認されませんでした。予定通りご出勤ください」という内容です。</p>
+        <p class="small text-muted mb-2">オーナーが辞退申請を却下した際に、申請した<strong>スタッフ</strong>へ通知を送信します。</p>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="notifyCancelRejectToggle">
           <label class="form-check-label" for="notifyCancelRejectToggle"><strong>キャンセル却下通知を有効にする</strong></label>
@@ -1949,8 +1988,19 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="キャンセル却下"></div>
         </div>
-        <p class="small text-muted">※ この通知はオーナーがキャンセル申請を却下した際に自動送信されます。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <div class="mb-2"><label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1"><code>{日付}</code> チェックアウト日<br><code>{スタッフ名}</code> 対象スタッフ名<br><code>{清掃詳細URL}</code> 清掃詳細画面URL</div>
+        </div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-subject" data-ntpl="キャンセル却下"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-body" data-ntpl="キャンセル却下" rows="5" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-preview" data-ntpl="キャンセル却下" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-primary ntpl-save" data-ntpl="キャンセル却下">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary ntpl-reset" data-ntpl="キャンセル却下">デフォルトに戻す</button>
+          <span class="small text-success ntpl-save-msg" data-ntpl="キャンセル却下" style="display:none;">保存しました</span>
+        </div>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="キャンセル却下">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
@@ -1965,14 +2015,26 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="請求書送信"></div>
         </div>
-        <p class="small text-muted">※ この通知は請求書作成時に自動送信されます。LINEの場合はPDF添付なしのテキスト通知のみです。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <div class="mb-2"><label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1"><code>{スタッフ名}</code> スタッフ名<br><code>{対象月}</code> 対象年月<br><code>{合計金額}</code> 合計金額<br><code>{対象期間}</code> 対象期間<br><code>{支払期限}</code> 支払期限<br><code>{PDF_URL}</code> PDF URL<br><code>{フォルダURL}</code> 保存先フォルダURL</div>
+        </div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-subject" data-ntpl="請求書送信"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-body" data-ntpl="請求書送信" rows="8" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-preview" data-ntpl="請求書送信" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-primary ntpl-save" data-ntpl="請求書送信">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary ntpl-reset" data-ntpl="請求書送信">デフォルトに戻す</button>
+          <span class="small text-success ntpl-save-msg" data-ntpl="請求書送信" style="display:none;">保存しました</span>
+        </div>
+        <p class="small text-muted mt-2">※ LINEの場合はPDF添付なしのテキスト通知のみです。</p>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="請求書送信">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>
 
       <div id="settingsNotifyCleaningDone" style="display:none;">
-        <p class="small text-muted mb-2">スタッフがチェックリストを完了した際に、<strong>オーナー</strong>へ清掃完了報告を送信します。チェック項目数・撮影枚数・特記事項が含まれます。</p>
+        <p class="small text-muted mb-2">スタッフがチェックリストを完了した際に、<strong>オーナー</strong>へ清掃完了報告を送信します。</p>
         <div class="form-check form-switch mb-3">
           <input class="form-check-input" type="checkbox" id="notifyCleaningDoneToggle">
           <label class="form-check-label" for="notifyCleaningDoneToggle"><strong>清掃完了通知を有効にする</strong></label>
@@ -1981,8 +2043,19 @@
           <label class="form-label small fw-bold">送信先</label>
           <div class="notify-targets-container" data-notify-key="清掃完了"></div>
         </div>
-        <p class="small text-muted">※ この通知はスタッフがチェックリストアプリで「清掃完了報告」ボタンを押した際に自動送信されます。</p>
-        <hr class="my-2">
+        <hr class="my-3">
+        <div class="mb-2"><label class="form-label small fw-bold">利用可能なプレースホルダー</label>
+          <div class="small text-muted mb-1"><code>{日付}</code> チェックアウト日<br><code>{チェック数}</code> 完了項目数<br><code>{全項目数}</code> 全項目数<br><code>{撮影数}</code> 撮影済み箇所数<br><code>{全撮影箇所数}</code> 全撮影箇所数<br><code>{特記事項}</code> メモ・特記事項<br><code>{清掃詳細URL}</code> 清掃詳細画面URL</div>
+        </div>
+        <div class="mb-2"><label class="form-label small">件名</label><input type="text" class="form-control form-control-sm ntpl-subject" data-ntpl="清掃完了"></div>
+        <div class="mb-2"><label class="form-label small">本文</label><textarea class="form-control form-control-sm ntpl-body" data-ntpl="清掃完了" rows="7" style="font-family:monospace;font-size:0.8rem;white-space:pre;"></textarea></div>
+        <div class="mt-2"><label class="form-label small fw-bold">プレビュー</label><pre class="border rounded p-2 small bg-light ntpl-preview" data-ntpl="清掃完了" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;"></pre></div>
+        <div class="d-flex gap-2 align-items-center mt-2">
+          <button type="button" class="btn btn-sm btn-primary ntpl-save" data-ntpl="清掃完了">保存</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary ntpl-reset" data-ntpl="清掃完了">デフォルトに戻す</button>
+          <span class="small text-success ntpl-save-msg" data-ntpl="清掃完了" style="display:none;">保存しました</span>
+        </div>
+        <hr class="my-3">
         <button type="button" class="btn btn-sm btn-outline-info btn-test-notify" data-notify-key="清掃完了">テスト送信</button>
         <span class="small text-muted ms-2">オーナーのメール宛 / LINE宛にサンプル通知を送信します</span>
       </div>

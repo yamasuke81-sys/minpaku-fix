@@ -2824,6 +2824,8 @@ function parseICal_(icalText, platformName) {
       // 日付を先に解析（STATUS:CANCELLEDでもcancelledDatePairsに記録するため）
       var checkIn = parseICalDateToKey_(current.dtstart);
       var checkOut = parseICalDateToKey_(current.dtend);
+      // [DEBUG-DATECHANGE] 生のDTSTART/DTENDとパース結果をログ（誤検出調査用）
+      Logger.log('[DEBUG-DATECHANGE] raw DTSTART="' + current.dtstart + '" → CI=' + checkIn + ' | raw DTEND="' + current.dtend + '" → CO=' + checkOut + ' | SUMMARY="' + (current.summary || '').substring(0, 50) + '"');
       if (!checkOut && checkIn && current.duration) {
         var days = parseICalDurationToDays_(current.duration);
         if (days > 0) checkOut = addDaysToDateKey_(checkIn, days);
@@ -3103,9 +3105,19 @@ function syncFromICal() {
             }
           } else if (!validPairs[pairKey] && !cancelledPairs[pairKey] && !isPast) {
             // フィードから消えた — ただし同じCIで異なるCOのvalidPairがあれば日付変更（延長/短縮）
+            // [DEBUG-DATECHANGE] 既存ペアがフィードにない場合の詳細ログ
+            var rawSpreadsheetCI = formData[ri][colMap.checkIn];
+            var rawSpreadsheetCO = formData[ri][colMap.checkOut];
+            Logger.log('[DEBUG-DATECHANGE] フィード不在: pairKey=' + pairKey + ' | スプシ生値 CI="' + rawSpreadsheetCI + '" (type=' + typeof rawSpreadsheetCI + (rawSpreadsheetCI instanceof Date ? ',Date' : '') + ') CO="' + rawSpreadsheetCO + '" (type=' + typeof rawSpreadsheetCO + (rawSpreadsheetCO instanceof Date ? ',Date' : '') + ')');
+            // 同じCIで始まるvalidPairsを全てログ
+            var matchingVPs = [];
+            var vpKeys = Object.keys(validPairs);
+            for (var vpd = 0; vpd < vpKeys.length; vpd++) {
+              if (vpKeys[vpd].indexOf(ciKey + '|') === 0) matchingVPs.push(vpKeys[vpd]);
+            }
+            Logger.log('[DEBUG-DATECHANGE] 同CI validPairs: ' + JSON.stringify(matchingVPs) + ' | cancelledPairs has pairKey=' + !!cancelledPairs[pairKey]);
             var dateChanged = false;
             var newCoKey = '';
-            var vpKeys = Object.keys(validPairs);
             for (var vpi = 0; vpi < vpKeys.length; vpi++) {
               if (vpKeys[vpi].indexOf(ciKey + '|') === 0 && vpKeys[vpi] !== pairKey) {
                 newCoKey = vpKeys[vpi].split('|')[1];

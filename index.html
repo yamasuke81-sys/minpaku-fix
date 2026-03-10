@@ -941,6 +941,31 @@
       background-color: #5c636a !important;
       border-color: #565e64 !important;
     }
+    /* 変更要請ボタン: ライトモード */
+    .btn-change-request-ok {
+      background-color: #198754 !important;
+      border-color: #198754 !important;
+      color: #fff !important;
+    }
+    .btn-change-request-ok:hover, .btn-change-request-ok:focus {
+      background-color: #146c43 !important;
+    }
+    .btn-change-request-cond {
+      background-color: #e8a012 !important;
+      border-color: #e8a012 !important;
+      color: #1a1a00 !important;
+    }
+    .btn-change-request-cond:hover, .btn-change-request-cond:focus {
+      background-color: #cc8d0f !important;
+    }
+    .btn-change-request-ng {
+      background-color: #dc3545 !important;
+      border-color: #dc3545 !important;
+      color: #fff !important;
+    }
+    .btn-change-request-ng:hover, .btn-change-request-ng:focus {
+      background-color: #bb2d3b !important;
+    }
     /* 募集回答ボタン: ナイトモード */
     @media (prefers-color-scheme: dark) {
       .recruit-btn-ok {
@@ -987,6 +1012,34 @@
       .recruit-btn-del:hover, .recruit-btn-del:focus {
         background-color: #5c636a !important;
       }
+      /* 変更要請ボタン: ダークモード */
+      .btn-change-request-ok {
+        background-color: #1a5c38 !important;
+        border-color: #1a8a56 !important;
+        color: #b8f0cc !important;
+      }
+      .btn-change-request-ok:hover, .btn-change-request-ok:focus {
+        background-color: #1a8a56 !important;
+      }
+      .btn-change-request-cond {
+        background-color: #7a5a00 !important;
+        border-color: #a67c00 !important;
+        color: #fff3c4 !important;
+      }
+      .btn-change-request-cond:hover, .btn-change-request-cond:focus {
+        background-color: #a67c00 !important;
+      }
+      .btn-change-request-ng {
+        background-color: #7a1a24 !important;
+        border-color: #b02a37 !important;
+        color: #ffc9cf !important;
+      }
+      .btn-change-request-ng:hover, .btn-change-request-ng:focus {
+        background-color: #b02a37 !important;
+      }
+      /* ダークモード: 見出し文字色改善 */
+      .recruit-status-badge.status-decided { color: #8cffb5 !important; }
+      .recruit-status-badge.status-laundry { color: #c0c8d0 !important; }
     }
     .modal-memo-area {
       padding: 0.4rem 0;
@@ -1110,7 +1163,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3557,9 +3610,9 @@
                   var changeBtnRow = document.createElement('div');
                   changeBtnRow.className = 'd-flex gap-1 justify-content-center flex-wrap';
                   var changeOpts = [
-                    { val: '◎', icon: '●', text: '対応可\n要請', cls: 'outline-warning' },
-                    { val: '△', icon: '▲', text: '条件付\n要請', cls: 'outline-warning' },
-                    { val: '×', icon: '✖', text: '不可\n要請', cls: 'outline-warning' }
+                    { val: '◎', icon: '●', text: '対応可\n要請', cls: 'change-request-ok' },
+                    { val: '△', icon: '▲', text: '条件付\n要請', cls: 'change-request-cond' },
+                    { val: '×', icon: '✖', text: '不可\n要請', cls: 'change-request-ng' }
                   ];
                   changeOpts.forEach(function(opt) {
                     var b = document.createElement('button');
@@ -5331,9 +5384,9 @@
                 (myResp !== '未回答' ? '<div class="small mb-2 text-center">現在の回答: <strong>' + myResp + '</strong>' + (myMemo ? '（' + escapeHtml(myMemo) + '）' : '') + '</div>' : '') +
                 '<div class="mb-2"><label class="form-label small fw-bold">変更後の回答と備考</label><input type="text" class="form-control form-control-sm mb-1" id="recruitEditChangeMemo" placeholder="変更理由を記入"></div>' +
                 '<div class="d-flex gap-2 justify-content-center">' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-stacked" data-change-resp="◎"><span class="btn-icon">●</span><span class="btn-label" style="white-space:pre-line;">対応可\n要請</span></button>' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-stacked" data-change-resp="△"><span class="btn-icon">▲</span><span class="btn-label" style="white-space:pre-line;">条件付\n要請</span></button>' +
-                '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-stacked" data-change-resp="×"><span class="btn-icon">✖</span><span class="btn-label" style="white-space:pre-line;">不可\n要請</span></button>' +
+                '<button type="button" class="btn btn-sm btn-change-request-ok fw-bold btn-stacked" data-change-resp="◎"><span class="btn-icon">●</span><span class="btn-label" style="white-space:pre-line;">対応可\n要請</span></button>' +
+                '<button type="button" class="btn btn-sm btn-change-request-cond fw-bold btn-stacked" data-change-resp="△"><span class="btn-icon">▲</span><span class="btn-label" style="white-space:pre-line;">条件付\n要請</span></button>' +
+                '<button type="button" class="btn btn-sm btn-change-request-ng fw-bold btn-stacked" data-change-resp="×"><span class="btn-icon">✖</span><span class="btn-label" style="white-space:pre-line;">不可\n要請</span></button>' +
                 '</div>';
               volunteerArea.querySelectorAll('[data-change-resp]').forEach(function(btn) {
                 btn.onclick = function() {

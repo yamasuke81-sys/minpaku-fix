@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310l</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2734,48 +2734,6 @@
         });
         // CO不一致ワーニングをwindowに保存（通知バナー用）
         window._coMismatchWarnings = _coMismatchWarnings;
-
-        // [DEBUG-PHANTOM] 長期予約・2027年予約のデバッグ情報収集
-        var _phantomDebug = [];
-        merged.forEach(function(b) {
-          var ci = b.checkInParsed, co = b.checkOutParsed;
-          if (ci && co) {
-            var ciD = new Date(ci), coD = new Date(co);
-            var nights = Math.round((coD - ciD) / 86400000);
-            if (nights > 30 || ciD.getFullYear() >= 2027) {
-              _phantomDebug.push({
-                rowNumber: b.rowNumber,
-                checkIn: ci,
-                checkOut: co,
-                nights: nights,
-                guestName: b.guestName,
-                bookingSite: b.bookingSite,
-                adults: b.guestCountAdults,
-                infants: b.guestCountInfants,
-                bbq: b.bbq,
-                cancelledAt: b.cancelledAt,
-                mergedRowNumbers: b.mergedRowNumbers
-              });
-            }
-          }
-        });
-        if (_phantomDebug.length > 0) {
-          console.log('[DEBUG-PHANTOM] 長期/2027年予約:', JSON.stringify(_phantomDebug, null, 2));
-          // デバッグバナー表示
-          var phantomBanner = document.getElementById('phantomDebugBanner');
-          if (!phantomBanner) {
-            phantomBanner = document.createElement('div');
-            phantomBanner.id = 'phantomDebugBanner';
-            phantomBanner.style.cssText = 'background:#fff3cd;border:2px solid #ffc107;padding:10px;margin:10px 0;border-radius:8px;font-size:12px;max-height:200px;overflow-y:auto;';
-            var cal = document.getElementById('calendar');
-            if (cal) cal.parentNode.insertBefore(phantomBanner, cal);
-          }
-          var html = '<b>[DEBUG] 長期予約・2027年予約 検出 (' + _phantomDebug.length + '件)</b><br>';
-          _phantomDebug.forEach(function(d) {
-            html += '行' + d.rowNumber + ': ' + d.checkIn + '→' + d.checkOut + ' (' + d.nights + '泊) ゲスト=' + d.guestName + ' サイト=' + d.bookingSite + ' 大人=' + d.adults + ' 幼児=' + d.infants + ' BBQ=' + d.bbq + (d.mergedRowNumbers ? ' merged=' + JSON.stringify(d.mergedRowNumbers) : '') + '<br>';
-          });
-          phantomBanner.innerHTML = html;
-        }
 
         merged.forEach(function(b) {
           const checkIn = b.checkInParsed;

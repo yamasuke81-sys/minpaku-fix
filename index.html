@@ -1110,7 +1110,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310m</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0310n</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2781,6 +2781,10 @@
             var isRecruiting = recStatus && !isFullyConfirmed;
             // 確定済み or 選定済ステータスのみ「決定」扱い。募集中+スタッフ選定済みは未確定
             var isDecided = isFullyConfirmed || (!isSelectedNotConfirmed && (!!bookStaff || !!recStaff));
+            // [DEBUG-CONFIRM] カレンダー清掃ドット判定
+            if (b.rowNumber == 10 || (checkOut && checkOut.indexOf('2026/3/23') >= 0) || (checkOut && checkOut.indexOf('2026-03-23') >= 0)) {
+              console.log('[DEBUG-CONFIRM cal] row=' + b.rowNumber + ' CO=' + checkOut + ' recStatus="' + recStatus + '" recStaff="' + recStaff + '" bookStaff="' + bookStaff + '" isDecided=' + isDecided + ' isFullyConfirmed=' + isFullyConfirmed + ' isSelectedNotConfirmed=' + isSelectedNotConfirmed + ' cleaningStaff="' + (b.cleaningStaff||'') + '"');
+            }
             var cleaningClasses = ['fc-event-cleaning', isDecided ? 'fc-event-cleaning-decided' : isRecruiting ? 'fc-event-cleaning-recruiting' : 'fc-event-cleaning-undecided'];
             if (isCancelled) cleaningClasses.push('fc-event-cancelled');
             var curStaff = normalizeName_(window.currentUserName);
@@ -3352,6 +3356,8 @@
               statusEl.textContent = cIsConfirmed ? 'スタッフ確定済み' : (cIsSelectedNotConfirmed ? 'スタッフ選定済（未確定）' : 'スタッフ募集中');
               statusEl.className = 'recruit-status-badge ' + (cIsConfirmed ? 'status-decided' : (cIsSelectedNotConfirmed ? 'status-selected' : 'status-recruiting'));
               statusEl.removeAttribute('style');
+              // [DEBUG-CONFIRM] キャッシュパスの確定判定デバッグ
+              console.log('[DEBUG-CONFIRM cache] rowNum=' + props.rowNumber + ' cStatus="' + cStatus + '" cleaningStaff="' + (d.cleaningStaff||'') + '" selectedStaff="' + (cachedRec.selectedStaff||'') + '" cIsConfirmed=' + cIsConfirmed + ' cIsSelectedNotConfirmed=' + cIsSelectedNotConfirmed);
             }
             if (volArea && volList && cachedRec && cachedRec.volunteers) {
               volArea.style.display = 'block';
@@ -3409,6 +3415,8 @@
               var isEffConfirmed = (effectiveStatus === 'スタッフ確定済み' || effectiveStatus === '選定済')
                 || (effectiveStatus !== '募集中' && !!resolvedStaff);
               var isEffSelectedNotConfirmed = !isEffConfirmed && effectiveStatus === '募集中' && !!resolvedStaff;
+              // [DEBUG-CONFIRM] サーバーレスポンスパスの確定判定デバッグ
+              console.log('[DEBUG-CONFIRM server] rowNum=' + props.rowNumber + ' r.status="' + (r.status||'') + '" staffAssigned="' + staffAssigned + '" selectedStaff="' + (r.selectedStaff||'') + '" resolvedStaff="' + resolvedStaff + '" isEffConfirmed=' + isEffConfirmed + ' isEffSelectedNotConfirmed=' + isEffSelectedNotConfirmed);
               if (statusEl && r.success) {
                 statusEl.textContent = isEffConfirmed ? 'スタッフ確定済み' : (isEffSelectedNotConfirmed ? 'スタッフ選定済（未確定）' : 'スタッフ募集中');
                 statusEl.className = 'recruit-status-badge ' + (isEffConfirmed ? 'status-decided' : (isEffSelectedNotConfirmed ? 'status-selected' : 'status-recruiting'));

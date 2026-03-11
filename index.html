@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311q</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311r</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2600,7 +2600,7 @@
               var today = new Date();
               var ds = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
               var clBtn = document.getElementById('btnTodayChecklist');
-              if (clBtn) { clBtn.href = r.url + '?date=' + encodeURIComponent(ds); clBtn.style.display = ''; }
+              if (clBtn && !window.readOnly) { clBtn.href = r.url + '?date=' + encodeURIComponent(ds); clBtn.style.display = ''; }
             }
           } catch(e) {}
         }).withFailureHandler(function() {}).getChecklistAppUrl();
@@ -4987,6 +4987,20 @@
           if (bar) bar.style.display = 'none';
           var addArea = document.getElementById('calendarAddBookingArea');
           if (addArea) addArea.style.display = 'none';
+          // GAS/スプシ/スタッフ画面/清掃✓リストボタンを非表示
+          ['btnTodayChecklist'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          });
+          // オーナー専用ボタン群（GAS/スプシ/スタッフ画面）を非表示
+          document.querySelectorAll('a[title="GASエディタを開く"], a[title="スプレッドシートを開く"], #btnOpenStaffView').forEach(function(el) {
+            el.style.display = 'none';
+          });
+          // アカウント名・変更ボタン・スタッフ選択を非表示
+          ['currentAccountBadge','staffDisplayName','btnStaffChange','staffNameSelect','btnAccountSwitch'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          });
           // イベントバーのカーソルポインタを無効化
           var style = document.createElement('style');
           style.textContent = '.fc-event { cursor: default !important; }';

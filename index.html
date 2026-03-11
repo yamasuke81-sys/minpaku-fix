@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311r</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0311s</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1185,7 +1185,7 @@
         </select>
       </div>
       <a href="#" id="btnAccountSwitch" class="btn btn-sm btn-link text-muted p-0" style="display:none; font-size:0.85rem;">アカウント切り替え</a>
-<? if (staffModeStr !== 'yes') { ?>
+<? if (staffModeStr !== 'yes' && readOnlyStr !== 'yes') { ?>
       <div class="d-flex gap-1">
         <a href="https://script.google.com/d/<?= scriptId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="GASエディタを開く">GAS</a>
         <a href="https://docs.google.com/spreadsheets/d/<?= spreadsheetId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="スプレッドシートを開く">スプシ</a>
@@ -5182,7 +5182,7 @@
               var navRecruit = document.getElementById('navRecruit');
               if (navRecruit) navRecruit.style.display = (window.staffMode || staffBarVisible) ? 'none' : '';
               var btnSwitch = document.getElementById('btnAccountSwitch');
-              if (btnSwitch && r.switchUrl && effectiveOwner && !window.staffMode) {
+              if (btnSwitch && r.switchUrl && effectiveOwner && !window.staffMode && !window.readOnly) {
                 btnSwitch.href = r.switchUrl;
                 btnSwitch.textContent = '別のアカウントに切り替える';
                 btnSwitch.style.display = '';
@@ -5191,7 +5191,7 @@
               if (addBookingArea) addBookingArea.style.display = (effectiveOwner && !window.staffMode) ? '' : 'none';
               updateNotificationBanner();
               var badge = document.getElementById('currentAccountBadge');
-              if (badge && r.currentAccountName) {
+              if (badge && r.currentAccountName && !window.readOnly) {
                 badge.textContent = r.currentAccountName;
                 badge.style.display = '';
               }
@@ -9736,19 +9736,19 @@
         if (!window.staffMode) return;
         window.isOwnerUser = false;
         var bar = document.getElementById('staffSelectorBar');
-        if (bar) bar.style.display = 'block';
+        if (bar && !window.readOnly) bar.style.display = 'block';
         var navSet = document.getElementById('navSettings');
         var navTest = document.getElementById('navStaffTest');
         if (navSet) navSet.style.display = 'none';
         if (navTest) navTest.style.display = 'none';
         populateStaffSelectOptions('staffNameSelect');
         var disp = document.getElementById('staffDisplayName');
-        if (disp) {
+        if (disp && !window.readOnly) {
           disp.textContent = window.currentUserName || window.currentUserEmail || '--';
           disp.style.display = '';
         }
         var changeBtn = document.getElementById('btnStaffChange');
-        if (changeBtn) changeBtn.style.display = '';
+        if (changeBtn && !window.readOnly) changeBtn.style.display = '';
         var saved = null;
         try { saved = JSON.parse(localStorage.getItem('staffSelected') || 'null'); } catch (e) {}
         if (saved && (saved.name || saved.email)) {
@@ -10007,7 +10007,7 @@
             } else if (r.email) {
               window.currentUserEmail = r.email;
               var badge = document.getElementById('currentAccountBadge');
-              if (badge && (r.displayName || r.email)) {
+              if (badge && (r.displayName || r.email) && !window.readOnly) {
                 badge.textContent = r.displayName || (r.email ? r.email.split('@')[0] : '');
                 badge.style.display = badge.textContent ? '' : 'none';
               }

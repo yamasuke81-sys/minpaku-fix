@@ -3,46 +3,106 @@
 @section('title', 'the Terrace 長浜')
 @section('meta_description', '瀬戸内海を一望できる貸切民泊「the Terrace 長浜」。最大10名宿泊可能、BBQ設備完備。広島で非日常のリゾート体験を。')
 
+{{-- レイアウトに透明ヘッダーを指示 --}}
+@section('hero_transparent', true)
+
+@push('styles')
+<style>
+    /* ヒーロー: スクロール中はスクロールバーの「ガタつき」防止 */
+    .hero-scroll { overflow-anchor: none; }
+
+    /* 宿名タイトルのアニメーション */
+    .hero-title-line {
+        display: block;
+        opacity: 0;
+        transform: translateY(30px);
+        transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    .hero-title-line.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .hero-title-line:nth-child(2) { transition-delay: 0.2s; }
+    .hero-title-line:nth-child(3) { transition-delay: 0.4s; }
+    .hero-title-line:nth-child(4) { transition-delay: 0.5s; }
+
+    /* スクロールインジケーター */
+    @keyframes scrollPulse {
+        0%, 100% { opacity: 0.6; transform: translateY(0); }
+        50% { opacity: 1; transform: translateY(8px); }
+    }
+    .scroll-indicator { animation: scrollPulse 2s ease-in-out infinite; }
+
+    /* ヘッダー透明→白の切り替え */
+    .header--transparent {
+        background: transparent !important;
+        border-bottom-color: transparent !important;
+        backdrop-filter: none !important;
+    }
+    .header--solid {
+        background: rgba(255,255,255,0.95) !important;
+        border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+        backdrop-filter: blur(10px) !important;
+    }
+</style>
+@endpush
+
 @section('content')
 
-{{-- ヒーローセクション --}}
-<section class="relative h-[80vh] min-h-[500px] flex items-center justify-center overflow-hidden">
-    {{-- 背景画像 --}}
-    <div class="absolute inset-0">
-        <img src="{{ asset('images/terrace-hero.jpg') }}" alt="the Terrace 長浜 — テラスからの瀬戸内海の眺望" class="w-full h-full object-cover">
-        <div class="absolute inset-0 bg-navy/40"></div>
-    </div>
+{{-- ===== スクロール演出ヒーローセクション ===== --}}
+{{-- 外側コンテナ: 250vh の高さでスクロール領域を確保 --}}
+<section id="heroScroll" class="relative hero-scroll" style="height: 250vh;">
 
-    {{-- テキストオーバーレイ --}}
-    <div class="relative z-10 text-center text-white px-4">
-        <p class="text-sm sm:text-base tracking-[0.3em] text-white/80 mb-4">瀬戸内の海を、貸し切る贅沢。</p>
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-wide mb-6">
-            the Terrace 長浜
-        </h1>
-        <p class="text-base sm:text-lg text-white/80 mb-8 max-w-xl mx-auto leading-relaxed">
-            目の前に広がる瀬戸内海。<br class="sm:hidden">
-            最大10名まで宿泊できる貸切民泊で、<br>
-            大切な人と特別な時間をお過ごしください。
-        </p>
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center px-8 py-3 bg-sunset text-white font-bold rounded-full hover:bg-sunset-light transition text-base shadow-lg">
-                空室を確認・予約する
-            </a>
-            <a href="{{ route('facility') }}" class="inline-flex items-center justify-center px-8 py-3 border-2 border-white/50 text-white font-bold rounded-full hover:bg-white/10 transition text-base">
-                施設を見る
-            </a>
+    {{-- sticky ビューポート: 画面に張り付く --}}
+    <div class="sticky top-0 h-screen w-full overflow-hidden">
+
+        {{-- 背景写真（縦長写真: 上=空, 下=テラス） --}}
+        <img
+            id="heroImg"
+            src="{{ asset('images/terrace-hero.jpg') }}"
+            alt="the Terrace 長浜 — テラスからの瀬戸内海の眺望"
+            class="absolute inset-0 w-full h-full object-cover will-change-transform"
+            style="object-position: center 0%;"
+        >
+
+        {{-- オーバーレイ（テキスト読みやすさ用、スクロールで変化） --}}
+        <div id="heroOverlay" class="absolute inset-0 pointer-events-none" style="background: rgba(27,58,92,0);"></div>
+
+        {{-- 宿名テキスト（スクロールでフェードイン） --}}
+        <div id="heroTitle" class="absolute inset-0 flex flex-col items-center justify-center px-4 pointer-events-none" style="opacity: 0;">
+            <div class="text-center pointer-events-auto">
+                <span class="hero-title-line text-xs sm:text-sm tracking-[0.4em] text-white/70 uppercase mb-6 font-light">
+                    Seto Inland Sea Private Villa
+                </span>
+                <h1 class="hero-title-line text-4xl sm:text-6xl lg:text-7xl font-bold text-white tracking-wider mb-4" style="text-shadow: 0 2px 20px rgba(0,0,0,0.3);">
+                    the Terrace 長浜
+                </h1>
+                <p class="hero-title-line text-sm sm:text-lg text-white/80 mb-10 max-w-lg mx-auto leading-relaxed font-light">
+                    瀬戸内の海を、貸し切る贅沢。
+                </p>
+                <div class="hero-title-line flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center px-8 py-3 bg-sunset text-white font-bold rounded-full hover:bg-sunset-light transition text-base shadow-lg">
+                        空室を確認・予約する
+                    </a>
+                    <a href="{{ route('facility') }}" class="inline-flex items-center justify-center px-8 py-3 border-2 border-white/50 text-white font-bold rounded-full hover:bg-white/10 transition text-base">
+                        施設を見る
+                    </a>
+                </div>
+            </div>
         </div>
-    </div>
 
-    {{-- スクロール誘導 --}}
-    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-        <svg class="w-6 h-6 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-        </svg>
+        {{-- スクロールインジケーター（最初だけ表示） --}}
+        <div id="scrollHint" class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 scroll-indicator">
+            <span class="text-white/60 text-xs tracking-[0.2em] uppercase">Scroll</span>
+            <svg class="w-5 h-5 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 14l-7 7m0 0l-7-7"/>
+            </svg>
+        </div>
+
     </div>
 </section>
 
-{{-- 特徴セクション --}}
+{{-- ===== 特徴セクション ===== --}}
 <section class="py-16 sm:py-24 bg-cream">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-12 sm:mb-16">
@@ -108,7 +168,7 @@
     </div>
 </section>
 
-{{-- 施設プレビューセクション --}}
+{{-- ===== 施設プレビューセクション ===== --}}
 <section class="py-16 sm:py-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -182,7 +242,7 @@
     </div>
 </section>
 
-{{-- CTAセクション --}}
+{{-- ===== CTAセクション ===== --}}
 <section class="py-16 sm:py-24 bg-navy">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <p class="text-sm text-sunset font-bold tracking-wider mb-2">RESERVATION</p>
@@ -205,3 +265,127 @@
 </section>
 
 @endsection
+
+@push('scripts')
+<script>
+(function() {
+    'use strict';
+
+    // 要素の参照
+    var heroScroll = document.getElementById('heroScroll');
+    var heroImg    = document.getElementById('heroImg');
+    var heroOverlay = document.getElementById('heroOverlay');
+    var heroTitle  = document.getElementById('heroTitle');
+    var scrollHint = document.getElementById('scrollHint');
+    var header     = document.getElementById('siteHeader');
+    var logo       = document.getElementById('siteLogo');
+    var desktopNav = document.getElementById('desktopNav');
+    var mobileBtn  = document.getElementById('mobileMenuBtn');
+
+    if (!heroScroll) return;
+
+    var titleLines = heroTitle.querySelectorAll('.hero-title-line');
+    var titleRevealed = false;
+    var ticking = false;
+
+    function onScroll() {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(update);
+    }
+
+    function update() {
+        ticking = false;
+
+        var rect = heroScroll.getBoundingClientRect();
+        var scrolled = -rect.top;
+        var maxScroll = heroScroll.offsetHeight - window.innerHeight;
+        // progress: 0（ページ上端）→ 1（ヒーローセクション終端）
+        var progress = Math.max(0, Math.min(1, scrolled / maxScroll));
+
+        // === 1. 画像のパン: 上（空）→ 下（テラス）===
+        // object-position を 0% → 60% に移動（写真の上部→中央下部）
+        var imgPos = progress * 60;
+        heroImg.style.objectPosition = 'center ' + imgPos + '%';
+
+        // === 2. オーバーレイ: テラスが見えたら少し暗くして文字を読みやすく ===
+        var overlayAlpha = 0;
+        if (progress > 0.3) {
+            overlayAlpha = Math.min(0.45, (progress - 0.3) * 1.2);
+        }
+        heroOverlay.style.background = 'rgba(27,58,92,' + overlayAlpha + ')';
+
+        // === 3. タイトル: 40%付近でフェードイン ===
+        var titleOpacity = 0;
+        if (progress > 0.35) {
+            titleOpacity = Math.min(1, (progress - 0.35) * 4);
+        }
+        heroTitle.style.opacity = titleOpacity;
+
+        // タイトル各行のスタガードアニメーション
+        if (progress > 0.38 && !titleRevealed) {
+            titleRevealed = true;
+            for (var i = 0; i < titleLines.length; i++) {
+                titleLines[i].classList.add('visible');
+            }
+        } else if (progress < 0.3 && titleRevealed) {
+            titleRevealed = false;
+            for (var i = 0; i < titleLines.length; i++) {
+                titleLines[i].classList.remove('visible');
+            }
+        }
+
+        // === 4. スクロールインジケーター: すぐ消える ===
+        var hintOpacity = Math.max(0, 1 - progress * 5);
+        scrollHint.style.opacity = hintOpacity;
+
+        // === 5. ヘッダー: 透明→白 ===
+        // ヒーローセクションを抜けたら白ヘッダーに
+        var pastHero = scrolled > maxScroll - 100;
+        if (pastHero) {
+            header.classList.remove('header--transparent');
+            header.classList.add('header--solid');
+            logo.style.color = '';
+            logo.classList.remove('text-white');
+            logo.classList.add('text-navy');
+            if (mobileBtn) {
+                mobileBtn.classList.remove('text-white');
+                mobileBtn.classList.add('text-navy');
+            }
+            if (desktopNav) {
+                var links = desktopNav.querySelectorAll('a:not(.bg-sunset)');
+                for (var i = 0; i < links.length; i++) {
+                    links[i].classList.remove('text-white/80', 'hover:text-white');
+                    links[i].classList.add('text-navy/70', 'hover:text-navy');
+                }
+            }
+        } else {
+            header.classList.add('header--transparent');
+            header.classList.remove('header--solid');
+            logo.classList.remove('text-navy');
+            logo.classList.add('text-white');
+            if (mobileBtn) {
+                mobileBtn.classList.remove('text-navy');
+                mobileBtn.classList.add('text-white');
+            }
+            if (desktopNav) {
+                var links = desktopNav.querySelectorAll('a:not(.bg-sunset)');
+                for (var i = 0; i < links.length; i++) {
+                    links[i].classList.remove('text-navy/70', 'hover:text-navy');
+                    links[i].classList.add('text-white/80', 'hover:text-white');
+                }
+            }
+        }
+    }
+
+    // 初期状態を設定
+    update();
+
+    // パフォーマンス: passive リスナー
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', function() {
+        requestAnimationFrame(update);
+    }, { passive: true });
+})();
+</script>
+@endpush

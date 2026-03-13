@@ -12,32 +12,33 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('styles')
 </head>
-<body class="min-h-screen flex flex-col bg-white text-navy">
+<body class="min-h-screen flex flex-col bg-white text-navy @yield('body_class')">
 
     {{-- ヘッダー --}}
-    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
+    <header id="siteHeader" class="fixed top-0 left-0 right-0 z-50 transition-all duration-500 @hasSection('hero_transparent') header--transparent @else bg-white/95 backdrop-blur border-b border-gray-100 @endif">
         <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 {{-- ロゴ --}}
-                <a href="{{ route('top') }}" class="text-xl font-bold text-navy tracking-wide">
+                <a href="{{ route('top') }}" class="text-xl font-bold tracking-wide transition-colors duration-500 @hasSection('hero_transparent') text-white @else text-navy @endif" id="siteLogo">
                     the Terrace 長浜
                 </a>
 
                 {{-- デスクトップナビ --}}
-                <div class="hidden md:flex items-center gap-6">
-                    <a href="{{ route('facility') }}" class="text-sm text-navy/70 hover:text-navy transition">施設紹介</a>
-                    <a href="{{ route('pricing') }}" class="text-sm text-navy/70 hover:text-navy transition">料金・予約</a>
-                    <a href="{{ route('access') }}" class="text-sm text-navy/70 hover:text-navy transition">アクセス</a>
-                    <a href="{{ route('faq') }}" class="text-sm text-navy/70 hover:text-navy transition">FAQ</a>
-                    <a href="{{ route('contact') }}" class="text-sm text-navy/70 hover:text-navy transition">お問い合わせ</a>
+                <div class="hidden md:flex items-center gap-6" id="desktopNav">
+                    <a href="{{ route('facility') }}" class="text-sm transition @hasSection('hero_transparent') text-white/80 hover:text-white @else text-navy/70 hover:text-navy @endif">施設紹介</a>
+                    <a href="{{ route('pricing') }}" class="text-sm transition @hasSection('hero_transparent') text-white/80 hover:text-white @else text-navy/70 hover:text-navy @endif">料金・予約</a>
+                    <a href="{{ route('access') }}" class="text-sm transition @hasSection('hero_transparent') text-white/80 hover:text-white @else text-navy/70 hover:text-navy @endif">アクセス</a>
+                    <a href="{{ route('faq') }}" class="text-sm transition @hasSection('hero_transparent') text-white/80 hover:text-white @else text-navy/70 hover:text-navy @endif">FAQ</a>
+                    <a href="{{ route('contact') }}" class="text-sm transition @hasSection('hero_transparent') text-white/80 hover:text-white @else text-navy/70 hover:text-navy @endif">お問い合わせ</a>
                     <a href="{{ route('pricing') }}" class="inline-flex items-center px-5 py-2 bg-sunset text-white text-sm font-bold rounded-full hover:bg-sunset-dark transition">
                         予約する
                     </a>
                 </div>
 
                 {{-- モバイルメニューボタン --}}
-                <button id="mobileMenuBtn" class="md:hidden p-2 text-navy" aria-label="メニューを開く">
+                <button id="mobileMenuBtn" class="md:hidden p-2 transition-colors duration-500 @hasSection('hero_transparent') text-white @else text-navy @endif" aria-label="メニューを開く">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
@@ -45,7 +46,7 @@
             </div>
 
             {{-- モバイルメニュー --}}
-            <div id="mobileMenu" class="hidden md:hidden pb-4 border-t border-gray-100">
+            <div id="mobileMenu" class="hidden md:hidden pb-4 border-t border-gray-100/20">
                 <div class="flex flex-col gap-3 pt-4">
                     <a href="{{ route('facility') }}" class="text-sm text-navy/70 hover:text-navy px-2 py-1">施設紹介</a>
                     <a href="{{ route('pricing') }}" class="text-sm text-navy/70 hover:text-navy px-2 py-1">料金・予約</a>
@@ -59,6 +60,11 @@
             </div>
         </nav>
     </header>
+
+    {{-- ヘッダー分のスペーサー（固定ヘッダー対応） --}}
+    @unless(View::hasSection('hero_transparent'))
+    <div class="h-16"></div>
+    @endunless
 
     {{-- メインコンテンツ --}}
     <main class="flex-1">
@@ -113,5 +119,6 @@
             menu.classList.toggle('hidden');
         });
     </script>
+    @stack('scripts')
 </body>
 </html>

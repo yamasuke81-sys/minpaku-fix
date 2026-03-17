@@ -332,7 +332,8 @@ function searchGuest(name, phone) {
         }
       }
 
-      // チェックインが30日以上先の予約はスキップ
+      // チェックインが30日以上先の予約はスキップ（ただし名前/電話マッチを先にチェック）
+      var _skippedByCiFuture = false;
       if (map.checkIn >= 0) {
         var ciVal = row[map.checkIn];
         if (ciVal) {
@@ -340,7 +341,7 @@ function searchGuest(name, phone) {
           if (!isNaN(ciDate.getTime())) {
             var future = new Date(today);
             future.setDate(future.getDate() + 30);
-            if (ciDate > future) { _dbgSkipped.ciFuture++; continue; }
+            if (ciDate > future) { _skippedByCiFuture = true; }
           }
         }
       }
@@ -368,6 +369,16 @@ function searchGuest(name, phone) {
             break;
           }
         }
+      }
+
+      // CI未来フィルタでスキップ（マッチしていた場合はカウント）
+      if (_skippedByCiFuture) {
+        _dbgSkipped.ciFuture++;
+        if (nameMatch || phoneMatch) {
+          if (!_dbgSkipped.ciFutureMatched) _dbgSkipped.ciFutureMatched = 0;
+          _dbgSkipped.ciFutureMatched++;
+        }
+        continue;
       }
 
       if (!nameMatch && !phoneMatch) { _dbgSkipped.noMatch++; }

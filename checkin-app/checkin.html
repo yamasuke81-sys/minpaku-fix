@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317m</div>
+<div class="version-badge" id="deployVersion">v0317n</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -335,8 +335,14 @@ function doSearch() {
 
     if (res.results.length === 0) {
       showScreen('resultScreen');
-      var noHtml = '<div class="no-results"><i class="bi bi-emoji-frown"></i><p class="mt-2">予約が見つかりませんでした<br>No reservation found</p>' +
-        '<button class="btn btn-outline-primary" onclick="showScreen(\'searchScreen\')" style="border-radius:.8rem;"><i class="bi bi-arrow-left"></i> 戻る / Back</button></div>';
+      var noHtml = '<div class="no-results"><i class="bi bi-emoji-frown"></i><p class="mt-2">予約が見つかりませんでした<br>No reservation found</p>';
+      // CI30日以上先でマッチしていた予約がある場合の案内
+      if (res._debug && res._debug.skipped && res._debug.skipped.ciFutureMatched > 0) {
+        noHtml += '<div style="margin:.8rem auto;padding:.6rem .8rem;background:#e8f4fd;border:1px solid #bee5eb;border-radius:.5rem;font-size:.85rem;text-align:center;max-width:320px;color:#0c5460;">' +
+          '<i class="bi bi-info-circle"></i> チェックイン日の30日以上前のため、まだ検索できません。チェックイン日が近づいてから再度お試しください。<br>' +
+          '<span style="font-size:.75rem;color:#666;">Reservations more than 30 days before check-in are not yet available. Please try again closer to your check-in date.</span></div>';
+      }
+      noHtml += '<button class="btn btn-outline-primary" onclick="showScreen(\'searchScreen\')" style="border-radius:.8rem;"><i class="bi bi-arrow-left"></i> 戻る / Back</button></div>';
       // [DEBUG] 検索デバッグ情報
       if (res._debug) {
         var d = res._debug;

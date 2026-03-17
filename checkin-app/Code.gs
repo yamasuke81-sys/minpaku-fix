@@ -186,6 +186,56 @@ function buildCheckinColumnMap_(headers) {
   return map;
 }
 
+// ===== 編集シート管理 =====
+
+var EDIT_SHEET_NAME_ = 'チェックインappゲスト編集分';
+var EDIT_HEADERS_ = ['行番号', 'カラム番号', 'フィールド名', '元の値', '編集後の値', '編集日時'];
+
+/** 編集シートを取得（なければ作成） */
+function getEditSheet_() {
+  var ssId = getSpreadsheetId_();
+  if (!ssId) throw new Error('スプレッドシートIDが設定されていません。');
+  var ss = SpreadsheetApp.openById(ssId);
+  var sheet = ss.getSheetByName(EDIT_SHEET_NAME_);
+  if (!sheet) {
+    sheet = ss.insertSheet(EDIT_SHEET_NAME_);
+    sheet.getRange(1, 1, 1, EDIT_HEADERS_.length).setValues([EDIT_HEADERS_]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/** 特定行番号の編集データを全て取得 → { colIndex: { original, edited, fieldName, editedAt } } */
+function getEditsForRow_(rowNumber) {
+  var sheet = getEditSheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {};
+  var data = sheet.getRange(2, 1, lastRow - 1, EDIT_HEADERS_.length).getValues();
+  var edits = {};
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === String(rowNumber)) {
+      edits[String(data[i][1])] = {
+        original: data[i][3],
+        edited: data[i][4],
+        fieldName: data[i][2],
+        editedAt: data[i][5],
+        sheetRow: i + 2 // 編集シート上の行番号（削除用）
+      };
+    }
+  }
+  return edits;
+}
+
+/** フィールド名を推定（カラムインデックスとヘッダーから） */
+function getFieldNameForCol_(headers, colIndex) {
+  if (colIndex >= 0 && colIndex < headers.length) {
+    var h = String(headers[colIndex] || '');
+    // 長いヘッダーは先頭30文字に切り詰め
+    return h.length > 30 ? h.substring(0, 30) + '…' : h;
+  }
+  return 'col_' + colIndex;
+}
+
 // ===== ゲスト検索 =====
 
 /** 電話番号を正規化（数字のみ、先頭の+81を0に変換） */
@@ -327,7 +377,7 @@ function formatDate_(val) {
   return String(val).trim();
 }
 
-/** ゲスト詳細を取得 */
+/** ゲスト詳細を取得（編集シートの差分をオーバーレイ） */
 function getGuestDetails(rowNumber) {
   try {
     var sheet = getSheet_();
@@ -335,18 +385,34 @@ function getGuestDetails(rowNumber) {
     var map = buildCheckinColumnMap_(headers);
     var row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
 
+    // 編集シートから差分を取得
+    var edits = getEditsForRow_(rowNumber);
+    var editedCols = {}; // colIndex → true（編集済みマーカー）
+    for (var k in edits) editedCols[k] = true;
+
+    /** セル値を取得（編集があればそちらを優先） */
+    function cellVal_(colIndex) {
+      if (colIndex < 0) return '';
+      if (edits[String(colIndex)]) return String(edits[String(colIndex)].edited || '');
+      var v = row[colIndex];
+      if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy/M/d HH:mm');
+      return String(v || '').trim();
+    }
+
     // 基本情報
     var result = {
       rowNumber: rowNumber,
-      checkIn: map.checkIn >= 0 ? formatDate_(row[map.checkIn]) : '',
-      checkOut: map.checkOut >= 0 ? formatDate_(row[map.checkOut]) : '',
-      guestCount: map.guestCount >= 0 ? String(row[map.guestCount] || '').trim() : '',
-      guestCountInfants: map.guestCountInfants >= 0 ? String(row[map.guestCountInfants] || '').trim() : '',
-      prevStay: map.prevStay >= 0 ? String(row[map.prevStay] || '').trim() : '',
-      nextStay: map.nextStay >= 0 ? String(row[map.nextStay] || '').trim() : '',
+      checkIn: map.checkIn >= 0 ? (edits[String(map.checkIn)] ? cellVal_(map.checkIn) : formatDate_(row[map.checkIn])) : '',
+      checkOut: map.checkOut >= 0 ? (edits[String(map.checkOut)] ? cellVal_(map.checkOut) : formatDate_(row[map.checkOut])) : '',
+      guestCount: cellVal_(map.guestCount),
+      guestCountInfants: cellVal_(map.guestCountInfants),
+      prevStay: cellVal_(map.prevStay),
+      nextStay: cellVal_(map.nextStay),
       guests: [],
-      tel1: map.telCols.length > 0 ? String(row[map.telCols[0]] || '').trim() : '',
-      tel2: map.telCols.length > 1 ? String(row[map.telCols[1]] || '').trim() : '',
+      tel1: map.telCols.length > 0 ? cellVal_(map.telCols[0]) : '',
+      tel2: map.telCols.length > 1 ? cellVal_(map.telCols[1]) : '',
+      hasEdits: Object.keys(edits).length > 0,
+      editedCols: editedCols,
       // 編集可能なカラムインデックスのマップ
       colMap: {
         checkIn: map.checkIn,
@@ -368,20 +434,21 @@ function getGuestDetails(rowNumber) {
     // ゲスト一覧を構築（最大10名）
     var maxGuests = map.guestNameCols.length;
     for (var g = 0; g < maxGuests; g++) {
-      var gName = String(row[map.guestNameCols[g]] || '').trim();
+      var gNameColIdx = map.guestNameCols[g];
+      var gName = cellVal_(gNameColIdx);
       if (!gName && g > 0) continue; // 2人目以降は名前がなければスキップ
 
       var guest = {
         index: g,
         name: gName,
-        address: g < map.addressCols.length ? String(row[map.addressCols[g]] || '').trim() : '',
-        age: g < map.ageCols.length ? String(row[map.ageCols[g]] || '').trim() : '',
-        nationality: g < map.nationalityCols.length ? String(row[map.nationalityCols[g]] || '').trim() : '',
-        passportNumber: g < map.passportNumberCols.length ? String(row[map.passportNumberCols[g]] || '').trim() : '',
+        address: g < map.addressCols.length ? cellVal_(map.addressCols[g]) : '',
+        age: g < map.ageCols.length ? cellVal_(map.ageCols[g]) : '',
+        nationality: g < map.nationalityCols.length ? cellVal_(map.nationalityCols[g]) : '',
+        passportNumber: g < map.passportNumberCols.length ? cellVal_(map.passportNumberCols[g]) : '',
         passportPhotoUrl: ''
       };
 
-      // パスポート写真URL
+      // パスポート写真URL（編集対象外なので元の値を使う）
       if (g < map.passportPhotoCols.length) {
         var pVal = String(row[map.passportPhotoCols[g]] || '').trim();
         if (pVal && pVal.indexOf('http') === 0) {
@@ -398,15 +465,99 @@ function getGuestDetails(rowNumber) {
   }
 }
 
-// ===== ゲスト情報更新（自動保存） =====
+// ===== ゲスト情報更新（編集シートに差分記録） =====
 
-/** 単一セルを更新 */
+/** 単一セルを編集シートに記録（フォームの回答1は変更しない） */
 function updateGuestField(rowNumber, colIndex, value) {
   try {
     var sheet = getSheet_();
-    // colIndex は 0-based → Range は 1-based
-    sheet.getRange(rowNumber, colIndex + 1).setValue(value);
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var originalValue = sheet.getRange(rowNumber, colIndex + 1).getValue();
+    var originalStr = (originalValue instanceof Date)
+      ? Utilities.formatDate(originalValue, 'Asia/Tokyo', 'yyyy/M/d HH:mm')
+      : String(originalValue || '');
+    var fieldName = getFieldNameForCol_(headers, colIndex);
+    var editSheet = getEditSheet_();
+    var lastRow = editSheet.getLastRow();
+
+    // 既存の編集エントリを探す
+    var existingRow = -1;
+    if (lastRow >= 2) {
+      var data = editSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (String(data[i][0]) === String(rowNumber) && String(data[i][1]) === String(colIndex)) {
+          existingRow = i + 2;
+          break;
+        }
+      }
+    }
+
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+
+    // 元の値と同じに戻された場合はエントリ削除
+    if (String(value).trim() === originalStr.trim()) {
+      if (existingRow > 0) {
+        editSheet.deleteRow(existingRow);
+      }
+      return JSON.stringify({ success: true, reverted: true });
+    }
+
+    if (existingRow > 0) {
+      // 既存エントリを更新
+      editSheet.getRange(existingRow, 4, 1, 3).setValues([[originalStr, value, now]]);
+    } else {
+      // 新規エントリ追加
+      editSheet.appendRow([rowNumber, colIndex, fieldName, originalStr, value, now]);
+    }
+
     return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.message });
+  }
+}
+
+/** ゲスト編集をリセット（編集シートから該当行の全エントリを削除） */
+function resetGuestEdits(rowNumber) {
+  try {
+    var editSheet = getEditSheet_();
+    var lastRow = editSheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, deleted: 0 });
+
+    var data = editSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var deleted = 0;
+    // 下の行から削除していく（行番号がずれないように）
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (String(data[i][0]) === String(rowNumber)) {
+        editSheet.deleteRow(i + 2);
+        deleted++;
+      }
+    }
+    return JSON.stringify({ success: true, deleted: deleted });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.message });
+  }
+}
+
+/** ゲスト編集履歴を取得（設定画面用） */
+function getGuestEditLog() {
+  try {
+    var editSheet = getEditSheet_();
+    var lastRow = editSheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, edits: [] });
+
+    var data = editSheet.getRange(2, 1, lastRow - 1, EDIT_HEADERS_.length).getValues();
+    var edits = [];
+    for (var i = 0; i < data.length; i++) {
+      edits.push({
+        rowNumber: data[i][0],
+        colIndex: data[i][1],
+        fieldName: data[i][2],
+        original: String(data[i][3] || ''),
+        edited: String(data[i][4] || ''),
+        editedAt: data[i][5]
+      });
+    }
+    return JSON.stringify({ success: true, edits: edits });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });
   }

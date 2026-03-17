@@ -47,6 +47,10 @@
     .field-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px rgba(44,111,187,.15); }
     .save-indicator { font-size: .7rem; color: var(--success); display: none; }
     .save-indicator.show { display: inline; }
+    .edited-badge { font-size: .65rem; color: #e67e22; font-weight: 600; margin-left: .3rem; }
+    .field-input.edited { border-color: #e67e22; background: #fff8f0; }
+    .btn-reset-edits { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: .6rem; padding: .4rem .8rem; font-size: .8rem; font-weight: 600; }
+    .btn-reset-edits:hover { background: #f1b0b7; }
     .passport-thumb { max-width: 120px; border-radius: .5rem; margin-top: .3rem; cursor: pointer; }
     .guest-divider { border: 0; border-top: 1px dashed #ddd; margin: .8rem 0; }
 
@@ -96,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317e</div>
+<div class="version-badge" id="deployVersion">v0317g</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -139,7 +143,12 @@
         <button class="btn-back" onclick="showScreen('resultScreen')"><i class="bi bi-arrow-left"></i></button>
         <h2>宿泊情報の確認 / Guest Info</h2>
       </div>
-      <span class="save-indicator" id="saveIndicator"><i class="bi bi-check-circle-fill"></i> 保存済</span>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn-reset-edits" id="btnResetEdits" onclick="doResetEdits()" style="display:none;">
+          <i class="bi bi-arrow-counterclockwise"></i> リセット
+        </button>
+        <span class="save-indicator" id="saveIndicator"><i class="bi bi-check-circle-fill"></i> 保存済</span>
+      </div>
     </div>
   </div>
   <div class="detail-body" id="detailBody"></div>
@@ -238,6 +247,16 @@
       <div id="fieldConfigList"></div>
     </div>
 
+    <!-- ゲスト編集履歴 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-pencil-square"></i> ゲスト編集履歴</h3>
+      <p style="font-size:.75rem;color:#888;">ゲストがチェックインアプリで変更した内容の一覧です</p>
+      <button class="btn btn-sm btn-outline-secondary" onclick="loadEditLog()" style="border-radius:.5rem;">
+        <i class="bi bi-arrow-clockwise"></i> 読み込み
+      </button>
+      <div id="editLogList" class="mt-2" style="font-size:.8rem;max-height:300px;overflow-y:auto;"></div>
+    </div>
+
     <!-- チェックイン記録 -->
     <div class="settings-section">
       <h3><i class="bi bi-clock-history"></i> チェックイン記録</h3>
@@ -268,6 +287,7 @@ var _colMap = null;
 var _displayFields = [];
 var _saveTimers = {};
 var _lastScreen = 'searchScreen';
+var _editedCols = {}; // colIndex → true（編集済みフィールド）
 
 // ===== GAS通信 =====
 function callGAS(fn, args) {
@@ -373,6 +393,9 @@ function loadGuestDetails(rowNumber) {
     }
     _guestData = res.data;
     _colMap = res.data.colMap;
+    _editedCols = res.data.editedCols || {};
+    // リセットボタン表示
+    document.getElementById('btnResetEdits').style.display = res.data.hasEdits ? '' : 'none';
     renderDetail();
   }).catch(function(err) {
     document.getElementById('detailBody').innerHTML = '<div class="text-center text-danger p-4">' + escapeHtml(err.message) + '</div>';
@@ -494,9 +517,12 @@ function renderDetail() {
 }
 
 function fieldRow(label, value, id, colIndex) {
-  var html = '<div class="field-row"><div class="field-label">' + label + '</div>';
+  var isEdited = colIndex >= 0 && _editedCols[String(colIndex)];
+  var editedBadge = isEdited ? '<span class="edited-badge">(編集済み)</span>' : '';
+  var editedClass = isEdited ? ' edited' : '';
+  var html = '<div class="field-row"><div class="field-label">' + label + editedBadge + '</div>';
   if (colIndex >= 0) {
-    html += '<input type="text" class="field-input" id="field_' + id + '" data-col="' + colIndex + '" value="' + escapeHtml(value || '') + '">';
+    html += '<input type="text" class="field-input' + editedClass + '" id="field_' + id + '" data-col="' + colIndex + '" value="' + escapeHtml(value || '') + '">';
   } else {
     html += '<div class="field-value">' + escapeHtml(value || '-') + '</div>';
   }
@@ -515,9 +541,51 @@ function autoSave(colIndex, value) {
         var ind = document.getElementById('saveIndicator');
         ind.classList.add('show');
         setTimeout(function() { ind.classList.remove('show'); }, 2000);
+        // 編集済みスタイル更新
+        var inp = document.querySelector('.field-input[data-col="' + colIndex + '"]');
+        if (inp) {
+          if (res.reverted) {
+            inp.classList.remove('edited');
+            delete _editedCols[String(colIndex)];
+            // ラベルのバッジ除去
+            var badge = inp.parentElement.querySelector('.edited-badge');
+            if (badge) badge.remove();
+          } else {
+            inp.classList.add('edited');
+            _editedCols[String(colIndex)] = true;
+            // ラベルにバッジ追加（まだなければ）
+            var labelEl = inp.parentElement.querySelector('.field-label');
+            if (labelEl && !labelEl.querySelector('.edited-badge')) {
+              labelEl.insertAdjacentHTML('beforeend', '<span class="edited-badge">(編集済み)</span>');
+            }
+          }
+          // リセットボタン表示制御
+          document.getElementById('btnResetEdits').style.display =
+            Object.keys(_editedCols).length > 0 ? '' : 'none';
+        }
       }
     }).catch(function() { /* 静かに失敗 */ });
   }, 800);
+}
+
+// ===== リセット =====
+function doResetEdits() {
+  if (!confirm('編集内容をリセットしますか？\nReset all edits?')) return;
+  var btn = document.getElementById('btnResetEdits');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-sm"></span>';
+
+  callGAS('resetGuestEdits', [_currentRow]).then(function(res) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> リセット';
+    if (res.success) {
+      // 詳細を再読み込み
+      loadGuestDetails(_currentRow);
+    }
+  }).catch(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> リセット';
+  });
 }
 
 // ===== 確認 =====
@@ -708,6 +776,29 @@ function loadCheckinLog() {
     }
     html += '</tbody></table>';
     document.getElementById('checkinLogList').innerHTML = html;
+  });
+}
+
+// ===== 編集履歴表示（設定画面） =====
+function loadEditLog() {
+  document.getElementById('editLogList').innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span></div>';
+  callGAS('getGuestEditLog').then(function(res) {
+    if (!res.success || !res.edits || res.edits.length === 0) {
+      document.getElementById('editLogList').innerHTML = '<div class="text-muted">編集履歴なし</div>';
+      return;
+    }
+    var html = '<table class="table table-sm table-striped" style="font-size:.75rem;"><thead><tr><th>日時</th><th>行</th><th>フィールド</th><th>元の値</th><th>編集後</th></tr></thead><tbody>';
+    for (var i = res.edits.length - 1; i >= 0; i--) {
+      var e = res.edits[i];
+      html += '<tr><td>' + escapeHtml(e.editedAt || '') + '</td><td>' + e.rowNumber + '</td><td>' +
+        escapeHtml(e.fieldName || '') + '</td><td style="color:#888;text-decoration:line-through;">' +
+        escapeHtml(e.original || '(空)') + '</td><td style="color:#e67e22;font-weight:600;">' +
+        escapeHtml(e.edited || '(空)') + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    document.getElementById('editLogList').innerHTML = html;
+  }).catch(function(err) {
+    document.getElementById('editLogList').innerHTML = '<div class="text-danger">読み込みエラー: ' + escapeHtml(err.message) + '</div>';
   });
 }
 

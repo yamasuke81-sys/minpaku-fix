@@ -101,7 +101,32 @@ function getSheet_() {
   return sheet;
 }
 
-/** ヘッダーからカラムマップを構築 */
+/** ヘッダーの種別を判定 */
+function classifyHeader_(h, hl) {
+  // 氏名
+  if (h.indexOf('氏名') > -1 || hl === 'full name' || hl.indexOf('full name') > -1) return 'name';
+  // 住所
+  if (h.indexOf('住所') > -1 || hl.indexOf('address') > -1) return 'address';
+  // 年齢
+  if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) return 'age';
+  // 国籍
+  if (h.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) return 'nationality';
+  // 旅券番号（パスポート写真より先に判定）
+  if (h.indexOf('旅券番号') > -1 || hl.indexOf('passport number') > -1) return 'passportNumber';
+  // パスポート写真
+  if ((h.indexOf('パスポート') > -1 || hl.indexOf('passport') > -1) &&
+      (h.indexOf('アップロード') > -1 || h.indexOf('upload') > -1 || hl.indexOf('upload') > -1 || hl.indexOf('photo') > -1)) return 'passportPhoto';
+  // 電話番号
+  if ((h.indexOf('電話') > -1 || h.indexOf('TEL') > -1 || hl.indexOf('phone') > -1) && h.indexOf('オーナー') === -1) return 'tel';
+  // メールアドレス
+  if ((h.indexOf('メール') > -1 || hl.indexOf('mail') > -1 || hl.indexOf('email') > -1) &&
+      h.indexOf('オーナー') === -1 && h.indexOf('非常に重要') === -1) return 'email';
+  return null;
+}
+
+/** ヘッダーからカラムマップを構築
+ *  各氏名カラムの右側を走査し、最初に出現する住所/年齢/国籍/旅券番号/パスポート写真を
+ *  そのゲストに紐づける（次の氏名カラムが出現するまでの範囲） */
 function buildCheckinColumnMap_(headers) {
   var map = {
     checkIn: -1,
@@ -120,67 +145,52 @@ function buildCheckinColumnMap_(headers) {
     emailCols: []
   };
 
+  // 1パス目: 単一フィールド（チェックイン/アウト、宿泊人数等）+ 氏名カラム位置を収集
+  var allNamePositions = [];
   for (var i = 0; i < headers.length; i++) {
     var h = String(headers[i] || '').trim();
     var hl = h.toLowerCase();
 
-    // チェックイン・チェックアウト
     if (h.indexOf('チェックイン') > -1 && h.indexOf('チェックアウト') === -1 && map.checkIn < 0) map.checkIn = i;
     if (h.indexOf('チェックアウト') > -1 && map.checkOut < 0) map.checkOut = i;
-
-    // 宿泊人数 — 「宿泊人数 / Number of Guests」にのみマッチ（「宿泊人数2名の〜ベッド」を除外）
     if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && h.indexOf('3歳以下') === -1
         && h.indexOf('ベッド') === -1 && h.indexOf('お答え') === -1 && map.guestCount < 0) map.guestCount = i;
-    // 3才以下 — 「3才以下の乳幼児の人数」にのみマッチ（「全員分の情報〜3才以下は除く」を除外）
     if ((h.indexOf('3才以下') > -1 || h.indexOf('3歳以下') > -1)
         && (h.indexOf('乳幼児') > -1 || hl.indexOf('infants') > -1) && map.guestCountInfants < 0) map.guestCountInfants = i;
-
-    // 前泊地・後泊地
     if (h.indexOf('前泊地') > -1 && map.prevStay < 0) map.prevStay = i;
     if ((h.indexOf('後泊地') > -1 || h.indexOf('行先地') > -1) && map.nextStay < 0) map.nextStay = i;
 
-    // 氏名（複数ゲスト対応）
-    if (h.indexOf('氏名') > -1 || hl === 'full name' || hl.indexOf('full name') > -1) {
-      map.guestNameCols.push(i);
+    var cls = classifyHeader_(h, hl);
+    if (cls === 'name') allNamePositions.push(i);
+    if (cls === 'tel') map.telCols.push(i);
+    if (cls === 'email') map.emailCols.push(i);
+  }
+
+  // 2パス目: 各氏名カラムの右側から、次の氏名カラム（または末尾）までの範囲で
+  //          最初に出現する住所/年齢/国籍/旅券番号/パスポート写真を紐づけ
+  for (var ni = 0; ni < allNamePositions.length; ni++) {
+    var nameCol = allNamePositions[ni];
+    var rangeEnd = (ni + 1 < allNamePositions.length) ? allNamePositions[ni + 1] : headers.length;
+
+    map.guestNameCols.push(nameCol);
+
+    var foundAddr = -1, foundAge = -1, foundNat = -1, foundPpNum = -1, foundPpPhoto = -1;
+    for (var j = nameCol + 1; j < rangeEnd; j++) {
+      var hj = String(headers[j] || '').trim();
+      var hlj = hj.toLowerCase();
+      var clsj = classifyHeader_(hj, hlj);
+      if (clsj === 'address' && foundAddr < 0) foundAddr = j;
+      if (clsj === 'age' && foundAge < 0) foundAge = j;
+      if (clsj === 'nationality' && foundNat < 0) foundNat = j;
+      if (clsj === 'passportNumber' && foundPpNum < 0) foundPpNum = j;
+      if (clsj === 'passportPhoto' && foundPpPhoto < 0) foundPpPhoto = j;
     }
 
-    // 住所（複数ゲスト対応）
-    if (h.indexOf('住所') > -1 || hl.indexOf('address') > -1) {
-      map.addressCols.push(i);
-    }
-
-    // 年齢（複数ゲスト対応）
-    if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) {
-      map.ageCols.push(i);
-    }
-
-    // 国籍（複数ゲスト対応）
-    if (h.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) {
-      map.nationalityCols.push(i);
-    }
-
-    // 旅券番号（パスポート写真と区別）
-    if (h.indexOf('旅券番号') > -1 || hl.indexOf('passport number') > -1) {
-      map.passportNumberCols.push(i);
-    }
-
-    // パスポート写真
-    if ((h.indexOf('パスポート') > -1 || hl.indexOf('passport') > -1) &&
-        (h.indexOf('アップロード') > -1 || h.indexOf('upload') > -1 || hl.indexOf('upload') > -1 || hl.indexOf('photo') > -1)) {
-      map.passportPhotoCols.push(i);
-    }
-
-    // 電話番号
-    if ((h.indexOf('電話') > -1 || h.indexOf('TEL') > -1 || hl.indexOf('phone') > -1) &&
-        h.indexOf('オーナー') === -1) {
-      map.telCols.push(i);
-    }
-
-    // メールアドレス
-    if ((h.indexOf('メール') > -1 || hl.indexOf('mail') > -1 || hl.indexOf('email') > -1) &&
-        h.indexOf('オーナー') === -1 && h.indexOf('非常に重要') === -1) {
-      map.emailCols.push(i);
-    }
+    map.addressCols.push(foundAddr);
+    map.ageCols.push(foundAge);
+    map.nationalityCols.push(foundNat);
+    map.passportNumberCols.push(foundPpNum);
+    map.passportPhotoCols.push(foundPpPhoto);
   }
 
   return map;
@@ -449,7 +459,7 @@ function getGuestDetails(rowNumber) {
       };
 
       // パスポート写真URL（編集対象外なので元の値を使う）
-      if (g < map.passportPhotoCols.length) {
+      if (g < map.passportPhotoCols.length && map.passportPhotoCols[g] >= 0) {
         var pVal = String(row[map.passportPhotoCols[g]] || '').trim();
         if (pVal && pVal.indexOf('http') === 0) {
           guest.passportPhotoUrl = pVal;

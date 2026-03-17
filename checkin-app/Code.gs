@@ -469,6 +469,39 @@ function getGuestDetails(rowNumber) {
       result.guests.push(guest);
     }
 
+    // [DEBUG] カラムマップ＋ヘッダー名＋生値をデバッグ情報として返す
+    var debugColMap = {};
+    var singleKeys = ['checkIn','checkOut','guestCount','guestCountInfants','prevStay','nextStay'];
+    for (var si = 0; si < singleKeys.length; si++) {
+      var sk = singleKeys[si];
+      var idx = map[sk];
+      debugColMap[sk] = {
+        colIndex: idx,
+        header: idx >= 0 ? String(headers[idx] || '').substring(0, 50) : '(未検出)',
+        rawValue: idx >= 0 ? String(row[idx] || '').substring(0, 50) : ''
+      };
+    }
+    var arrayKeys = ['guestNameCols','addressCols','ageCols','nationalityCols','passportNumberCols','passportPhotoCols','telCols','emailCols'];
+    for (var ai = 0; ai < arrayKeys.length; ai++) {
+      var ak = arrayKeys[ai];
+      var arr = map[ak] || [];
+      debugColMap[ak] = [];
+      for (var aidx = 0; aidx < arr.length; aidx++) {
+        var ci = arr[aidx];
+        debugColMap[ak].push({
+          colIndex: ci,
+          header: ci >= 0 ? String(headers[ci] || '').substring(0, 50) : '(未検出)',
+          rawValue: ci >= 0 ? String(row[ci] || '').substring(0, 50) : ''
+        });
+      }
+    }
+    // 全ヘッダー一覧（最初の60列）
+    var allHeaders = [];
+    for (var hi = 0; hi < Math.min(headers.length, 60); hi++) {
+      allHeaders.push({ col: hi, header: String(headers[hi] || '').substring(0, 60) });
+    }
+    result._debug = { colMap: debugColMap, allHeaders: allHeaders, totalCols: headers.length };
+
     return JSON.stringify({ success: true, data: result });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });

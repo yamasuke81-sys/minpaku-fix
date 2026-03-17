@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317h</div>
+<div class="version-badge" id="deployVersion">v0317i</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -397,6 +397,8 @@ function loadGuestDetails(rowNumber) {
     // リセットボタン表示
     document.getElementById('btnResetEdits').style.display = res.data.hasEdits ? '' : 'none';
     renderDetail();
+    // [DEBUG] デバッグ情報表示
+    if (res.data._debug) renderDebugPanel(res.data._debug);
   }).catch(function(err) {
     document.getElementById('detailBody').innerHTML = '<div class="text-center text-danger p-4">' + escapeHtml(err.message) + '</div>';
   });
@@ -777,6 +779,46 @@ function loadCheckinLog() {
     html += '</tbody></table>';
     document.getElementById('checkinLogList').innerHTML = html;
   });
+}
+
+// ===== [DEBUG] デバッグパネル =====
+function renderDebugPanel(dbg) {
+  var html = '<div class="detail-section" style="background:#fff3cd;border:2px solid #ffc107;">';
+  html += '<h3 style="color:#856404;">[DEBUG] カラムマッピング</h3>';
+  html += '<div style="font-size:.7rem;overflow-x:auto;">';
+
+  // 単一フィールド
+  var cm = dbg.colMap;
+  var singles = ['checkIn','checkOut','guestCount','guestCountInfants','prevStay','nextStay'];
+  html += '<table class="table table-sm" style="font-size:.7rem;"><thead><tr><th>フィールド</th><th>col#</th><th>ヘッダー</th><th>生値</th></tr></thead><tbody>';
+  for (var i = 0; i < singles.length; i++) {
+    var s = cm[singles[i]];
+    html += '<tr><td><b>' + singles[i] + '</b></td><td>' + s.colIndex + '</td><td>' + escapeHtml(s.header) + '</td><td>' + escapeHtml(s.rawValue) + '</td></tr>';
+  }
+  html += '</tbody></table>';
+
+  // 配列フィールド
+  var arrays = ['guestNameCols','addressCols','ageCols','nationalityCols','passportNumberCols','passportPhotoCols','telCols','emailCols'];
+  html += '<table class="table table-sm" style="font-size:.7rem;"><thead><tr><th>フィールド</th><th>idx</th><th>col#</th><th>ヘッダー</th><th>生値</th></tr></thead><tbody>';
+  for (var a = 0; a < arrays.length; a++) {
+    var arr = cm[arrays[a]] || [];
+    for (var j = 0; j < arr.length; j++) {
+      html += '<tr><td><b>' + arrays[a] + '</b></td><td>' + j + '</td><td>' + arr[j].colIndex + '</td><td>' + escapeHtml(arr[j].header) + '</td><td>' + escapeHtml(arr[j].rawValue) + '</td></tr>';
+    }
+    if (arr.length === 0) html += '<tr><td><b>' + arrays[a] + '</b></td><td colspan="4" class="text-muted">(なし)</td></tr>';
+  }
+  html += '</tbody></table>';
+
+  // 全ヘッダー一覧
+  html += '<details><summary>全ヘッダー一覧 (' + dbg.totalCols + '列)</summary>';
+  html += '<table class="table table-sm" style="font-size:.65rem;"><tbody>';
+  for (var h = 0; h < dbg.allHeaders.length; h++) {
+    html += '<tr><td>' + dbg.allHeaders[h].col + '</td><td>' + escapeHtml(dbg.allHeaders[h].header) + '</td></tr>';
+  }
+  html += '</tbody></table></details>';
+
+  html += '</div></div>';
+  document.getElementById('detailBody').insertAdjacentHTML('beforeend', html);
 }
 
 // ===== 編集履歴表示（設定画面） =====

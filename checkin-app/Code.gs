@@ -128,9 +128,12 @@ function buildCheckinColumnMap_(headers) {
     if (h.indexOf('チェックイン') > -1 && h.indexOf('チェックアウト') === -1 && map.checkIn < 0) map.checkIn = i;
     if (h.indexOf('チェックアウト') > -1 && map.checkOut < 0) map.checkOut = i;
 
-    // 宿泊人数
-    if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && h.indexOf('3歳以下') === -1 && map.guestCount < 0) map.guestCount = i;
-    if ((h.indexOf('3才以下') > -1 || h.indexOf('3歳以下') > -1) && map.guestCountInfants < 0) map.guestCountInfants = i;
+    // 宿泊人数 — 「宿泊人数 / Number of Guests」にのみマッチ（「宿泊人数2名の〜ベッド」を除外）
+    if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && h.indexOf('3歳以下') === -1
+        && h.indexOf('ベッド') === -1 && h.indexOf('お答え') === -1 && map.guestCount < 0) map.guestCount = i;
+    // 3才以下 — 「3才以下の乳幼児の人数」にのみマッチ（「全員分の情報〜3才以下は除く」を除外）
+    if ((h.indexOf('3才以下') > -1 || h.indexOf('3歳以下') > -1)
+        && (h.indexOf('乳幼児') > -1 || hl.indexOf('infants') > -1) && map.guestCountInfants < 0) map.guestCountInfants = i;
 
     // 前泊地・後泊地
     if (h.indexOf('前泊地') > -1 && map.prevStay < 0) map.prevStay = i;

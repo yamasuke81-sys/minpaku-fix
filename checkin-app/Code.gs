@@ -105,8 +105,9 @@ function getSheet_() {
 function classifyHeader_(h, hl) {
   // 氏名
   if (h.indexOf('氏名') > -1 || hl === 'full name' || hl.indexOf('full name') > -1) return 'name';
-  // 住所
-  if (h.indexOf('住所') > -1 || hl.indexOf('address') > -1) return 'address';
+  // 住所（「メールアドレス / Email Address」を除外）
+  if ((h.indexOf('住所') > -1 || hl.indexOf('address') > -1) &&
+      h.indexOf('メール') === -1 && hl.indexOf('email') === -1 && hl.indexOf('mail') === -1) return 'address';
   // 年齢
   if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) return 'age';
   // 国籍
@@ -151,10 +152,12 @@ function buildCheckinColumnMap_(headers) {
     var h = String(headers[i] || '').trim();
     var hl = h.toLowerCase();
 
-    if (h.indexOf('チェックイン') > -1 && h.indexOf('チェックアウト') === -1 && map.checkIn < 0) map.checkIn = i;
+    if (h.indexOf('チェックイン') > -1 && h.indexOf('チェックアウト') === -1
+        && h.indexOf('案内') === -1 && h.indexOf('お願い') === -1 && map.checkIn < 0) map.checkIn = i;
     if (h.indexOf('チェックアウト') > -1 && map.checkOut < 0) map.checkOut = i;
-    if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && h.indexOf('3歳以下') === -1
-        && h.indexOf('ベッド') === -1 && h.indexOf('お答え') === -1 && map.guestCount < 0) map.guestCount = i;
+    if (h.indexOf('宿泊人数') > -1 && h.indexOf('乳幼児') === -1 && hl.indexOf('infants') === -1
+        && h.indexOf('ベッド') === -1 && h.indexOf('お答え') === -1 && h.indexOf('iCal') === -1
+        && map.guestCount < 0) map.guestCount = i;
     if ((h.indexOf('3才以下') > -1 || h.indexOf('3歳以下') > -1)
         && (h.indexOf('乳幼児') > -1 || hl.indexOf('infants') > -1) && map.guestCountInfants < 0) map.guestCountInfants = i;
     if (h.indexOf('前泊地') > -1 && map.prevStay < 0) map.prevStay = i;

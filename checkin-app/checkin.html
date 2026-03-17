@@ -96,7 +96,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317a</div>
+<div class="version-badge" id="deployVersion">v0317d</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -116,7 +116,7 @@
     <button class="btn-search" id="btnSearch" onclick="doSearch()">
       <i class="bi bi-search"></i> 検索 / Search
     </button>
-    <div class="search-hint">お名前または電話番号のどちらかを入力してください<br>Please enter your name or phone number</div>
+    <div class="search-hint">お名前または電話番号のどちらかを入力してください</div>
     <div id="searchError" class="text-danger text-center mt-2" style="font-size:.85rem;display:none;"></div>
   </div>
 </div>
@@ -401,7 +401,7 @@ function renderDetail() {
   // 予約基本情報
   html += '<div class="detail-section"><h3><i class="bi bi-calendar-event"></i> 予約情報 / Reservation</h3>';
   if (isFieldVisible('guestCount')) {
-    html += fieldRow(getFieldLabel('guestCount', '宿泊人数'), d.guestCount, 'guestCount', _colMap.guestCount);
+    html += fieldRow(getFieldLabel('guestCount', '宿泊人数 / Number of Guests<br><small style="color:#666">※ 3才以下は除く / Excluding children under 3 years old</small>'), d.guestCount, 'guestCount', _colMap.guestCount);
   }
   if (isFieldVisible('guestCountInfants') && (d.guestCountInfants || _colMap.guestCountInfants >= 0)) {
     html += fieldRow(getFieldLabel('guestCountInfants', '3才以下の人数'), d.guestCountInfants, 'guestCountInfants', _colMap.guestCountInfants);

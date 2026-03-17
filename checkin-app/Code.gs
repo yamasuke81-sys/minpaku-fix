@@ -293,9 +293,31 @@ function searchGuest(name, phone) {
     today.setHours(0, 0, 0, 0);
 
     var results = [];
+    // [DEBUG] 検索過程を記録
+    var _dbgSkipped = { coPast: 0, ciFuture: 0, noMatch: 0 };
+    var _dbgSamples = []; // 最初の5行のサンプル
 
     for (var r = 1; r < data.length; r++) {
       var row = data[r];
+
+      // [DEBUG] 最初の5行のサンプルを記録
+      if (_dbgSamples.length < 5) {
+        var sampleNames = [];
+        for (var sni = 0; sni < Math.min(map.guestNameCols.length, 2); sni++) {
+          sampleNames.push(String(row[map.guestNameCols[sni]] || '').substring(0, 20));
+        }
+        var samplePhones = [];
+        for (var sti = 0; sti < Math.min(map.telCols.length, 2); sti++) {
+          samplePhones.push(String(row[map.telCols[sti]] || '').substring(0, 20));
+        }
+        _dbgSamples.push({
+          row: r + 1,
+          ci: map.checkIn >= 0 ? String(row[map.checkIn] || '').substring(0, 30) : '(unmapped)',
+          co: map.checkOut >= 0 ? String(row[map.checkOut] || '').substring(0, 30) : '(unmapped)',
+          names: sampleNames,
+          phones: samplePhones
+        });
+      }
 
       // チェックアウトが過去の予約はスキップ（3日前まで許容）
       if (map.checkOut >= 0) {
@@ -305,7 +327,7 @@ function searchGuest(name, phone) {
           if (!isNaN(coDate.getTime())) {
             var cutoff = new Date(today);
             cutoff.setDate(cutoff.getDate() - 3);
-            if (coDate < cutoff) continue;
+            if (coDate < cutoff) { _dbgSkipped.coPast++; continue; }
           }
         }
       }
@@ -318,7 +340,7 @@ function searchGuest(name, phone) {
           if (!isNaN(ciDate.getTime())) {
             var future = new Date(today);
             future.setDate(future.getDate() + 30);
-            if (ciDate > future) continue;
+            if (ciDate > future) { _dbgSkipped.ciFuture++; continue; }
           }
         }
       }
@@ -348,6 +370,8 @@ function searchGuest(name, phone) {
         }
       }
 
+      if (!nameMatch && !phoneMatch) { _dbgSkipped.noMatch++; }
+
       if (nameMatch || phoneMatch) {
         var primaryName = '';
         if (map.guestNameCols.length > 0) primaryName = String(row[map.guestNameCols[0]] || '').trim();
@@ -372,7 +396,14 @@ function searchGuest(name, phone) {
       return (order[a.matchType] || 9) - (order[b.matchType] || 9);
     });
 
-    return JSON.stringify({ success: true, results: results });
+    return JSON.stringify({ success: true, results: results, _debug: {
+      searchInput: { name: name, phone: phone, normalizedName: normalizedSearchName, normalizedPhone: normalizedSearchPhone },
+      colMap: { checkIn: map.checkIn, checkOut: map.checkOut, guestCount: map.guestCount, guestNameCols: map.guestNameCols.slice(0,3), telCols: map.telCols },
+      totalRows: data.length - 1,
+      skipped: _dbgSkipped,
+      samples: _dbgSamples,
+      today: Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy/M/d')
+    }});
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });
   }

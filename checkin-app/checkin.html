@@ -84,7 +84,7 @@
     /* 共通 */
     .btn-back { background: none; border: none; color: #fff; font-size: 1.2rem; padding: .2rem .5rem; }
     .spinner-sm { width: 1rem; height: 1rem; border-width: .15rem; }
-    .settings-gear { position: fixed; bottom: 1rem; right: 1rem; background: rgba(0,0,0,.3); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .settings-gear { position: fixed; top: .5rem; right: .5rem; background: rgba(0,0,0,.2); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: .85rem; z-index: 100; display: flex; align-items: center; justify-content: center; }
     .version-badge { position: fixed; bottom: 1rem; left: 1rem; font-size: .65rem; color: rgba(255,255,255,.5); z-index: 100; }
     .btn-confirm-checkin { background: var(--success); color: #fff; border: none; border-radius: .8rem; padding: .8rem; font-size: 1.1rem; font-weight: 600; width: 100%; margin-top: .5rem; }
     .btn-confirm-checkin:disabled { opacity: .6; }
@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317j</div>
+<div class="version-badge" id="deployVersion">v0317k</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -335,9 +335,26 @@ function doSearch() {
 
     if (res.results.length === 0) {
       showScreen('resultScreen');
-      document.getElementById('resultList').innerHTML =
-        '<div class="no-results"><i class="bi bi-emoji-frown"></i><p class="mt-2">予約が見つかりませんでした<br>No reservation found</p>' +
+      var noHtml = '<div class="no-results"><i class="bi bi-emoji-frown"></i><p class="mt-2">予約が見つかりませんでした<br>No reservation found</p>' +
         '<button class="btn btn-outline-primary" onclick="showScreen(\'searchScreen\')" style="border-radius:.8rem;"><i class="bi bi-arrow-left"></i> 戻る / Back</button></div>';
+      // [DEBUG] 検索デバッグ情報
+      if (res._debug) {
+        var d = res._debug;
+        noHtml += '<div style="margin-top:1rem;padding:.8rem;background:#fff3cd;border:2px solid #ffc107;border-radius:.5rem;font-size:.7rem;text-align:left;">';
+        noHtml += '<b>[DEBUG] 検索情報</b><br>';
+        noHtml += '入力: name="' + escapeHtml(d.searchInput.name) + '" phone="' + escapeHtml(d.searchInput.phone) + '"<br>';
+        noHtml += '正規化: name="' + escapeHtml(d.searchInput.normalizedName) + '" phone="' + escapeHtml(d.searchInput.normalizedPhone) + '"<br>';
+        noHtml += 'colMap: checkIn=' + d.colMap.checkIn + ' checkOut=' + d.colMap.checkOut + ' nameCols=' + JSON.stringify(d.colMap.guestNameCols) + ' telCols=' + JSON.stringify(d.colMap.telCols) + '<br>';
+        noHtml += '全行数: ' + d.totalRows + ' / today: ' + d.today + '<br>';
+        noHtml += 'スキップ: CO過去=' + d.skipped.coPast + ' CI未来=' + d.skipped.ciFuture + ' マッチなし=' + d.skipped.noMatch + '<br>';
+        noHtml += '<b>先頭5行サンプル:</b><br>';
+        for (var si = 0; si < d.samples.length; si++) {
+          var s = d.samples[si];
+          noHtml += 'row' + s.row + ': CI=' + escapeHtml(s.ci) + ' CO=' + escapeHtml(s.co) + ' names=' + escapeHtml(JSON.stringify(s.names)) + ' phones=' + escapeHtml(JSON.stringify(s.phones)) + '<br>';
+        }
+        noHtml += '</div>';
+      }
+      document.getElementById('resultList').innerHTML = noHtml;
       return;
     }
 

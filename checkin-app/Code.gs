@@ -612,8 +612,11 @@ function confirmCheckin(rowNumber) {
 function notifyMeetCall(rowNumber) {
   try {
     var props = PropertiesService.getScriptProperties();
-    var notifyEmail = props.getProperty('NOTIFY_EMAIL') || '';
-    if (!notifyEmail) return JSON.stringify({ success: false, error: '通知先メールアドレスが未設定です' });
+    var notifyEmailRaw = props.getProperty('NOTIFY_EMAIL') || '';
+    if (!notifyEmailRaw) return JSON.stringify({ success: false, error: '通知先メールアドレスが未設定です' });
+    // カンマ・改行・セミコロン区切りで複数メール対応
+    var notifyEmails = notifyEmailRaw.split(/[,;\s\n]+/).filter(function(e) { return e && e.indexOf('@') > 0; });
+    if (notifyEmails.length === 0) return JSON.stringify({ success: false, error: '有効なメールアドレスがありません' });
 
     var meetUrl = props.getProperty('MEET_URL') || '';
 
@@ -651,21 +654,36 @@ function notifyMeetCall(rowNumber) {
 
     // 予約情報
     body += '【予約情報】\n';
-    body += '宿泊者名: ' + guestName + '\n';
     if (checkIn) body += 'チェックイン: ' + checkIn + '\n';
     if (checkOut) body += 'チェックアウト: ' + checkOut + '\n';
     if (guestCount) body += '人数: ' + guestCount + '名\n';
     if (tel) body += '電話番号: ' + tel + '\n';
 
-    // 追加ゲスト情報
-    for (var g = 1; g < map.guestNameCols.length; g++) {
+    // 全ゲスト情報（国籍・旅券番号・パスポート写真含む）
+    for (var g = 0; g < map.guestNameCols.length; g++) {
       var gn = cellVal_(map.guestNameCols[g]);
-      if (!gn) continue;
+      if (!gn && g > 0) continue;
       body += '\n[宿泊者' + (g + 1) + ']\n';
-      body += '名前: ' + gn + '\n';
+      body += '名前: ' + (gn || '(未入力)') + '\n';
       if (g < map.nationalityCols.length) {
         var nat = cellVal_(map.nationalityCols[g]);
         if (nat) body += '国籍: ' + nat + '\n';
+      }
+      if (g < map.passportNumberCols.length) {
+        var ppNum = cellVal_(map.passportNumberCols[g]);
+        if (ppNum) body += '旅券番号: ' + ppNum + '\n';
+      }
+      if (g < map.passportPhotoCols.length && map.passportPhotoCols[g] >= 0) {
+        var ppPhoto = String(row[map.passportPhotoCols[g]] || '').trim();
+        if (ppPhoto && ppPhoto.indexOf('http') === 0) body += 'パスポート写真: ' + ppPhoto + '\n';
+      }
+      if (g < map.addressCols.length) {
+        var addr = cellVal_(map.addressCols[g]);
+        if (addr) body += '住所: ' + addr + '\n';
+      }
+      if (g < map.ageCols.length) {
+        var age = cellVal_(map.ageCols[g]);
+        if (age) body += '年齢: ' + age + '\n';
       }
     }
 
@@ -685,7 +703,9 @@ function notifyMeetCall(rowNumber) {
     body += '\n---\nこのメールはチェックインアプリから自動送信されました。';
 
     var subject = '【チェックイン】' + guestName + ' さんがGoogle Meetで連絡しています';
-    GmailApp.sendEmail(notifyEmail, subject, body);
+    for (var ei = 0; ei < notifyEmails.length; ei++) {
+      GmailApp.sendEmail(notifyEmails[ei], subject, body);
+    }
 
     return JSON.stringify({ success: true });
   } catch (e) {

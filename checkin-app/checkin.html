@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317r</div>
+<div class="version-badge" id="deployVersion">v0317s</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -231,8 +231,8 @@
       </div>
       <div class="mb-2">
         <label class="form-label">Meet通話通知先メール</label>
-        <input type="email" class="form-control" id="settNotifyEmail" placeholder="owner@example.com">
-        <small class="text-muted">宿泊者がMeetボタンを押した際に通知を送信します</small>
+        <textarea class="form-control" id="settNotifyEmail" rows="2" placeholder="owner@example.com, staff@example.com" style="font-size:.85rem;"></textarea>
+        <small class="text-muted">宿泊者がMeetボタンを押した際に通知を送信します。カンマ区切りで複数登録可</small>
       </div>
     </div>
 

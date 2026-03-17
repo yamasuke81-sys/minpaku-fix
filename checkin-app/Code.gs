@@ -21,17 +21,17 @@ function getSpreadsheetId_() {
 
 /** デフォルトの表示フィールド定義 */
 var DEFAULT_FIELDS_ = [
-  { key: 'guestCount', label: '宿泊人数', visible: true },
-  { key: 'guestCountInfants', label: '3才以下の人数', visible: true },
-  { key: 'checkIn', label: 'チェックイン', visible: true },
-  { key: 'checkOut', label: 'チェックアウト', visible: true },
-  { key: 'guestName', label: '氏名', visible: true },
-  { key: 'age', label: '年齢', visible: true },
-  { key: 'address', label: '住所', visible: true },
+  { key: 'guestCount', label: '宿泊人数 / Number of Guests', visible: true },
+  { key: 'guestCountInfants', label: '3才以下の乳幼児の人数 / Number of infants under 3 years old', visible: true },
+  { key: 'checkIn', label: 'チェックイン / Check-in', visible: true },
+  { key: 'checkOut', label: 'チェックアウト / Check-out', visible: true },
+  { key: 'guestName', label: '氏名 / Full Name', visible: true },
+  { key: 'age', label: '年齢 / Age', visible: true },
+  { key: 'address', label: '住所 / Address', visible: true },
   { key: 'tel', label: '電話番号', visible: true },
-  { key: 'nationality', label: '国籍', visible: true },
-  { key: 'passportNumber', label: '旅券番号', visible: true },
-  { key: 'passportPhoto', label: 'パスポート写真', visible: true },
+  { key: 'nationality', label: '国籍 / Nationality', visible: true },
+  { key: 'passportNumber', label: '旅券番号を入力してください / Please enter your passport number.', visible: true },
+  { key: 'passportPhoto', label: 'パスポートの写真をアップロードしてください / Please upload a photo of your passport.', visible: true },
   { key: 'prevStay', label: '前泊地', visible: true },
   { key: 'nextStay', label: '行先地', visible: true }
 ];

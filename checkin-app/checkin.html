@@ -96,7 +96,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317d</div>
+<div class="version-badge" id="deployVersion">v0317e</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -116,7 +116,6 @@
     <button class="btn-search" id="btnSearch" onclick="doSearch()">
       <i class="bi bi-search"></i> 検索 / Search
     </button>
-    <div class="search-hint">お名前または電話番号のどちらかを入力してください</div>
     <div id="searchError" class="text-danger text-center mt-2" style="font-size:.85rem;display:none;"></div>
   </div>
 </div>
@@ -401,16 +400,16 @@ function renderDetail() {
   // 予約基本情報
   html += '<div class="detail-section"><h3><i class="bi bi-calendar-event"></i> 予約情報 / Reservation</h3>';
   if (isFieldVisible('guestCount')) {
-    html += fieldRow(getFieldLabel('guestCount', '宿泊人数 / Number of Guests<br><small style="color:#666">※ 3才以下は除く / Excluding children under 3 years old</small>'), d.guestCount, 'guestCount', _colMap.guestCount);
+    html += fieldRow(getFieldLabel('guestCount', '宿泊人数 / Number of Guests') + '<br><small style="color:#888;font-weight:400;">※ 3才以下は除く / Excluding children under 3 years old</small>', d.guestCount, 'guestCount', _colMap.guestCount);
   }
   if (isFieldVisible('guestCountInfants') && (d.guestCountInfants || _colMap.guestCountInfants >= 0)) {
-    html += fieldRow(getFieldLabel('guestCountInfants', '3才以下の人数'), d.guestCountInfants, 'guestCountInfants', _colMap.guestCountInfants);
+    html += fieldRow(getFieldLabel('guestCountInfants', '3才以下の乳幼児の人数 / Number of infants under 3 years old'), d.guestCountInfants, 'guestCountInfants', _colMap.guestCountInfants);
   }
   if (isFieldVisible('checkIn')) {
-    html += fieldRow(getFieldLabel('checkIn', 'チェックイン'), d.checkIn, 'checkIn', _colMap.checkIn);
+    html += fieldRow(getFieldLabel('checkIn', 'チェックイン / Check-in'), d.checkIn, 'checkIn', _colMap.checkIn);
   }
   if (isFieldVisible('checkOut')) {
-    html += fieldRow(getFieldLabel('checkOut', 'チェックアウト'), d.checkOut, 'checkOut', _colMap.checkOut);
+    html += fieldRow(getFieldLabel('checkOut', 'チェックアウト / Check-out'), d.checkOut, 'checkOut', _colMap.checkOut);
   }
   if (isFieldVisible('prevStay')) {
     html += fieldRow(getFieldLabel('prevStay', '前泊地'), d.prevStay, 'prevStay', _colMap.prevStay);
@@ -442,33 +441,33 @@ function renderDetail() {
 
     if (isFieldVisible('guestName')) {
       var nameColIdx = gIdx < _colMap.guestNameCols.length ? _colMap.guestNameCols[gIdx] : -1;
-      html += fieldRow(getFieldLabel('guestName', '氏名'), guest.name, 'gname_' + gIdx, nameColIdx);
+      html += fieldRow(getFieldLabel('guestName', '氏名 / Full Name'), guest.name, 'gname_' + gIdx, nameColIdx);
     }
 
     if (isFieldVisible('age')) {
       var ageColIdx = gIdx < _colMap.ageCols.length ? _colMap.ageCols[gIdx] : -1;
-      html += fieldRow(getFieldLabel('age', '年齢'), guest.age, 'age_' + gIdx, ageColIdx);
+      html += fieldRow(getFieldLabel('age', '年齢 / Age'), guest.age, 'age_' + gIdx, ageColIdx);
     }
 
     if (isFieldVisible('address')) {
       var addrColIdx = gIdx < _colMap.addressCols.length ? _colMap.addressCols[gIdx] : -1;
-      html += fieldRow(getFieldLabel('address', '住所'), guest.address, 'addr_' + gIdx, addrColIdx);
+      html += fieldRow(getFieldLabel('address', '住所 / Address'), guest.address, 'addr_' + gIdx, addrColIdx);
     }
 
     if (isFieldVisible('nationality')) {
       var natColIdx = gIdx < _colMap.nationalityCols.length ? _colMap.nationalityCols[gIdx] : -1;
-      html += fieldRow(getFieldLabel('nationality', '国籍'), guest.nationality, 'nat_' + gIdx, natColIdx);
+      html += fieldRow(getFieldLabel('nationality', '国籍 / Nationality'), guest.nationality, 'nat_' + gIdx, natColIdx);
     }
 
     if (isFieldVisible('passportNumber')) {
       var ppNumColIdx = gIdx < _colMap.passportNumberCols.length ? _colMap.passportNumberCols[gIdx] : -1;
       if (guest.passportNumber || ppNumColIdx >= 0) {
-        html += fieldRow(getFieldLabel('passportNumber', '旅券番号'), guest.passportNumber, 'ppnum_' + gIdx, ppNumColIdx);
+        html += fieldRow(getFieldLabel('passportNumber', '旅券番号を入力してください / Please enter your passport number.'), guest.passportNumber, 'ppnum_' + gIdx, ppNumColIdx);
       }
     }
 
     if (isFieldVisible('passportPhoto') && guest.passportPhotoUrl) {
-      html += '<div class="field-row"><div class="field-label">' + escapeHtml(getFieldLabel('passportPhoto', 'パスポート写真')) + '</div>';
+      html += '<div class="field-row"><div class="field-label">' + getFieldLabel('passportPhoto', 'パスポートの写真をアップロードしてください / Please upload a photo of your passport.') + '</div>';
       // Google Driveの画像をサムネイル表示
       var thumbUrl = guest.passportPhotoUrl;
       if (thumbUrl.indexOf('drive.google.com') > -1) {
@@ -495,7 +494,7 @@ function renderDetail() {
 }
 
 function fieldRow(label, value, id, colIndex) {
-  var html = '<div class="field-row"><div class="field-label">' + escapeHtml(label) + '</div>';
+  var html = '<div class="field-row"><div class="field-label">' + label + '</div>';
   if (colIndex >= 0) {
     html += '<input type="text" class="field-input" id="field_' + id + '" data-col="' + colIndex + '" value="' + escapeHtml(value || '') + '">';
   } else {
@@ -541,6 +540,10 @@ function doConfirm() {
 function showConfirmScreen() {
   showScreen('confirmScreen');
 
+  // 読み込み中表示
+  document.getElementById('callButtons').innerHTML =
+    '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">連絡先を読み込み中...</p></div>';
+
   callGAS('getContactSettings').then(function(settings) {
     var html = '';
     var type = settings.contactType || 'meet';
@@ -560,6 +563,8 @@ function showConfirmScreen() {
     }
 
     document.getElementById('callButtons').innerHTML = html;
+  }).catch(function() {
+    document.getElementById('callButtons').innerHTML = '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました</p>';
   });
 }
 

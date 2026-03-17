@@ -332,14 +332,14 @@ function searchGuest(name, phone) {
         }
       }
 
-      // チェックインが365日以上先の予約はスキップ
+      // チェックインが30日以上先の予約はスキップ
       if (map.checkIn >= 0) {
         var ciVal = row[map.checkIn];
         if (ciVal) {
           var ciDate = new Date(ciVal);
           if (!isNaN(ciDate.getTime())) {
             var future = new Date(today);
-            future.setDate(future.getDate() + 365);
+            future.setDate(future.getDate() + 30);
             if (ciDate > future) { _dbgSkipped.ciFuture++; continue; }
           }
         }

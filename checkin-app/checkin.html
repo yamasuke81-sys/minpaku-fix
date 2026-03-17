@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317q</div>
+<div class="version-badge" id="deployVersion">v0317r</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -228,6 +228,11 @@
       <div class="mb-2">
         <label class="form-label">電話番号</label>
         <input type="tel" class="form-control" id="settPhoneNumber" placeholder="090-1234-5678">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Meet通話通知先メール</label>
+        <input type="email" class="form-control" id="settNotifyEmail" placeholder="owner@example.com">
+        <small class="text-muted">宿泊者がMeetボタンを押した際に通知を送信します</small>
       </div>
     </div>
 
@@ -623,7 +628,7 @@ function showConfirmScreen() {
     var type = settings.contactType || 'meet';
 
     if ((type === 'meet' || type === 'both') && settings.meetUrl) {
-      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +
+      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet" id="btnMeetCall">' +
         '<i class="bi bi-camera-video-fill"></i> Google Meetで連絡</a>';
     }
     if ((type === 'phone' || type === 'both') && settings.phoneNumber) {
@@ -637,6 +642,15 @@ function showConfirmScreen() {
     }
 
     document.getElementById('callButtons').innerHTML = html;
+
+    // Meetボタンクリック時にオーナーへメール通知を送信
+    var meetBtn = document.getElementById('btnMeetCall');
+    if (meetBtn) {
+      meetBtn.addEventListener('click', function() {
+        // バックグラウンドで通知送信（リンク遷移は通常通り）
+        callGAS('notifyMeetCall', [_currentRow]).then(function() {}).catch(function() {});
+      });
+    }
   }).catch(function() {
     document.getElementById('callButtons').innerHTML = '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました</p>';
   });
@@ -695,6 +709,7 @@ function loadSettings() {
     document.getElementById('settContactType').value = settings.contactType || 'meet';
     document.getElementById('settMeetUrl').value = settings.meetUrl || '';
     document.getElementById('settPhoneNumber').value = settings.phoneNumber || '';
+    document.getElementById('settNotifyEmail').value = settings.notifyEmail || '';
     document.getElementById('settPin').value = settings.settingsPin || '0000';
 
     // 表示フィールド設定を描画
@@ -739,6 +754,7 @@ function saveSettings() {
     contactType: document.getElementById('settContactType').value,
     meetUrl: document.getElementById('settMeetUrl').value.trim(),
     phoneNumber: document.getElementById('settPhoneNumber').value.trim(),
+    notifyEmail: document.getElementById('settNotifyEmail').value.trim(),
     settingsPin: document.getElementById('settPin').value.trim(),
     displayFields: fields
   };

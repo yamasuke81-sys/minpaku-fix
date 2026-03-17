@@ -46,6 +46,7 @@ function getCheckinSettings() {
     contactType: props.getProperty('CONTACT_TYPE') || 'meet',
     meetUrl: props.getProperty('MEET_URL') || '',
     phoneNumber: props.getProperty('PHONE_NUMBER') || '',
+    notifyEmail: props.getProperty('NOTIFY_EMAIL') || '',
     settingsPin: props.getProperty('SETTINGS_PIN') || '0000',
     sheetName: props.getProperty('SHEET_NAME') || 'フォームの回答 1',
     displayFields: fields
@@ -60,6 +61,7 @@ function saveCheckinSettings(settingsJson) {
   if (s.contactType !== undefined) props.setProperty('CONTACT_TYPE', s.contactType);
   if (s.meetUrl !== undefined) props.setProperty('MEET_URL', s.meetUrl);
   if (s.phoneNumber !== undefined) props.setProperty('PHONE_NUMBER', s.phoneNumber);
+  if (s.notifyEmail !== undefined) props.setProperty('NOTIFY_EMAIL', s.notifyEmail);
   if (s.settingsPin !== undefined) props.setProperty('SETTINGS_PIN', s.settingsPin);
   if (s.sheetName !== undefined) props.setProperty('SHEET_NAME', s.sheetName);
   if (s.displayFields !== undefined) props.setProperty('DISPLAY_FIELDS', JSON.stringify(s.displayFields));
@@ -599,6 +601,91 @@ function confirmCheckin(rowNumber) {
     // 最新100件のみ保持
     if (log.length > 100) log = log.slice(log.length - 100);
     props.setProperty('CHECKIN_LOG', JSON.stringify(log));
+
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.message });
+  }
+}
+
+/** Google Meet通話開始時にオーナーへメール通知 */
+function notifyMeetCall(rowNumber) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var notifyEmail = props.getProperty('NOTIFY_EMAIL') || '';
+    if (!notifyEmail) return JSON.stringify({ success: false, error: '通知先メールアドレスが未設定です' });
+
+    var meetUrl = props.getProperty('MEET_URL') || '';
+
+    // ゲスト情報を取得
+    var sheet = getSheet_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var map = buildCheckinColumnMap_(headers);
+    var row = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    // 編集情報を取得
+    var edits = getEditsForRow_(rowNumber);
+
+    /** セル値を取得 */
+    function cellVal_(colIndex) {
+      if (colIndex < 0) return '';
+      var v = row[colIndex];
+      if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy/M/d HH:mm');
+      return String(v || '').trim();
+    }
+
+    var guestName = map.guestNameCols.length > 0 ? cellVal_(map.guestNameCols[0]) : '(不明)';
+    var checkIn = map.checkIn >= 0 ? cellVal_(map.checkIn) : '';
+    var checkOut = map.checkOut >= 0 ? cellVal_(map.checkOut) : '';
+    var guestCount = map.guestCount >= 0 ? cellVal_(map.guestCount) : '';
+    var tel = map.telCols.length > 0 ? cellVal_(map.telCols[0]) : '';
+
+    // メール本文を構築
+    var body = '';
+    body += '宿泊者がGoogle Meetで連絡を開始しました。\n\n';
+
+    // Google Meet URL
+    if (meetUrl) {
+      body += '【Google Meet URL】\n' + meetUrl + '\n\n';
+    }
+
+    // 予約情報
+    body += '【予約情報】\n';
+    body += '宿泊者名: ' + guestName + '\n';
+    if (checkIn) body += 'チェックイン: ' + checkIn + '\n';
+    if (checkOut) body += 'チェックアウト: ' + checkOut + '\n';
+    if (guestCount) body += '人数: ' + guestCount + '名\n';
+    if (tel) body += '電話番号: ' + tel + '\n';
+
+    // 追加ゲスト情報
+    for (var g = 1; g < map.guestNameCols.length; g++) {
+      var gn = cellVal_(map.guestNameCols[g]);
+      if (!gn) continue;
+      body += '\n[宿泊者' + (g + 1) + ']\n';
+      body += '名前: ' + gn + '\n';
+      if (g < map.nationalityCols.length) {
+        var nat = cellVal_(map.nationalityCols[g]);
+        if (nat) body += '国籍: ' + nat + '\n';
+      }
+    }
+
+    // 修正内容
+    var editKeys = Object.keys(edits);
+    if (editKeys.length > 0) {
+      body += '\n【宿泊者が修正した内容】\n';
+      for (var e = 0; e < editKeys.length; e++) {
+        var ed = edits[editKeys[e]];
+        body += '・' + (ed.fieldName || 'カラム' + editKeys[e]) + ': ';
+        body += '「' + (ed.original || '(空)') + '」→「' + (ed.edited || '(空)') + '」\n';
+      }
+    } else {
+      body += '\n※ 宿泊者による情報の修正はありません。\n';
+    }
+
+    body += '\n---\nこのメールはチェックインアプリから自動送信されました。';
+
+    var subject = '【チェックイン】' + guestName + ' さんがGoogle Meetで連絡しています';
+    GmailApp.sendEmail(notifyEmail, subject, body);
 
     return JSON.stringify({ success: true });
   } catch (e) {

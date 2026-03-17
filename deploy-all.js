@@ -4,7 +4,8 @@
  *
  * 1. メインアプリ: clasp push → clasp deploy
  * 2. チェックリストアプリ: deploy-checklist.js を呼び出し（push → deploy）
- * 3. ブラウザでメインアプリを自動オープン（オーナー用=通常、スタッフ用=シークレット）
+ * 3. チェックインアプリ: deploy-checkin.js を呼び出し（push → deploy）
+ * 4. ブラウザでメインアプリを自動オープン（オーナー用=通常、スタッフ用=シークレット）
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -12,6 +13,7 @@ const path = require('path');
 
 const rootDir = __dirname;
 const checklistDir = path.join(rootDir, 'checklist-app');
+const checkinDir = path.join(rootDir, 'checkin-app');
 
 // clasp コマンドのパスを解決
 const binDir = path.join(rootDir, 'node_modules', '.bin');
@@ -468,6 +470,51 @@ function main() {
     console.error('  エラー: ' + clDeployScript + ' が見つかりません');
   }
 
+  // === チェックインアプリ（deploy-checkin.js に委譲） ===
+  var ciClaspJson = path.join(checkinDir, '.clasp.json');
+  var ciClaspConfig = {};
+  try { ciClaspConfig = JSON.parse(fs.readFileSync(ciClaspJson, 'utf8')); } catch (e) {}
+  if (ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
+    console.log('[4/4] チェックインアプリ: deploy-checkin.js を実行...');
+    console.log('');
+    var ciDeployScript = path.join(checkinDir, 'deploy-checkin.js');
+    if (fs.existsSync(ciDeployScript)) {
+      try {
+        var sep3 = process.platform === 'win32' ? ';' : ':';
+        var envPath3 = binDir + sep3 + (process.env.PATH || '');
+        execSync('node "' + ciDeployScript + '"', {
+          shell: true,
+          cwd: checkinDir,
+          stdio: 'inherit',
+          timeout: 120000,
+          env: Object.assign({}, process.env, { PATH: envPath3 })
+        });
+        console.log('');
+        console.log('  チェックインアプリ: デプロイ完了');
+        try {
+          var configPath3 = path.join(rootDir, 'deploy-config.json');
+          if (fs.existsSync(configPath3)) {
+            var cfg3 = JSON.parse(fs.readFileSync(configPath3, 'utf8'));
+            if (cfg3.checkinDeploymentId) {
+              urls.push({ label: 'チェックイン', url: 'https://script.google.com/macros/s/' + cfg3.checkinDeploymentId + '/exec' });
+            }
+          }
+        } catch (cfgErr3) {}
+      } catch (ciErr) {
+        console.log('');
+        if (ciErr.killed) {
+          console.error('  チェックインアプリ: タイムアウト（120秒）で強制終了');
+        } else {
+          console.error('  チェックインアプリのデプロイに失敗');
+        }
+      }
+    } else {
+      console.error('  エラー: ' + ciDeployScript + ' が見つかりません');
+    }
+  } else {
+    console.log('[4/4] チェックインアプリ: スキップ（scriptId未設定）');
+  }
+
   // === デプロイ数チェック（200件上限） ===
   console.log('');
   console.log('[デプロイ数チェック（上限200件）]');
@@ -475,12 +522,18 @@ function main() {
   if (fs.existsSync(checklistDir)) {
     checkDeployCount('チェックリスト', checklistDir);
   }
+  if (fs.existsSync(checkinDir) && ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
+    checkDeployCount('チェックイン', checkinDir);
+  }
 
   // === バージョン数チェック（200件上限） ===
   console.log('[バージョン数チェック（上限200件）]');
   checkVersionCount('メインアプリ', rootDir);
   if (fs.existsSync(checklistDir)) {
     checkVersionCount('チェックリスト', checklistDir);
+  }
+  if (fs.existsSync(checkinDir) && ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
+    checkVersionCount('チェックイン', checkinDir);
   }
 
   console.log('');

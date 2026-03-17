@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>チェックイン</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --primary: #2c6fbb; --success: #28a745; --danger: #dc3545; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f5f7fa; margin: 0; padding: 0; min-height: 100vh; }
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* 検索画面 */
+    #searchScreen { justify-content: center; align-items: center; padding: 2rem 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    #searchScreen .search-card { background: #fff; border-radius: 1.2rem; padding: 2rem 1.5rem; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.15); }
+    #searchScreen h1 { font-size: 1.4rem; font-weight: 700; color: #333; text-align: center; margin-bottom: 1.5rem; }
+    #searchScreen .form-control { border-radius: .8rem; padding: .75rem 1rem; font-size: 1rem; border: 2px solid #e0e0e0; }
+    #searchScreen .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 .2rem rgba(44,111,187,.15); }
+    #searchScreen .btn-search { background: var(--primary); color: #fff; border: none; border-radius: .8rem; padding: .8rem; font-size: 1.1rem; font-weight: 600; width: 100%; }
+    #searchScreen .btn-search:disabled { opacity: .6; }
+    .search-hint { font-size: .8rem; color: #888; text-align: center; margin-top: .5rem; }
+
+    /* 検索結果 */
+    #resultScreen { padding: 1rem; background: #f5f7fa; }
+    .result-card { background: #fff; border-radius: .8rem; padding: 1rem; margin-bottom: .8rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); cursor: pointer; border: 2px solid transparent; transition: border-color .2s; }
+    .result-card:hover, .result-card:active { border-color: var(--primary); }
+    .result-card .name { font-size: 1.1rem; font-weight: 600; }
+    .result-card .dates { font-size: .85rem; color: #666; }
+    .match-badge { font-size: .7rem; padding: .2rem .5rem; border-radius: .4rem; }
+    .match-both { background: #d4edda; color: #155724; }
+    .match-name { background: #cce5ff; color: #004085; }
+    .match-phone { background: #fff3cd; color: #856404; }
+
+    /* 詳細画面 */
+    #detailScreen { padding: 0; background: #f5f7fa; }
+    .detail-header { background: var(--primary); color: #fff; padding: 1rem; position: sticky; top: 0; z-index: 10; }
+    .detail-header h2 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+    .detail-body { padding: 1rem; flex: 1; overflow-y: auto; }
+    .detail-section { background: #fff; border-radius: .8rem; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .detail-section h3 { font-size: .9rem; font-weight: 700; color: var(--primary); margin-bottom: .8rem; border-bottom: 2px solid #e8f0fe; padding-bottom: .4rem; }
+    .field-row { margin-bottom: .6rem; }
+    .field-label { font-size: .75rem; color: #888; font-weight: 600; margin-bottom: .15rem; }
+    .field-value { font-size: .95rem; }
+    .field-input { border: 1px solid #ddd; border-radius: .5rem; padding: .4rem .6rem; font-size: .95rem; width: 100%; }
+    .field-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px rgba(44,111,187,.15); }
+    .save-indicator { font-size: .7rem; color: var(--success); display: none; }
+    .save-indicator.show { display: inline; }
+    .passport-thumb { max-width: 120px; border-radius: .5rem; margin-top: .3rem; cursor: pointer; }
+    .guest-divider { border: 0; border-top: 1px dashed #ddd; margin: .8rem 0; }
+
+    /* 確認画面 */
+    #confirmScreen { justify-content: center; align-items: center; padding: 2rem 1rem; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .confirm-card { background: #fff; border-radius: 1.2rem; padding: 2rem 1.5rem; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.15); text-align: center; }
+    .confirm-card .bi-check-circle-fill { font-size: 4rem; color: var(--success); }
+    .confirm-card h2 { font-size: 1.3rem; font-weight: 700; margin: 1rem 0; }
+    .btn-call { border: none; border-radius: .8rem; padding: 1rem; font-size: 1.1rem; font-weight: 600; width: 100%; margin-top: .8rem; display: flex; align-items: center; justify-content: center; gap: .5rem; }
+    .btn-call-meet { background: #1a73e8; color: #fff; }
+    .btn-call-phone { background: var(--success); color: #fff; }
+
+    /* 設定画面 */
+    #settingsScreen { padding: 0; background: #f5f7fa; }
+    .settings-header { background: #333; color: #fff; padding: 1rem; display: flex; align-items: center; justify-content: space-between; }
+    .settings-body { padding: 1rem; flex: 1; overflow-y: auto; }
+    .settings-section { background: #fff; border-radius: .8rem; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .settings-section h3 { font-size: .9rem; font-weight: 700; margin-bottom: .8rem; }
+    .settings-section .form-label { font-size: .8rem; font-weight: 600; color: #555; }
+    .settings-section .form-control, .settings-section .form-select { font-size: .9rem; }
+    .field-config-row { display: flex; align-items: center; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid #f0f0f0; }
+    .field-config-row:last-child { border-bottom: none; }
+    .field-config-label { flex: 1; }
+    .field-config-label input { border: 1px solid #ddd; border-radius: .4rem; padding: .25rem .4rem; font-size: .85rem; width: 100%; }
+
+    /* PIN画面 */
+    #pinScreen { justify-content: center; align-items: center; padding: 2rem 1rem; background: #333; }
+    .pin-card { background: #fff; border-radius: 1.2rem; padding: 2rem 1.5rem; width: 100%; max-width: 320px; text-align: center; }
+    .pin-input { font-size: 2rem; text-align: center; letter-spacing: .5rem; border: 2px solid #ddd; border-radius: .8rem; padding: .5rem; width: 100%; }
+
+    /* 共通 */
+    .btn-back { background: none; border: none; color: #fff; font-size: 1.2rem; padding: .2rem .5rem; }
+    .spinner-sm { width: 1rem; height: 1rem; border-width: .15rem; }
+    .settings-gear { position: fixed; bottom: 1rem; right: 1rem; background: rgba(0,0,0,.3); color: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .version-badge { position: fixed; bottom: 1rem; left: 1rem; font-size: .65rem; color: rgba(255,255,255,.5); z-index: 100; }
+    .btn-confirm-checkin { background: var(--success); color: #fff; border: none; border-radius: .8rem; padding: .8rem; font-size: 1.1rem; font-weight: 600; width: 100%; margin-top: .5rem; }
+    .btn-confirm-checkin:disabled { opacity: .6; }
+    .no-results { text-align: center; padding: 3rem 1rem; color: #888; }
+    .no-results .bi { font-size: 3rem; }
+
+    /* パスポート拡大モーダル */
+    .passport-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 1rem; }
+    .passport-overlay.show { display: flex; }
+    .passport-overlay img { max-width: 100%; max-height: 90vh; border-radius: .5rem; }
+  </style>
+</head>
+<body>
+
+<!-- ===== バージョンバッジ ===== -->
+<div class="version-badge" id="deployVersion">v0317a</div>
+
+<!-- ===== 設定ギアボタン ===== -->
+<button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
+
+<!-- ===== 1. 検索画面 ===== -->
+<div id="searchScreen" class="screen active">
+  <div class="search-card">
+    <h1><i class="bi bi-house-door"></i> チェックイン</h1>
+    <div class="mb-3">
+      <label class="form-label fw-bold">お名前 / Name</label>
+      <input type="text" class="form-control" id="searchName" placeholder="例: 山田太郎" autocomplete="off">
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-bold">電話番号 / Phone</label>
+      <input type="tel" class="form-control" id="searchPhone" placeholder="例: 090-1234-5678" autocomplete="off">
+    </div>
+    <button class="btn-search" id="btnSearch" onclick="doSearch()">
+      <i class="bi bi-search"></i> 検索 / Search
+    </button>
+    <div class="search-hint">お名前または電話番号のどちらかを入力してください<br>Please enter your name or phone number</div>
+    <div id="searchError" class="text-danger text-center mt-2" style="font-size:.85rem;display:none;"></div>
+  </div>
+</div>
+
+<!-- ===== 2. 検索結果画面 ===== -->
+<div id="resultScreen" class="screen">
+  <div class="detail-header">
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn-back" onclick="showScreen('searchScreen')"><i class="bi bi-arrow-left"></i></button>
+      <h2>検索結果 / Results</h2>
+    </div>
+  </div>
+  <div id="resultList" style="padding:1rem;flex:1;overflow-y:auto;"></div>
+</div>
+
+<!-- ===== 3. 詳細・編集画面 ===== -->
+<div id="detailScreen" class="screen">
+  <div class="detail-header">
+    <div class="d-flex align-items-center justify-content-between w-100">
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn-back" onclick="showScreen('resultScreen')"><i class="bi bi-arrow-left"></i></button>
+        <h2>宿泊情報の確認 / Guest Info</h2>
+      </div>
+      <span class="save-indicator" id="saveIndicator"><i class="bi bi-check-circle-fill"></i> 保存済</span>
+    </div>
+  </div>
+  <div class="detail-body" id="detailBody"></div>
+  <div style="padding:0 1rem 1rem;">
+    <button class="btn-confirm-checkin" id="btnConfirm" onclick="doConfirm()">
+      <i class="bi bi-check-lg"></i> 確認 / Confirm
+    </button>
+  </div>
+</div>
+
+<!-- ===== 4. 確認完了画面 ===== -->
+<div id="confirmScreen" class="screen">
+  <div class="confirm-card">
+    <i class="bi bi-check-circle-fill"></i>
+    <h2>確認完了<br><small style="font-size:.8rem;color:#666;">Information Confirmed</small></h2>
+    <p style="font-size:.9rem;color:#666;">次にスタッフへ連絡してください<br>Please contact the staff</p>
+    <div id="callButtons"></div>
+    <button class="btn btn-outline-secondary mt-3" onclick="resetToSearch()" style="border-radius:.8rem;">
+      <i class="bi bi-arrow-counterclockwise"></i> 最初に戻る / Back to Start
+    </button>
+  </div>
+</div>
+
+<!-- ===== 5. PIN入力画面 ===== -->
+<div id="pinScreen" class="screen">
+  <div class="pin-card">
+    <h3 class="mb-3"><i class="bi bi-lock-fill"></i> PIN</h3>
+    <input type="password" class="pin-input" id="pinInput" maxlength="8" inputmode="numeric" placeholder="****">
+    <div id="pinError" class="text-danger mt-2" style="font-size:.85rem;display:none;"></div>
+    <button class="btn btn-dark w-100 mt-3" onclick="verifyPinAndOpen()" style="border-radius:.8rem;padding:.7rem;">
+      <i class="bi bi-unlock-fill"></i> 開く
+    </button>
+    <button class="btn btn-link text-muted mt-2" onclick="showScreen('searchScreen')">戻る</button>
+  </div>
+</div>
+
+<!-- ===== 6. 設定画面 ===== -->
+<div id="settingsScreen" class="screen">
+  <div class="settings-header">
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn-back" onclick="showScreen('searchScreen')"><i class="bi bi-arrow-left"></i></button>
+      <h2 style="font-size:1.1rem;margin:0;">設定</h2>
+    </div>
+    <button class="btn btn-sm btn-outline-light" onclick="saveSettings()" style="border-radius:.5rem;">
+      <i class="bi bi-check-lg"></i> 保存
+    </button>
+  </div>
+  <div class="settings-body">
+    <!-- 基本設定 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-database"></i> スプレッドシート</h3>
+      <div class="mb-2">
+        <label class="form-label">スプレッドシートID</label>
+        <input type="text" class="form-control" id="settSpreadsheetId" placeholder="1A2B3C...">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">シート名</label>
+        <input type="text" class="form-control" id="settSheetName" placeholder="フォームの回答 1">
+      </div>
+    </div>
+
+    <!-- 連絡先設定 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-telephone"></i> スタッフ連絡先</h3>
+      <div class="mb-2">
+        <label class="form-label">連絡方法</label>
+        <select class="form-select" id="settContactType">
+          <option value="meet">Google Meet</option>
+          <option value="phone">電話番号</option>
+          <option value="both">両方</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Google Meet URL</label>
+        <input type="url" class="form-control" id="settMeetUrl" placeholder="https://meet.google.com/xxx-xxxx-xxx">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">電話番号</label>
+        <input type="tel" class="form-control" id="settPhoneNumber" placeholder="090-1234-5678">
+      </div>
+    </div>
+
+    <!-- PIN設定 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-lock"></i> セキュリティ</h3>
+      <div class="mb-2">
+        <label class="form-label">設定画面PIN</label>
+        <input type="text" class="form-control" id="settPin" placeholder="0000" maxlength="8">
+      </div>
+    </div>
+
+    <!-- 表示フィールド設定 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-layout-text-sidebar"></i> 表示項目設定</h3>
+      <p style="font-size:.75rem;color:#888;">表示/非表示の切替と、表示名のカスタマイズができます</p>
+      <div id="fieldConfigList"></div>
+    </div>
+
+    <!-- チェックイン記録 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-clock-history"></i> チェックイン記録</h3>
+      <button class="btn btn-sm btn-outline-secondary" onclick="loadCheckinLog()" style="border-radius:.5rem;">
+        <i class="bi bi-arrow-clockwise"></i> 読み込み
+      </button>
+      <div id="checkinLogList" class="mt-2" style="font-size:.8rem;max-height:200px;overflow-y:auto;"></div>
+    </div>
+
+    <div class="text-center mt-3 mb-3">
+      <button class="btn btn-danger btn-sm" onclick="if(confirm('設定をリセットしますか？'))resetSettings()" style="border-radius:.5rem;">
+        <i class="bi bi-trash"></i> 設定をリセット
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- パスポート拡大表示 -->
+<div class="passport-overlay" id="passportOverlay" onclick="this.classList.remove('show')">
+  <img id="passportFullImg" src="" alt="パスポート">
+</div>
+
+<script>
+// ===== グローバル状態 =====
+var _currentRow = null;
+var _guestData = null;
+var _colMap = null;
+var _displayFields = [];
+var _saveTimers = {};
+var _lastScreen = 'searchScreen';
+
+// ===== GAS通信 =====
+function callGAS(fn, args) {
+  return new Promise(function(resolve, reject) {
+    var runner = google.script.run.withSuccessHandler(function(json) {
+      resolve(JSON.parse(json));
+    }).withFailureHandler(reject);
+    runner[fn].apply(runner, args || []);
+  });
+}
+
+// ===== 画面切替 =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  _lastScreen = id;
+}
+
+// ===== 検索 =====
+function doSearch() {
+  var name = document.getElementById('searchName').value.trim();
+  var phone = document.getElementById('searchPhone').value.trim();
+  var errEl = document.getElementById('searchError');
+  errEl.style.display = 'none';
+
+  if (!name && !phone) {
+    errEl.textContent = 'お名前または電話番号を入力してください';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  var btn = document.getElementById('btnSearch');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-sm"></span> 検索中...';
+
+  callGAS('searchGuest', [name, phone]).then(function(res) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search"></i> 検索 / Search';
+
+    if (!res.success) {
+      errEl.textContent = res.error || 'エラーが発生しました';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    if (res.results.length === 0) {
+      showScreen('resultScreen');
+      document.getElementById('resultList').innerHTML =
+        '<div class="no-results"><i class="bi bi-emoji-frown"></i><p class="mt-2">予約が見つかりませんでした<br>No reservation found</p>' +
+        '<button class="btn btn-outline-primary" onclick="showScreen(\'searchScreen\')" style="border-radius:.8rem;"><i class="bi bi-arrow-left"></i> 戻る / Back</button></div>';
+      return;
+    }
+
+    if (res.results.length === 1) {
+      // 1件ならそのまま詳細へ
+      loadGuestDetails(res.results[0].rowNumber);
+      return;
+    }
+
+    // 複数件: 結果一覧を表示
+    showScreen('resultScreen');
+    renderResultList(res.results);
+  }).catch(function(err) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search"></i> 検索 / Search';
+    errEl.textContent = err.message || 'エラーが発生しました';
+    errEl.style.display = 'block';
+  });
+}
+
+function renderResultList(results) {
+  var html = '';
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var badgeClass = r.matchType === 'both' ? 'match-both' : (r.matchType === 'name' ? 'match-name' : 'match-phone');
+    var badgeText = r.matchType === 'both' ? '名前+電話一致' : (r.matchType === 'name' ? '名前一致' : '電話一致');
+    html += '<div class="result-card" onclick="loadGuestDetails(' + r.rowNumber + ')">' +
+      '<div class="d-flex justify-content-between align-items-start">' +
+      '<div class="name">' + escapeHtml(r.guestName || '(名前なし)') + '</div>' +
+      '<span class="match-badge ' + badgeClass + '">' + badgeText + '</span>' +
+      '</div>' +
+      '<div class="dates mt-1">CI: ' + escapeHtml(r.checkIn) + ' / CO: ' + escapeHtml(r.checkOut) + '</div>' +
+      '<div class="dates">宿泊人数: ' + escapeHtml(r.guestCount || '-') + '</div>' +
+      '</div>';
+  }
+  document.getElementById('resultList').innerHTML = html;
+}
+
+// ===== 詳細取得・表示 =====
+function loadGuestDetails(rowNumber) {
+  _currentRow = rowNumber;
+  showScreen('detailScreen');
+  document.getElementById('detailBody').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span><p class="mt-2">読み込み中...</p></div>';
+
+  // 表示フィールド設定を取得してから詳細を読み込む
+  callGAS('getDisplayFields').then(function(fields) {
+    _displayFields = fields;
+    return callGAS('getGuestDetails', [rowNumber]);
+  }).then(function(res) {
+    if (!res.success) {
+      document.getElementById('detailBody').innerHTML = '<div class="text-center text-danger p-4">' + escapeHtml(res.error) + '</div>';
+      return;
+    }
+    _guestData = res.data;
+    _colMap = res.data.colMap;
+    renderDetail();
+  }).catch(function(err) {
+    document.getElementById('detailBody').innerHTML = '<div class="text-center text-danger p-4">' + escapeHtml(err.message) + '</div>';
+  });
+}
+
+function isFieldVisible(key) {
+  for (var i = 0; i < _displayFields.length; i++) {
+    if (_displayFields[i].key === key) return _displayFields[i].visible !== false;
+  }
+  return true; // デフォルト表示
+}
+
+function getFieldLabel(key, fallback) {
+  for (var i = 0; i < _displayFields.length; i++) {
+    if (_displayFields[i].key === key) return _displayFields[i].label || fallback;
+  }
+  return fallback;
+}
+
+function renderDetail() {
+  var d = _guestData;
+  var html = '';
+
+  // 予約基本情報
+  html += '<div class="detail-section"><h3><i class="bi bi-calendar-event"></i> 予約情報 / Reservation</h3>';
+  if (isFieldVisible('guestCount')) {
+    html += fieldRow(getFieldLabel('guestCount', '宿泊人数'), d.guestCount, 'guestCount', _colMap.guestCount);
+  }
+  if (isFieldVisible('guestCountInfants') && (d.guestCountInfants || _colMap.guestCountInfants >= 0)) {
+    html += fieldRow(getFieldLabel('guestCountInfants', '3才以下の人数'), d.guestCountInfants, 'guestCountInfants', _colMap.guestCountInfants);
+  }
+  if (isFieldVisible('checkIn')) {
+    html += fieldRow(getFieldLabel('checkIn', 'チェックイン'), d.checkIn, 'checkIn', _colMap.checkIn);
+  }
+  if (isFieldVisible('checkOut')) {
+    html += fieldRow(getFieldLabel('checkOut', 'チェックアウト'), d.checkOut, 'checkOut', _colMap.checkOut);
+  }
+  if (isFieldVisible('prevStay')) {
+    html += fieldRow(getFieldLabel('prevStay', '前泊地'), d.prevStay, 'prevStay', _colMap.prevStay);
+  }
+  if (isFieldVisible('nextStay')) {
+    html += fieldRow(getFieldLabel('nextStay', '行先地'), d.nextStay, 'nextStay', _colMap.nextStay);
+  }
+  html += '</div>';
+
+  // 電話番号
+  if (isFieldVisible('tel')) {
+    html += '<div class="detail-section"><h3><i class="bi bi-telephone"></i> ' + escapeHtml(getFieldLabel('tel', '電話番号')) + ' / Phone</h3>';
+    if (_colMap.telCols.length > 0) {
+      html += fieldRow('電話番号 1', d.tel1, 'tel1', _colMap.telCols[0]);
+    }
+    if (_colMap.telCols.length > 1) {
+      html += fieldRow('電話番号 2', d.tel2, 'tel2', _colMap.telCols[1]);
+    }
+    html += '</div>';
+  }
+
+  // ゲスト一覧
+  for (var g = 0; g < d.guests.length; g++) {
+    var guest = d.guests[g];
+    var gIdx = guest.index;
+    var gNum = g + 1;
+
+    html += '<div class="detail-section"><h3><i class="bi bi-person"></i> 宿泊者 ' + gNum + ' / Guest ' + gNum + '</h3>';
+
+    if (isFieldVisible('guestName')) {
+      var nameColIdx = gIdx < _colMap.guestNameCols.length ? _colMap.guestNameCols[gIdx] : -1;
+      html += fieldRow(getFieldLabel('guestName', '氏名'), guest.name, 'gname_' + gIdx, nameColIdx);
+    }
+
+    if (isFieldVisible('age')) {
+      var ageColIdx = gIdx < _colMap.ageCols.length ? _colMap.ageCols[gIdx] : -1;
+      html += fieldRow(getFieldLabel('age', '年齢'), guest.age, 'age_' + gIdx, ageColIdx);
+    }
+
+    if (isFieldVisible('address')) {
+      var addrColIdx = gIdx < _colMap.addressCols.length ? _colMap.addressCols[gIdx] : -1;
+      html += fieldRow(getFieldLabel('address', '住所'), guest.address, 'addr_' + gIdx, addrColIdx);
+    }
+
+    if (isFieldVisible('nationality')) {
+      var natColIdx = gIdx < _colMap.nationalityCols.length ? _colMap.nationalityCols[gIdx] : -1;
+      html += fieldRow(getFieldLabel('nationality', '国籍'), guest.nationality, 'nat_' + gIdx, natColIdx);
+    }
+
+    if (isFieldVisible('passportNumber')) {
+      var ppNumColIdx = gIdx < _colMap.passportNumberCols.length ? _colMap.passportNumberCols[gIdx] : -1;
+      if (guest.passportNumber || ppNumColIdx >= 0) {
+        html += fieldRow(getFieldLabel('passportNumber', '旅券番号'), guest.passportNumber, 'ppnum_' + gIdx, ppNumColIdx);
+      }
+    }
+
+    if (isFieldVisible('passportPhoto') && guest.passportPhotoUrl) {
+      html += '<div class="field-row"><div class="field-label">' + escapeHtml(getFieldLabel('passportPhoto', 'パスポート写真')) + '</div>';
+      // Google Driveの画像をサムネイル表示
+      var thumbUrl = guest.passportPhotoUrl;
+      if (thumbUrl.indexOf('drive.google.com') > -1) {
+        var fileId = extractDriveFileId_(thumbUrl);
+        if (fileId) thumbUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w300';
+      }
+      html += '<img src="' + escapeHtml(thumbUrl) + '" class="passport-thumb" onclick="showPassport(\'' + escapeHtml(guest.passportPhotoUrl) + '\')" onerror="this.style.display=\'none\'">';
+      html += '</div>';
+    }
+
+    html += '</div>';
+  }
+
+  document.getElementById('detailBody').innerHTML = html;
+
+  // 入力フィールドにイベントリスナーを設定
+  document.querySelectorAll('.field-input[data-col]').forEach(function(inp) {
+    inp.addEventListener('input', function() {
+      var colIdx = parseInt(this.getAttribute('data-col'));
+      var val = this.value;
+      autoSave(colIdx, val);
+    });
+  });
+}
+
+function fieldRow(label, value, id, colIndex) {
+  var html = '<div class="field-row"><div class="field-label">' + escapeHtml(label) + '</div>';
+  if (colIndex >= 0) {
+    html += '<input type="text" class="field-input" id="field_' + id + '" data-col="' + colIndex + '" value="' + escapeHtml(value || '') + '">';
+  } else {
+    html += '<div class="field-value">' + escapeHtml(value || '-') + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ===== 自動保存 =====
+function autoSave(colIndex, value) {
+  var key = 'col_' + colIndex;
+  if (_saveTimers[key]) clearTimeout(_saveTimers[key]);
+
+  _saveTimers[key] = setTimeout(function() {
+    callGAS('updateGuestField', [_currentRow, colIndex, value]).then(function(res) {
+      if (res.success) {
+        var ind = document.getElementById('saveIndicator');
+        ind.classList.add('show');
+        setTimeout(function() { ind.classList.remove('show'); }, 2000);
+      }
+    }).catch(function() { /* 静かに失敗 */ });
+  }, 800);
+}
+
+// ===== 確認 =====
+function doConfirm() {
+  var btn = document.getElementById('btnConfirm');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-sm"></span> 処理中...';
+
+  callGAS('confirmCheckin', [_currentRow]).then(function(res) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> 確認 / Confirm';
+    showConfirmScreen();
+  }).catch(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> 確認 / Confirm';
+    showConfirmScreen(); // エラーでも進む
+  });
+}
+
+function showConfirmScreen() {
+  showScreen('confirmScreen');
+
+  callGAS('getContactSettings').then(function(settings) {
+    var html = '';
+    var type = settings.contactType || 'meet';
+
+    if ((type === 'meet' || type === 'both') && settings.meetUrl) {
+      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +
+        '<i class="bi bi-camera-video-fill"></i> Google Meetで連絡</a>';
+    }
+    if ((type === 'phone' || type === 'both') && settings.phoneNumber) {
+      var tel = settings.phoneNumber.replace(/[^\d+]/g, '');
+      html += '<a href="tel:' + tel + '" class="btn btn-call btn-call-phone">' +
+        '<i class="bi bi-telephone-fill"></i> 電話をかける / Call</a>';
+    }
+
+    if (!html) {
+      html = '<p class="text-muted" style="font-size:.85rem;">連絡先が設定されていません</p>';
+    }
+
+    document.getElementById('callButtons').innerHTML = html;
+  });
+}
+
+function resetToSearch() {
+  _currentRow = null;
+  _guestData = null;
+  document.getElementById('searchName').value = '';
+  document.getElementById('searchPhone').value = '';
+  showScreen('searchScreen');
+}
+
+// ===== パスポート拡大 =====
+function showPassport(url) {
+  var fullUrl = url;
+  if (url.indexOf('drive.google.com') > -1) {
+    var fileId = extractDriveFileId_(url);
+    if (fileId) fullUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
+  }
+  document.getElementById('passportFullImg').src = fullUrl;
+  document.getElementById('passportOverlay').classList.add('show');
+}
+
+function extractDriveFileId_(url) {
+  var m = url.match(/[-\w]{25,}/);
+  return m ? m[0] : '';
+}
+
+// ===== PIN =====
+function showPinScreen() {
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinError').style.display = 'none';
+  showScreen('pinScreen');
+}
+
+function verifyPinAndOpen() {
+  var pin = document.getElementById('pinInput').value;
+  callGAS('verifyPin', [pin]).then(function(res) {
+    if (res.valid) {
+      loadSettings();
+    } else {
+      var errEl = document.getElementById('pinError');
+      errEl.textContent = 'PINが正しくありません';
+      errEl.style.display = 'block';
+    }
+  });
+}
+
+// ===== 設定 =====
+function loadSettings() {
+  showScreen('settingsScreen');
+  callGAS('getCheckinSettings').then(function(settings) {
+    document.getElementById('settSpreadsheetId').value = settings.spreadsheetId || '';
+    document.getElementById('settSheetName').value = settings.sheetName || 'フォームの回答 1';
+    document.getElementById('settContactType').value = settings.contactType || 'meet';
+    document.getElementById('settMeetUrl').value = settings.meetUrl || '';
+    document.getElementById('settPhoneNumber').value = settings.phoneNumber || '';
+    document.getElementById('settPin').value = settings.settingsPin || '0000';
+
+    // 表示フィールド設定を描画
+    var fields = settings.displayFields || [];
+    renderFieldConfig(fields);
+  });
+}
+
+function renderFieldConfig(fields) {
+  var html = '';
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    var checked = f.visible !== false ? 'checked' : '';
+    html += '<div class="field-config-row">' +
+      '<div class="form-check form-switch" style="flex:0 0 auto;">' +
+      '<input class="form-check-input field-vis-toggle" type="checkbox" data-key="' + f.key + '" ' + checked + '>' +
+      '</div>' +
+      '<div class="field-config-label">' +
+      '<input type="text" class="field-label-input" data-key="' + f.key + '" value="' + escapeHtml(f.label || '') + '">' +
+      '</div>' +
+      '</div>';
+  }
+  document.getElementById('fieldConfigList').innerHTML = html;
+}
+
+function saveSettings() {
+  // フィールド設定を収集
+  var fields = [];
+  document.querySelectorAll('.field-vis-toggle').forEach(function(toggle) {
+    var key = toggle.getAttribute('data-key');
+    var labelInput = document.querySelector('.field-label-input[data-key="' + key + '"]');
+    fields.push({
+      key: key,
+      label: labelInput ? labelInput.value.trim() : key,
+      visible: toggle.checked
+    });
+  });
+
+  var settings = {
+    spreadsheetId: document.getElementById('settSpreadsheetId').value.trim(),
+    sheetName: document.getElementById('settSheetName').value.trim(),
+    contactType: document.getElementById('settContactType').value,
+    meetUrl: document.getElementById('settMeetUrl').value.trim(),
+    phoneNumber: document.getElementById('settPhoneNumber').value.trim(),
+    settingsPin: document.getElementById('settPin').value.trim(),
+    displayFields: fields
+  };
+
+  callGAS('saveCheckinSettings', [JSON.stringify(settings)]).then(function(res) {
+    if (res.success) {
+      alert('設定を保存しました');
+    } else {
+      alert('保存に失敗しました: ' + (res.error || ''));
+    }
+  }).catch(function(err) {
+    alert('保存に失敗しました: ' + err.message);
+  });
+}
+
+function resetSettings() {
+  var props = ['SPREADSHEET_ID', 'CONTACT_TYPE', 'MEET_URL', 'PHONE_NUMBER', 'SETTINGS_PIN', 'SHEET_NAME', 'DISPLAY_FIELDS'];
+  // リセットは全設定をクリアして再読み込み
+  callGAS('saveCheckinSettings', [JSON.stringify({
+    spreadsheetId: '',
+    contactType: 'meet',
+    meetUrl: '',
+    phoneNumber: '',
+    settingsPin: '0000',
+    sheetName: 'フォームの回答 1'
+  })]).then(function() {
+    loadSettings();
+  });
+}
+
+function loadCheckinLog() {
+  callGAS('getCheckinLog').then(function(log) {
+    var items = typeof log === 'string' ? JSON.parse(log) : log;
+    if (!items || items.length === 0) {
+      document.getElementById('checkinLogList').innerHTML = '<div class="text-muted">記録なし</div>';
+      return;
+    }
+    var html = '<table class="table table-sm table-striped" style="font-size:.8rem;"><thead><tr><th>日時</th><th>ゲスト</th></tr></thead><tbody>';
+    for (var i = items.length - 1; i >= 0; i--) {
+      html += '<tr><td>' + escapeHtml(items[i].confirmedAt || '') + '</td><td>' + escapeHtml(items[i].guestName || '') + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    document.getElementById('checkinLogList').innerHTML = html;
+  });
+}
+
+// ===== ユーティリティ =====
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Enter キーで検索
+document.getElementById('searchName').addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
+document.getElementById('searchPhone').addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
+document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPinAndOpen(); });
+</script>
+
+</body>
+</html>

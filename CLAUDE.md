@@ -218,16 +218,39 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 10. **[低]** セッション8のデバッグログ残存箇所のクリーンアップ（`checkAndSendReminders`の[DEBUG-CH]/[DEBUG-REMIND]ログ等）
 
 ## 現在のセッション状態
-- **ブランチ**: `claude/verify-staff-response-display-xbDkI`
-- **最新コミット**: `279adc8`
+- **ブランチ**: `claude/verify-staff-response-display-jWr8l`
+- **最新コミット**: (コミット後更新)
 - **Code.gs行数**: ~12,302行（ルール8の検証用）
 - **index.html行数**: ~9,949行
 - **checklist-app/Code.gs行数**: ~3,460行
 - **checklist-app/checklist.html行数**: ~6,255行
-- **進行中タスク**: v0310nデバッグコードで清掃モーダル確定誤表示を監視中
+- **checkin-app/Code.gs行数**: ~420行（新規作成）
+- **checkin-app/checkin.html行数**: ~470行（新規作成）
+- **進行中タスク**: チェックインアプリの実装
 - **デバッグコード残存**: UIデバッグパネル2つ（通知+清掃モーダル）+ LINE ID収集のデバッグバナー + v0310nの[DEBUG-CONFIRM]/[DEBUG-CAL]/[DEBUG-DAYCELL]ログ
 - **未修正バグ**: 📤ボタン（手動LINE送信）が反応しない問題（原因未特定、自動送信で代替）
 - **解決済み**: 幽霊予約（行2の162泊Booking.comブロック日）→ ユーザーが手動削除済み + v0310mで60泊超フィルタ追加
+
+## 2026-03-17（セッション16）修正内容
+1. **チェックインアプリ新規作成（v0317a）**: 宿泊者がチェックイン時にポストのスマホで予約情報を確認・修正するWebアプリを独立GASプロジェクトとして作成
+   - `checkin-app/Code.gs`: ゲスト検索（名前/電話番号のゆらぎ対応）、詳細取得、フィールド自動保存、チェックイン確認記録、PIN付き設定画面
+   - `checkin-app/checkin.html`: モバイル最適化UI（検索→結果→詳細編集→確認→スタッフ連絡の5画面フロー）
+   - `checkin-app/deploy-checkin.js`: デプロイスクリプト
+   - `deploy-all.js`: チェックインアプリのデプロイを追加（scriptId未設定時はスキップ）
+   - 設定画面: スプシID、シート名、連絡方法（Meet/電話/両方）、表示項目の選択・ラベル名カスタマイズ
+
+## 2026-03-17（セッション16）コミット履歴（コミットハッシュ付き）
+| コミット | 内容 |
+|---|---|
+| (後で追記) | feat: v0317a チェックインアプリ新規作成 |
+
+### 変更ファイルと箇所（セッション16）
+- **checkin-app/Code.gs**: 新規作成 — doGet, searchGuest, getGuestDetails, updateGuestField, confirmCheckin, verifyPin, getCheckinSettings, saveCheckinSettings, getDisplayFields 等
+- **checkin-app/checkin.html**: 新規作成 — Bootstrap 5 モバイルUI、5画面SPA、自動保存、PIN設定画面
+- **checkin-app/deploy-checkin.js**: 新規作成 — clasp push/deploy スクリプト
+- **checkin-app/appsscript.json, .clasp.json, .claspignore**: 新規作成
+- **deploy-all.js**: チェックインアプリのデプロイ追加（[4/4]ステップ）+ デプロイ数/バージョン数チェック追加
+- **index.html**: バージョンバッジ v0311s → v0317a
 
 ## 2026-03-10（セッション14）修正内容
 1. **Booking.comブロック日フィルタ改善（v0310l→m）**: 幽霊予約（2027/4/1〜9/10, 162泊）の原因調査。Booking.comの「CLOSED - Not available」エントリについて、v0310lで一旦全スキップにしたが、Booking.com経由の実予約も取れなくなる問題に気づき、v0310mで60泊超のみスキップに変更。60泊以下は実予約として取り込み、60泊超はブロック日として除外
@@ -525,7 +548,9 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 | `index.html` | ~9495行 | メインアプリ フロントエンド |
 | `checklist-app/Code.gs` | ~2997行 | チェックリストアプリ サーバー |
 | `checklist-app/checklist.html` | ~6002行 | チェックリストアプリ フロントエンド |
-| `deploy-all.js` | ~457行 | 一括デプロイスクリプト |
+| `checkin-app/Code.gs` | ~420行 | チェックインアプリ サーバー |
+| `checkin-app/checkin.html` | ~470行 | チェックインアプリ フロントエンド |
+| `deploy-all.js` | ~510行 | 一括デプロイスクリプト |
 | `CLAUDE.md` | 本ファイル | 開発引き継ぎ資料 |
 
 ## チャット移行時の必須ルール
@@ -772,7 +797,7 @@ minpaku-fix/
 ├── .clasp.json                  # メインアプリのclasp設定
 ├── .claspignore                 # メインアプリ push 時の除外ルール
 ├── deploy.js                    # メインアプリ デプロイスクリプト
-├── deploy-all.js                # 一括デプロイ（メイン+チェックリスト）
+├── deploy-all.js                # 一括デプロイ（メイン+チェックリスト+チェックイン）
 ├── deploy-all.bat               # deploy-all.jsのWindows用ラッパー
 ├── deploy-config.json           # デプロイID保存（git追跡対象外！）
 ├── deploy-config.sample.json    # deploy-config.json のテンプレート
@@ -784,6 +809,14 @@ minpaku-fix/
 │   ├── .clasp.json              # チェックリストアプリのclasp設定
 │   ├── .claspignore             # チェックリストアプリ push 時の除外ルール
 │   ├── deploy-checklist.js      # チェックリストアプリ デプロイスクリプト
+│   └── appsscript.json
+│
+├── checkin-app/                 # チェックインアプリ（別GASプロジェクト）
+│   ├── Code.gs                  # チェックインアプリ GAS コード
+│   ├── checkin.html             # チェックインアプリ UI
+│   ├── .clasp.json              # チェックインアプリのclasp設定
+│   ├── .claspignore             # チェックインアプリ push 時の除外ルール
+│   ├── deploy-checkin.js        # チェックインアプリ デプロイスクリプト
 │   └── appsscript.json
 │
 ├── manual-generator/            # スタッフ操作マニュアル生成ツール

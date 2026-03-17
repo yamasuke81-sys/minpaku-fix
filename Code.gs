@@ -277,6 +277,10 @@ function doGet(e) {
     PropertiesService.getScriptProperties().setProperty('CHECKLIST_APP_URL', String(url).trim());
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
   }
+  if (action === 'setCheckinAppUrl' && url && typeof url === 'string') {
+    PropertiesService.getScriptProperties().setProperty('CHECKIN_APP_URL', String(url).trim());
+    return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+  }
   // ゲートウェイURL保存アクション
   if (action === 'setGatewayUrl' && url && typeof url === 'string') {
     PropertiesService.getScriptProperties().setProperty('GATEWAY_URL', String(url).trim());
@@ -11075,6 +11079,27 @@ function getChecklistAppUrl() {
       return JSON.stringify({ success: false, error: 'CHECKLIST_APP_URL が Script Properties に設定されていません' });
     }
     return JSON.stringify({ success: true, url: url });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** チェックインアプリURLを取得 */
+function getCheckinAppUrl() {
+  try {
+    var url = PropertiesService.getScriptProperties().getProperty('CHECKIN_APP_URL') || '';
+    if (!url) return JSON.stringify({ success: false, error: 'CHECKIN_APP_URL が未設定です' });
+    return JSON.stringify({ success: true, url: url });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** チェックインアプリURLを保存 */
+function saveCheckinAppUrl(url) {
+  try {
+    PropertiesService.getScriptProperties().setProperty('CHECKIN_APP_URL', String(url || '').trim());
+    return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

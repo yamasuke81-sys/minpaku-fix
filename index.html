@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0317a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0317q</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1191,6 +1191,7 @@
         <a href="https://docs.google.com/spreadsheets/d/<?= spreadsheetId ?>/edit" target="_blank" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;" title="スプレッドシートを開く">スプシ</a>
 <? var _staffViewUrl = (savedOwnerUrl || baseUrl) ? ((savedOwnerUrl || baseUrl) + ((savedOwnerUrl || baseUrl).indexOf('?') >= 0 ? '&' : '?') + 'staff=1') : ''; ?>
         <a href="<?= _staffViewUrl ?>" target="_blank" id="btnOpenStaffView" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;<%= _staffViewUrl ? '' : 'display:none;' %>" title="スタッフ画面を開く">スタッフ画面</a>
+        <a href="#" target="_blank" id="btnOpenCheckin" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;display:none;" title="チェックインアプリを開く">checkin</a>
       </div>
 <? } ?>
     </div>
@@ -1408,6 +1409,17 @@
             <button type="button" class="btn btn-sm btn-primary" id="btnCopyReadonlyUrl">コピー</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenReadonlyUrl">開く</button>
           </div>
+        </div>
+        <div class="mb-3 p-2 border rounded bg-light">
+          <label class="form-label small fw-bold">チェックインアプリURL</label>
+          <p class="small text-muted mb-1">チェックインアプリのデプロイURLを設定すると、ヘッダーに「checkin」ボタンが表示されます。</p>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            <input type="url" class="form-control form-control-sm flex-grow-1" id="checkinAppUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec" style="min-width:200px;">
+            <button type="button" class="btn btn-sm btn-success" id="btnSaveCheckinAppUrl">保存</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnCopyCheckinAppUrl">コピー</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOpenCheckinAppUrl">開く</button>
+          </div>
+          <div id="checkinAppUrlSaveMsg" class="small text-success mt-1" style="display:none;">保存しました</div>
         </div>
       </div>
       <div id="settingsStaff" style="display:none;">
@@ -2604,6 +2616,19 @@
             }
           } catch(e) {}
         }).withFailureHandler(function() {}).getChecklistAppUrl();
+      } catch(e) {}
+      // チェックインアプリURLをプリフェッチ → ボタンのhrefに設定
+      try {
+        google.script.run.withSuccessHandler(function(resStr) {
+          try {
+            var r = JSON.parse(resStr);
+            if (r.success && r.url) {
+              window._checkinAppUrl = r.url;
+              var ciBtn = document.getElementById('btnOpenCheckin');
+              if (ciBtn && !window.readOnly) { ciBtn.href = r.url; ciBtn.style.display = ''; }
+            }
+          } catch(e) {}
+        }).withFailureHandler(function() {}).getCheckinAppUrl();
       } catch(e) {}
       // ディープリンク: URLパラメータで指定された日付の清掃詳細を自動で開く
       window.initialCleaningDate = '<?= initialCleaningDate ?>' || '';
@@ -7449,6 +7474,40 @@
       }
       setupUrlButtons('btnCopyStaffUrl', 'btnOpenStaffUrl', 'staffUrlInput', 'スタッフ用URL');
       setupUrlButtons('btnCopyReadonlyUrl', 'btnOpenReadonlyUrl', 'readonlyUrlInput', '閲覧専用URL');
+      setupUrlButtons('btnCopyCheckinAppUrl', 'btnOpenCheckinAppUrl', 'checkinAppUrlInput', 'チェックインアプリURL');
+      // チェックインアプリURL保存
+      document.getElementById('btnSaveCheckinAppUrl').addEventListener('click', function() {
+        var url = document.getElementById('checkinAppUrlInput').value.trim();
+        if (!url) { alert('URLを入力してください。'); return; }
+        var btn = this; btn.disabled = true; btn.textContent = '保存中…';
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          btn.disabled = false; btn.textContent = '保存';
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success) {
+              window._checkinAppUrl = url;
+              var ciBtn = document.getElementById('btnOpenCheckin');
+              if (ciBtn) { ciBtn.href = url; ciBtn.style.display = ''; }
+              var msg = document.getElementById('checkinAppUrlSaveMsg');
+              if (msg) { msg.style.display = 'block'; setTimeout(function() { msg.style.display = 'none'; }, 3000); }
+            } else { alert('保存に失敗しました: ' + (r.error || '')); }
+          } catch(e) { alert('保存に失敗しました。'); }
+        }).withFailureHandler(function(err) {
+          btn.disabled = false; btn.textContent = '保存';
+          alert('保存に失敗しました: ' + (err.message || ''));
+        }).saveCheckinAppUrl(url);
+      });
+      // チェックインアプリURL初期読み込み
+      try {
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var r = JSON.parse(jsonStr);
+            if (r.success && r.url) {
+              document.getElementById('checkinAppUrlInput').value = r.url;
+            }
+          } catch(e) {}
+        }).withFailureHandler(function() {}).getCheckinAppUrl();
+      } catch(e) {}
       // オーナーURL保存（共通関数）
       function doSaveOwnerUrl(ownerUrl, btn) {
         if (!ownerUrl) { if (btn) { alert('オーナーURLを入力してください。'); } return; }

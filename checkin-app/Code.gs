@@ -293,31 +293,10 @@ function searchGuest(name, phone) {
     today.setHours(0, 0, 0, 0);
 
     var results = [];
-    // [DEBUG] 検索過程を記録
-    var _dbgSkipped = { coPast: 0, ciFuture: 0, noMatch: 0 };
-    var _dbgSamples = []; // 最初の5行のサンプル
+    var ciFutureMatched = 0; // CI30日以上先だが名前+電話マッチした件数
 
     for (var r = 1; r < data.length; r++) {
       var row = data[r];
-
-      // [DEBUG] 最初の5行のサンプルを記録
-      if (_dbgSamples.length < 5) {
-        var sampleNames = [];
-        for (var sni = 0; sni < Math.min(map.guestNameCols.length, 2); sni++) {
-          sampleNames.push(String(row[map.guestNameCols[sni]] || '').substring(0, 20));
-        }
-        var samplePhones = [];
-        for (var sti = 0; sti < Math.min(map.telCols.length, 2); sti++) {
-          samplePhones.push(String(row[map.telCols[sti]] || '').substring(0, 20));
-        }
-        _dbgSamples.push({
-          row: r + 1,
-          ci: map.checkIn >= 0 ? String(row[map.checkIn] || '').substring(0, 30) : '(unmapped)',
-          co: map.checkOut >= 0 ? String(row[map.checkOut] || '').substring(0, 30) : '(unmapped)',
-          names: sampleNames,
-          phones: samplePhones
-        });
-      }
 
       // チェックアウトが過去の予約はスキップ
       if (map.checkOut >= 0) {
@@ -325,13 +304,13 @@ function searchGuest(name, phone) {
         if (coVal) {
           var coDate = new Date(coVal);
           if (!isNaN(coDate.getTime())) {
-            if (coDate < today) { _dbgSkipped.coPast++; continue; }
+            if (coDate < today) continue;
           }
         }
       }
 
-      // チェックインが30日以上先の予約はスキップ（ただし名前/電話マッチを先にチェック）
-      var _skippedByCiFuture = false;
+      // チェックインが30日以上先か判定
+      var isCiFuture = false;
       if (map.checkIn >= 0) {
         var ciVal = row[map.checkIn];
         if (ciVal) {
@@ -339,7 +318,7 @@ function searchGuest(name, phone) {
           if (!isNaN(ciDate.getTime())) {
             var future = new Date(today);
             future.setDate(future.getDate() + 30);
-            if (ciDate > future) { _skippedByCiFuture = true; }
+            if (ciDate > future) isCiFuture = true;
           }
         }
       }
@@ -370,16 +349,10 @@ function searchGuest(name, phone) {
       }
 
       // CI未来フィルタでスキップ（マッチしていた場合はカウント）
-      if (_skippedByCiFuture) {
-        _dbgSkipped.ciFuture++;
-        if (nameMatch && phoneMatch) {
-          if (!_dbgSkipped.ciFutureMatched) _dbgSkipped.ciFutureMatched = 0;
-          _dbgSkipped.ciFutureMatched++;
-        }
+      if (isCiFuture) {
+        if (nameMatch && phoneMatch) ciFutureMatched++;
         continue;
       }
-
-      if (!(nameMatch && phoneMatch)) { _dbgSkipped.noMatch++; }
 
       if (nameMatch && phoneMatch) {
         var primaryName = '';
@@ -393,26 +366,12 @@ function searchGuest(name, phone) {
           guestName: primaryName,
           checkIn: ci,
           checkOut: co,
-          guestCount: gc,
-          matchType: nameMatch && phoneMatch ? 'both' : (nameMatch ? 'name' : 'phone')
+          guestCount: gc
         });
       }
     }
 
-    // マッチ度順にソート（both > name/phone）
-    results.sort(function(a, b) {
-      var order = { both: 0, name: 1, phone: 2 };
-      return (order[a.matchType] || 9) - (order[b.matchType] || 9);
-    });
-
-    return JSON.stringify({ success: true, results: results, _debug: {
-      searchInput: { name: name, phone: phone, normalizedName: normalizedSearchName, normalizedPhone: normalizedSearchPhone },
-      colMap: { checkIn: map.checkIn, checkOut: map.checkOut, guestCount: map.guestCount, guestNameCols: map.guestNameCols.slice(0,3), telCols: map.telCols },
-      totalRows: data.length - 1,
-      skipped: _dbgSkipped,
-      samples: _dbgSamples,
-      today: Utilities.formatDate(today, 'Asia/Tokyo', 'yyyy/M/d')
-    }});
+    return JSON.stringify({ success: true, results: results, ciFutureMatched: ciFutureMatched });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });
   }
@@ -511,39 +470,6 @@ function getGuestDetails(rowNumber) {
 
       result.guests.push(guest);
     }
-
-    // [DEBUG] カラムマップ＋ヘッダー名＋生値をデバッグ情報として返す
-    var debugColMap = {};
-    var singleKeys = ['checkIn','checkOut','guestCount','guestCountInfants','prevStay','nextStay'];
-    for (var si = 0; si < singleKeys.length; si++) {
-      var sk = singleKeys[si];
-      var idx = map[sk];
-      debugColMap[sk] = {
-        colIndex: idx,
-        header: idx >= 0 ? String(headers[idx] || '').substring(0, 50) : '(未検出)',
-        rawValue: idx >= 0 ? String(row[idx] || '').substring(0, 50) : ''
-      };
-    }
-    var arrayKeys = ['guestNameCols','addressCols','ageCols','nationalityCols','passportNumberCols','passportPhotoCols','telCols','emailCols'];
-    for (var ai = 0; ai < arrayKeys.length; ai++) {
-      var ak = arrayKeys[ai];
-      var arr = map[ak] || [];
-      debugColMap[ak] = [];
-      for (var aidx = 0; aidx < arr.length; aidx++) {
-        var ci = arr[aidx];
-        debugColMap[ak].push({
-          colIndex: ci,
-          header: ci >= 0 ? String(headers[ci] || '').substring(0, 50) : '(未検出)',
-          rawValue: ci >= 0 ? String(row[ci] || '').substring(0, 50) : ''
-        });
-      }
-    }
-    // 全ヘッダー一覧（最初の60列）
-    var allHeaders = [];
-    for (var hi = 0; hi < Math.min(headers.length, 60); hi++) {
-      allHeaders.push({ col: hi, header: String(headers[hi] || '').substring(0, 60) });
-    }
-    result._debug = { colMap: debugColMap, allHeaders: allHeaders, totalCols: headers.length };
 
     return JSON.stringify({ success: true, data: result });
   } catch (e) {

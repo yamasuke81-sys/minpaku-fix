@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0317n</div>
+<div class="version-badge" id="deployVersion">v0317o</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -313,8 +313,8 @@ function doSearch() {
   var errEl = document.getElementById('searchError');
   errEl.style.display = 'none';
 
-  if (!name && !phone) {
-    errEl.textContent = 'お名前または電話番号を入力してください';
+  if (!name || !phone) {
+    errEl.textContent = 'お名前と電話番号の両方を入力してください / Please enter both name and phone number';
     errEl.style.display = 'block';
     return;
   }

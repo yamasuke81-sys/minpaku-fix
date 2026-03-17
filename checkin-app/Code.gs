@@ -319,15 +319,13 @@ function searchGuest(name, phone) {
         });
       }
 
-      // チェックアウトが過去の予約はスキップ（3日前まで許容）
+      // チェックアウトが過去の予約はスキップ
       if (map.checkOut >= 0) {
         var coVal = row[map.checkOut];
         if (coVal) {
           var coDate = new Date(coVal);
           if (!isNaN(coDate.getTime())) {
-            var cutoff = new Date(today);
-            cutoff.setDate(cutoff.getDate() - 3);
-            if (coDate < cutoff) { _dbgSkipped.coPast++; continue; }
+            if (coDate < today) { _dbgSkipped.coPast++; continue; }
           }
         }
       }
@@ -374,16 +372,16 @@ function searchGuest(name, phone) {
       // CI未来フィルタでスキップ（マッチしていた場合はカウント）
       if (_skippedByCiFuture) {
         _dbgSkipped.ciFuture++;
-        if (nameMatch || phoneMatch) {
+        if (nameMatch && phoneMatch) {
           if (!_dbgSkipped.ciFutureMatched) _dbgSkipped.ciFutureMatched = 0;
           _dbgSkipped.ciFutureMatched++;
         }
         continue;
       }
 
-      if (!nameMatch && !phoneMatch) { _dbgSkipped.noMatch++; }
+      if (!(nameMatch && phoneMatch)) { _dbgSkipped.noMatch++; }
 
-      if (nameMatch || phoneMatch) {
+      if (nameMatch && phoneMatch) {
         var primaryName = '';
         if (map.guestNameCols.length > 0) primaryName = String(row[map.guestNameCols[0]] || '').trim();
         var ci = map.checkIn >= 0 ? formatDate_(row[map.checkIn]) : '';

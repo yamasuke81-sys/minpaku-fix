@@ -432,6 +432,9 @@ function getNextReservation(checkoutDate) {
       var ciVal = data[r][col.ci];
       var ciStr = normDateStr_(ciVal);
       if (!ciStr || ciStr < targetCo) continue;
+      // 現在の予約自身を除外（チェックアウト日が一致する行）
+      var rowCoStr = col.co !== undefined ? normDateStr_(data[r][col.co]) : '';
+      if (rowCoStr === targetCo) continue;
       if (ciStr < bestCi) {
         bestCi = ciStr;
         var coStr = col.co !== undefined ? normDateStr_(data[r][col.co]) : '';

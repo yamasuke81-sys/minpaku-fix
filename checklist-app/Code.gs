@@ -398,6 +398,108 @@ function getNextBookingDetails(checkoutDate) {
   }
 }
 
+/**
+ * 次回予約を取得（チェックアウト日以降の最も近い予約）
+ */
+function getNextReservation(checkoutDate) {
+  try {
+    var bookingSs = getBookingSpreadsheet_();
+    var formSheet = bookingSs.getSheetByName(CL_BOOKING_SHEET);
+    if (!formSheet || formSheet.getLastRow() < 2) {
+      return JSON.stringify({ success: true, next: null });
+    }
+    var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+    var col = {};
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i] || '').trim();
+      if (h === 'チェックイン') col.ci = i;
+      else if (h === 'チェックアウト') col.co = i;
+      else if (h === '宿泊者名') col.guest = i;
+      else if (h === '人数') col.count = i;
+      else if (h === '3歳以下') col.infant = i;
+      else if (h === 'BBQ利用') col.bbq = i;
+      else if (h === '国籍') col.nat = i;
+      else if (h === 'ベッド') col.bed = i;
+    }
+    if (col.ci === undefined) return JSON.stringify({ success: true, next: null });
+
+    var data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+    var targetCo = normDateStr_(checkoutDate);
+    var best = null;
+    var bestCi = '9999-12-31';
+
+    for (var r = 0; r < data.length; r++) {
+      var ciVal = data[r][col.ci];
+      var ciStr = normDateStr_(ciVal);
+      if (!ciStr || ciStr < targetCo) continue;
+      if (ciStr < bestCi) {
+        bestCi = ciStr;
+        var coStr = col.co !== undefined ? normDateStr_(data[r][col.co]) : '';
+        var adult = col.count !== undefined ? extractCount_(String(data[r][col.count] || '')) : '';
+        var infant = col.infant !== undefined ? extractCount_(String(data[r][col.infant] || '')) : '';
+        var guestFmt = '';
+        if (adult || infant) {
+          guestFmt = (adult ? '大人' + adult + '名' : '') + (infant ? (adult ? '、' : '') + '3歳以下' + infant + '名' : '');
+        }
+        best = {
+          checkIn: ciStr,
+          checkOut: coStr,
+          dateRange: ciStr + ' ～ ' + coStr,
+          guestName: col.guest !== undefined ? String(data[r][col.guest] || '') : '',
+          guestCount: guestFmt || '-',
+          bbq: col.bbq !== undefined ? String(data[r][col.bbq] || '').trim() : '',
+          nationality: (col.nat !== undefined ? String(data[r][col.nat] || '').trim() : '') || '日本',
+          bedCount: col.bed !== undefined ? String(data[r][col.bed] || '').trim() : ''
+        };
+      }
+    }
+
+    // スタッフ共有用シートからベッド情報を補完
+    if (best && !best.bedCount) {
+      try {
+        var staffShare = bookingSs.getSheetByName('スタッフ共有用');
+        if (staffShare && staffShare.getLastRow() >= 2) {
+          var sHeaders = staffShare.getRange(1, 1, 1, staffShare.getLastColumn()).getValues()[0];
+          var sCi = -1, sBed = -1, sBbq = -1, sCount = -1, sInfant = -1;
+          for (var si = 0; si < sHeaders.length; si++) {
+            var sh = String(sHeaders[si] || '').trim();
+            if (sh === 'チェックイン') sCi = si;
+            else if (sh === 'ベッド数' || sh === 'ベッド') sBed = si;
+            else if (sh === 'BBQ利用') sBbq = si;
+            else if (sh === '人数') sCount = si;
+            else if (sh === '3歳以下') sInfant = si;
+          }
+          if (sCi >= 0) {
+            var sData = staffShare.getRange(2, 1, staffShare.getLastRow() - 1, staffShare.getLastColumn()).getValues();
+            for (var sj = 0; sj < sData.length; sj++) {
+              if (normDateStr_(sData[sj][sCi]) === best.checkIn) {
+                if (!best.bedCount && sBed >= 0) best.bedCount = String(sData[sj][sBed] || '').trim();
+                if ((!best.bbq || best.bbq === '') && sBbq >= 0) best.bbq = String(sData[sj][sBbq] || '').trim();
+                if (best.guestCount === '-' && sCount >= 0) {
+                  var sa = extractCount_(String(sData[sj][sCount] || ''));
+                  var si2 = sInfant >= 0 ? extractCount_(String(sData[sj][sInfant] || '')) : '';
+                  if (sa || si2) best.guestCount = (sa ? '大人' + sa + '名' : '') + (si2 ? (sa ? '、' : '') + '3歳以下' + si2 + '名' : '');
+                }
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) { /* スタッフ共有用シートの補完失敗は無視 */ }
+    }
+
+    return JSON.stringify({ success: true, next: best });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+function extractCount_(str) {
+  if (!str) return '';
+  var m = str.match(/(\d+)/);
+  return m ? m[1] : str;
+}
+
 function formatDateValue_(val) {
   if (!val) return '';
   if (val instanceof Date) {

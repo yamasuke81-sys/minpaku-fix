@@ -119,7 +119,7 @@
       padding: 10px 6px;
       border: 1px solid #bdc3c7;
       background: white;
-      font-size: 13px;
+      font-size: 18px;
       font-weight: bold;
       color: #7f8c8d;
       cursor: pointer;
@@ -146,6 +146,32 @@
     }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    /* 次回予約カード */
+    .nres-card {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #dee2e6;
+      overflow: hidden;
+    }
+    .nres-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+    .nres-row:last-child { border-bottom: none; }
+    .nres-label {
+      color: #6c757d;
+      font-size: 13px;
+      min-width: 4em;
+      flex-shrink: 0;
+    }
+    .nres-value {
+      font-weight: 600;
+      color: #2c3e50;
+    }
 
     /* 次回予約情報 */
     .booking-info {
@@ -1512,7 +1538,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0310b</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318a</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1528,10 +1554,12 @@
 
   <!-- タブナビゲーション（ヘッダー直下） -->
   <div class="tab-nav" id="tabNav">
-    <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')">チェックリスト</button>
-    <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')">撮影</button>
-    <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')">要補充<span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
-    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')" style="display:none;">設定</button>
+    <button class="tab-nav-btn" data-tab="nextRes" onclick="switchTab('nextRes')"><i class="bi bi-calendar-event"></i></button>
+    <button class="tab-nav-btn active" data-tab="checklist" onclick="switchTab('checklist')"><i class="bi bi-check2-square"></i></button>
+    <button class="tab-nav-btn" data-tab="photo" onclick="switchTab('photo')"><i class="bi bi-camera"></i></button>
+    <button class="tab-nav-btn" data-tab="laundry" onclick="switchTab('laundry')"><i class="bi bi-basket2"></i></button>
+    <button class="tab-nav-btn" data-tab="supply" onclick="switchTab('supply')"><i class="bi bi-box-seam"></i><span id="supplyBadge" class="tab-badge tab-badge-warning hidden">0</span></button>
+    <button class="tab-nav-btn" data-tab="clSettings" onclick="switchTab('clSettings')" style="display:none;"><i class="bi bi-gear"></i></button>
   </div>
 
   <div id="loadingArea" class="loading">読み込み中...</div>
@@ -1584,11 +1612,6 @@
         <div id="completionInfo" style="display:none;margin-top:8px;padding:8px 10px;background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;font-size:13px;color:#155724;text-align:center;"></div>
       </div>
 
-      <!-- コインランドリー状況（清掃完了ボタンの下） -->
-      <div id="laundrySection" class="laundry-section" style="margin:8px 12px 16px;padding:12px;background:#e2e3e5;border-radius:10px;border:1px solid #c4c8cb;">
-        <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;"><i class="bi bi-basket2"></i> コインランドリー状況</div>
-        <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
-      </div>
     </div>
 
     <!-- 要補充タブ -->
@@ -1598,9 +1621,26 @@
       </div>
     </div>
 
+    <!-- 次回予約タブ -->
+    <div id="tabNextRes" class="tab-content">
+      <div style="padding:12px;">
+        <div id="nextResContent"><div style="text-align:center;color:#999;font-size:13px;padding:20px;">読み込み中…</div></div>
+      </div>
+    </div>
+
     <!-- 撮影タブ -->
     <div id="tabPhoto" class="tab-content">
       <div id="photoSection"></div>
+    </div>
+
+    <!-- ランドリータブ -->
+    <div id="tabLaundry" class="tab-content">
+      <div style="padding:12px;">
+        <div id="laundrySection" style="padding:12px;background:#e2e3e5;border-radius:10px;border:1px solid #c4c8cb;">
+          <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;"><i class="bi bi-basket2"></i> コインランドリー状況</div>
+          <div id="laundryContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- 設定タブ（オーナーのみ表示） -->
@@ -2273,6 +2313,7 @@
       var target = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (target) target.classList.add('active');
       if (tabName === 'clSettings') { loadFolderSettings(); loadClLineNotifySettings(); }
+      if (tabName === 'nextRes') loadNextReservation();
     }
 
     // フォルダ設定の読み込み
@@ -3197,6 +3238,10 @@
     // 折りたたみ状態を保持（再描画時に維持するため）
     var supplyGroupCollapsed = {};
 
+    function stripMaikai_(name) {
+      return (name || '').replace(/【毎回】/g, '').trim();
+    }
+
     function renderSupplyList() {
       var supplyNeeded = checklistData.supplyNeeded || {};
       var items = checklistData.items || [];
@@ -3260,7 +3305,7 @@
           html += '<div class="supply-single-item' + (isNeeded ? ' supply-checked' : '') + '">';
           html += '<input type="checkbox" class="supply-item-checkbox" data-item-id="' + escapeHtml(item.id) + '" data-item-name="' + escapeHtml(item.name) + '" data-item-category="' + escapeHtml(item.category || '') + '" ' + (isNeeded ? 'checked' : '') + ' onchange="toggleSupplyFromTab(this)">';
           html += '<div class="supply-item-info">';
-          html += '<div class="supply-item-name">' + escapeHtml(item.name) + '</div>';
+          html += '<div class="supply-item-name">' + escapeHtml(stripMaikai_(item.name)) + '</div>';
           if (item.category) {
             html += '<div class="supply-item-tags">';
             item.category.split('：').forEach(function(part, idx) {
@@ -3277,7 +3322,7 @@
           html += '<div class="supply-group' + (isCollapsed ? ' collapsed' : '') + '" data-group-name="' + escapeHtml(name) + '">';
           html += '<div class="supply-group-header" onclick="toggleSupplyGroup(this)">';
           html += '<span class="supply-group-icon">▼</span>';
-          html += '<span class="supply-group-name">' + escapeHtml(name) + '</span>';
+          html += '<span class="supply-group-name">' + escapeHtml(stripMaikai_(name)) + '</span>';
           html += '<span class="supply-group-badge' + (groupNeededCount === 0 ? ' none' : '') + '">' + groupNeededCount + '/' + group.length + '</span>';
           html += '</div>';
           html += '<div class="supply-group-body" style="max-height:' + (isCollapsed ? '0' : (group.length * 60)) + 'px;">';
@@ -6211,6 +6256,66 @@
       callGAS('cancelCleaningLaundryStep', [checkoutDate, step]).then(function(res) {
         if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; }
       }).catch(function() { alert('通信エラー'); btn.disabled = false; });
+    }
+
+    // ==========================================
+    // 次回予約タブ
+    // ==========================================
+    var _nextResLoaded = false;
+    function loadNextReservation() {
+      if (_nextResLoaded) return;
+      var el = document.getElementById('nextResContent');
+      if (!el) return;
+      el.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;padding:20px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
+      callGAS('getNextReservation', [checkoutDate]).then(function(res) {
+        _nextResLoaded = true;
+        if (!res.success || !res.next) {
+          el.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:30px;">次回予約なし</div>';
+          return;
+        }
+        renderNextReservation(el, res.next);
+      }).catch(function() {
+        el.innerHTML = '<div style="text-align:center;color:#dc3545;font-size:13px;padding:20px;">取得できませんでした</div>';
+      });
+    }
+
+    function renderNextReservation(el, nr) {
+      var ci = nr.checkIn || '';
+      var co = nr.checkOut || '';
+      // 本日チェックインかチェック
+      var isToday = false;
+      if (ci) {
+        var today = new Date();
+        var todayStr = today.getFullYear() + '-' + ('0' + (today.getMonth() + 1)).slice(-2) + '-' + ('0' + today.getDate()).slice(-2);
+        isToday = (ci === todayStr);
+      }
+      var days = ['日','月','火','水','木','金','土'];
+      function fmtDate(s) {
+        if (!s) return '';
+        var m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (!m) return s;
+        var d = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+        return parseInt(m[2],10) + '/' + parseInt(m[3],10) + '(' + days[d.getDay()] + ')';
+      }
+      var dateDisp = fmtDate(ci) + ' ～ ' + fmtDate(co);
+      var bbqVal = (nr.bbq || '').trim();
+      var bbqDisp = '';
+      if (bbqVal === '有' || bbqVal === 'あり' || bbqVal === 'yes' || bbqVal === 'Yes' || bbqVal === '○') bbqDisp = 'あり';
+      else if (bbqVal === '無' || bbqVal === 'なし' || bbqVal === 'no' || bbqVal === 'No' || bbqVal === '×' || bbqVal === '') bbqDisp = 'なし';
+      else bbqDisp = bbqVal;
+
+      var html = '';
+      if (isToday) {
+        html += '<div style="text-align:center;margin-bottom:10px;"><span style="display:inline-block;background:#dc3545;color:#fff;font-weight:700;font-size:14px;padding:4px 16px;border-radius:20px;">本日チェックイン</span></div>';
+      }
+      html += '<div class="nres-card">';
+      html += '<div class="nres-row"><span class="nres-label">日付</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div>';
+      html += '<div class="nres-row"><span class="nres-label">人数</span><span class="nres-value">' + escapeHtml(nr.guestCount || '-') + '</span></div>';
+      if (nr.bedCount) html += '<div class="nres-row"><span class="nres-label">ベッド</span><span class="nres-value">' + escapeHtml(nr.bedCount) + '</span></div>';
+      html += '<div class="nres-row"><span class="nres-label">BBQ</span><span class="nres-value">' + escapeHtml(bbqDisp) + '</span></div>';
+      html += '<div class="nres-row"><span class="nres-label">国籍</span><span class="nres-value">' + escapeHtml(nr.nationality || '日本') + '</span></div>';
+      html += '</div>';
+      el.innerHTML = html;
     }
 
     function getSelectedStaffName_() {

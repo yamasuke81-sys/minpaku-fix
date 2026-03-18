@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318i</div>
+<div class="version-badge" id="deployVersion">v0318j</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -629,28 +629,36 @@ function doConfirm() {
 function showConfirmScreen() {
   showScreen('confirmScreen');
 
-  // 読み込み中表示
-  document.getElementById('callButtons').innerHTML =
-    '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">通知送信中... / Sending notification...</p></div>';
+  // [DEBUG-CONFIRM] デバッグ: 画面表示状態を確認
+  var dbgEl = document.getElementById('callButtons');
+  dbgEl.innerHTML =
+    '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">読み込み中... / Loading...</p></div>';
+  console.log('[DEBUG-CONFIRM] showConfirmScreen called, _currentRow=' + _currentRow);
 
-  // 確認ボタン押下時にメール通知を送信
+  // 通知送信とボタン読み込みを並行実行
+  var notifyDone = false, contactDone = false;
+  var notifyHtml = '';
+  var contactHtml = '';
+
+  // 通知送信
   callGAS('notifyMeetCall', [_currentRow]).then(function(r) {
-    var notifyHtml = '';
-    if (r && r.success) {
-      notifyHtml = '';
-    } else {
+    console.log('[DEBUG-CONFIRM] notifyMeetCall success:', JSON.stringify(r));
+    if (!(r && r.success)) {
       notifyHtml = '<div class="alert alert-warning mb-3" style="font-size:.8rem;"><i class="bi bi-exclamation-triangle-fill"></i> 通知送信: ' + (r && r.error || '不明なエラー') + '</div>';
     }
-    loadCallButtons_(notifyHtml);
+    notifyDone = true;
+    if (contactDone) renderCallButtons_(notifyHtml, contactHtml);
   }).catch(function(e) {
-    var notifyHtml = '<div class="alert alert-danger mb-3" style="font-size:.8rem;"><i class="bi bi-x-circle-fill"></i> 通知送信エラー: ' + (e.message || e) + '</div>';
-    loadCallButtons_(notifyHtml);
+    console.log('[DEBUG-CONFIRM] notifyMeetCall error:', e);
+    notifyHtml = '<div class="alert alert-danger mb-3" style="font-size:.8rem;"><i class="bi bi-x-circle-fill"></i> 通知送信エラー: ' + (e.message || e) + '</div>';
+    notifyDone = true;
+    if (contactDone) renderCallButtons_(notifyHtml, contactHtml);
   });
-}
 
-function loadCallButtons_(notifyHtml) {
+  // 連絡先ボタン読み込み
   callGAS('getContactSettings').then(function(settings) {
-    var html = notifyHtml || '';
+    console.log('[DEBUG-CONFIRM] getContactSettings success:', JSON.stringify(settings));
+    var html = '';
     var type = settings.contactType || 'line';
     var showLine = (type === 'line' || type === 'line_meet' || type === 'line_phone' || type === 'all');
     var showMeet = (type === 'meet' || type === 'line_meet' || type === 'all');
@@ -673,14 +681,22 @@ function loadCallButtons_(notifyHtml) {
     }
 
     if (!showLine && !showMeet && !showPhone) {
-      html += '<p class="text-muted" style="font-size:.85rem;">連絡先が設定されていません</p>';
+      html += '<p class="text-muted" style="font-size:.85rem;">連絡先が設定されていません<br>No contact method configured</p>';
     }
-
-    document.getElementById('callButtons').innerHTML = html;
-  }).catch(function() {
-    document.getElementById('callButtons').innerHTML = (notifyHtml || '') +
-      '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました</p>';
+    contactHtml = html;
+    contactDone = true;
+    if (notifyDone) renderCallButtons_(notifyHtml, contactHtml);
+  }).catch(function(e) {
+    console.log('[DEBUG-CONFIRM] getContactSettings error:', e);
+    contactHtml = '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました<br>Error: ' + (e.message || e) + '</p>';
+    contactDone = true;
+    if (notifyDone) renderCallButtons_(notifyHtml, contactHtml);
   });
+}
+
+function renderCallButtons_(notifyHtml, contactHtml) {
+  console.log('[DEBUG-CONFIRM] renderCallButtons_ called');
+  document.getElementById('callButtons').innerHTML = notifyHtml + contactHtml;
 }
 
 function resetToSearch() {

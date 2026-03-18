@@ -116,7 +116,7 @@
     }
     .tab-nav-btn {
       flex: 1;
-      padding: 10px 6px;
+      padding: 12px 4px;
       border: 1px solid #bdc3c7;
       background: white;
       font-size: 18px;
@@ -125,6 +125,7 @@
       cursor: pointer;
       border-radius: 8px;
       transition: all 0.2s;
+      min-height: 44px;
     }
     .tab-nav-btn.active {
       color: white;
@@ -1538,7 +1539,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318c</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318d</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -2675,7 +2676,7 @@
 
     function renderBookingInfo() {
       if (!bookingData) return;
-      var html = '<h3>📅 次回予約詳細</h3>';
+      var html = '<h3>📅 本日の予約詳細</h3>';
       html += '<div class="booking-row"><span class="booking-label">チェックイン</span><span class="booking-value">' + escapeHtml(bookingData.checkIn) + '</span></div>';
       html += '<div class="booking-row"><span class="booking-label">チェックアウト</span><span class="booking-value">' + escapeHtml(bookingData.checkOut) + '</span></div>';
       if (bookingData.guestName) html += '<div class="booking-row"><span class="booking-label">宿泊者名</span><span class="booking-value">' + escapeHtml(bookingData.guestName) + '</span></div>';
@@ -6271,7 +6272,7 @@
       callGAS('getNextReservation', [checkoutDate]).then(function(res) {
         _nextResLoaded = true;
         if (!res.success || !res.next) {
-          el.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:30px;">次回予約なし</div>';
+          el.innerHTML = '<div style="text-align:center;color:#6c757d;font-size:14px;padding:30px;">チェックアウト後の予約はありません</div>';
           return;
         }
         renderNextReservation(el, res.next);

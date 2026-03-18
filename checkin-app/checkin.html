@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318g</div>
+<div class="version-badge" id="deployVersion">v0318h</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -191,9 +191,7 @@
       <button class="btn-back" onclick="showScreen('searchScreen')"><i class="bi bi-arrow-left"></i></button>
       <h2 style="font-size:1.1rem;margin:0;">設定</h2>
     </div>
-    <button class="btn btn-sm btn-outline-light" onclick="saveSettings()" style="border-radius:.5rem;">
-      <i class="bi bi-check-lg"></i> 保存
-    </button>
+    <!-- 保存ボタンはページ下部に配置 -->
   </div>
   <div class="settings-body">
     <!-- 基本設定 -->
@@ -278,7 +276,12 @@
       <div id="checkinLogList" class="mt-2" style="font-size:.8rem;max-height:200px;overflow-y:auto;"></div>
     </div>
 
-    <div class="text-center mt-3 mb-3">
+    <div class="text-center mt-3 mb-2">
+      <button class="btn btn-primary" onclick="saveSettings()" style="border-radius:.6rem;padding:.6rem 2rem;font-size:1rem;font-weight:600;width:100%;max-width:300px;">
+        <i class="bi bi-check-lg"></i> 保存
+      </button>
+    </div>
+    <div class="text-center mb-3">
       <button class="btn btn-danger btn-sm" onclick="if(confirm('設定をリセットしますか？'))resetSettings()" style="border-radius:.5rem;">
         <i class="bi bi-trash"></i> 設定をリセット
       </button>
@@ -656,23 +659,18 @@ function loadCallButtons_(notifyHtml) {
 
     if (showLine && settings.lineOaId) {
       var lineId = settings.lineOaId.replace(/^@/, '');
-      // LINEコール（ビデオ通話）を直接起動
       var lineCallUrl = 'https://line.me/R/call/@' + lineId + '/video';
       html += '<a href="' + lineCallUrl + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;">' +
-        '<i class="bi bi-camera-video-fill"></i> LINEでビデオ通話 / LINE Video Call</a>';
-      // トーク画面も開けるようにサブボタンを追加
-      var lineChatUrl = 'https://line.me/R/oaMessage/@' + lineId + '/';
-      html += '<a href="' + lineChatUrl + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;opacity:.8;font-size:.85rem;">' +
-        '<i class="bi bi-chat-dots-fill"></i> LINEでチャット / LINE Chat</a>';
+        '<i class="bi bi-camera-video-fill"></i> スタッフに連絡 / Contact Staff</a>';
     }
     if (showMeet && settings.meetUrl) {
       html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +
-        '<i class="bi bi-camera-video-fill"></i> Google Meetで連絡</a>';
+        '<i class="bi bi-camera-video-fill"></i> スタッフに連絡 / Contact Staff</a>';
     }
     if (showPhone && settings.phoneNumber) {
       var tel = settings.phoneNumber.replace(/[^\d+]/g, '');
       html += '<a href="tel:' + tel + '" class="btn btn-call btn-call-phone">' +
-        '<i class="bi bi-telephone-fill"></i> 電話をかける / Call</a>';
+        '<i class="bi bi-telephone-fill"></i> スタッフに連絡 / Contact Staff</a>';
     }
 
     if (!showLine && !showMeet && !showPhone) {

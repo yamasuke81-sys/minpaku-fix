@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0318n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0318o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -4464,7 +4464,7 @@
         var otherArea = document.getElementById('staffEditOtherArea');
         var otherInput = document.getElementById('staffEditOtherName');
         if (sel) {
-          sel.innerHTML = '<option value="">追加するスタッフを選択</option>';
+          sel.innerHTML = '<option value="">スタッフを選択</option>';
           // 立候補者の回答状態マップを作成
           var volMap = {};
           var volList = volunteers || [];
@@ -4472,17 +4472,30 @@
             var name = (v.staffName || '').trim();
             if (name) volMap[name] = (v.response || '').trim();
           });
-          // 全スタッフを取得してドロップダウンに表示
+          // 全スタッフを取得し、未確定時と同じ表示形式で表示
           google.script.run
             .withSuccessHandler(function(jsonStr) {
               try {
                 var s = JSON.parse(jsonStr);
                 if (s.success && s.list && s.list.length) {
-                  sel.innerHTML = '<option value="">追加するスタッフを選択</option>';
-                  s.list.forEach(function(st) {
+                  // 全スタッフに回答状態を付与
+                  var allStaff = s.list.map(function(st) {
                     var name = st.name || '';
-                    var resp = volMap[name] || '';
-                    var respLabel = resp === '◎' ? ' [対応可]' : (resp === '△' ? ' [条件付]' : (resp === '×' ? ' [対応不可]' : ''));
+                    return { staffName: name, response: volMap[name] || '' };
+                  });
+                  // 回答状態でソート: ◎→△→未回答→× の順（未確定時と同じ）
+                  var respOrder = { '◎': 0, '△': 1, '未回答': 2, '×': 3 };
+                  allStaff.sort(function(a, b) {
+                    var ra = (a.response || '未回答') || '未回答';
+                    var rb = (b.response || '未回答') || '未回答';
+                    return (respOrder[ra] !== undefined ? respOrder[ra] : 2) - (respOrder[rb] !== undefined ? respOrder[rb] : 2);
+                  });
+                  sel.innerHTML = '<option value="">スタッフを選択</option>';
+                  allStaff.forEach(function(v) {
+                    var name = (v.staffName || '').trim();
+                    var resp = (v.response || '').trim() || '未回答';
+                    if (!name) return;
+                    var respLabel = resp === '◎' ? ' ● 対応可' : (resp === '△' ? ' ▲ 条件付' : (resp === '×' ? ' ✖ 対応不可' : ' — 未回答'));
                     sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
                   });
                   sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
@@ -4490,14 +4503,17 @@
               } catch (e) {}
             })
             .withFailureHandler(function() {
-              // フォールバック: 立候補者のみ表示
-              volList.forEach(function(v) {
+              // フォールバック: 立候補者のみ表示（未確定時と同じ形式）
+              var respOrder = { '◎': 0, '△': 1, '未回答': 2, '×': 3 };
+              var sorted = volList.slice().sort(function(a, b) {
+                return (respOrder[a.response] !== undefined ? respOrder[a.response] : 2) - (respOrder[b.response] !== undefined ? respOrder[b.response] : 2);
+              });
+              sorted.forEach(function(v) {
                 var name = (v.staffName || '').trim();
-                var resp = (v.response || '').trim();
-                if (name) {
-                  var respLabel = resp === '◎' ? ' [対応可]' : (resp === '△' ? ' [条件付]' : (resp === '×' ? ' [対応不可]' : ''));
-                  sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
-                }
+                var resp = (v.response || '').trim() || '未回答';
+                if (!name) return;
+                var respLabel = resp === '◎' ? ' ● 対応可' : (resp === '△' ? ' ▲ 条件付' : (resp === '×' ? ' ✖ 対応不可' : ' — 未回答'));
+                sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
               });
               sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
             })

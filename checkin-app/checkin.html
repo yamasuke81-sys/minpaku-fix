@@ -99,8 +99,40 @@
 </head>
 <body>
 
+<!-- ===== デバッグバナー（ホワイトアウト調査） ===== -->
+<div id="debugWhiteout" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ff0;color:#000;font-size:12px;padding:4px 8px;font-family:monospace;">
+  [DEBUG] HTML loaded, v0318o, <span id="dbgTime"></span>
+  <span id="dbgScreenState"></span>
+  <span id="dbgErrors" style="color:red;"></span>
+</div>
+<script>
+(function(){
+  document.getElementById('dbgTime').textContent = new Date().toLocaleTimeString();
+  // 画面の状態を1秒後にチェック
+  setTimeout(function(){
+    var ss = document.getElementById('searchScreen');
+    var dbg = document.getElementById('dbgScreenState');
+    if (ss) {
+      var cs = window.getComputedStyle(ss);
+      dbg.textContent = ' | searchScreen: display=' + cs.display + ' class="' + ss.className + '" h=' + ss.offsetHeight;
+    } else {
+      dbg.textContent = ' | searchScreen NOT FOUND';
+    }
+  }, 1000);
+  // エラーキャッチ
+  window.addEventListener('error', function(e) {
+    var el = document.getElementById('dbgErrors');
+    if (el) el.textContent += ' | ERR: ' + e.message + ' @' + (e.filename||'').split('/').pop() + ':' + e.lineno;
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    var el = document.getElementById('dbgErrors');
+    if (el) el.textContent += ' | REJECT: ' + (e.reason ? e.reason.message || e.reason : 'unknown');
+  });
+})();
+</script>
+
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318n</div>
+<div class="version-badge" id="deployVersion">v0318o</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>

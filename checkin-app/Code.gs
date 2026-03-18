@@ -46,6 +46,7 @@ function getCheckinSettings() {
     contactType: props.getProperty('CONTACT_TYPE') || 'meet',
     meetUrl: props.getProperty('MEET_URL') || '',
     phoneNumber: props.getProperty('PHONE_NUMBER') || '',
+    devicePhone: props.getProperty('DEVICE_PHONE') || '',
     lineOaId: props.getProperty('LINE_OA_ID') || '',
     notifyEmail: props.getProperty('NOTIFY_EMAIL') || '',
     settingsPin: props.getProperty('SETTINGS_PIN') || '0000',
@@ -62,6 +63,7 @@ function saveCheckinSettings(settingsJson) {
   if (s.contactType !== undefined) props.setProperty('CONTACT_TYPE', s.contactType);
   if (s.meetUrl !== undefined) props.setProperty('MEET_URL', s.meetUrl);
   if (s.phoneNumber !== undefined) props.setProperty('PHONE_NUMBER', s.phoneNumber);
+  if (s.devicePhone !== undefined) props.setProperty('DEVICE_PHONE', s.devicePhone);
   if (s.lineOaId !== undefined) props.setProperty('LINE_OA_ID', s.lineOaId);
   if (s.notifyEmail !== undefined) props.setProperty('NOTIFY_EMAIL', s.notifyEmail);
   if (s.settingsPin !== undefined) props.setProperty('SETTINGS_PIN', s.settingsPin);
@@ -621,7 +623,11 @@ function notifyMeetCall(rowNumber) {
     var notifyEmails = notifyEmailRaw.split(/[,;\s\n]+/).filter(function(e) { return e && e.indexOf('@') > 0; });
     if (notifyEmails.length === 0) return JSON.stringify({ success: false, error: '有効なメールアドレスがありません' });
 
+    var contactType = props.getProperty('CONTACT_TYPE') || 'meet';
     var meetUrl = props.getProperty('MEET_URL') || '';
+    var lineOaId = props.getProperty('LINE_OA_ID') || '';
+    var devicePhone = props.getProperty('DEVICE_PHONE') || '';
+    var phoneNumber = props.getProperty('PHONE_NUMBER') || '';
 
     // ゲスト情報を取得
     var sheet = getSheet_();
@@ -650,10 +656,32 @@ function notifyMeetCall(rowNumber) {
     var body = '';
     body += '宿泊者がチェックインの確認を完了しました。\n\n';
 
-    // Google Meet URL
-    if (meetUrl) {
-      body += '【Google Meet URL】\n' + meetUrl + '\n\n';
+    // 連絡方法に応じたスタッフ向け案内
+    var showLine = (contactType === 'line' || contactType === 'line_meet' || contactType === 'line_phone' || contactType === 'all');
+    var showMeet = (contactType === 'meet' || contactType === 'line_meet' || contactType === 'all');
+    var showPhone = (contactType === 'phone' || contactType === 'line_phone' || contactType === 'all');
+
+    body += '【宿泊者への連絡方法】\n';
+    if (showLine && lineOaId) {
+      body += '・LINE: 宿泊者にはLINE公式アカウント(' + lineOaId + ')への発信を案内しています。LINE公式アカウントへの着信をお待ちください。\n';
     }
+    if (showMeet && meetUrl) {
+      body += '・Google Meet: 宿泊者には以下のURLで参加するよう案内しています。\n  ' + meetUrl + '\n';
+    }
+    if (showPhone) {
+      body += '・電話: 宿泊者には電話で連絡するよう案内しています。';
+      if (devicePhone) {
+        body += '\n  チェックインapp端末の電話番号: ' + devicePhone + '\n  この番号への着信をお待ちください。\n';
+      } else if (phoneNumber) {
+        body += '\n  連絡先電話番号: ' + phoneNumber + '\n';
+      } else {
+        body += '\n';
+      }
+    }
+    if (!showLine && !showMeet && !showPhone) {
+      body += '（連絡方法が設定されていません）\n';
+    }
+    body += '\n';
 
     var guestCountInfants = map.guestCountInfants >= 0 ? cellVal_(map.guestCountInfants) : '';
     var prevStay = map.prevStay >= 0 ? cellVal_(map.prevStay) : '';

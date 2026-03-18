@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318h</div>
+<div class="version-badge" id="deployVersion">v0318i</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -637,7 +637,7 @@ function showConfirmScreen() {
   callGAS('notifyMeetCall', [_currentRow]).then(function(r) {
     var notifyHtml = '';
     if (r && r.success) {
-      notifyHtml = '<div class="alert alert-success mb-3" style="font-size:.8rem;"><i class="bi bi-check-circle-fill"></i> スタッフに通知を送信しました</div>';
+      notifyHtml = '';
     } else {
       notifyHtml = '<div class="alert alert-warning mb-3" style="font-size:.8rem;"><i class="bi bi-exclamation-triangle-fill"></i> 通知送信: ' + (r && r.error || '不明なエラー') + '</div>';
     }
@@ -651,7 +651,6 @@ function showConfirmScreen() {
 function loadCallButtons_(notifyHtml) {
   callGAS('getContactSettings').then(function(settings) {
     var html = notifyHtml || '';
-    html += '<p style="font-size:.85rem;color:#666;margin-bottom:.8rem;">スタッフへ連絡してください<br>Please contact the staff</p>';
     var type = settings.contactType || 'line';
     var showLine = (type === 'line' || type === 'line_meet' || type === 'line_phone' || type === 'all');
     var showMeet = (type === 'meet' || type === 'line_meet' || type === 'all');

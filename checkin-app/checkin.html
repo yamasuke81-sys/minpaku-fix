@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318c</div>
+<div class="version-badge" id="deployVersion">v0318d</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -164,7 +164,6 @@
   <div class="confirm-card">
     <i class="bi bi-check-circle-fill"></i>
     <h2>確認完了<br><small style="font-size:.8rem;color:#666;">Information Confirmed</small></h2>
-    <p style="font-size:.9rem;color:#666;">次にスタッフへ連絡してください<br>Please contact the staff</p>
     <div id="callButtons"></div>
     <button class="btn btn-outline-secondary mt-3" onclick="resetToSearch()" style="border-radius:.8rem;">
       <i class="bi bi-arrow-counterclockwise"></i> 最初に戻る / Back to Start
@@ -216,10 +215,18 @@
       <div class="mb-2">
         <label class="form-label">連絡方法</label>
         <select class="form-select" id="settContactType">
+          <option value="line">LINEビデオ通話</option>
           <option value="meet">Google Meet</option>
           <option value="phone">電話番号</option>
-          <option value="both">両方</option>
+          <option value="line_meet">LINE + Meet</option>
+          <option value="line_phone">LINE + 電話</option>
+          <option value="all">すべて</option>
         </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">LINE公式アカウントID</label>
+        <input type="text" class="form-control" id="settLineOaId" placeholder="@xxx">
+        <small class="text-muted">LINE公式アカウントのID（@から始まる）。LINEコールでビデオ通話を開始します</small>
       </div>
       <div class="mb-2">
         <label class="form-label">Google Meet URL</label>
@@ -230,9 +237,9 @@
         <input type="tel" class="form-control" id="settPhoneNumber" placeholder="090-1234-5678">
       </div>
       <div class="mb-2">
-        <label class="form-label">Meet通話通知先メール</label>
+        <label class="form-label">チェックイン通知先メール</label>
         <textarea class="form-control" id="settNotifyEmail" rows="2" placeholder="owner@example.com, staff@example.com" style="font-size:.85rem;"></textarea>
-        <small class="text-muted">宿泊者がMeetボタンを押した際に通知を送信します。カンマ区切りで複数登録可</small>
+        <small class="text-muted">宿泊者が確認ボタンを押した際に通知を送信します。カンマ区切りで複数登録可</small>
       </div>
     </div>
 
@@ -621,55 +628,56 @@ function showConfirmScreen() {
 
   // 読み込み中表示
   document.getElementById('callButtons').innerHTML =
-    '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">連絡先を読み込み中...</p></div>';
+    '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">通知送信中... / Sending notification...</p></div>';
 
+  // 確認ボタン押下時にメール通知を送信
+  callGAS('notifyMeetCall', [_currentRow]).then(function(r) {
+    var notifyHtml = '';
+    if (r && r.success) {
+      notifyHtml = '<div class="alert alert-success mb-3" style="font-size:.8rem;"><i class="bi bi-check-circle-fill"></i> スタッフに通知を送信しました</div>';
+    } else {
+      notifyHtml = '<div class="alert alert-warning mb-3" style="font-size:.8rem;"><i class="bi bi-exclamation-triangle-fill"></i> 通知送信: ' + (r && r.error || '不明なエラー') + '</div>';
+    }
+    loadCallButtons_(notifyHtml);
+  }).catch(function(e) {
+    var notifyHtml = '<div class="alert alert-danger mb-3" style="font-size:.8rem;"><i class="bi bi-x-circle-fill"></i> 通知送信エラー: ' + (e.message || e) + '</div>';
+    loadCallButtons_(notifyHtml);
+  });
+}
+
+function loadCallButtons_(notifyHtml) {
   callGAS('getContactSettings').then(function(settings) {
-    var html = '';
-    var type = settings.contactType || 'meet';
+    var html = notifyHtml || '';
+    html += '<p style="font-size:.85rem;color:#666;margin-bottom:.8rem;">スタッフへ連絡してください<br>Please contact the staff</p>';
+    var type = settings.contactType || 'line';
+    var showLine = (type === 'line' || type === 'line_meet' || type === 'line_phone' || type === 'all');
+    var showMeet = (type === 'meet' || type === 'line_meet' || type === 'all');
+    var showPhone = (type === 'phone' || type === 'line_phone' || type === 'all');
 
-    if ((type === 'meet' || type === 'both') && settings.meetUrl) {
-      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet" id="btnMeetCall">' +
+    if (showLine && settings.lineOaId) {
+      var lineId = settings.lineOaId.replace(/^@/, '');
+      var lineUrl = 'https://line.me/R/oaMessage/@' + lineId + '/';
+      html += '<a href="' + lineUrl + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;">' +
+        '<i class="bi bi-chat-video-fill"></i> LINEでビデオ通話 / LINE Video Call</a>';
+    }
+    if (showMeet && settings.meetUrl) {
+      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +
         '<i class="bi bi-camera-video-fill"></i> Google Meetで連絡</a>';
     }
-    if ((type === 'phone' || type === 'both') && settings.phoneNumber) {
+    if (showPhone && settings.phoneNumber) {
       var tel = settings.phoneNumber.replace(/[^\d+]/g, '');
       html += '<a href="tel:' + tel + '" class="btn btn-call btn-call-phone">' +
         '<i class="bi bi-telephone-fill"></i> 電話をかける / Call</a>';
     }
 
-    if (!html) {
-      html = '<p class="text-muted" style="font-size:.85rem;">連絡先が設定されていません</p>';
+    if (!showLine && !showMeet && !showPhone) {
+      html += '<p class="text-muted" style="font-size:.85rem;">連絡先が設定されていません</p>';
     }
 
     document.getElementById('callButtons').innerHTML = html;
-
-    // Meetボタンクリック時にオーナーへメール通知を送信
-    var meetBtn = document.getElementById('btnMeetCall');
-    if (meetBtn) {
-      meetBtn.addEventListener('click', function() {
-        // バックグラウンドで通知送信（リンク遷移は通常通り）
-        callGAS('notifyMeetCall', [_currentRow]).then(function(r) {
-          var debugMsg = '[DEBUG-MEET] result=' + JSON.stringify(r);
-          console.log(debugMsg);
-          var d = document.createElement('div');
-          d.className = 'alert ' + (r && r.success ? 'alert-success' : 'alert-danger') + ' mt-2';
-          d.style.fontSize = '.8rem';
-          d.textContent = r && r.success ? '通知送信OK' : '通知送信失敗: ' + (r && r.error || '不明なエラー');
-          document.getElementById('callButtons').appendChild(d);
-          setTimeout(function() { d.remove(); }, 8000);
-        }).catch(function(e) {
-          console.log('[DEBUG-MEET] catch error:', e);
-          var d = document.createElement('div');
-          d.className = 'alert alert-danger mt-2';
-          d.style.fontSize = '.8rem';
-          d.textContent = '通知送信エラー: ' + (e.message || e);
-          document.getElementById('callButtons').appendChild(d);
-          setTimeout(function() { d.remove(); }, 8000);
-        });
-      });
-    }
   }).catch(function() {
-    document.getElementById('callButtons').innerHTML = '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました</p>';
+    document.getElementById('callButtons').innerHTML = (notifyHtml || '') +
+      '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました</p>';
   });
 }
 
@@ -723,7 +731,8 @@ function loadSettings() {
   callGAS('getCheckinSettings').then(function(settings) {
     document.getElementById('settSpreadsheetId').value = settings.spreadsheetId || '';
     document.getElementById('settSheetName').value = settings.sheetName || 'フォームの回答 1';
-    document.getElementById('settContactType').value = settings.contactType || 'meet';
+    document.getElementById('settContactType').value = settings.contactType || 'line';
+    document.getElementById('settLineOaId').value = settings.lineOaId || '';
     document.getElementById('settMeetUrl').value = settings.meetUrl || '';
     document.getElementById('settPhoneNumber').value = settings.phoneNumber || '';
     document.getElementById('settNotifyEmail').value = settings.notifyEmail || '';
@@ -769,6 +778,7 @@ function saveSettings() {
     spreadsheetId: document.getElementById('settSpreadsheetId').value.trim(),
     sheetName: document.getElementById('settSheetName').value.trim(),
     contactType: document.getElementById('settContactType').value,
+    lineOaId: document.getElementById('settLineOaId').value.trim(),
     meetUrl: document.getElementById('settMeetUrl').value.trim(),
     phoneNumber: document.getElementById('settPhoneNumber').value.trim(),
     notifyEmail: document.getElementById('settNotifyEmail').value.trim(),

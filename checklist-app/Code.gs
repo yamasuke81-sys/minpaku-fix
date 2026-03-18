@@ -433,8 +433,10 @@ function getNextReservation(checkoutDate) {
       var ciStr = normDateStr_(ciVal);
       if (!ciStr || ciStr < targetCo) continue;
       // 現在の予約自身を除外（チェックアウト日が一致する行）
-      var rowCoStr = col.co !== undefined ? normDateStr_(data[r][col.co]) : '';
-      if (rowCoStr === targetCo) continue;
+      if (targetCo && col.co !== undefined) {
+        var rowCoStr = normDateStr_(data[r][col.co]);
+        if (rowCoStr && rowCoStr === targetCo) continue;
+      }
       if (ciStr < bestCi) {
         bestCi = ciStr;
         var coStr = col.co !== undefined ? normDateStr_(data[r][col.co]) : '';
@@ -500,7 +502,7 @@ function getNextReservation(checkoutDate) {
 function extractCount_(str) {
   if (!str) return '';
   var m = str.match(/(\d+)/);
-  return m ? m[1] : str;
+  return m ? m[1] : '';
 }
 
 function formatDateValue_(val) {

@@ -416,6 +416,8 @@ function getNextReservation(checkoutDate) {
       var h = String(headers[i] || '').trim();
       var hl = h.toLowerCase();
       if (i < 20) _debugHeaders.push(i + ':' + h);
+      // 長すぎるヘッダー（説明文）はカラム検出をスキップ（誤マッチ防止）
+      if (h.length > 30) continue;
       if ((hl.indexOf('チェックイン') > -1 || hl.indexOf('check-in') > -1) && col.ci === undefined) col.ci = i;
       else if ((hl.indexOf('チェックアウト') > -1 || hl.indexOf('check-out') > -1) && col.co === undefined) col.co = i;
       if ((hl.indexOf('氏名') > -1 || hl.indexOf('名前') > -1 || hl === 'full name') && col.guest === undefined) col.guest = i;

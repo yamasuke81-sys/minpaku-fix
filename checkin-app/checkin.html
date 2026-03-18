@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318f</div>
+<div class="version-badge" id="deployVersion">v0318g</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -867,25 +867,29 @@ document.getElementById('searchName').addEventListener('keydown', function(e) { 
 document.getElementById('searchPhone').addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
 document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPinAndOpen(); });
 
-// スマホ省電力復帰対策: ページがフリーズ→復帰した場合にリロード
+// タブ切替復帰対策: バックグラウンドから復帰した際にGASセッション切れで白画面になる問題を防止
 (function() {
-  var FREEZE_THRESHOLD = 10000; // 10秒以上のフリーズでリロード
-  var lastTick = Date.now();
+  var _hiddenAt = 0;
+  var STALE_THRESHOLD = 30000; // 30秒以上バックグラウンドならリロード対象
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+      _hiddenAt = Date.now();
+    } else if (_hiddenAt && (Date.now() - _hiddenAt > STALE_THRESHOLD)) {
+      // 詳細編集中は自動保存済みなのでリロードしても安全
+      location.reload();
+    }
+  });
+
+  // setInterval でフリーズ検出（ブラウザがタイマーを停止していた場合）
+  var _lastTick = Date.now();
   setInterval(function() {
     var now = Date.now();
-    if (now - lastTick > FREEZE_THRESHOLD) {
-      // 検索画面にいる場合のみリロード（編集中のデータロスを防ぐ）
-      var searchScreen = document.getElementById('searchScreen');
-      if (searchScreen && searchScreen.style.display !== 'none') {
-        location.reload();
-      }
+    if (now - _lastTick > 60000) { // 1分以上タイマーが止まっていた場合
+      location.reload();
     }
-    lastTick = now;
-  }, 2000);
-  // visibilitychange でも復帰検出
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) lastTick = Date.now();
-  });
+    _lastTick = now;
+  }, 5000);
 })();
 </script>
 

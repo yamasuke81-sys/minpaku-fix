@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318a</div>
+<div class="version-badge" id="deployVersion">v0318b</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -648,7 +648,24 @@ function showConfirmScreen() {
     if (meetBtn) {
       meetBtn.addEventListener('click', function() {
         // バックグラウンドで通知送信（リンク遷移は通常通り）
-        callGAS('notifyMeetCall', [_currentRow]).then(function() {}).catch(function() {});
+        callGAS('notifyMeetCall', [_currentRow]).then(function(r) {
+          var debugMsg = '[DEBUG-MEET] result=' + JSON.stringify(r);
+          console.log(debugMsg);
+          var d = document.createElement('div');
+          d.className = 'alert ' + (r && r.success ? 'alert-success' : 'alert-danger') + ' mt-2';
+          d.style.fontSize = '.8rem';
+          d.textContent = r && r.success ? '通知送信OK' : '通知送信失敗: ' + (r && r.error || '不明なエラー');
+          document.getElementById('callButtons').appendChild(d);
+          setTimeout(function() { d.remove(); }, 8000);
+        }).catch(function(e) {
+          console.log('[DEBUG-MEET] catch error:', e);
+          var d = document.createElement('div');
+          d.className = 'alert alert-danger mt-2';
+          d.style.fontSize = '.8rem';
+          d.textContent = '通知送信エラー: ' + (e.message || e);
+          document.getElementById('callButtons').appendChild(d);
+          setTimeout(function() { d.remove(); }, 8000);
+        });
       });
     }
   }).catch(function() {

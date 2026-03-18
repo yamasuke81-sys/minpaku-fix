@@ -9,7 +9,7 @@
   <style>
     :root { --primary: #2c6fbb; --success: #28a745; --danger: #dc3545; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f5f7fa; margin: 0; padding: 0; min-height: 100vh; }
-    .screen { display: none; min-height: 100vh; }
+    .screen { display: none; height: 100vh; overflow: hidden; }
     .screen.active { display: flex; flex-direction: column; }
 
     /* 検索画面 */
@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318m</div>
+<div class="version-badge" id="deployVersion">v0318n</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -331,6 +331,7 @@ function showScreen(id) {
   var el = document.getElementById(id);
   el.classList.add('active');
   _lastScreen = id;
+  window.scrollTo(0, 0);
   // [DEBUG-WHITEOUT] DOM状態を記録
   var cs = window.getComputedStyle(el);
   console.log('[DEBUG-WHITEOUT] showScreen("' + id + '") classList=' + el.className +

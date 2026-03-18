@@ -465,34 +465,25 @@ function getNextReservation(checkoutDate) {
     }
 
     // スタッフ共有用シートから不足情報を補完（メインアプリと同じロジック）
-    var _dbgStaff = { sheetFound: false, colMap: null, matchRow: -1, bedRaw: '', bedCol: -1 };
     if (best) {
       try {
         var staffShare = bookingSs.getSheetByName('スタッフ共有用');
-        _dbgStaff.sheetFound = !!staffShare;
         if (staffShare && staffShare.getLastRow() >= 2) {
           var sHeaders = staffShare.getRange(1, 1, 1, staffShare.getLastColumn()).getValues()[0];
           var sc = { ci: -1, bed: -1, bbq: -1, count: -1, infant: -1 };
-          var _dbgSHeaders = [];
           for (var si = 0; si < sHeaders.length; si++) {
             var sh = String(sHeaders[si] || '').trim();
             var shl = sh.toLowerCase();
-            if (si < 15) _dbgSHeaders.push(si + ':' + sh);
-            if ((sh.indexOf('チェックイン') > -1 || shl.indexOf('check-in') > -1) && sc.ci < 0) sc.ci = si;
+            if ((sh.indexOf('チェックイン') > -1 || shl.indexOf('check-in') > -1 || shl === 'ci/in' || shl === 'ci') && sc.ci < 0) sc.ci = si;
             if (sh.indexOf('ベッド数') > -1 && sc.bed < 0) sc.bed = si;
             if ((sh.indexOf('バーベキュー') > -1 || shl.indexOf('bbq') > -1) && sc.bbq < 0) sc.bbq = si;
             if (sh.indexOf('宿泊人数') > -1 && sh.indexOf('3才以下') === -1 && sh.indexOf('乳幼児') === -1 && sc.count < 0) sc.count = si;
             if ((sh.indexOf('3才以下') > -1 || sh.indexOf('3歳以下') > -1 || sh.indexOf('乳幼児') > -1) && sc.infant < 0) sc.infant = si;
           }
-          _dbgStaff.colMap = sc;
-          _dbgStaff.headers = _dbgSHeaders;
-          _dbgStaff.bedCol = sc.bed;
           if (sc.ci >= 0) {
             var sData = staffShare.getRange(2, 1, staffShare.getLastRow() - 1, staffShare.getLastColumn()).getValues();
             for (var sj = 0; sj < sData.length; sj++) {
               if (normDateStr_(sData[sj][sc.ci]) === best.checkIn) {
-                _dbgStaff.matchRow = sj;
-                _dbgStaff.bedRaw = sc.bed >= 0 ? String(sData[sj][sc.bed] || '') : 'no bed col';
                 if (!best.bedCount && sc.bed >= 0) best.bedCount = String(sData[sj][sc.bed] || '').trim();
                 if ((!best.bbq || best.bbq === '') && sc.bbq >= 0) best.bbq = String(sData[sj][sc.bbq] || '').trim();
                 if (best.guestCount === '-' && sc.count >= 0) {
@@ -505,10 +496,10 @@ function getNextReservation(checkoutDate) {
             }
           }
         }
-      } catch (e) { _dbgStaff.error = e.toString(); }
+      } catch (e) { /* スタッフ共有用シートの補完失敗は無視 */ }
     }
 
-    return JSON.stringify({ success: true, next: best, _dbgStaff: _dbgStaff, _dbgFormCol: col });
+    return JSON.stringify({ success: true, next: best });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

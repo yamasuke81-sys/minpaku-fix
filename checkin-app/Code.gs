@@ -652,12 +652,23 @@ function notifyMeetCall(rowNumber) {
       body += '【Google Meet URL】\n' + meetUrl + '\n\n';
     }
 
+    var guestCountInfants = map.guestCountInfants >= 0 ? cellVal_(map.guestCountInfants) : '';
+    var prevStay = map.prevStay >= 0 ? cellVal_(map.prevStay) : '';
+    var nextStay = map.nextStay >= 0 ? cellVal_(map.nextStay) : '';
+    var tel2 = map.telCols.length > 1 ? cellVal_(map.telCols[1]) : '';
+    var email1 = (map.emailCols && map.emailCols.length > 0) ? cellVal_(map.emailCols[0]) : '';
+
     // 予約情報
     body += '【予約情報】\n';
     if (checkIn) body += 'チェックイン: ' + checkIn + '\n';
     if (checkOut) body += 'チェックアウト: ' + checkOut + '\n';
     if (guestCount) body += '人数: ' + guestCount + '名\n';
-    if (tel) body += '電話番号: ' + tel + '\n';
+    if (guestCountInfants) body += '乳幼児: ' + guestCountInfants + '名\n';
+    if (tel) body += '電話番号1: ' + tel + '\n';
+    if (tel2) body += '電話番号2: ' + tel2 + '\n';
+    if (email1) body += 'メール: ' + email1 + '\n';
+    if (prevStay) body += '前の滞在地: ' + prevStay + '\n';
+    if (nextStay) body += '次の滞在地: ' + nextStay + '\n';
 
     // 全ゲスト情報（国籍・旅券番号・パスポート写真含む）
     for (var g = 0; g < map.guestNameCols.length; g++) {

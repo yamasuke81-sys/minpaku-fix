@@ -613,11 +613,9 @@ function notifyMeetCall(rowNumber) {
   try {
     var props = PropertiesService.getScriptProperties();
     var notifyEmailRaw = props.getProperty('NOTIFY_EMAIL') || '';
-    Logger.log('[DEBUG-MEET] notifyMeetCall called. rowNumber=' + rowNumber + ', NOTIFY_EMAIL raw="' + notifyEmailRaw + '"');
     if (!notifyEmailRaw) return JSON.stringify({ success: false, error: '通知先メールアドレスが未設定です' });
     // カンマ・改行・セミコロン区切りで複数メール対応
     var notifyEmails = notifyEmailRaw.split(/[,;\s\n]+/).filter(function(e) { return e && e.indexOf('@') > 0; });
-    Logger.log('[DEBUG-MEET] parsed notifyEmails=' + JSON.stringify(notifyEmails));
     if (notifyEmails.length === 0) return JSON.stringify({ success: false, error: '有効なメールアドレスがありません' });
 
     var meetUrl = props.getProperty('MEET_URL') || '';
@@ -716,16 +714,12 @@ function notifyMeetCall(rowNumber) {
     body += '\n---\nこのメールはチェックインアプリから自動送信されました。';
 
     var subject = '【チェックイン】' + guestName + ' さんがGoogle Meetで連絡しています';
-    Logger.log('[DEBUG-MEET] subject="' + subject + '", sending to ' + notifyEmails.length + ' recipients');
     for (var ei = 0; ei < notifyEmails.length; ei++) {
-      Logger.log('[DEBUG-MEET] sending to: ' + notifyEmails[ei]);
       GmailApp.sendEmail(notifyEmails[ei], subject, body);
-      Logger.log('[DEBUG-MEET] sent OK to: ' + notifyEmails[ei]);
     }
 
     return JSON.stringify({ success: true });
   } catch (e) {
-    Logger.log('[DEBUG-MEET] ERROR: ' + e.message + '\n' + e.stack);
     return JSON.stringify({ success: false, error: e.message });
   }
 }

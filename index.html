@@ -4465,16 +4465,43 @@
         var otherInput = document.getElementById('staffEditOtherName');
         if (sel) {
           sel.innerHTML = '<option value="">追加するスタッフを選択</option>';
+          // 立候補者の回答状態マップを作成
+          var volMap = {};
           var volList = volunteers || [];
           volList.forEach(function(v) {
             var name = (v.staffName || '').trim();
-            var resp = (v.response || '').trim();
-            if (name && (resp === '◎' || resp === '△')) {
-              var respLabel = resp === '◎' ? ' [対応可]' : ' [条件付]';
-              sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
-            }
+            if (name) volMap[name] = (v.response || '').trim();
           });
-          sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
+          // 全スタッフを取得してドロップダウンに表示
+          google.script.run
+            .withSuccessHandler(function(jsonStr) {
+              try {
+                var s = JSON.parse(jsonStr);
+                if (s.success && s.list && s.list.length) {
+                  sel.innerHTML = '<option value="">追加するスタッフを選択</option>';
+                  s.list.forEach(function(st) {
+                    var name = st.name || '';
+                    var resp = volMap[name] || '';
+                    var respLabel = resp === '◎' ? ' [対応可]' : (resp === '△' ? ' [条件付]' : (resp === '×' ? ' [対応不可]' : ''));
+                    sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
+                  });
+                  sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
+                }
+              } catch (e) {}
+            })
+            .withFailureHandler(function() {
+              // フォールバック: 立候補者のみ表示
+              volList.forEach(function(v) {
+                var name = (v.staffName || '').trim();
+                var resp = (v.response || '').trim();
+                if (name) {
+                  var respLabel = resp === '◎' ? ' [対応可]' : (resp === '△' ? ' [条件付]' : (resp === '×' ? ' [対応不可]' : ''));
+                  sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + respLabel + '</option>';
+                }
+              });
+              sel.innerHTML += '<option value="__other__">その他（手入力）</option>';
+            })
+            .getStaffNamesForSelection();
         }
         if (otherArea) otherArea.style.setProperty('display', 'none', 'important');
         if (otherInput) otherInput.value = '';

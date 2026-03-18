@@ -407,13 +407,15 @@ function getNextReservation(checkoutDate) {
     var bookingSs = getBookingSpreadsheet_();
     var formSheet = bookingSs.getSheetByName(CL_BOOKING_SHEET);
     if (!formSheet || formSheet.getLastRow() < 2) {
-      return JSON.stringify({ success: true, next: null });
+      return JSON.stringify({ success: true, next: null, _debug: 'sheet empty or not found' });
     }
     var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     var col = {};
+    var _debugHeaders = [];
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
       var hl = h.toLowerCase();
+      if (i < 20) _debugHeaders.push(i + ':' + h);
       if ((hl.indexOf('チェックイン') > -1 || hl.indexOf('check-in') > -1) && col.ci === undefined) col.ci = i;
       else if ((hl.indexOf('チェックアウト') > -1 || hl.indexOf('check-out') > -1) && col.co === undefined) col.co = i;
       if ((hl.indexOf('氏名') > -1 || hl.indexOf('名前') > -1 || hl === 'full name') && col.guest === undefined) col.guest = i;
@@ -423,21 +425,25 @@ function getNextReservation(checkoutDate) {
       if ((hl.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) && col.nat === undefined) col.nat = i;
       if (hl.indexOf('ベッド数') > -1 && col.bed === undefined) col.bed = i;
     }
-    if (col.ci === undefined) return JSON.stringify({ success: true, next: null });
+    Logger.log('[DEBUG-NEXTRES] checkoutDate=' + checkoutDate + ' headers=' + _debugHeaders.join(' | '));
+    Logger.log('[DEBUG-NEXTRES] colMap=' + JSON.stringify(col));
+    if (col.ci === undefined) return JSON.stringify({ success: true, next: null, _debug: 'ci col not found', _headers: _debugHeaders });
 
     var data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     var targetCo = normDateStr_(checkoutDate);
     var best = null;
     var bestCi = '9999-12-31';
+    Logger.log('[DEBUG-NEXTRES] targetCo=' + targetCo + ' rows=' + data.length);
 
+    var _debugSkipped = 0, _debugPast = 0, _debugSelf = 0;
     for (var r = 0; r < data.length; r++) {
       var ciVal = data[r][col.ci];
       var ciStr = normDateStr_(ciVal);
-      if (!ciStr || ciStr < targetCo) continue;
+      if (!ciStr || ciStr < targetCo) { _debugPast++; continue; }
       // 現在の予約自身を除外（チェックアウト日が一致する行）
       if (targetCo && col.co !== undefined) {
         var rowCoStr = normDateStr_(data[r][col.co]);
-        if (rowCoStr && rowCoStr === targetCo) continue;
+        if (rowCoStr && rowCoStr === targetCo) { _debugSelf++; continue; }
       }
       if (ciStr < bestCi) {
         bestCi = ciStr;
@@ -496,7 +502,8 @@ function getNextReservation(checkoutDate) {
       } catch (e) { /* スタッフ共有用シートの補完失敗は無視 */ }
     }
 
-    return JSON.stringify({ success: true, next: best });
+    Logger.log('[DEBUG-NEXTRES] result: past=' + _debugPast + ' self=' + _debugSelf + ' best=' + JSON.stringify(best));
+    return JSON.stringify({ success: true, next: best, _debug: { checkoutDate: checkoutDate, targetCo: targetCo, colMap: col, headers: _debugHeaders, rows: data.length, past: _debugPast, self: _debugSelf } });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

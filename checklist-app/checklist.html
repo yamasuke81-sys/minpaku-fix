@@ -1511,7 +1511,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318g</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318h</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6222,18 +6222,13 @@
       el.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;padding:20px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
       callGAS('getNextReservation', [checkoutDate]).then(function(res) {
         _nextResLoaded = true;
-        // デバッグ情報を表示
-        var dbgHtml = '<div style="background:#fff3cd;color:#856404;font-size:11px;padding:6px 8px;border-radius:4px;margin-bottom:8px;font-family:monospace;word-break:break-all;">'
-          + '[DEBUG] checkoutDate=' + escapeHtml(checkoutDate) + '<br>'
-          + 'response=' + escapeHtml(JSON.stringify(res._debug || {})) + '</div>';
         if (!res.success || !res.next) {
-          el.innerHTML = dbgHtml + '<div style="text-align:center;color:#6c757d;font-size:14px;padding:30px;">チェックアウト後の予約はありません</div>';
+          el.innerHTML = '<div style="text-align:center;color:#6c757d;font-size:14px;padding:30px;">チェックアウト後の予約はありません</div>';
           return;
         }
-        el.innerHTML = dbgHtml;
         renderNextReservation(el, res.next);
       }).catch(function(err) {
-        el.innerHTML = '<div style="text-align:center;color:#dc3545;font-size:13px;padding:20px;">取得できませんでした: ' + escapeHtml(String(err)) + '</div>';
+        el.innerHTML = '<div style="text-align:center;color:#dc3545;font-size:13px;padding:20px;">取得できませんでした</div>';
       });
     }
 

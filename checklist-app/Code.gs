@@ -407,51 +407,46 @@ function getNextReservation(checkoutDate) {
     var bookingSs = getBookingSpreadsheet_();
     var formSheet = bookingSs.getSheetByName(CL_BOOKING_SHEET);
     if (!formSheet || formSheet.getLastRow() < 2) {
-      return JSON.stringify({ success: true, next: null, _debug: 'sheet empty or not found' });
+      return JSON.stringify({ success: true, next: null });
     }
+
+    // メインアプリのbuildColumnMapと同じヘッダーマッチング（完全一致）
     var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
-    var col = {};
-    var _debugHeaders = [];
+    var col = { ci: -1, co: -1, guest: -1, count: -1, infant: -1, bbq: -1, nat: -1, bed: -1 };
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
       var hl = h.toLowerCase();
-      if (i < 20) _debugHeaders.push(i + ':' + h);
-      // 長すぎるヘッダー（説明文）はカラム検出をスキップ（誤マッチ防止）
-      if (h.length > 30) continue;
-      if ((hl.indexOf('チェックイン') > -1 || hl.indexOf('check-in') > -1) && col.ci === undefined) col.ci = i;
-      else if ((hl.indexOf('チェックアウト') > -1 || hl.indexOf('check-out') > -1) && col.co === undefined) col.co = i;
-      if ((hl.indexOf('氏名') > -1 || hl.indexOf('名前') > -1 || hl === 'full name') && col.guest === undefined) col.guest = i;
-      if (hl.indexOf('宿泊人数') > -1 && hl.indexOf('3才以下') === -1 && hl.indexOf('乳幼児') === -1 && col.count === undefined) col.count = i;
-      if ((hl.indexOf('3才以下') > -1 || hl.indexOf('3歳以下') > -1 || hl.indexOf('乳幼児') > -1) && col.infant === undefined) col.infant = i;
-      if ((hl.indexOf('バーベキュー') > -1 || hl.indexOf('bbq') > -1) && col.bbq === undefined) col.bbq = i;
-      if ((hl.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) && col.nat === undefined) col.nat = i;
-      if (hl.indexOf('ベッド数') > -1 && col.bed === undefined) col.bed = i;
+      // CI/COは完全一致（説明文の誤マッチ防止）
+      if (h === 'チェックイン / Check-in' && col.ci < 0) col.ci = i;
+      if (h === 'チェックアウト / Check-out' && col.co < 0) col.co = i;
+      if ((h.indexOf('氏名') > -1 || h.indexOf('名前') > -1 || hl === 'full name') && col.guest < 0) col.guest = i;
+      if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下の乳幼児') === -1 && col.count < 0) col.count = i;
+      if (h.indexOf('3才以下の乳幼児') > -1 && col.infant < 0) col.infant = i;
+      if ((h.indexOf('バーベキュー') > -1 || hl.indexOf('bbq') > -1) && col.bbq < 0) col.bbq = i;
+      if ((h.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) && col.nat < 0) col.nat = i;
+      if (h.indexOf('ベッド数') > -1 && col.bed < 0) col.bed = i;
     }
-    Logger.log('[DEBUG-NEXTRES] checkoutDate=' + checkoutDate + ' headers=' + _debugHeaders.join(' | '));
-    Logger.log('[DEBUG-NEXTRES] colMap=' + JSON.stringify(col));
-    if (col.ci === undefined) return JSON.stringify({ success: true, next: null, _debug: 'ci col not found', _headers: _debugHeaders });
+    if (col.ci < 0) return JSON.stringify({ success: true, next: null });
 
     var data = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
     var targetCo = normDateStr_(checkoutDate);
     var best = null;
     var bestCi = '9999-12-31';
-    Logger.log('[DEBUG-NEXTRES] targetCo=' + targetCo + ' rows=' + data.length);
 
-    var _debugSkipped = 0, _debugPast = 0, _debugSelf = 0;
     for (var r = 0; r < data.length; r++) {
       var ciVal = data[r][col.ci];
       var ciStr = normDateStr_(ciVal);
-      if (!ciStr || ciStr < targetCo) { _debugPast++; continue; }
+      if (!ciStr || ciStr < targetCo) continue;
       // 現在の予約自身を除外（チェックアウト日が一致する行）
-      if (targetCo && col.co !== undefined) {
+      if (targetCo && col.co >= 0) {
         var rowCoStr = normDateStr_(data[r][col.co]);
-        if (rowCoStr && rowCoStr === targetCo) { _debugSelf++; continue; }
+        if (rowCoStr && rowCoStr === targetCo) continue;
       }
       if (ciStr < bestCi) {
         bestCi = ciStr;
-        var coStr = col.co !== undefined ? normDateStr_(data[r][col.co]) : '';
-        var adult = col.count !== undefined ? extractCount_(String(data[r][col.count] || '')) : '';
-        var infant = col.infant !== undefined ? extractCount_(String(data[r][col.infant] || '')) : '';
+        var coStr = col.co >= 0 ? normDateStr_(data[r][col.co]) : '';
+        var adult = col.count >= 0 ? extractCount_(String(data[r][col.count] || '')) : '';
+        var infant = col.infant >= 0 ? extractCount_(String(data[r][col.infant] || '')) : '';
         var guestFmt = '';
         if (adult || infant) {
           guestFmt = (adult ? '大人' + adult + '名' : '') + (infant ? (adult ? '、' : '') + '3歳以下' + infant + '名' : '');
@@ -460,40 +455,40 @@ function getNextReservation(checkoutDate) {
           checkIn: ciStr,
           checkOut: coStr,
           dateRange: ciStr + ' ～ ' + coStr,
-          guestName: col.guest !== undefined ? String(data[r][col.guest] || '') : '',
+          guestName: col.guest >= 0 ? String(data[r][col.guest] || '') : '',
           guestCount: guestFmt || '-',
-          bbq: col.bbq !== undefined ? String(data[r][col.bbq] || '').trim() : '',
-          nationality: (col.nat !== undefined ? String(data[r][col.nat] || '').trim() : '') || '日本',
-          bedCount: col.bed !== undefined ? String(data[r][col.bed] || '').trim() : ''
+          bbq: col.bbq >= 0 ? String(data[r][col.bbq] || '').trim() : '',
+          nationality: (col.nat >= 0 ? String(data[r][col.nat] || '').trim() : '') || '日本',
+          bedCount: col.bed >= 0 ? String(data[r][col.bed] || '').trim() : ''
         };
       }
     }
 
-    // スタッフ共有用シートからベッド情報を補完
-    if (best && !best.bedCount) {
+    // スタッフ共有用シートから不足情報を補完（メインアプリと同じロジック）
+    if (best) {
       try {
         var staffShare = bookingSs.getSheetByName('スタッフ共有用');
         if (staffShare && staffShare.getLastRow() >= 2) {
           var sHeaders = staffShare.getRange(1, 1, 1, staffShare.getLastColumn()).getValues()[0];
-          var sCi = -1, sBed = -1, sBbq = -1, sCount = -1, sInfant = -1;
+          var sc = { ci: -1, bed: -1, bbq: -1, count: -1, infant: -1 };
           for (var si = 0; si < sHeaders.length; si++) {
             var sh = String(sHeaders[si] || '').trim();
             var shl = sh.toLowerCase();
-            if ((shl.indexOf('チェックイン') > -1 || shl.indexOf('check-in') > -1) && sCi < 0) sCi = si;
-            if (shl.indexOf('ベッド数') > -1 && sBed < 0) sBed = si;
-            if ((shl.indexOf('バーベキュー') > -1 || shl.indexOf('bbq') > -1) && sBbq < 0) sBbq = si;
-            if (shl.indexOf('宿泊人数') > -1 && shl.indexOf('3才以下') === -1 && shl.indexOf('乳幼児') === -1 && sCount < 0) sCount = si;
-            if ((shl.indexOf('3才以下') > -1 || shl.indexOf('3歳以下') > -1 || shl.indexOf('乳幼児') > -1) && sInfant < 0) sInfant = si;
+            if ((sh.indexOf('チェックイン') > -1 || shl.indexOf('check-in') > -1) && sc.ci < 0) sc.ci = si;
+            if (sh.indexOf('ベッド数') > -1 && sc.bed < 0) sc.bed = si;
+            if ((sh.indexOf('バーベキュー') > -1 || shl.indexOf('bbq') > -1) && sc.bbq < 0) sc.bbq = si;
+            if (sh.indexOf('宿泊人数') > -1 && sh.indexOf('3才以下') === -1 && sh.indexOf('乳幼児') === -1 && sc.count < 0) sc.count = si;
+            if ((sh.indexOf('3才以下') > -1 || sh.indexOf('3歳以下') > -1 || sh.indexOf('乳幼児') > -1) && sc.infant < 0) sc.infant = si;
           }
-          if (sCi >= 0) {
+          if (sc.ci >= 0) {
             var sData = staffShare.getRange(2, 1, staffShare.getLastRow() - 1, staffShare.getLastColumn()).getValues();
             for (var sj = 0; sj < sData.length; sj++) {
-              if (normDateStr_(sData[sj][sCi]) === best.checkIn) {
-                if (!best.bedCount && sBed >= 0) best.bedCount = String(sData[sj][sBed] || '').trim();
-                if ((!best.bbq || best.bbq === '') && sBbq >= 0) best.bbq = String(sData[sj][sBbq] || '').trim();
-                if (best.guestCount === '-' && sCount >= 0) {
-                  var sa = extractCount_(String(sData[sj][sCount] || ''));
-                  var si2 = sInfant >= 0 ? extractCount_(String(sData[sj][sInfant] || '')) : '';
+              if (normDateStr_(sData[sj][sc.ci]) === best.checkIn) {
+                if (!best.bedCount && sc.bed >= 0) best.bedCount = String(sData[sj][sc.bed] || '').trim();
+                if ((!best.bbq || best.bbq === '') && sc.bbq >= 0) best.bbq = String(sData[sj][sc.bbq] || '').trim();
+                if (best.guestCount === '-' && sc.count >= 0) {
+                  var sa = extractCount_(String(sData[sj][sc.count] || ''));
+                  var si2 = sc.infant >= 0 ? extractCount_(String(sData[sj][sc.infant] || '')) : '';
                   if (sa || si2) best.guestCount = (sa ? '大人' + sa + '名' : '') + (si2 ? (sa ? '、' : '') + '3歳以下' + si2 + '名' : '');
                 }
                 break;
@@ -504,8 +499,7 @@ function getNextReservation(checkoutDate) {
       } catch (e) { /* スタッフ共有用シートの補完失敗は無視 */ }
     }
 
-    Logger.log('[DEBUG-NEXTRES] result: past=' + _debugPast + ' self=' + _debugSelf + ' best=' + JSON.stringify(best));
-    return JSON.stringify({ success: true, next: best, _debug: { checkoutDate: checkoutDate, targetCo: targetCo, colMap: col, headers: _debugHeaders, rows: data.length, past: _debugPast, self: _debugSelf } });
+    return JSON.stringify({ success: true, next: best });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

@@ -6231,14 +6231,13 @@
           el.innerHTML = dbg + '<div style="text-align:center;color:#6c757d;font-size:14px;padding:30px;">チェックアウト後の予約はありません</div>';
           return;
         }
-        el.innerHTML = dbg;
-        renderNextReservation(el, res.next);
+        renderNextReservation(el, res.next, dbg);
       }).catch(function(err) {
         el.innerHTML = '<div style="text-align:center;color:#dc3545;font-size:13px;padding:20px;">取得できませんでした</div>';
       });
     }
 
-    function renderNextReservation(el, nr) {
+    function renderNextReservation(el, nr, dbgHtml) {
       var ci = nr.checkIn || '';
       var co = nr.checkOut || '';
       // 本日チェックインかチェック
@@ -6274,7 +6273,7 @@
       html += '<div class="nres-row"><span class="nres-label">BBQ</span><span class="nres-value">' + escapeHtml(bbqDisp) + '</span></div>';
       html += '<div class="nres-row"><span class="nres-label">国籍</span><span class="nres-value">' + escapeHtml(nr.nationality || '日本') + '</span></div>';
       html += '</div>';
-      el.innerHTML = html;
+      el.innerHTML = (dbgHtml || '') + html;
     }
 
     function getSelectedStaffName_() {

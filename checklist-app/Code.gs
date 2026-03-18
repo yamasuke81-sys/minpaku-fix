@@ -349,14 +349,15 @@ function getNextBookingDetails(checkoutDate) {
     var colMap = {};
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
-      if (h === 'チェックイン') colMap.checkIn = i;
-      else if (h === 'チェックアウト') colMap.checkOut = i;
-      else if (h === '宿泊者名') colMap.guestName = i;
-      else if (h === '人数') colMap.guestCount = i;
-      else if (h === '予約サイト') colMap.bookingSite = i;
-      else if (h === 'BBQ利用') colMap.bbq = i;
-      else if (h === 'リネン') colMap.linen = i;
-      else if (h === 'ベッド') colMap.bed = i;
+      var hl = h.toLowerCase();
+      if ((hl.indexOf('チェックイン') > -1 || hl.indexOf('check-in') > -1) && colMap.checkIn === undefined) colMap.checkIn = i;
+      if ((hl.indexOf('チェックアウト') > -1 || hl.indexOf('check-out') > -1) && colMap.checkOut === undefined) colMap.checkOut = i;
+      if ((hl.indexOf('氏名') > -1 || hl.indexOf('名前') > -1 || hl === 'full name') && colMap.guestName === undefined) colMap.guestName = i;
+      if (hl.indexOf('宿泊人数') > -1 && hl.indexOf('3才以下') === -1 && hl.indexOf('乳幼児') === -1 && colMap.guestCount === undefined) colMap.guestCount = i;
+      if ((hl.indexOf('予約サイト') > -1 || hl.indexOf('どこでこのホテルを予約しましたか') > -1) && colMap.bookingSite === undefined) colMap.bookingSite = i;
+      if ((hl.indexOf('バーベキュー') > -1 || hl.indexOf('bbq') > -1) && colMap.bbq === undefined) colMap.bbq = i;
+      if (hl.indexOf('リネン') > -1 && colMap.linen === undefined) colMap.linen = i;
+      if (hl.indexOf('ベッド数') > -1 && colMap.bed === undefined) colMap.bed = i;
     }
 
     if (colMap.checkOut === undefined) {
@@ -412,14 +413,15 @@ function getNextReservation(checkoutDate) {
     var col = {};
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
-      if (h === 'チェックイン') col.ci = i;
-      else if (h === 'チェックアウト') col.co = i;
-      else if (h === '宿泊者名') col.guest = i;
-      else if (h === '人数') col.count = i;
-      else if (h === '3歳以下') col.infant = i;
-      else if (h === 'BBQ利用') col.bbq = i;
-      else if (h === '国籍') col.nat = i;
-      else if (h === 'ベッド') col.bed = i;
+      var hl = h.toLowerCase();
+      if ((hl.indexOf('チェックイン') > -1 || hl.indexOf('check-in') > -1) && col.ci === undefined) col.ci = i;
+      else if ((hl.indexOf('チェックアウト') > -1 || hl.indexOf('check-out') > -1) && col.co === undefined) col.co = i;
+      if ((hl.indexOf('氏名') > -1 || hl.indexOf('名前') > -1 || hl === 'full name') && col.guest === undefined) col.guest = i;
+      if (hl.indexOf('宿泊人数') > -1 && hl.indexOf('3才以下') === -1 && hl.indexOf('乳幼児') === -1 && col.count === undefined) col.count = i;
+      if ((hl.indexOf('3才以下') > -1 || hl.indexOf('3歳以下') > -1 || hl.indexOf('乳幼児') > -1) && col.infant === undefined) col.infant = i;
+      if ((hl.indexOf('バーベキュー') > -1 || hl.indexOf('bbq') > -1) && col.bbq === undefined) col.bbq = i;
+      if ((hl.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) && col.nat === undefined) col.nat = i;
+      if (hl.indexOf('ベッド数') > -1 && col.bed === undefined) col.bed = i;
     }
     if (col.ci === undefined) return JSON.stringify({ success: true, next: null });
 
@@ -468,11 +470,12 @@ function getNextReservation(checkoutDate) {
           var sCi = -1, sBed = -1, sBbq = -1, sCount = -1, sInfant = -1;
           for (var si = 0; si < sHeaders.length; si++) {
             var sh = String(sHeaders[si] || '').trim();
-            if (sh === 'チェックイン') sCi = si;
-            else if (sh === 'ベッド数' || sh === 'ベッド') sBed = si;
-            else if (sh === 'BBQ利用') sBbq = si;
-            else if (sh === '人数') sCount = si;
-            else if (sh === '3歳以下') sInfant = si;
+            var shl = sh.toLowerCase();
+            if ((shl.indexOf('チェックイン') > -1 || shl.indexOf('check-in') > -1) && sCi < 0) sCi = si;
+            if (shl.indexOf('ベッド数') > -1 && sBed < 0) sBed = si;
+            if ((shl.indexOf('バーベキュー') > -1 || shl.indexOf('bbq') > -1) && sBbq < 0) sBbq = si;
+            if (shl.indexOf('宿泊人数') > -1 && shl.indexOf('3才以下') === -1 && shl.indexOf('乳幼児') === -1 && sCount < 0) sCount = si;
+            if ((shl.indexOf('3才以下') > -1 || shl.indexOf('3歳以下') > -1 || shl.indexOf('乳幼児') > -1) && sInfant < 0) sInfant = si;
           }
           if (sCi >= 0) {
             var sData = staffShare.getRange(2, 1, staffShare.getLastRow() - 1, staffShare.getLastColumn()).getValues();

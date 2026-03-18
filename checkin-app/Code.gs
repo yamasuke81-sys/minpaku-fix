@@ -648,7 +648,7 @@ function notifyMeetCall(rowNumber) {
 
     // メール本文を構築
     var body = '';
-    body += '宿泊者がGoogle Meetで連絡を開始しました。\n\n';
+    body += '宿泊者がチェックインの確認を完了しました。\n\n';
 
     // Google Meet URL
     if (meetUrl) {
@@ -716,9 +716,9 @@ function notifyMeetCall(rowNumber) {
 
     body += '\n---\nこのメールはチェックインアプリから自動送信されました。';
 
-    var subject = '【チェックイン】' + guestName + ' さんがGoogle Meetで連絡しています';
+    var subject = '【チェックイン】' + guestName + ' さんが確認を完了しました';
     for (var ei = 0; ei < notifyEmails.length; ei++) {
-      GmailApp.sendEmail(notifyEmails[ei], subject, body);
+      MailApp.sendEmail(notifyEmails[ei], subject, body);
     }
 
     return JSON.stringify({ success: true });

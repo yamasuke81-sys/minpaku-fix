@@ -100,7 +100,7 @@
 <body>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318k</div>
+<div class="version-badge" id="deployVersion">v0318l</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -224,7 +224,12 @@
       <div class="mb-2">
         <label class="form-label">LINE公式アカウントID</label>
         <input type="text" class="form-control" id="settLineOaId" placeholder="@xxx">
-        <small class="text-muted">LINE公式アカウントのID（@から始まる）。LINEコールでビデオ通話を開始します</small>
+        <small class="text-muted">LINE公式アカウントのID（@から始まる）</small>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">LINEコールURL（直通）</label>
+        <input type="text" class="form-control" id="settLineCallUrl" placeholder="https://lin.ee/xxxxx">
+        <small class="text-muted">LINE管理画面の「LINEコールを宣伝」から取得したURL。設定するとワンタップで通話発信できます。未設定時はプロフィールページを開きます</small>
       </div>
       <div class="mb-2">
         <label class="form-label">Google Meet URL</label>
@@ -670,11 +675,10 @@ function showConfirmScreen() {
     var showMeet = (type === 'meet' || type === 'line_meet' || type === 'all');
     var showPhone = (type === 'phone' || type === 'line_phone' || type === 'all');
 
-    if (showLine && settings.lineOaId) {
-      var lineId = settings.lineOaId.replace(/^@/, '');
-      var lineCallUrl = 'https://line.me/R/ti/p/@' + lineId;
-      html += '<a href="' + lineCallUrl + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;">' +
-        '<i class="bi bi-camera-video-fill"></i> スタッフに連絡<br><small style="font-size:.75em;">Contact Staff via LINE</small></a>';
+    if (showLine && (settings.lineCallUrl || settings.lineOaId)) {
+      var lineCallUrl = settings.lineCallUrl || ('https://line.me/R/ti/p/@' + settings.lineOaId.replace(/^@/, ''));
+      html += '<a href="' + escapeHtml(lineCallUrl) + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;">' +
+        '<i class="bi bi-telephone-fill"></i> スタッフに連絡<br><small style="font-size:.75em;">Contact Staff via LINE</small></a>';
     }
     if (showMeet && settings.meetUrl) {
       html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +
@@ -757,6 +761,7 @@ function loadSettings() {
     document.getElementById('settSheetName').value = settings.sheetName || 'フォームの回答 1';
     document.getElementById('settContactType').value = settings.contactType || 'line';
     document.getElementById('settLineOaId').value = settings.lineOaId || '';
+    document.getElementById('settLineCallUrl').value = settings.lineCallUrl || '';
     document.getElementById('settMeetUrl').value = settings.meetUrl || '';
     document.getElementById('settPhoneNumber').value = settings.phoneNumber || '';
     document.getElementById('settDevicePhone').value = settings.devicePhone || '';
@@ -804,6 +809,7 @@ function saveSettings() {
     sheetName: document.getElementById('settSheetName').value.trim(),
     contactType: document.getElementById('settContactType').value,
     lineOaId: document.getElementById('settLineOaId').value.trim(),
+    lineCallUrl: document.getElementById('settLineCallUrl').value.trim(),
     meetUrl: document.getElementById('settMeetUrl').value.trim(),
     phoneNumber: document.getElementById('settPhoneNumber').value.trim(),
     devicePhone: document.getElementById('settDevicePhone').value.trim(),

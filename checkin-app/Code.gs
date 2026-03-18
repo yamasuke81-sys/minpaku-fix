@@ -48,6 +48,7 @@ function getCheckinSettings() {
     phoneNumber: props.getProperty('PHONE_NUMBER') || '',
     devicePhone: props.getProperty('DEVICE_PHONE') || '',
     lineOaId: props.getProperty('LINE_OA_ID') || '',
+    lineCallUrl: props.getProperty('LINE_CALL_URL') || '',
     notifyEmail: props.getProperty('NOTIFY_EMAIL') || '',
     settingsPin: props.getProperty('SETTINGS_PIN') || '0000',
     sheetName: props.getProperty('SHEET_NAME') || 'フォームの回答 1',
@@ -65,6 +66,7 @@ function saveCheckinSettings(settingsJson) {
   if (s.phoneNumber !== undefined) props.setProperty('PHONE_NUMBER', s.phoneNumber);
   if (s.devicePhone !== undefined) props.setProperty('DEVICE_PHONE', s.devicePhone);
   if (s.lineOaId !== undefined) props.setProperty('LINE_OA_ID', s.lineOaId);
+  if (s.lineCallUrl !== undefined) props.setProperty('LINE_CALL_URL', s.lineCallUrl);
   if (s.notifyEmail !== undefined) props.setProperty('NOTIFY_EMAIL', s.notifyEmail);
   if (s.settingsPin !== undefined) props.setProperty('SETTINGS_PIN', s.settingsPin);
   if (s.sheetName !== undefined) props.setProperty('SHEET_NAME', s.sheetName);
@@ -91,7 +93,8 @@ function getContactSettings() {
     contactType: props.getProperty('CONTACT_TYPE') || 'line',
     meetUrl: props.getProperty('MEET_URL') || '',
     phoneNumber: props.getProperty('PHONE_NUMBER') || '',
-    lineOaId: props.getProperty('LINE_OA_ID') || ''
+    lineOaId: props.getProperty('LINE_OA_ID') || '',
+    lineCallUrl: props.getProperty('LINE_CALL_URL') || ''
   });
 }
 

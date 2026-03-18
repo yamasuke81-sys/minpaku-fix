@@ -21,3 +21,4 @@ deploy-all.bat
 deploy.bat
 setup-check.bat
 .gitignore
+.claude/**

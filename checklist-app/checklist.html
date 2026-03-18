@@ -174,35 +174,7 @@
       color: #2c3e50;
     }
 
-    /* 次回予約情報 */
-    .booking-info {
-      background: white;
-      margin: 12px;
-      padding: 16px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .booking-info h3 {
-      font-size: 16px;
-      color: #2c3e50;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #3498db;
-    }
-    .booking-row {
-      display: flex;
-      padding: 6px 0;
-      font-size: 14px;
-    }
-    .booking-label {
-      font-weight: bold;
-      min-width: 100px;
-      color: #555;
-    }
-    .booking-value {
-      flex: 1;
-      color: #333;
-    }
+    /* booking-info CSS removed: 次回予約は次回タブに統合 */
 
     /* セクション（部屋ごと） */
     .section {
@@ -1539,7 +1511,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318d</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0318e</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1569,8 +1541,7 @@
     <!-- ストレージ容量警告 -->
     <div id="storageWarning" style="display:none;margin:8px 12px;padding:10px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px;color:#856404;"></div>
 
-    <!-- 次回予約情報 -->
-    <div id="bookingInfo" class="booking-info hidden"></div>
+    <!-- bookingInfo removed: 次回予約は次回タブに統合 -->
 
     <!-- チェックリストタブ -->
     <div id="tabChecklist" class="tab-content active">
@@ -1959,7 +1930,7 @@
       if (!id) { id = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); localStorage.setItem(key, id); }
       return id;
     })();
-    var bookingData = null;
+    // bookingData removed: 次回予約は次回タブに統合
     var staffList = [];
     var staffRowCount = 1;
     // 自端末が選択したスタッフ名（保存対象はこれのみ、同期による吸収を防止）
@@ -2631,16 +2602,9 @@
     // === データ読み込み ===
     function loadData() {
       Promise.all([
-        callGAS('getNextBookingDetails', [checkoutDate]),
         callGAS('getChecklistForDate', [checkoutDate, deviceId])
       ]).then(function(results) {
-        var bookingRes = results[0];
-        var checklistRes = results[1];
-
-        if (bookingRes.success) {
-          bookingData = bookingRes.booking;
-          renderBookingInfo();
-        }
+        var checklistRes = results[0];
 
         if (checklistRes.success) {
           checklistData = checklistRes;
@@ -2669,26 +2633,13 @@
         loadLaundryStatus();
         loadCompletionStatus();
         checkDriveStorage();
+        loadNextReservation();
       }).catch(function(err) {
         alert('データの読み込みに失敗しました: ' + err);
       });
     }
 
-    function renderBookingInfo() {
-      if (!bookingData) return;
-      var html = '<h3>📅 本日の予約詳細</h3>';
-      html += '<div class="booking-row"><span class="booking-label">チェックイン</span><span class="booking-value">' + escapeHtml(bookingData.checkIn) + '</span></div>';
-      html += '<div class="booking-row"><span class="booking-label">チェックアウト</span><span class="booking-value">' + escapeHtml(bookingData.checkOut) + '</span></div>';
-      if (bookingData.guestName) html += '<div class="booking-row"><span class="booking-label">宿泊者名</span><span class="booking-value">' + escapeHtml(bookingData.guestName) + '</span></div>';
-      if (bookingData.guestCount) html += '<div class="booking-row"><span class="booking-label">人数</span><span class="booking-value">' + escapeHtml(bookingData.guestCount) + '名</span></div>';
-      if (bookingData.bookingSite) html += '<div class="booking-row"><span class="booking-label">予約サイト</span><span class="booking-value">' + escapeHtml(bookingData.bookingSite) + '</span></div>';
-      if (bookingData.bbq) html += '<div class="booking-row"><span class="booking-label">BBQ利用</span><span class="booking-value">' + escapeHtml(bookingData.bbq) + '</span></div>';
-      if (bookingData.linen) html += '<div class="booking-row"><span class="booking-label">リネン</span><span class="booking-value">' + escapeHtml(bookingData.linen) + '</span></div>';
-      if (bookingData.bed) html += '<div class="booking-row"><span class="booking-label">ベッド</span><span class="booking-value">' + escapeHtml(bookingData.bed) + '</span></div>';
-
-      document.getElementById('bookingInfo').innerHTML = html;
-      document.getElementById('bookingInfo').classList.remove('hidden');
-    }
+    // renderBookingInfo removed: 次回予約は次回タブに統合
 
     // === チェックリスト ===
     function renderChecklistItem(item, checked, supplyNeeded) {

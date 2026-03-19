@@ -468,8 +468,16 @@ function getNextReservation(checkoutDate) {
       }
     }
 
-    // スタッフ共有用シートから不足情報を補完（メインアプリと同じロジック）
+    // 不足情報を補完（メインアプリと同じロジック）
     if (best) {
+      // ベッド数マスタから計算を優先（ゲストのベッド選択を反映）
+      if (!best.bedCount) {
+        try {
+          best.bedCount = clCalculateBedCount_(best._formRow, col, bookingSs);
+        } catch (e) { /* ベッド数計算失敗は無視 */ }
+      }
+
+      // スタッフ共有用シートから不足情報を補完（ベッド数は計算結果が空の場合のみ）
       try {
         var staffShare = bookingSs.getSheetByName('スタッフ共有用');
         if (staffShare && staffShare.getLastRow() >= 2) {
@@ -502,12 +510,6 @@ function getNextReservation(checkoutDate) {
         }
       } catch (e) { /* スタッフ共有用シートの補完失敗は無視 */ }
 
-      // ベッド数マスタから計算（メインアプリと同じ方式）
-      if (!best.bedCount) {
-        try {
-          best.bedCount = clCalculateBedCount_(best._formRow, col, bookingSs);
-        } catch (e) { /* ベッド数計算失敗は無視 */ }
-      }
       delete best._formRow;
     }
 

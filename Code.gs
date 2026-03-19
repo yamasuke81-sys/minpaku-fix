@@ -6562,9 +6562,13 @@ function getNextReservationAfterCheckout_(formSheet, colMap, currentCheckoutStr,
   if (best && ss) {
     var ciStr = (best.date || '').split(/\s*～\s*/)[0].trim();
     if (!best.bedCount) {
-      best.bedCount = getBedCountFromStaffShare_(ss, ciStr);
-      if (!best.bedCount && bestFormRow && bestColMap) {
+      // フォーム行がある場合はマスタ計算を優先（ゲストのベッド選択を反映）
+      if (bestFormRow && bestColMap) {
         best.bedCount = calculateBedCountLikeStaffShare_(bestFormRow, bestColMap, ss);
+      }
+      // フォーム行がない or 計算結果が空の場合はスタッフ共有用シートから取得
+      if (!best.bedCount) {
+        best.bedCount = getBedCountFromStaffShare_(ss, ciStr);
       }
     }
     var staffSheet = ss.getSheetByName(SHEET_STAFF_SHARE);
@@ -9230,6 +9234,7 @@ function getRecruitmentStatusMap() {
     function findNextRes_(checkoutStr, excludeRowNum) {
       if (!checkoutStr) return null;
       var best = null;
+      var bestFormRow = null; // フォーム行の参照を保持（ベッド数計算用）
       // 除外行のチェックイン日・チェックアウト日を取得（重複行スキップ用）
       var excludeCi = '', excludeCo = '';
       if (excludeRowNum) {
@@ -9265,6 +9270,7 @@ function getRecruitmentStatusMap() {
           memo: '',
           bedCount: ''
         };
+        bestFormRow = sb.row;
         break;
       }
       // フォームに無ければスタッフ共有シートから検索
@@ -9294,15 +9300,24 @@ function getRecruitmentStatusMap() {
           }
         }
       }
-      // ベッド数をスタッフ共有シートから補完
-      if (best && !best.bedCount && staffShareData && staffShareColMap && staffShareColMap.checkIn >= 0) {
-        var targetCi = best.date.split(/\s*～\s*/)[0].trim();
-        for (var n = 0; n < staffShareData.length; n++) {
-          var nCi = parseDate(staffShareData[n][staffShareColMap.checkIn]);
-          if (!nCi) continue;
-          if (toDateKeySafe_(nCi) === targetCi && staffShareColMap.bedCount >= 0) {
-            best.bedCount = String(staffShareData[n][staffShareColMap.bedCount] || '').trim();
-            if (best.bedCount) break;
+      // ベッド数を補完（フォーム行のゲスト選択を優先、なければスタッフ共有シート）
+      if (best && !best.bedCount) {
+        // フォーム行がある場合はマスタ計算を優先（ゲストのベッド選択を反映）
+        if (bestFormRow && formColMap) {
+          try {
+            best.bedCount = calculateBedCountLikeStaffShare_(bestFormRow, formColMap, ss);
+          } catch (e) { /* 計算失敗は無視 */ }
+        }
+        // 計算結果が空の場合はスタッフ共有シートから取得
+        if (!best.bedCount && staffShareData && staffShareColMap && staffShareColMap.checkIn >= 0) {
+          var targetCi = best.date.split(/\s*～\s*/)[0].trim();
+          for (var n = 0; n < staffShareData.length; n++) {
+            var nCi = parseDate(staffShareData[n][staffShareColMap.checkIn]);
+            if (!nCi) continue;
+            if (toDateKeySafe_(nCi) === targetCi && staffShareColMap.bedCount >= 0) {
+              best.bedCount = String(staffShareData[n][staffShareColMap.bedCount] || '').trim();
+              if (best.bedCount) break;
+            }
           }
         }
       }

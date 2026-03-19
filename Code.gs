@@ -40,9 +40,11 @@ function sortFormResponses_() {
   const colMap = buildColumnMap(headers);
   const sortCol = colMap.checkIn >= 0 ? colMap.checkIn + 1 : 4; // 1始まり、デフォルトD列
 
+  Logger.log('[DEBUG-SORT] sortFormResponses_: rows=' + (lastRow - 1) + ' sortCol=' + sortCol + ' (ascending=false)');
   sheet
     .getRange(2, 1, lastRow - 1, lastCol)
     .sort({ column: sortCol, ascending: false });
+  Logger.log('[DEBUG-SORT] sortFormResponses_: ソート完了 at ' + new Date().toLocaleString('ja-JP'));
 
   // ソート後に募集シートの行番号を同期（行番号ずれ防止）
   try { syncRecruitBookingRowsAfterSort_(ss, sheet, colMap); } catch (e) {}
@@ -868,10 +870,32 @@ function getData() {
       });
     }
 
+    // [DEBUG-FORMMERGE] 3/22 CI行のデバッグ情報
+    var debugRows = [];
+    for (var di = 0; di < data.length; di++) {
+      var d = data[di];
+      if (d.checkInParsed && d.checkInParsed.indexOf('2026') >= 0 && d.checkInParsed.indexOf('3/22') >= 0) {
+        debugRows.push({
+          row: d.rowNumber,
+          ciRaw: d.checkIn,
+          ciParsed: d.checkInParsed,
+          coRaw: d.checkOut,
+          coParsed: d.checkOutParsed,
+          name: d.guestName,
+          bbq: d.bbq,
+          bed: d.bedChoice,
+          site: d.bookingSite
+        });
+      }
+    }
+    Logger.log('[DEBUG-FORMMERGE] 3/22行: ' + JSON.stringify(debugRows));
+    Logger.log('[DEBUG-FORMMERGE] 全行数: ' + data.length + ', シート最終行: ' + lastRow);
+
     return JSON.stringify({
       success: true,
       data: data,
-      columnMap: columnMap
+      columnMap: columnMap,
+      _debug322: debugRows
     });
 
   } catch (e) {

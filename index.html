@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0319i</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0319j</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -4695,6 +4695,24 @@
             return;
           }
           allBookings = res.data || [];
+          // [DEBUG-FORMMERGE] 3/22行のデバッグ表示
+          try {
+            var d322 = (res.data || []).filter(function(b) { return b.checkInParsed && b.checkInParsed.indexOf('3/22') >= 0; });
+            if (d322.length > 0 || (res._debug322 && res._debug322.length > 0)) {
+              var dbgHtml = '[DEBUG-FORMMERGE] 3/22 CI行 (getData): ' + d322.length + '件<br>';
+              d322.forEach(function(r) {
+                dbgHtml += 'row=' + r.rowNumber + ' ciParsed="' + r.checkInParsed + '" name="' + r.guestName + '" bbq="' + r.bbq + '" bed="' + r.bedChoice + '" site="' + r.bookingSite + '"<br>';
+              });
+              if (res._debug322) {
+                dbgHtml += '<br>Server debug: ' + JSON.stringify(res._debug322);
+              }
+              var dbgDiv = document.createElement('div');
+              dbgDiv.style.cssText = 'margin:8px;padding:8px;background:#e8f4fd;border:1px solid #2196F3;border-radius:8px;font-size:11px;font-family:monospace;max-height:150px;overflow-y:auto;';
+              dbgDiv.innerHTML = dbgHtml;
+              var cal = document.getElementById('calendar');
+              if (cal) cal.parentNode.insertBefore(dbgDiv, cal);
+            }
+          } catch(e) { console.log('[DEBUG-FORMMERGE] error:', e); }
           // 拡張された recruitMap をグローバルにキャッシュ（nextReservation含む）
           window._recruitFullMap = recruitMap;
           // 先にリセットして古いデータが残らないようにする

@@ -874,7 +874,7 @@ function getData() {
     var debugRows = [];
     for (var di = 0; di < data.length; di++) {
       var d = data[di];
-      if (d.checkInParsed && d.checkInParsed.indexOf('2026') >= 0 && d.checkInParsed.indexOf('3/22') >= 0) {
+      if (d.checkInParsed && d.checkInParsed === '2026-03-22') {
         debugRows.push({
           row: d.rowNumber,
           ciRaw: d.checkIn,

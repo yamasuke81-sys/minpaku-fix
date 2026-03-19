@@ -556,6 +556,65 @@ function clCalculateBedCount_(formRow, col, ss) {
   return '';
 }
 
+/**
+ * 当日の清掃スタッフ情報を取得（募集シート + 募集_立候補シートから）
+ * メインアプリの getRecruitmentForBooking と同等のデータを返す
+ */
+function getCleaningStaffInfo(checkoutDate) {
+  try {
+    var bookingSs = getBookingSpreadsheet_();
+    var recruitSheet = bookingSs.getSheetByName('募集');
+    if (!recruitSheet || recruitSheet.getLastRow() < 2) {
+      return JSON.stringify({ success: true, status: '', selectedStaff: '', volunteers: [] });
+    }
+    var targetCo = normDateStr_(checkoutDate);
+    var rows = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 5).getValues();
+    // チェックアウト日で募集エントリを検索（非キャンセル優先）
+    var matchIdx = -1;
+    for (var i = 0; i < rows.length; i++) {
+      var rCo = normDateStr_(rows[i][0]);
+      if (rCo === targetCo) {
+        var rStatus = String(rows[i][3] || '').trim();
+        if (rStatus === 'キャンセル') continue;
+        matchIdx = i;
+        break;
+      }
+    }
+    if (matchIdx < 0) {
+      return JSON.stringify({ success: true, status: '', selectedStaff: '', volunteers: [] });
+    }
+    var recruitRowIndex = matchIdx + 2;
+    var status = String(rows[matchIdx][3] || '').trim() || '募集中';
+    var selectedStaff = String(rows[matchIdx][4] || '').trim();
+    // 立候補シートから回答・メモを取得
+    var volunteers = [];
+    var volSheet = bookingSs.getSheetByName('募集_立候補');
+    if (volSheet && volSheet.getLastRow() >= 2) {
+      var volLastCol = Math.max(volSheet.getLastColumn(), 7);
+      var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
+      var rid = 'r' + recruitRowIndex;
+      for (var j = 0; j < volRows.length; j++) {
+        if (String(volRows[j][0] || '').trim() === rid) {
+          var rawStatus = String(volRows[j][5] || '').trim();
+          var response = rawStatus;
+          if (rawStatus === '立候補' || rawStatus === '◎') response = '◎';
+          else if (rawStatus === '保留' || rawStatus === '△') response = '△';
+          else if (rawStatus === '不可' || rawStatus === '×') response = '×';
+          else if (!rawStatus) response = '未回答';
+          volunteers.push({
+            staffName: String(volRows[j][1] || '').trim(),
+            response: response,
+            memo: String(volRows[j][4] || '').trim()
+          });
+        }
+      }
+    }
+    return JSON.stringify({ success: true, status: status, selectedStaff: selectedStaff, volunteers: volunteers });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 function formatDateValue_(val) {
   if (!val) return '';
   if (val instanceof Date) {

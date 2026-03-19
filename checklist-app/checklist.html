@@ -1511,7 +1511,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319a</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319b</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1596,7 +1596,15 @@
     <!-- 次回予約タブ -->
     <div id="tabNextRes" class="tab-content active">
       <div style="padding:12px;">
-        <div id="nextResContent"><div style="text-align:center;color:#999;font-size:13px;padding:20px;">読み込み中…</div></div>
+        <!-- 当日の清掃スタッフ情報 -->
+        <div id="cleaningStaffSection">
+          <div style="font-size:15px;font-weight:700;color:#2c3e50;margin-bottom:8px;"><i class="bi bi-people-fill" style="margin-right:4px;"></i>本日の清掃スタッフ</div>
+          <div id="cleaningStaffContent"><div style="text-align:center;color:#999;font-size:13px;padding:10px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div></div>
+        </div>
+        <hr style="margin:14px 0;border-color:#dee2e6;">
+        <!-- 次回予約情報 -->
+        <div style="font-size:15px;font-weight:700;color:#2c3e50;margin-bottom:8px;"><i class="bi bi-calendar-event" style="margin-right:4px;"></i>次回予約情報</div>
+        <div id="nextResContent"><div style="text-align:center;color:#999;font-size:13px;padding:20px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div></div>
       </div>
     </div>
 
@@ -6215,21 +6223,98 @@
     // 次回予約タブ
     // ==========================================
     var _nextResLoaded = false;
+    var _staffInfoLoaded = false;
     function loadNextReservation() {
-      if (_nextResLoaded) return;
-      var el = document.getElementById('nextResContent');
+      if (!_nextResLoaded) {
+        var el = document.getElementById('nextResContent');
+        if (el) {
+          el.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;padding:20px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
+          callGAS('getNextReservation', [checkoutDate]).then(function(res) {
+            _nextResLoaded = true;
+            if (!res.success || !res.next) {
+              el.innerHTML = '<div style="text-align:center;color:#6c757d;font-size:14px;padding:30px;">チェックアウト後の予約はありません</div>';
+              return;
+            }
+            renderNextReservation(el, res.next);
+          }).catch(function(err) {
+            el.innerHTML = '<div style="text-align:center;color:#dc3545;font-size:13px;padding:20px;">取得できませんでした</div>';
+          });
+        }
+      }
+      if (!_staffInfoLoaded) {
+        loadCleaningStaffInfo();
+      }
+    }
+
+    function loadCleaningStaffInfo() {
+      if (_staffInfoLoaded) return;
+      var el = document.getElementById('cleaningStaffContent');
       if (!el) return;
-      el.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;padding:20px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
-      callGAS('getNextReservation', [checkoutDate]).then(function(res) {
-        _nextResLoaded = true;
-        if (!res.success || !res.next) {
-          el.innerHTML = '<div style="text-align:center;color:#6c757d;font-size:14px;padding:30px;">チェックアウト後の予約はありません</div>';
+      callGAS('getCleaningStaffInfo', [checkoutDate]).then(function(res) {
+        _staffInfoLoaded = true;
+        if (!res.success) {
+          el.innerHTML = '<div style="color:#999;font-size:13px;">取得できませんでした</div>';
           return;
         }
-        renderNextReservation(el, res.next);
+        renderCleaningStaffInfo(el, res);
       }).catch(function(err) {
-        el.innerHTML = '<div style="text-align:center;color:#dc3545;font-size:13px;padding:20px;">取得できませんでした</div>';
+        el.innerHTML = '<div style="color:#dc3545;font-size:13px;">取得できませんでした</div>';
       });
+    }
+
+    function renderCleaningStaffInfo(el, info) {
+      var html = '';
+      var status = info.status || '';
+      var selectedStaff = info.selectedStaff || '';
+      var volunteers = info.volunteers || [];
+
+      // ステータスバッジ
+      if (status === 'スタッフ確定済み' || status === '選定済') {
+        html += '<div style="margin-bottom:8px;"><span style="display:inline-block;background:#198754;color:#fff;font-weight:700;font-size:12px;padding:3px 10px;border-radius:12px;">確定済み</span></div>';
+      } else if (status === '募集中') {
+        html += '<div style="margin-bottom:8px;"><span style="display:inline-block;background:#dc3545;color:#fff;font-weight:700;font-size:12px;padding:3px 10px;border-radius:12px;">募集中</span></div>';
+      } else {
+        html += '<div style="color:#6c757d;font-size:13px;padding:6px 0;">募集情報なし</div>';
+        el.innerHTML = html;
+        return;
+      }
+
+      // 確定スタッフ名表示
+      if (selectedStaff) {
+        var names = selectedStaff.split(/[,、]/).map(function(n) { return n.trim(); }).filter(Boolean);
+        // メモマップ作成
+        var memoMap = {};
+        volunteers.forEach(function(v) {
+          if (v.memo) memoMap[v.staffName] = v.memo;
+        });
+        html += '<div style="margin-bottom:10px;">';
+        names.forEach(function(name) {
+          var memo = memoMap[name] || '';
+          html += '<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin-bottom:4px;background:#e8f5e9;border-radius:8px;font-size:14px;">';
+          html += '<i class="bi bi-person-fill" style="color:#198754;font-size:16px;"></i>';
+          html += '<span style="font-weight:600;">' + escapeHtml(name) + '</span>';
+          if (memo) html += '<span style="color:#666;font-size:12px;margin-left:auto;">(' + escapeHtml(memo) + ')</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      // 回答状況（全スタッフ）
+      if (volunteers.length) {
+        html += '<div style="font-size:12px;font-weight:600;color:#6c757d;margin-bottom:4px;">回答状況</div>';
+        html += '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:13px;">';
+        volunteers.forEach(function(v) {
+          var respClass = v.response === '◎' ? '#198754' : (v.response === '△' ? '#ffc107' : (v.response === '×' ? '#dc3545' : '#adb5bd'));
+          var respSymbol = v.response === '◎' ? '●' : (v.response === '△' ? '▲' : (v.response === '×' ? '✖' : '未回答'));
+          html += '<div style="padding:3px 0;">' + escapeHtml(v.staffName) + '</div>';
+          html += '<div style="padding:3px 0;"><span style="color:' + respClass + ';font-weight:700;">' + respSymbol + '</span>';
+          if (v.memo) html += ' <span style="color:#888;font-size:11px;">(' + escapeHtml(v.memo) + ')</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      el.innerHTML = html;
     }
 
     function renderNextReservation(el, nr) {

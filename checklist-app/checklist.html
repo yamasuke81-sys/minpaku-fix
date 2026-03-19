@@ -1511,7 +1511,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319f</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319g</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1538,6 +1538,8 @@
   <div id="loadingArea" class="loading">読み込み中...</div>
 
   <div id="contentArea" class="hidden">
+    <!-- [DEBUG-SYNC] デバッグバナー -->
+    <div id="syncDebugBanner" style="display:none;margin:8px 12px;padding:8px 12px;background:#e8f4fd;border:1px solid #2196F3;border-radius:8px;font-size:11px;color:#333;max-height:120px;overflow-y:auto;font-family:monospace;white-space:pre-wrap;"></div>
     <!-- ストレージ容量警告 -->
     <div id="storageWarning" style="display:none;margin:8px 12px;padding:10px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;font-size:13px;color:#856404;"></div>
 
@@ -1929,6 +1931,20 @@
     var pendingToggles = {};
     // 同期が実行中かどうかを追跡（同期の重複実行防止用）
     var syncInProgress = false;
+    // [DEBUG-SYNC] デバッグログ
+    var _syncDebugLog = [];
+    function _syncLog(msg) {
+      var ts = new Date().toLocaleTimeString('ja-JP');
+      var entry = ts + ' ' + msg;
+      _syncDebugLog.push(entry);
+      if (_syncDebugLog.length > 30) _syncDebugLog.shift();
+      console.log('[DEBUG-SYNC] ' + entry);
+      var banner = document.getElementById('syncDebugBanner');
+      if (banner) {
+        banner.style.display = 'block';
+        banner.textContent = _syncDebugLog.slice(-10).join('\n');
+      }
+    }
     // スタッフ選択の保存中フラグ（同期による上書き防止）
     var staffSelectionSaving = false;
     // 端末識別ID（スタッフ選択のマージ用：端末ごとに固有）
@@ -2015,9 +2031,14 @@
         // 同期が既に実行中の場合のみスキップ（他のGAS呼び出しは許可）
         if (syncInProgress) return;
         syncInProgress = true;
+        var syncStartTime = Date.now(); // [DEBUG-SYNC]
+        var pendingCount = Object.keys(pendingToggles).length; // [DEBUG-SYNC]
+        _syncLog('SYNC開始 pending=' + pendingCount + (pendingCount > 0 ? ' ids=' + Object.keys(pendingToggles).map(function(k){return k.substring(0,8);}).join(',') : '')); // [DEBUG-SYNC]
         callGAS('getChecklistForDate', [checkoutDate, deviceId]).then(function(res) {
           syncInProgress = false;
+          var elapsed = Date.now() - syncStartTime; // [DEBUG-SYNC]
           if (res.success) {
+            var serverCheckedCount = Object.keys(res.checked || {}).length; // [DEBUG-SYNC]
             // 現在の折りたたみ状態を保存
             var collapseState = saveCollapseState();
             var activeTab = getActiveTab();
@@ -2029,6 +2050,7 @@
             }
             // インフライト（保存中）のトグル変更をサーバーデータにマージ
             // サーバーにまだ反映されていないローカルの操作を保護する
+            var currentPending = Object.keys(pendingToggles).length; // [DEBUG-SYNC]
             Object.keys(pendingToggles).forEach(function(itemId) {
               if (pendingToggles[itemId]) {
                 // チェック中の項目: サーバーデータに上書き
@@ -2038,6 +2060,8 @@
                 delete res.checked[itemId];
               }
             });
+            var mergedCheckedCount = Object.keys(res.checked || {}).length; // [DEBUG-SYNC]
+            _syncLog('SYNC完了 ' + elapsed + 'ms svr=' + serverCheckedCount + '件 merge後=' + mergedCheckedCount + '件 pending=' + currentPending); // [DEBUG-SYNC]
             checklistData = res;
             renderChecklist();
             renderPhotoSection();
@@ -2052,7 +2076,7 @@
             restoreCollapseState(collapseState);
             if (activeTab) switchTab(activeTab);
           }
-        }).catch(function() { syncInProgress = false; });
+        }).catch(function(e) { syncInProgress = false; _syncLog('SYNC失敗 ' + (Date.now() - syncStartTime) + 'ms err=' + (e && e.message || e)); });
       }
 
       // イベントリスナー
@@ -2814,6 +2838,7 @@
     }
 
     function renderChecklist() {
+      _syncLog('RENDER checked=' + Object.keys((checklistData && checklistData.checked) || {}).length + '件 pending=' + Object.keys(pendingToggles).length); // [DEBUG-SYNC]
       try {
         var items = checklistData.items || [];
         var checked = checklistData.checked || {};
@@ -3528,6 +3553,7 @@
       var checked = checkbox.checked;
       var names = getSelectedStaffNames();
       var who = names.length > 0 ? names.join(', ') : staffName;
+      var toggleStartTime = Date.now(); // [DEBUG-SYNC]
 
       // インフライト追跡: 同期時にサーバーデータで巻き戻されないよう保護
       if (checked) {
@@ -3535,11 +3561,14 @@
       } else {
         pendingToggles[itemId] = false;
       }
+      _syncLog('TOGGLE ' + (checked ? 'ON' : 'OFF') + ' id=' + itemId.substring(0, 8) + ' pending=' + Object.keys(pendingToggles).length); // [DEBUG-SYNC]
 
       showSaveStatus('saving');
       callGAS('toggleChecklistItem', [checkoutDate, itemId, checked, who]).then(function(res) {
+        var elapsed = Date.now() - toggleStartTime; // [DEBUG-SYNC]
         delete pendingToggles[itemId];
         if (res.success) {
+          _syncLog('SAVED id=' + itemId.substring(0, 8) + ' ' + elapsed + 'ms pending残=' + Object.keys(pendingToggles).length); // [DEBUG-SYNC]
           showSaveStatus('saved');
           if (checked) {
             checklistData.checked[itemId] = { checked: true, by: who, at: new Date() };
@@ -3550,10 +3579,16 @@
           updateSectionCounts();
           updateCheckAllButton();
         } else {
+          _syncLog('FAIL(server) id=' + itemId.substring(0, 8) + ' ' + elapsed + 'ms'); // [DEBUG-SYNC]
           showSaveStatus('error');
           checkbox.checked = !checked;
         }
-      }).catch(function() { delete pendingToggles[itemId]; showSaveStatus('error'); });
+      }).catch(function(e) {
+        var elapsed = Date.now() - toggleStartTime; // [DEBUG-SYNC]
+        _syncLog('FAIL(network) id=' + itemId.substring(0, 8) + ' ' + elapsed + 'ms err=' + (e && e.message || e)); // [DEBUG-SYNC]
+        delete pendingToggles[itemId];
+        showSaveStatus('error');
+      });
     }
 
     function toggleSupply(checkbox) {

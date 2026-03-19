@@ -1511,7 +1511,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319g</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319l</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6388,8 +6388,34 @@
       html += '<div class="nres-row"><span class="nres-label">BBQ</span><span class="nres-value">' + escapeHtml(bbqDisp) + '</span></div>';
       html += '<div class="nres-row"><span class="nres-label">国籍</span><span class="nres-value">' + escapeHtml(nr.nationality || '日本') + '</span></div>';
       html += '</div>';
+      // 連絡事項（編集可能）
+      html += '<div style="margin-top:12px;">';
+      html += '<div style="font-size:13px;font-weight:700;color:#2c3e50;margin-bottom:6px;"><i class="bi bi-chat-left-text" style="margin-right:4px;"></i>連絡事項</div>';
+      html += '<textarea id="nextResNotice" class="form-control form-control-sm" rows="3" placeholder="連絡事項を入力…" style="font-size:13px;" data-row="' + (nr.rowNumber || '') + '">' + escapeHtml(nr.cleaningNotice || '') + '</textarea>';
+      html += '<div class="text-end mt-1"><button id="btnSaveNextResNotice" class="btn btn-sm btn-primary" style="font-size:12px;" onclick="saveNextResNotice()">保存</button></div>';
+      html += '</div>';
       el.innerHTML = html;
     }
+
+    function saveNextResNotice() {
+      var ta = document.getElementById('nextResNotice');
+      var btn = document.getElementById('btnSaveNextResNotice');
+      if (!ta || !ta.dataset.row) return;
+      if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
+      callGAS('saveCleaningNotice', [parseInt(ta.dataset.row, 10), ta.value]).then(function(res) {
+        if (res.success) {
+          if (btn) { btn.textContent = '保存しました'; btn.classList.replace('btn-primary', 'btn-success'); }
+          setTimeout(function() { if (btn) { btn.disabled = false; btn.textContent = '保存'; btn.classList.replace('btn-success', 'btn-primary'); } }, 2000);
+        } else {
+          alert(res.error || '保存に失敗しました');
+          if (btn) { btn.disabled = false; btn.textContent = '保存'; }
+        }
+      }).catch(function(e) {
+        alert('保存に失敗しました: ' + (e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = '保存'; }
+      });
+    }
+    window.saveNextResNotice = saveNextResNotice;
 
     function getSelectedStaffName_() {
       var selects = document.querySelectorAll('[id^="staffSelect"]');

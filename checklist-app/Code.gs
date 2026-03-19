@@ -413,7 +413,7 @@ function getNextReservation(checkoutDate) {
 
     // メインアプリのbuildColumnMapと同じヘッダーマッチング（完全一致）
     var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
-    var col = { ci: -1, co: -1, guest: -1, count: -1, infant: -1, bbq: -1, nat: -1, bed: -1, bedChoice: -1 };
+    var col = { ci: -1, co: -1, guest: -1, count: -1, infant: -1, bbq: -1, nat: -1, bed: -1, bedChoice: -1, cleaningNotice: -1 };
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
       var hl = h.toLowerCase();
@@ -428,6 +428,7 @@ function getNextReservation(checkoutDate) {
       if (h.indexOf('ベッド数') > -1 && col.bed < 0) col.bed = i;
       if (h.indexOf('宿泊人数2名のお客様のみお答えください') > -1 && h.indexOf('ベッド') > -1 && col.bedChoice < 0) col.bedChoice = i;
       if (h.indexOf('宿泊人数2名') > -1 && col.bedChoice < 0) col.bedChoice = i;
+      if ((h === '連絡事項' || h === '清掃連絡事項') && col.cleaningNotice < 0) col.cleaningNotice = i;
     }
     if (col.ci < 0) return JSON.stringify({ success: true, next: null });
 
@@ -463,6 +464,8 @@ function getNextReservation(checkoutDate) {
           bbq: col.bbq >= 0 ? String(data[r][col.bbq] || '').trim() : '',
           nationality: (col.nat >= 0 ? String(data[r][col.nat] || '').trim() : '') || '日本',
           bedCount: col.bed >= 0 ? String(data[r][col.bed] || '').trim() : '',
+          cleaningNotice: col.cleaningNotice >= 0 ? String(data[r][col.cleaningNotice] || '').trim() : '',
+          rowNumber: r + 2,
           _formRow: data[r]
         };
       }
@@ -512,6 +515,33 @@ function getNextReservation(checkoutDate) {
     }
 
     return JSON.stringify({ success: true, next: best });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 連絡事項を保存（メインアプリの saveCleaningNotice と同じシートに書き込む）
+ */
+function saveCleaningNotice(rowNumber, noticeText) {
+  try {
+    var bookingSs = clGetBookingSs_();
+    if (!bookingSs) return JSON.stringify({ success: false, error: 'スプレッドシートが見つかりません' });
+    var sheet = bookingSs.getSheetByName('フォームの回答 1');
+    if (!sheet || rowNumber < 2 || rowNumber > sheet.getLastRow()) return JSON.stringify({ success: false, error: '無効な行です' });
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var noticeCol = -1;
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i] || '').trim();
+      if ((h === '連絡事項' || h === '清掃連絡事項') && noticeCol < 0) noticeCol = i;
+    }
+    if (noticeCol < 0) {
+      var newCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newCol).setValue('連絡事項');
+      noticeCol = newCol - 1;
+    }
+    sheet.getRange(rowNumber, noticeCol + 1).setValue(noticeText || '');
+    return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

@@ -104,7 +104,7 @@
 
 <!-- ===== デバッグバナー（ホワイトアウト調査） ===== -->
 <div id="debugWhiteout" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ff0;color:#000;font-size:12px;padding:4px 8px;font-family:monospace;">
-  [DEBUG] HTML loaded, v0318p, <span id="dbgTime"></span>
+  [DEBUG] HTML loaded, v0319k, <span id="dbgTime"></span>
   <span id="dbgScreenState"></span>
   <span id="dbgErrors" style="color:red;"></span>
 </div>
@@ -135,7 +135,7 @@
 </script>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0318p</div>
+<div class="version-badge" id="deployVersion">v0319k</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -364,21 +364,13 @@ function callGAS(fn, args) {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   var el = document.getElementById(id);
+  if (!el) {
+    console.error('[ERROR] showScreen: element #' + id + ' not found');
+    return;
+  }
   el.classList.add('active');
   _lastScreen = id;
   window.scrollTo(0, 0);
-  // [DEBUG-WHITEOUT] DOM状態を記録
-  var cs = window.getComputedStyle(el);
-  console.log('[DEBUG-WHITEOUT] showScreen("' + id + '") classList=' + el.className +
-    ' display=' + cs.display + ' visibility=' + cs.visibility + ' opacity=' + cs.opacity +
-    ' height=' + cs.height + ' bg=' + cs.background.substring(0, 80) +
-    ' offsetH=' + el.offsetHeight + ' children=' + el.children.length +
-    ' innerHTML=' + el.innerHTML.substring(0, 200));
-  // 全screen要素の状態を記録
-  document.querySelectorAll('.screen').forEach(function(s) {
-    var scs = window.getComputedStyle(s);
-    console.log('[DEBUG-WHITEOUT] screen#' + s.id + ' display=' + scs.display + ' zIndex=' + scs.zIndex);
-  });
 }
 
 // ===== 検索 =====
@@ -754,23 +746,18 @@ function showConfirmScreen() {
 }
 
 function renderCallButtons_(notifyHtml, contactHtml) {
-  console.log('[DEBUG-CONFIRM] renderCallButtons_ called');
   var cb = document.getElementById('callButtons');
+  if (!cb) return;
   cb.innerHTML = notifyHtml + contactHtml;
-  // [DEBUG-WHITEOUT] ボタン描画後のDOM状態
-  var confirmEl = document.getElementById('confirmScreen');
-  var confirmCs = window.getComputedStyle(confirmEl);
-  console.log('[DEBUG-WHITEOUT] after renderCallButtons: callButtons.innerHTML=' + cb.innerHTML.substring(0, 300));
-  console.log('[DEBUG-WHITEOUT] confirmScreen display=' + confirmCs.display + ' visibility=' + confirmCs.visibility +
-    ' offsetH=' + confirmEl.offsetHeight + ' scrollH=' + confirmEl.scrollHeight +
-    ' confirmCard.offsetH=' + (confirmEl.firstElementChild ? confirmEl.firstElementChild.offsetHeight : 'null'));
 }
 
 function resetToSearch() {
   _currentRow = null;
   _guestData = null;
-  document.getElementById('searchName').value = '';
-  document.getElementById('searchPhone').value = '';
+  var sn = document.getElementById('searchName');
+  var sp = document.getElementById('searchPhone');
+  if (sn) sn.value = '';
+  if (sp) sp.value = '';
   showScreen('searchScreen');
 }
 
@@ -947,9 +934,13 @@ function escapeHtml(str) {
 }
 
 // Enter キーで検索
-document.getElementById('searchName').addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
-document.getElementById('searchPhone').addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
-document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPinAndOpen(); });
+// Enter キーで検索（要素がない場合はスキップ）
+['searchName', 'searchPhone'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
+});
+var pinEl = document.getElementById('pinInput');
+if (pinEl) pinEl.addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPinAndOpen(); });
 
 // タブ切替復帰対策: バックグラウンドから復帰した際にGASセッション切れで白画面になる問題を防止
 (function() {

@@ -3624,8 +3624,14 @@ function getAutoSyncSettings() {
   try {
     var props = PropertiesService.getScriptProperties();
     var enabled = props.getProperty('AUTO_SYNC_ENABLED') === 'true';
-    var intervalHours = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_HOURS'), 10) || 1;
-    return JSON.stringify({ success: true, enabled: enabled, intervalHours: intervalHours });
+    var intervalMinutes = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_MINUTES'), 10);
+    // 後方互換: AUTO_SYNC_INTERVAL_HOURSからの移行
+    if (!intervalMinutes || isNaN(intervalMinutes)) {
+      var intervalHours = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_HOURS'), 10) || 1;
+      intervalMinutes = intervalHours * 60;
+    }
+    var intervalHours = intervalMinutes >= 60 ? Math.round(intervalMinutes / 60) : 1;
+    return JSON.stringify({ success: true, enabled: enabled, intervalHours: intervalHours, intervalMinutes: intervalMinutes });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -3633,25 +3639,28 @@ function getAutoSyncSettings() {
 
 /**
  * 自動同期設定の保存＋トリガー設定
- * enabledは廃止。ソースごとの有効/無効状態から自動判定する。
+ * フロントエンドから分単位の値を受け取る（10=10分, 15=15分, 30=30分, 60=1時間, 120=2時間...）
  * 後方互換のため引数2つでも1つでも受け付ける。
  */
 function saveAutoSyncSettings(enabledOrInterval, intervalHoursOpt) {
   try {
     if (!requireOwner()) return JSON.stringify({ success: false, error: 'オーナーのみ' });
-    // 後方互換: saveAutoSyncSettings(interval) or saveAutoSyncSettings(enabled, interval)
-    var intervalHours;
+    // 新形式: intervalMinutes（分単位）で受け取る
+    var intervalMinutes;
     if (intervalHoursOpt !== undefined) {
-      intervalHours = parseInt(intervalHoursOpt, 10) || 1;
+      // 旧形式: saveAutoSyncSettings(enabled, hours)
+      intervalMinutes = (parseInt(intervalHoursOpt, 10) || 1) * 60;
     } else {
-      intervalHours = parseInt(enabledOrInterval, 10) || 1;
+      intervalMinutes = parseInt(enabledOrInterval, 10) || 60;
     }
     var props = PropertiesService.getScriptProperties();
-    props.setProperty('AUTO_SYNC_INTERVAL_HOURS', String(intervalHours));
+    props.setProperty('AUTO_SYNC_INTERVAL_MINUTES', String(intervalMinutes));
+    // 後方互換のためHOURSも更新
+    props.setProperty('AUTO_SYNC_INTERVAL_HOURS', String(Math.max(1, Math.round(intervalMinutes / 60))));
     // ソースの有効状態からトリガー要否を自動判定
     var hasActive = hasAnyActiveSyncSource_();
     props.setProperty('AUTO_SYNC_ENABLED', hasActive ? 'true' : 'false');
-    setupAutoSyncTrigger_(hasActive, intervalHours);
+    setupAutoSyncTrigger_(hasActive, intervalMinutes);
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -3677,7 +3686,7 @@ function hasAnyActiveSyncSource_() {
   } catch (e) { return false; }
 }
 
-function setupAutoSyncTrigger_(enabled, intervalHours) {
+function setupAutoSyncTrigger_(enabled, intervalMinutes) {
   // 既存のautoSyncトリガーを全て削除
   var triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(function(t) {
@@ -3686,10 +3695,15 @@ function setupAutoSyncTrigger_(enabled, intervalHours) {
     }
   });
   if (enabled) {
-    ScriptApp.newTrigger('autoSyncFromICal')
-      .timeBased()
-      .everyHours(intervalHours || 1)
-      .create();
+    var builder = ScriptApp.newTrigger('autoSyncFromICal').timeBased();
+    if (intervalMinutes && intervalMinutes < 60) {
+      // 分単位トリガー（GAS対応: 1, 5, 10, 15, 30分）
+      builder.everyMinutes(intervalMinutes).create();
+    } else {
+      // 時間単位トリガー
+      var hours = Math.max(1, Math.round((intervalMinutes || 60) / 60));
+      builder.everyHours(hours).create();
+    }
   }
 }
 
@@ -10798,23 +10812,26 @@ function recreateAllTriggers() {
 
   // ステップ3: iCal同期トリガーを再作成（設定から間隔を読む）
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var settingsSheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
-    var syncInterval = 1; // デフォルト1時間
-    if (settingsSheet && settingsSheet.getLastRow() >= 2) {
-      var sRows = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 2).getValues();
-      for (var j = 0; j < sRows.length; j++) {
-        if (String(sRows[j][0]).trim() === 'iCal同期間隔') {
-          syncInterval = parseInt(sRows[j][1], 10) || 1;
-          break;
-        }
-      }
+    var props = PropertiesService.getScriptProperties();
+    var syncMinutes = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_MINUTES'), 10);
+    if (!syncMinutes || isNaN(syncMinutes)) {
+      // 後方互換: 旧HOURS設定から読む
+      var syncHours = parseInt(props.getProperty('AUTO_SYNC_INTERVAL_HOURS'), 10) || 1;
+      syncMinutes = syncHours * 60;
     }
-    ScriptApp.newTrigger('autoSyncFromICal')
-      .timeBased().everyHours(syncInterval).create();
-    results.push('作成: autoSyncFromICal (' + syncInterval + '時間ごと)');
+    var builder = ScriptApp.newTrigger('autoSyncFromICal').timeBased();
+    var label;
+    if (syncMinutes < 60) {
+      builder.everyMinutes(syncMinutes).create();
+      label = syncMinutes + '分ごと';
+    } else {
+      var hours = Math.max(1, Math.round(syncMinutes / 60));
+      builder.everyHours(hours).create();
+      label = hours + '時間ごと';
+    }
+    results.push('作成: autoSyncFromICal (' + label + ')');
   } catch (e) {
-    // iCal同期設定がない場合はデフォルト1時間
+    // デフォルト1時間
     ScriptApp.newTrigger('autoSyncFromICal')
       .timeBased().everyHours(1).create();
     results.push('作成: autoSyncFromICal (1時間ごと, デフォルト)');

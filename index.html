@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0319m</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0319n</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1662,6 +1662,9 @@
         <div class="mb-2">
           <label class="form-label small">同期間隔</label>
           <select class="form-select form-select-sm" id="autoSyncInterval" style="max-width:160px;">
+            <option value="10m">10分ごと</option>
+            <option value="15m">15分ごと</option>
+            <option value="30m">30分ごと</option>
             <option value="1">1時間ごと</option>
             <option value="2">2時間ごと</option>
             <option value="4">4時間ごと</option>
@@ -9288,7 +9291,13 @@
           try {
             var r = JSON.parse(jsonStr);
             if (r.success) {
-              document.getElementById('autoSyncInterval').value = String(r.intervalHours || 1);
+              // intervalMinutesがあれば分単位、なければ時間単位（後方互換）
+              var sel = document.getElementById('autoSyncInterval');
+              if (r.intervalMinutes && r.intervalMinutes < 60) {
+                sel.value = r.intervalMinutes + 'm';
+              } else {
+                sel.value = String(r.intervalHours || 1);
+              }
             }
           } catch (e) {}
         }).getAutoSyncSettings();
@@ -9297,14 +9306,19 @@
       document.getElementById('btnSaveAutoSync').addEventListener('click', function() {
         var btn = this;
         var resEl = document.getElementById('autoSyncSaveResult');
-        var interval = parseInt(document.getElementById('autoSyncInterval').value, 10) || 1;
+        var rawVal = document.getElementById('autoSyncInterval').value;
+        // 分単位("10m","15m","30m")か時間単位("1","2",...)かを判定
+        var isMinutes = rawVal.indexOf('m') >= 0;
+        var numVal = parseInt(rawVal, 10);
+        var intervalMinutes = isMinutes ? numVal : (numVal * 60);
+        var displayLabel = isMinutes ? (numVal + '分ごと') : (numVal + '時間ごと');
         btn.disabled = true;
         resEl.style.display = 'none';
         google.script.run.withSuccessHandler(function(jsonStr) {
           var r = JSON.parse(jsonStr);
           resEl.style.display = 'block';
           resEl.className = 'small mt-1 ' + (r.success ? 'text-success' : 'text-danger');
-          resEl.textContent = r.success ? (interval + '時間ごとの同期間隔を保存しました') : (r.error || '保存に失敗しました');
+          resEl.textContent = r.success ? (displayLabel + 'の同期間隔を保存しました') : (r.error || '保存に失敗しました');
           btn.disabled = false;
           setTimeout(function() { resEl.style.display = 'none'; }, 3000);
         }).withFailureHandler(function(err) {
@@ -9312,7 +9326,7 @@
           resEl.className = 'small mt-1 text-danger';
           resEl.textContent = err.message || '保存に失敗しました';
           btn.disabled = false;
-        }).saveAutoSyncSettings(interval);
+        }).saveAutoSyncSettings(intervalMinutes);
       });
 
       // [DEBUG] iCal同期デバッグ情報取得

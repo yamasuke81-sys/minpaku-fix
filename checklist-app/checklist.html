@@ -1511,7 +1511,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319b</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319c</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6299,10 +6299,10 @@
         html += '</div>';
       }
 
-      // 回答状況（全スタッフ）
+      // 回答状況（全スタッフ）— 折りたたみ
       if (volunteers.length) {
-        html += '<div style="font-size:12px;font-weight:600;color:#6c757d;margin-bottom:4px;">回答状況</div>';
-        html += '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:13px;">';
+        html += '<details style="margin-top:4px;"><summary style="font-size:12px;font-weight:600;color:#6c757d;cursor:pointer;user-select:none;">回答状況</summary>';
+        html += '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:13px;margin-top:6px;">';
         volunteers.forEach(function(v) {
           var respClass = v.response === '◎' ? '#198754' : (v.response === '△' ? '#ffc107' : (v.response === '×' ? '#dc3545' : '#adb5bd'));
           var respSymbol = v.response === '◎' ? '●' : (v.response === '△' ? '▲' : (v.response === '×' ? '✖' : '未回答'));
@@ -6311,7 +6311,7 @@
           if (v.memo) html += ' <span style="color:#888;font-size:11px;">(' + escapeHtml(v.memo) + ')</span>';
           html += '</div>';
         });
-        html += '</div>';
+        html += '</div></details>';
       }
 
       el.innerHTML = html;

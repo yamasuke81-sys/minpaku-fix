@@ -34,6 +34,7 @@ const CL_BOOKING_SHEET = 'フォームの回答 1';
 const CL_OWNER_SHEET = '設定_オーナー';
 const CL_STAFF_SHEET = '清掃スタッフ';
 const CL_RECRUIT_SETTINGS_SHEET = '募集設定';
+const CL_BED_COUNT_MASTER = 'ベッド数マスタ';
 
 /** メール通知が有効かチェック（デフォルトtrue） */
 function isEmailNotifyEnabled_(sheetKey) {
@@ -412,7 +413,7 @@ function getNextReservation(checkoutDate) {
 
     // メインアプリのbuildColumnMapと同じヘッダーマッチング（完全一致）
     var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
-    var col = { ci: -1, co: -1, guest: -1, count: -1, infant: -1, bbq: -1, nat: -1, bed: -1 };
+    var col = { ci: -1, co: -1, guest: -1, count: -1, infant: -1, bbq: -1, nat: -1, bed: -1, bedChoice: -1 };
     for (var i = 0; i < headers.length; i++) {
       var h = String(headers[i] || '').trim();
       var hl = h.toLowerCase();
@@ -425,6 +426,8 @@ function getNextReservation(checkoutDate) {
       if ((h.indexOf('バーベキュー') > -1 || hl.indexOf('bbq') > -1) && col.bbq < 0) col.bbq = i;
       if ((h.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) && col.nat < 0) col.nat = i;
       if (h.indexOf('ベッド数') > -1 && col.bed < 0) col.bed = i;
+      if (h.indexOf('宿泊人数2名のお客様のみお答えください') > -1 && h.indexOf('ベッド') > -1 && col.bedChoice < 0) col.bedChoice = i;
+      if (h.indexOf('宿泊人数2名') > -1 && col.bedChoice < 0) col.bedChoice = i;
     }
     if (col.ci < 0) return JSON.stringify({ success: true, next: null });
 
@@ -459,7 +462,8 @@ function getNextReservation(checkoutDate) {
           guestCount: guestFmt || '-',
           bbq: col.bbq >= 0 ? String(data[r][col.bbq] || '').trim() : '',
           nationality: (col.nat >= 0 ? String(data[r][col.nat] || '').trim() : '') || '日本',
-          bedCount: col.bed >= 0 ? String(data[r][col.bed] || '').trim() : ''
+          bedCount: col.bed >= 0 ? String(data[r][col.bed] || '').trim() : '',
+          _formRow: data[r]
         };
       }
     }
@@ -497,6 +501,14 @@ function getNextReservation(checkoutDate) {
           }
         }
       } catch (e) { /* スタッフ共有用シートの補完失敗は無視 */ }
+
+      // ベッド数マスタから計算（メインアプリと同じ方式）
+      if (!best.bedCount) {
+        try {
+          best.bedCount = clCalculateBedCount_(best._formRow, col, bookingSs);
+        } catch (e) { /* ベッド数計算失敗は無視 */ }
+      }
+      delete best._formRow;
     }
 
     return JSON.stringify({ success: true, next: best });
@@ -509,6 +521,39 @@ function extractCount_(str) {
   if (!str) return '';
   var m = str.match(/(\d+)/);
   return m ? m[1] : '';
+}
+
+/**
+ * ベッド数マスタからベッド数を計算（メインアプリの calculateBedCountLikeStaffShare_ と同じロジック）
+ * ベッド数マスタ B:C を参照。2名かつ宿泊人数2名の選択肢に応じて C3/C4、それ以外は VLOOKUP
+ */
+function clCalculateBedCount_(formRow, col, ss) {
+  if (!ss || !formRow) return '';
+  var masterSheet = ss.getSheetByName(CL_BED_COUNT_MASTER);
+  if (!masterSheet || masterSheet.getLastRow() < 2) return '';
+  var guestsRaw = col.count >= 0 ? String(formRow[col.count] || '').trim() : '';
+  var guestsNum = parseInt(extractCount_(guestsRaw), 10);
+  if (isNaN(guestsNum) || guestsRaw === '') return '';
+  var twoGuestChoice = col.bedChoice >= 0 ? String(formRow[col.bedChoice] || '').trim() : '';
+  var masterData = masterSheet.getRange(1, 1, Math.min(masterSheet.getLastRow(), 100), 3).getValues();
+  if (guestsNum === 2) {
+    if (twoGuestChoice.indexOf('2人で1台') >= 0) {
+      if (masterData.length >= 3 && masterData[2][2] != null) return String(masterData[2][2]).trim();
+      return '';
+    }
+    if (twoGuestChoice.indexOf('1人1台') >= 0) {
+      if (masterData.length >= 4 && masterData[3][2] != null) return String(masterData[3][2]).trim();
+      return '';
+    }
+  }
+  for (var r = 1; r < masterData.length; r++) {
+    var bVal = masterData[r][1];
+    var bNum = parseInt(String(bVal || '').trim(), 10);
+    if (!isNaN(bNum) && bNum === guestsNum && masterData[r][2] != null) {
+      return String(masterData[r][2]).trim();
+    }
+  }
+  return '';
 }
 
 function formatDateValue_(val) {

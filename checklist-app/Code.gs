@@ -315,13 +315,14 @@ function getCleaningStaffList() {
     if (!staffSheet || staffSheet.getLastRow() < 2) {
       return JSON.stringify({ success: true, list: [] });
     }
-    var lastCol = Math.max(staffSheet.getLastColumn(), 11);
+    var lastCol = Math.max(staffSheet.getLastColumn(), 12);
     var data = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, lastCol).getValues();
     var items = [];
     data.forEach(function(row) {
       var name = String(row[0] || '').trim();
       var active = lastCol >= 9 ? String(row[8] || 'Y').trim() : 'Y';
-      if (name && active !== 'N') {
+      var hidden = String(row[11] || '').trim();
+      if (name && active !== 'N' && hidden !== 'Y') {
         var order = parseInt(row[10], 10) || 9999;
         items.push({ name: name, order: order });
       }

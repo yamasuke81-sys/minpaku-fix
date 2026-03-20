@@ -75,18 +75,38 @@
       margin-bottom: 4px;
     }
     .staff-row:last-child { margin-bottom: 0; }
-    .staff-select {
-      padding: 8px 10px;
+    .staff-check-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
       border-radius: 6px;
       border: 1px solid #bbb;
       background: white;
-      color: #333;
-      font-size: 15px;
+      cursor: pointer;
+      font-size: 14px;
       font-weight: bold;
-      flex: 1;
-      min-height: 38px;
+      color: #333;
+      user-select: none;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .staff-select option { color: #333; background: white; }
+    .staff-check-item.checked {
+      background: #d4edda;
+      border-color: #28a745;
+      color: #155724;
+    }
+    .staff-check-item.remote {
+      background: #eaf4fd;
+      border-color: #90caf9;
+      color: #1565c0;
+      opacity: 0.8;
+    }
+    .staff-check-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #28a745;
+      cursor: pointer;
+    }
     .staff-add-btn, .staff-remove-btn {
       width: 32px;
       height: 32px;
@@ -1511,7 +1531,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0319l</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320b</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1547,13 +1567,10 @@
 
     <!-- チェックリストタブ -->
     <div id="tabChecklist" class="tab-content">
-      <!-- 担当スタッフ選択 -->
+      <!-- 担当スタッフ選択（チェックボックス式） -->
       <div class="staff-selector" id="staffSelector" style="background:#f0f8ff;border:2px solid #3498db;border-radius:8px;padding:10px 12px;margin:10px 12px 4px;">
-        <div class="staff-selector-label" id="staffSelectorLabel" style="font-size:12px;font-weight:bold;color:#2c3e50;margin-bottom:6px;">担当スタッフ</div>
-        <div class="staff-row" style="display:flex;align-items:center;gap:6px;">
-          <select class="staff-select" id="staffSelect0" style="padding:8px 10px;border-radius:6px;border:1px solid #bbb;background:white;color:#333;font-size:15px;font-weight:bold;flex:1;min-height:38px;"><option value="">担当スタッフを選択</option></select>
-          <button class="staff-add-btn" onclick="addStaffRow()" title="スタッフ追加" style="width:32px;height:32px;border-radius:50%;border:1px solid #3498db;background:white;color:#3498db;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>
-        </div>
+        <div style="font-size:12px;font-weight:bold;color:#2c3e50;margin-bottom:6px;">担当スタッフ</div>
+        <div id="staffCheckboxList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
         <div id="remoteStaffInfo" style="display:none;font-size:11px;color:#7f8c8d;margin-top:6px;padding:4px 6px;background:#eaf4fd;border-radius:4px;"></div>
       </div>
 
@@ -1956,7 +1973,6 @@
     })();
     // bookingData removed: 次回予約は次回タブに統合
     var staffList = [];
-    var staffRowCount = 1;
     // 自端末が選択したスタッフ名（保存対象はこれのみ、同期による吸収を防止）
     var localStaffNames = [];
     var saveIndicatorTimer = null;
@@ -2083,13 +2099,7 @@
       document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
       document.getElementById('bulkPhotoInput').addEventListener('change', handleBulkPhotoUpload);
       document.getElementById('memoPhotoInput').addEventListener('change', handleMemoPhotoSelect);
-      document.getElementById('staffSelect0').addEventListener('change', function() { updateStaffLabel(); updateSettingsTabVisibility(); saveStaffSelectionToServer(); });
-      // スタッフ追加行のchange検知（イベント委譲）
-      document.getElementById('staffSelector').addEventListener('change', function(e) {
-        if (e.target.classList.contains('staff-select') && e.target.id !== 'staffSelect0') {
-          saveStaffSelectionToServer();
-        }
-      });
+      // スタッフチェックボックスのchange検知はrenderStaffCheckboxes()内で設定済み
 
       // 項目名タッチでチェック切替（イベント委譲）
       document.getElementById('checklistContainer').addEventListener('click', function(e) {
@@ -2153,60 +2163,50 @@
       });
     };
 
-    // === スタッフ選択 ===
+    // === スタッフ選択（チェックボックス式） ===
     function loadStaffList() {
       callGAS('getCleaningStaffList', []).then(function(res) {
         if (res.success && res.list) {
           staffList = res.list;
-          populateStaffSelects();
+          renderStaffCheckboxes();
         }
       }).catch(function() {});
     }
 
-    function populateStaffSelects() {
-      var selects = document.querySelectorAll('.staff-select');
-      selects.forEach(function(sel) {
-        var currentVal = sel.value;
-        sel.innerHTML = '<option value="">担当スタッフを選択</option>';
-        staffList.forEach(function(name) {
-          if (name === 'オーナー') return; // 最後に追加するのでスキップ
-          var opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          sel.appendChild(opt);
+    function renderStaffCheckboxes() {
+      var container = document.getElementById('staffCheckboxList');
+      if (!container) return;
+      // 既存のチェック状態を保持
+      var currentSelected = getSelectedStaffNames();
+      container.innerHTML = '';
+      // オーナー以外のスタッフを先に表示
+      var orderedList = staffList.filter(function(n) { return n !== 'オーナー'; });
+      orderedList.push('オーナー');
+      orderedList.forEach(function(name) {
+        var label = document.createElement('label');
+        label.className = 'staff-check-item';
+        var isChecked = currentSelected.indexOf(name) !== -1 || (!currentSelected.length && staffName && staffName === name);
+        if (isChecked) label.classList.add('checked');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = name;
+        cb.checked = isChecked;
+        cb.addEventListener('change', function() {
+          label.classList.toggle('checked', cb.checked);
+          updateSettingsTabVisibility();
+          saveStaffSelectionToServer();
         });
-        // 「オーナー」を常に最後に表示
-        var ownerOpt = document.createElement('option');
-        ownerOpt.value = 'オーナー';
-        ownerOpt.textContent = 'オーナー';
-        sel.appendChild(ownerOpt);
-        // 初期選択: URLパラメータのstaffNameに一致するものがあれば選択
-        if (!currentVal && staffName) {
-          sel.value = staffName;
-        } else if (currentVal) {
-          sel.value = currentVal;
-        }
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(name));
+        container.appendChild(label);
       });
-      // ラベルの表示制御: 未選択時のみ表示
-      updateStaffLabel();
-      // 設定タブの表示制御: オーナー選択時のみ表示
       updateSettingsTabVisibility();
     }
 
-    function updateStaffLabel() {
-      var label = document.getElementById('staffSelectorLabel');
-      var firstSelect = document.getElementById('staffSelect0');
-      if (label && firstSelect) {
-        label.style.display = firstSelect.value ? 'none' : '';
-      }
-    }
-
     function updateSettingsTabVisibility() {
-      var firstSelect = document.getElementById('staffSelect0');
-      var isOwner = firstSelect && firstSelect.value === 'オーナー';
+      var isOwner = getSelectedStaffNames().indexOf('オーナー') !== -1;
       var settingsBtn = document.querySelector('.tab-nav-btn[data-tab="clSettings"]');
       if (settingsBtn) settingsBtn.style.display = isOwner ? '' : 'none';
-      // オーナーでない場合に設定タブが表示中なら切り替え
       if (!isOwner) {
         var settingsTab = document.getElementById('tabClSettings');
         if (settingsTab && settingsTab.classList.contains('active')) {
@@ -2215,31 +2215,10 @@
       }
     }
 
-    function addStaffRow() {
-      var container = document.getElementById('staffSelector');
-      var idx = staffRowCount;
-      staffRowCount++;
-      var row = document.createElement('div');
-      row.className = 'staff-row';
-      row.id = 'staffRow' + idx;
-      row.innerHTML = '<select class="staff-select" id="staffSelect' + idx + '"></select>' +
-        '<button class="staff-remove-btn" onclick="removeStaffRow(' + idx + ')" title="削除">✕</button>';
-      container.appendChild(row);
-      populateStaffSelects();
-    }
-
-    function removeStaffRow(idx) {
-      var row = document.getElementById('staffRow' + idx);
-      if (row) {
-        row.remove();
-        saveStaffSelectionToServer();
-      }
-    }
-
     function getSelectedStaffNames() {
       var names = [];
-      document.querySelectorAll('.staff-select').forEach(function(sel) {
-        var v = sel.value.trim();
+      document.querySelectorAll('#staffCheckboxList input[type="checkbox"]:checked').forEach(function(cb) {
+        var v = cb.value.trim();
         if (v && names.indexOf(v) === -1) names.push(v);
       });
       return names;
@@ -2259,37 +2238,41 @@
     }
 
     // サーバーから受信したスタッフ選択をUIに反映
-    // selectedStaff: 全端末の和集合（表示用）, myStaff: 自端末の選択（ドロップダウン用）
-    // ドロップダウンには myStaff のみ設定し、他端末分は読み取り専用で表示
-    // → 保存時にドロップダウンの値だけが送信されるため「粘着ユニオン問題」を防止
+    // selectedStaff: 全端末の和集合（表示用）, myStaff: 自端末の選択（チェックボックス用）
+    // チェックボックスには myStaff のみ設定し、他端末分は読み取り専用で表示
+    // → 保存時にチェックボックスの値だけが送信されるため「粘着ユニオン問題」を防止
     function applyStaffSelection(selectedStaff, myStaff) {
       if (!selectedStaff || !Array.isArray(selectedStaff)) selectedStaff = [];
       if (!myStaff || !Array.isArray(myStaff)) myStaff = localStaffNames || [];
       // 保存中は同期データで上書きしない
       if (staffSelectionSaving) return;
 
-      // --- ドロップダウン: 自端末分のみ ---
+      // --- チェックボックス: 自端末分のみ ---
       var currentLocal = getSelectedStaffNames();
       if (JSON.stringify(currentLocal) !== JSON.stringify(myStaff)) {
-        var container = document.getElementById('staffSelector');
-        container.querySelectorAll('.staff-row').forEach(function(row) {
-          if (!row.querySelector('#staffSelect0')) row.remove();
+        document.querySelectorAll('#staffCheckboxList input[type="checkbox"]').forEach(function(cb) {
+          var isMyStaff = myStaff.indexOf(cb.value) !== -1;
+          cb.checked = isMyStaff;
+          var label = cb.closest('.staff-check-item');
+          if (label) {
+            label.classList.toggle('checked', isMyStaff);
+            label.classList.remove('remote');
+          }
         });
-        staffRowCount = 1;
-
-        var firstSelect = document.getElementById('staffSelect0');
-        if (firstSelect) firstSelect.value = myStaff[0] || '';
-
-        for (var i = 1; i < myStaff.length; i++) {
-          addStaffRow();
-          var sel = document.getElementById('staffSelect' + (staffRowCount - 1));
-          if (sel) sel.value = myStaff[i];
-        }
       }
 
-      // --- 他端末の担当表示（読み取り専用） ---
+      // --- 他端末の担当表示 ---
       var remoteOnly = selectedStaff.filter(function(name) {
         return myStaff.indexOf(name) === -1;
+      });
+      // 他端末で選択中のスタッフにリモート表示を付ける
+      document.querySelectorAll('#staffCheckboxList input[type="checkbox"]').forEach(function(cb) {
+        var label = cb.closest('.staff-check-item');
+        if (label && !cb.checked && remoteOnly.indexOf(cb.value) !== -1) {
+          label.classList.add('remote');
+        } else if (label) {
+          label.classList.remove('remote');
+        }
       });
       var infoEl = document.getElementById('remoteStaffInfo');
       if (infoEl) {
@@ -2302,7 +2285,6 @@
         }
       }
 
-      updateStaffLabel();
       updateSettingsTabVisibility();
     }
 
@@ -6391,7 +6373,7 @@
       // 連絡事項（編集可能）
       html += '<div style="margin-top:12px;">';
       html += '<div style="font-size:13px;font-weight:700;color:#2c3e50;margin-bottom:6px;"><i class="bi bi-chat-left-text" style="margin-right:4px;"></i>連絡事項</div>';
-      html += '<textarea id="nextResNotice" class="form-control form-control-sm" rows="3" placeholder="連絡事項を入力…" style="font-size:13px;" data-row="' + (nr.rowNumber || '') + '">' + escapeHtml(nr.cleaningNotice || '') + '</textarea>';
+      html += '<textarea id="nextResNotice" class="form-control form-control-sm" rows="3" placeholder="連絡事項を入力…" style="font-size:13px;width:100%;box-sizing:border-box;" data-row="' + (nr.rowNumber || '') + '">' + escapeHtml(nr.cleaningNotice || '') + '</textarea>';
       html += '<div class="text-end mt-1"><button id="btnSaveNextResNotice" class="btn btn-sm btn-primary" style="font-size:12px;" onclick="saveNextResNotice()">保存</button></div>';
       html += '</div>';
       el.innerHTML = html;

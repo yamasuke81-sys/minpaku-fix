@@ -1052,14 +1052,13 @@ function saveStaffSelection(checkoutDate, staffNames, dId) {
     var sheet = clSheet_(SHEET_CL_STAFF_SELECTION);
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
-    var deviceId = dId || 'unknown';
 
-    // この端末の既存レコードを探す
+    // この日付の既存レコードを探す（端末区別なし・日付ごとに1レコード）
     var existingRow = -1;
     if (lastRow >= 2) {
       var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
       for (var i = 0; i < data.length; i++) {
-        if (normDateStr_(data[i][0]) === targetDate && data[i][3] === deviceId) {
+        if (normDateStr_(data[i][0]) === targetDate) {
           existingRow = i + 2;
           break;
         }
@@ -1070,12 +1069,10 @@ function saveStaffSelection(checkoutDate, staffNames, dId) {
     var namesJson = JSON.stringify(staffNames || []);
 
     if (existingRow > 0) {
-      // この端末の既存レコードを更新
-      sheet.getRange(existingRow, 2, 1, 3).setValues([[namesJson, now, deviceId]]);
+      sheet.getRange(existingRow, 2, 1, 2).setValues([[namesJson, now]]);
     } else {
-      // 新規レコードを追加
       var nextRow = sheet.getLastRow() + 1;
-      sheet.getRange(nextRow, 1, 1, 4).setValues([[checkoutDate, namesJson, now, deviceId]]);
+      sheet.getRange(nextRow, 1, 1, 3).setValues([[checkoutDate, namesJson, now]]);
     }
 
     return JSON.stringify({ success: true });
@@ -1087,20 +1084,17 @@ function saveStaffSelection(checkoutDate, staffNames, dId) {
 }
 
 /**
- * スタッフ選択を取得（全端末の和集合を返す）
- * 24時間以上古いレコードは無視（古い端末データの除外）
+ * スタッフ選択を取得（日付ごとに1レコード・端末区別なし）
  * @param {string} checkoutDate
- * @return {string[]} 選択されたスタッフ名の配列（重複なし）
+ * @return {string[]} 選択されたスタッフ名の配列
  */
 function getStaffSelection_(checkoutDate) {
   return getStaffSelectionDetailed_(checkoutDate, '').merged;
 }
 
 /**
- * スタッフ選択を詳細取得（和集合 + 自端末分）
- * @param {string} checkoutDate
- * @param {string} deviceId - 端末識別ID（空文字の場合 myStaff は空配列）
- * @return {{ merged: string[], myStaff: string[] }}
+ * スタッフ選択を取得（後方互換のためmerged/myStaff形式で返す）
+ * 端末区別は廃止。全端末で同一のリストを共有する。
  */
 function getStaffSelectionDetailed_(checkoutDate, deviceId) {
   try {
@@ -1108,28 +1102,18 @@ function getStaffSelectionDetailed_(checkoutDate, deviceId) {
     var targetDate = normDateStr_(checkoutDate);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return { merged: [], myStaff: [] };
-    var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-    var cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    var merged = {};
-    var myStaff = [];
+    var data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
     for (var i = 0; i < data.length; i++) {
       if (normDateStr_(data[i][0]) !== targetDate) continue;
-      var ts = data[i][2];
-      if (ts instanceof Date && ts < cutoff) continue;
       try {
         var names = JSON.parse(data[i][1]);
         if (Array.isArray(names)) {
-          for (var j = 0; j < names.length; j++) {
-            if (names[j]) merged[names[j]] = true;
-          }
-          // この端末のレコードなら myStaff に設定
-          if (deviceId && data[i][3] === deviceId) {
-            myStaff = names.filter(function(n) { return !!n; });
-          }
+          var filtered = names.filter(function(n) { return !!n; });
+          return { merged: filtered, myStaff: filtered };
         }
       } catch (e) {}
     }
-    return { merged: Object.keys(merged), myStaff: myStaff };
+    return { merged: [], myStaff: [] };
   } catch (e) {
     return { merged: [], myStaff: [] };
   }

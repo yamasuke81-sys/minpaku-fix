@@ -95,12 +95,6 @@
       border-color: #28a745;
       color: #155724;
     }
-    .staff-check-item.remote {
-      background: #eaf4fd;
-      border-color: #90caf9;
-      color: #1565c0;
-      opacity: 0.8;
-    }
     .staff-check-item input[type="checkbox"] {
       width: 18px;
       height: 18px;
@@ -1531,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320c</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320d</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1571,7 +1565,6 @@
       <div class="staff-selector" id="staffSelector" style="background:#f0f8ff;border:2px solid #3498db;border-radius:8px;padding:10px 12px;margin:10px 12px 4px;">
         <div style="font-size:12px;font-weight:bold;color:#2c3e50;margin-bottom:6px;">担当スタッフ</div>
         <div id="staffCheckboxList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        <div id="remoteStaffInfo" style="display:none;font-size:11px;color:#7f8c8d;margin-top:6px;padding:4px 6px;background:#eaf4fd;border-radius:4px;"></div>
       </div>
 
       <!-- 全体操作バー -->
@@ -1973,8 +1966,6 @@
     })();
     // bookingData removed: 次回予約は次回タブに統合
     var staffList = [];
-    // 自端末が選択したスタッフ名（保存対象はこれのみ、同期による吸収を防止）
-    var localStaffNames = [];
     var saveIndicatorTimer = null;
     // メモ写真用
     var pendingMemoPhotoFileId = null;
@@ -2085,8 +2076,7 @@
             renderSupplyList();
             updateProgress();
             updateCheckAllButton();
-            // スタッフ選択を反映（自端末分のみドロップダウンに設定、他端末分は表示のみ）
-            localStaffNames = res.myStaff || localStaffNames;
+            // スタッフ選択を反映（全端末共有）
             applyStaffSelection(res.selectedStaff, res.myStaff);
             // 折りたたみ状態とタブを復元
             restoreCollapseState(collapseState);
@@ -2224,11 +2214,9 @@
       return names;
     }
 
-    // スタッフ選択をバックエンドに保存（端末ごとに保存し、全端末の和集合で同期）
+    // スタッフ選択をバックエンドに保存（全端末で共有・端末区別なし）
     function saveStaffSelectionToServer() {
       var names = getSelectedStaffNames();
-      // 自端末の選択を更新（同期で他端末の名前が混入するのを防止）
-      localStaffNames = names;
       staffSelectionSaving = true;
       showSaveStatus('saving');
       callGAS('saveStaffSelection', [checkoutDate, names, deviceId]).then(function(res) {
@@ -2240,52 +2228,22 @@
       });
     }
 
-    // サーバーから受信したスタッフ選択をUIに反映
-    // selectedStaff: 全端末の和集合（表示用）, myStaff: 自端末の選択（チェックボックス用）
-    // チェックボックスには myStaff のみ設定し、他端末分は読み取り専用で表示
-    // → 保存時にチェックボックスの値だけが送信されるため「粘着ユニオン問題」を防止
+    // サーバーから受信したスタッフ選択をUIに反映（全端末共有）
     function applyStaffSelection(selectedStaff, myStaff) {
-      if (!selectedStaff || !Array.isArray(selectedStaff)) selectedStaff = [];
-      if (!myStaff || !Array.isArray(myStaff)) myStaff = localStaffNames || [];
+      // 端末区別なし: selectedStaff（=myStaff）をそのまま反映
+      var staff = selectedStaff || myStaff || [];
+      if (!Array.isArray(staff)) staff = [];
       // 保存中は同期データで上書きしない
       if (staffSelectionSaving) return;
 
-      // --- チェックボックス: 自端末分のみ ---
-      var currentLocal = getSelectedStaffNames();
-      if (JSON.stringify(currentLocal) !== JSON.stringify(myStaff)) {
+      var currentSelected = getSelectedStaffNames();
+      if (JSON.stringify(currentSelected.sort()) !== JSON.stringify(staff.slice().sort())) {
         document.querySelectorAll('#staffCheckboxList input[type="checkbox"]').forEach(function(cb) {
-          var isMyStaff = myStaff.indexOf(cb.value) !== -1;
-          cb.checked = isMyStaff;
+          var isSelected = staff.indexOf(cb.value) !== -1;
+          cb.checked = isSelected;
           var label = cb.closest('.staff-check-item');
-          if (label) {
-            label.classList.toggle('checked', isMyStaff);
-            label.classList.remove('remote');
-          }
+          if (label) label.classList.toggle('checked', isSelected);
         });
-      }
-
-      // --- 他端末の担当表示 ---
-      var remoteOnly = selectedStaff.filter(function(name) {
-        return myStaff.indexOf(name) === -1;
-      });
-      // 他端末で選択中のスタッフにリモート表示を付ける
-      document.querySelectorAll('#staffCheckboxList input[type="checkbox"]').forEach(function(cb) {
-        var label = cb.closest('.staff-check-item');
-        if (label && !cb.checked && remoteOnly.indexOf(cb.value) !== -1) {
-          label.classList.add('remote');
-        } else if (label) {
-          label.classList.remove('remote');
-        }
-      });
-      var infoEl = document.getElementById('remoteStaffInfo');
-      if (infoEl) {
-        if (remoteOnly.length > 0) {
-          infoEl.textContent = '他の端末: ' + remoteOnly.join(', ');
-          infoEl.style.display = '';
-        } else {
-          infoEl.textContent = '';
-          infoEl.style.display = 'none';
-        }
       }
 
       updateSettingsTabVisibility();
@@ -2634,8 +2592,7 @@
             renderMemos();
             renderSupplyList();
             updateProgress();
-            // サーバーに保存済みのスタッフ選択を反映（自端末分をドロップダウンに、他端末分は表示のみ）
-            localStaffNames = checklistRes.myStaff || [];
+            // サーバーに保存済みのスタッフ選択を反映（全端末共有）
             applyStaffSelection(checklistRes.selectedStaff, checklistRes.myStaff);
           } catch (e) {
             console.error('初期レンダリングエラー:', e);
@@ -6403,9 +6360,10 @@
     window.saveNextResNotice = saveNextResNotice;
 
     function getSelectedStaffName_() {
-      var selects = document.querySelectorAll('[id^="staffSelect"]');
-      for (var i = 0; i < selects.length; i++) {
-        if (selects[i].value) return selects[i].value;
+      // チェックボックス式: 最初にチェックされたスタッフ名を返す
+      var checked = document.querySelectorAll('#staffCheckboxList input[type="checkbox"]:checked');
+      for (var i = 0; i < checked.length; i++) {
+        if (checked[i].value) return checked[i].value;
       }
       return '';
     }

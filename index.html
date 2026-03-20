@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1251,7 +1251,7 @@
         </div>
       </div>
       <div class="small text-muted mb-2">
-        <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済
+        <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済 <span style="display:inline-block;width:16px;height:16px;border:2px solid #0d6efd;border-radius:3px;background:#e8f0fe;vertical-align:middle;"></span>=今日
       </div>
       <div id="staffResponseContent" style="overflow-x:auto;"></div>
     </div>
@@ -5337,7 +5337,8 @@
       function renderStaffResponseCalendar(list, monthStr) {
         var container = document.getElementById('staffResponseContent');
         if (!container) return;
-        // 対象月の日付リストを作成
+        var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // 対象月
         var ym = monthStr ? monthStr.split('-') : null;
         var year, month;
         if (ym && ym.length === 2) {
@@ -5348,26 +5349,32 @@
           year = now.getFullYear();
           month = now.getMonth() + 1;
         }
-        var daysInMonth = new Date(year, month, 0).getDate();
         var dayNames = ['日','月','火','水','木','金','土'];
+        var todayStr = new Date().toISOString().slice(0, 10);
+
+        // 前月・当月・翌月の日付リストを生成
+        var months = [];
+        for (var mi = -1; mi <= 1; mi++) {
+          var mDate = new Date(year, month - 1 + mi, 1);
+          var mY = mDate.getFullYear();
+          var mM = mDate.getMonth() + 1;
+          var mDays = new Date(mY, mM, 0).getDate();
+          months.push({ year: mY, month: mM, days: mDays });
+        }
 
         // 募集データを日付→募集情報にマッピング
         var recruitByDate = {};
         list.forEach(function(r) {
           if (r.status === 'キャンセル済み') return;
           var d = (r.checkoutDate || '').slice(0, 10);
-          // 同一日付で複数ある場合は非キャンセルを優先
           if (recruitByDate[d]) {
-            var existing = recruitByDate[d];
-            if ((existing.status === 'キャンセル済み') && r.status !== 'キャンセル済み') {
-              recruitByDate[d] = r;
-            }
+            if (recruitByDate[d].status === 'キャンセル済み') recruitByDate[d] = r;
           } else {
             recruitByDate[d] = r;
           }
         });
 
-        // スタッフ名一覧を収集（全募集の volunteers から）
+        // スタッフ名一覧を収集
         var staffSet = {};
         var staffOrder = [];
         list.forEach(function(r) {
@@ -5385,30 +5392,75 @@
           return;
         }
 
-        // テーブル構築
-        var html = '<table class="table table-bordered table-sm mb-0" style="font-size:12px;white-space:nowrap;min-width:' + (120 + daysInMonth * 38) + 'px;">';
-        // ヘッダー: 月表示
-        html += '<thead><tr><th style="position:sticky;left:0;z-index:2;background:#f8f9fa;min-width:80px;">' + month + '月</th>';
-        for (var d = 1; d <= daysInMonth; d++) {
-          var dt = new Date(year, month - 1, d);
+        // カラーテーマ
+        var C = isDark ? {
+          headerBg: '#1a1a2e', stickyBg: '#16213e', stickyBorder: '#495057',
+          noRecruit: '#1c1c1c', cellBg: '#0f0f23', tableBorder: '#495057',
+          todayBg: '#1a3a5c', todayBorder: '#0d6efd',
+          confirmedBorder: '#dc3545', confirmedBg: '#3d1a1e',
+          monthSepBg: '#2c2c44', monthSepColor: '#adb5bd',
+          symOk: '#4cdf7f', symHold: '#ffc107', symNg: '#ff6b6b', symNone: '#6c757d',
+          sunColor: '#ff6b6b', satColor: '#6bb3ff', dayColor: '#ccc'
+        } : {
+          headerBg: '#f8f9fa', stickyBg: '#fff', stickyBorder: '#dee2e6',
+          noRecruit: '#f5f5f5', cellBg: '', tableBorder: '#dee2e6',
+          todayBg: '#e8f0fe', todayBorder: '#0d6efd',
+          confirmedBorder: '#dc3545', confirmedBg: '#fff5f5',
+          monthSepBg: '#e9ecef', monthSepColor: '#495057',
+          symOk: '#198754', symHold: '#cc9a06', symNg: '#dc3545', symNone: '#adb5bd',
+          sunColor: '#dc3545', satColor: '#0d6efd', dayColor: ''
+        };
+
+        // 全日付カラムを生成
+        var allDates = [];
+        months.forEach(function(m) {
+          for (var d = 1; d <= m.days; d++) {
+            allDates.push({
+              year: m.year, month: m.month, day: d,
+              dateStr: m.year + '-' + String(m.month).padStart(2, '0') + '-' + String(d).padStart(2, '0'),
+              isCurrentMonth: m.month === month && m.year === year
+            });
+          }
+        });
+
+        var totalCols = allDates.length;
+        var html = '<table class="table table-sm mb-0" style="font-size:12px;white-space:nowrap;border-collapse:collapse;min-width:' + (100 + totalCols * 36) + 'px;">';
+
+        // ヘッダー行1: 月ラベル（colspan）
+        html += '<thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:3;background:' + C.headerBg + ';min-width:80px;border:1px solid ' + C.tableBorder + ';vertical-align:middle;">スタッフ</th>';
+        months.forEach(function(m) {
+          var isCurrent = m.month === month && m.year === year;
+          var mBg = isCurrent ? C.headerBg : C.monthSepBg;
+          var mColor = isCurrent ? '' : C.monthSepColor;
+          html += '<th colspan="' + m.days + '" class="text-center" style="background:' + mBg + ';' + (mColor ? 'color:' + mColor + ';' : '') + 'border:1px solid ' + C.tableBorder + ';font-size:13px;">' + m.month + '月</th>';
+        });
+        html += '</tr>';
+
+        // ヘッダー行2: 日付+曜日
+        html += '<tr>';
+        allDates.forEach(function(dd) {
+          var dt = new Date(dd.year, dd.month - 1, dd.day);
           var dow = dt.getDay();
-          var dowColor = dow === 0 ? 'color:#dc3545;' : (dow === 6 ? 'color:#0d6efd;' : '');
-          var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-          var hasRecruit = !!recruitByDate[dateStr];
-          var bgStyle = hasRecruit ? '' : 'background:#f5f5f5;';
-          html += '<th class="text-center" style="min-width:34px;' + dowColor + bgStyle + '"><div>' + d + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
-        }
+          var isToday = dd.dateStr === todayStr;
+          var hasRecruit = !!recruitByDate[dd.dateStr];
+          var dowColor = dow === 0 ? C.sunColor : (dow === 6 ? C.satColor : C.dayColor);
+          var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
+          var borderStyle = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
+          html += '<th class="text-center" style="min-width:34px;color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+        });
         html += '</tr></thead><tbody>';
 
         // 各スタッフ行
         staffOrder.forEach(function(staffName) {
-          html += '<tr><td style="position:sticky;left:0;z-index:1;background:#fff;font-weight:bold;border-right:2px solid #dee2e6;">' + escapeHtml(staffName) + '</td>';
-          for (var d = 1; d <= daysInMonth; d++) {
-            var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-            var recruit = recruitByDate[dateStr];
+          html += '<tr><td style="position:sticky;left:0;z-index:1;background:' + C.stickyBg + ';font-weight:bold;border:1px solid ' + C.tableBorder + ';border-right:2px solid ' + C.stickyBorder + ';">' + escapeHtml(staffName) + '</td>';
+          allDates.forEach(function(dd) {
+            var isToday = dd.dateStr === todayStr;
+            var recruit = recruitByDate[dd.dateStr];
             if (!recruit) {
-              html += '<td class="text-center" style="background:#f5f5f5;">-</td>';
-              continue;
+              var emptyBg = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.noRecruit);
+              var emptyBorder = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
+              html += '<td class="text-center" style="background:' + emptyBg + ';' + emptyBorder + 'color:' + C.symNone + ';">-</td>';
+              return;
             }
             // このスタッフの回答を探す
             var vol = null;
@@ -5421,22 +5473,22 @@
               }
             }
             var resp = vol ? (vol.response || '未回答') : '未回答';
-            var symbol = '', cls = '';
-            if (resp === '◎') { symbol = '●'; cls = 'text-success fw-bold'; }
-            else if (resp === '△') { symbol = '▲'; cls = 'text-warning fw-bold'; }
-            else if (resp === '×') { symbol = '✖'; cls = 'text-danger fw-bold'; }
-            else { symbol = '−'; cls = 'text-muted'; }
+            var symbol = '', symColor = '';
+            if (resp === '◎') { symbol = '●'; symColor = C.symOk; }
+            else if (resp === '△') { symbol = '▲'; symColor = C.symHold; }
+            else if (resp === '×') { symbol = '✖'; symColor = C.symNg; }
+            else { symbol = '−'; symColor = C.symNone; }
             // 確定済みかどうか
             var isConfirmed = false;
             var selectedStaff = (recruit.selectedStaff || '').trim();
             if (selectedStaff && (recruit.status === '選定済' || recruit.status === 'スタッフ確定済み')) {
-              // selectedStaffにこのスタッフ名が含まれるかチェック（カンマ区切り対応）
               var confirmedNames = selectedStaff.split(/[,、\s]+/).map(function(s) { return s.trim(); });
               isConfirmed = confirmedNames.indexOf(staffName) >= 0;
             }
-            var cellStyle = isConfirmed ? 'border:2px solid #dc3545;background:#fff5f5;' : '';
-            html += '<td class="text-center ' + cls + '" style="' + cellStyle + '">' + symbol + '</td>';
-          }
+            var cellBg = isConfirmed ? C.confirmedBg : (isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.cellBg));
+            var cellBorder = isConfirmed ? 'border:2.5px solid ' + C.confirmedBorder + ';' : (isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';');
+            html += '<td class="text-center" style="' + cellBorder + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
+          });
           html += '</tr>';
         });
 

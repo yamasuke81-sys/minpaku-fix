@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5428,7 +5428,7 @@
         var html = '<table class="table table-sm mb-0" style="font-size:12px;white-space:nowrap;border-collapse:collapse;min-width:' + (100 + totalCols * 36) + 'px;">';
 
         // ヘッダー行1: 月ラベル（colspan）
-        html += '<thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:3;background:' + C.headerBg + ';min-width:80px;border:1px solid ' + C.tableBorder + ';vertical-align:middle;' + (C.stickyColor ? 'color:' + C.stickyColor + ';' : '') + '">スタッフ</th>';
+        html += '<thead><tr><th rowspan="2" style="position:sticky;left:0;z-index:3;background:' + C.headerBg + ';min-width:80px;max-width:90px;border:1px solid ' + C.tableBorder + ';vertical-align:middle;' + (C.stickyColor ? 'color:' + C.stickyColor + ';' : '') + '">スタッフ</th>';
         months.forEach(function(m) {
           var isCurrent = m.month === month && m.year === year;
           var mBg = isCurrent ? C.headerBg : C.monthSepBg;
@@ -5455,7 +5455,7 @@
 
         // 各スタッフ行
         staffOrder.forEach(function(staffName) {
-          html += '<tr><td style="position:sticky;left:0;z-index:1;background:' + C.stickyBg + ';font-weight:bold;border:1px solid ' + C.tableBorder + ';border-right:2px solid ' + C.stickyBorder + ';' + (C.stickyColor ? 'color:' + C.stickyColor + ';' : '') + '">' + escapeHtml(staffName) + '</td>';
+          html += '<tr><td style="position:sticky;left:0;z-index:1;background:' + C.stickyBg + ';font-weight:bold;border:1px solid ' + C.tableBorder + ';border-right:2px solid ' + C.stickyBorder + ';max-width:90px;overflow:hidden;text-overflow:ellipsis;' + (C.stickyColor ? 'color:' + C.stickyColor + ';' : '') + '">' + escapeHtml(staffName) + '</td>';
           allDates.forEach(function(dd) {
             var isToday = dd.dateStr === todayStr;
             var recruit = recruitByDate[dd.dateStr];
@@ -5489,8 +5489,9 @@
               isConfirmed = confirmedNames.indexOf(staffName) >= 0;
             }
             var cellBg = isConfirmed ? C.confirmedBg : (isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.cellBg));
-            var cellBorder = isConfirmed ? 'border:2.5px solid ' + C.confirmedBorder + ';' : (isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';');
-            html += '<td class="text-center sr-staff-cell" data-sr-date="' + dd.dateStr + '" data-sr-staff="' + escapeHtml(staffName) + '" style="cursor:pointer;' + cellBorder + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
+            var cellBorder = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
+            var cellShadow = isConfirmed ? 'box-shadow:inset 0 0 0 2px ' + C.confirmedBorder + ';' : '';
+            html += '<td class="text-center sr-staff-cell" data-sr-date="' + dd.dateStr + '" data-sr-staff="' + escapeHtml(staffName) + '" style="cursor:pointer;' + cellBorder + cellShadow + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
           });
           html += '</tr>';
         });

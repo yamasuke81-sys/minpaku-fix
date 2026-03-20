@@ -1531,7 +1531,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320b</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320c</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -2230,10 +2230,13 @@
       // 自端末の選択を更新（同期で他端末の名前が混入するのを防止）
       localStaffNames = names;
       staffSelectionSaving = true;
+      showSaveStatus('saving');
       callGAS('saveStaffSelection', [checkoutDate, names, deviceId]).then(function(res) {
         staffSelectionSaving = false;
+        showSaveStatus(res && res.success ? 'saved' : 'error');
       }).catch(function() {
         staffSelectionSaving = false;
+        showSaveStatus('error');
       });
     }
 

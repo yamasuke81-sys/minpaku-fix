@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320d</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0320e</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6140,9 +6140,24 @@
     }
 
     function doLaundryStep(step, btn) {
-      var sName = getSelectedStaffName_() || staffName || '';
-      if (!sName) { alert('スタッフを選択してください'); return; }
+      var selectedNames = getSelectedStaffNames();
       var labels = { sent: 'コインランドリーに出した', received: 'コインランドリーから回収した', returned: 'リネンを施設に戻した' };
+
+      // スタッフ未選択
+      if (selectedNames.length === 0 && !staffName) { alert('スタッフを選択してください'); return; }
+
+      // 複数人選択中 → 誰が実行するか選択
+      if (selectedNames.length > 1 && !btn._laundryStaff) {
+        showLaundryStaffPicker(selectedNames, function(picked) {
+          btn._laundryStaff = picked;
+          doLaundryStep(step, btn);
+        });
+        return;
+      }
+
+      var sName = btn._laundryStaff || selectedNames[0] || staffName || '';
+      btn._laundryStaff = null;
+
       // confirm()はiOS Safariでブロックされるため2タップ方式
       if (!btn._confirmReady) {
         btn._confirmReady = true;
@@ -6167,6 +6182,36 @@
       callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
         if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
       }).catch(function(e) { alert('通信エラー'); btn.disabled = false; });
+    }
+
+    // コインランドリー実行者選択ダイアログ
+    function showLaundryStaffPicker(names, callback) {
+      // 既存のダイアログがあれば削除
+      var old = document.getElementById('laundryStaffPicker');
+      if (old) old.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'laundryStaffPicker';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;text-align:center;';
+      box.innerHTML = '<div style="font-weight:bold;font-size:15px;margin-bottom:14px;">誰がコインランドリーに行きますか？</div>';
+      names.forEach(function(name) {
+        var btn = document.createElement('button');
+        btn.textContent = name;
+        btn.style.cssText = 'display:block;width:100%;padding:12px;margin:6px 0;border:1px solid #3498db;border-radius:8px;background:#f0f8ff;color:#2c3e50;font-size:15px;font-weight:bold;cursor:pointer;';
+        btn.addEventListener('click', function() {
+          overlay.remove();
+          callback(name);
+        });
+        box.appendChild(btn);
+      });
+      var cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'キャンセル';
+      cancelBtn.style.cssText = 'display:block;width:100%;padding:10px;margin-top:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;';
+      cancelBtn.addEventListener('click', function() { overlay.remove(); });
+      box.appendChild(cancelBtn);
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
     }
 
     function cancelLaundryStep(step, btn) {

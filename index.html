@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320i</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5436,7 +5436,7 @@
         });
         html += '</tr>';
 
-        // ヘッダー行2: 日付+曜日
+        // ヘッダー行2: 日付+曜日（オーナーは募集日タップで確定・編集可能）
         html += '<tr>';
         allDates.forEach(function(dd) {
           var dt = new Date(dd.year, dd.month - 1, dd.day);
@@ -5446,7 +5446,8 @@
           var dowColor = dow === 0 ? C.sunColor : (dow === 6 ? C.satColor : C.dayColor);
           var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
           var borderStyle = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
-          html += '<th class="text-center" style="min-width:34px;color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+          var clickAttr = hasRecruit ? ' class="text-center sr-date-header" data-sr-date="' + dd.dateStr + '" style="min-width:34px;cursor:pointer;color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"' : ' class="text-center" style="min-width:34px;color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"';
+          html += '<th' + clickAttr + '><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
         });
         html += '</tr></thead><tbody>';
 
@@ -5487,13 +5488,189 @@
             }
             var cellBg = isConfirmed ? C.confirmedBg : (isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.cellBg));
             var cellBorder = isConfirmed ? 'border:2.5px solid ' + C.confirmedBorder + ';' : (isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';');
-            html += '<td class="text-center" style="' + cellBorder + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
+            html += '<td class="text-center sr-staff-cell" data-sr-date="' + dd.dateStr + '" data-sr-staff="' + escapeHtml(staffName) + '" style="cursor:pointer;' + cellBorder + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
           });
           html += '</tr>';
         });
 
         html += '</tbody></table>';
         container.innerHTML = html;
+
+        // --- イベントハンドラー ---
+        // スタッフセルタップ: ログイン者自身のセル → 回答ダイアログ、オーナー → 募集編集モーダル
+        container.querySelectorAll('.sr-staff-cell').forEach(function(td) {
+          td.addEventListener('click', function() {
+            var dateStr = this.getAttribute('data-sr-date');
+            var cellStaff = this.getAttribute('data-sr-staff');
+            var recruit = recruitByDate[dateStr];
+            if (!recruit) return;
+            var curName = (window.currentUserName || '').trim();
+            var curEmail = (window.currentUserEmail || '').trim();
+            // オーナーモード → 募集編集モーダルを開く
+            if (window.isOwnerUser && !window.staffMode) {
+              openRecruitEditModalFromCalendar_(recruit);
+              return;
+            }
+            // スタッフモード: 自分のセルでなければ無視
+            var isMyCell = false;
+            if (curName && curName.toLowerCase() === cellStaff.toLowerCase()) isMyCell = true;
+            if (!isMyCell && curEmail) {
+              // emailでもチェック
+              if (recruit.volunteers) {
+                for (var vi = 0; vi < recruit.volunteers.length; vi++) {
+                  var v = recruit.volunteers[vi];
+                  if (v.staffName === cellStaff && (v.email || '').toLowerCase() === curEmail.toLowerCase()) { isMyCell = true; break; }
+                }
+              }
+            }
+            if (!isMyCell) return;
+            // 自分のセル → 回答ダイアログを表示
+            openStaffResponseDialog_(recruit, cellStaff);
+          });
+        });
+        // 日付ヘッダータップ: オーナー → 募集編集モーダル
+        container.querySelectorAll('.sr-date-header').forEach(function(th) {
+          th.addEventListener('click', function() {
+            if (!window.isOwnerUser || window.staffMode) return;
+            var dateStr = this.getAttribute('data-sr-date');
+            var recruit = recruitByDate[dateStr];
+            if (!recruit) return;
+            openRecruitEditModalFromCalendar_(recruit);
+          });
+        });
+      }
+
+      // 募集編集モーダルを開く（カレンダーから）
+      function openRecruitEditModalFromCalendar_(recruit) {
+        var r = {
+          rowIndex: recruit.rowIndex,
+          id: recruit.id,
+          checkoutDate: recruit.checkoutDate,
+          bookingRowNumber: recruit.bookingRowNumber || 0,
+          status: recruit.status || '募集中',
+          selectedStaff: recruit.selectedStaff || '',
+          notifyMethod: recruit.notifyMethod || 'メール',
+          volunteers: recruit.volunteers || [],
+          reserveDate: recruit.reserveDate || '',
+          reserveGuestCount: recruit.reserveGuestCount || '',
+          reserveBBQ: recruit.reserveBBQ || '',
+          reserveNationality: recruit.reserveNationality || '',
+          reserveBedCount: recruit.reserveBedCount || '',
+          reserveMemo: recruit.reserveMemo || '',
+          isNew: false
+        };
+        openRecruitEditModal(r);
+        var modal = new bootstrap.Modal(document.getElementById('recruitEditModal'));
+        modal.show();
+      }
+
+      // スタッフ回答ダイアログ（スタッフ回答一覧からの簡易版）
+      function openStaffResponseDialog_(recruit, staffName) {
+        // 既存ダイアログがあれば削除
+        var old = document.getElementById('srResponseDialog');
+        if (old) old.remove();
+
+        var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var myResp = '未回答', myMemo = '';
+        if (recruit.volunteers) {
+          recruit.volunteers.forEach(function(v) {
+            if (v.staffName === staffName) {
+              myResp = v.response || '未回答';
+              myMemo = v.memo || '';
+            }
+          });
+        }
+        var isConfirmedStatus = (recruit.status === 'スタッフ確定済み' || recruit.status === '選定済');
+
+        var overlay = document.createElement('div');
+        overlay.id = 'srResponseDialog';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+        var box = document.createElement('div');
+        box.style.cssText = 'width:100%;max-width:420px;border-radius:16px 16px 0 0;padding:20px;' + (isDark ? 'background:#1e1e2e;color:#e0e0e0;' : 'background:#fff;color:#333;');
+
+        var dateLabel = recruit.checkoutDate || '';
+        var headerHtml = '<div style="font-weight:bold;font-size:15px;margin-bottom:4px;">' + escapeHtml(dateLabel) + ' — ' + escapeHtml(staffName) + '</div>';
+        if (myResp !== '未回答') {
+          var respLabel = myResp === '◎' ? '● 対応可' : (myResp === '△' ? '▲ 条件付' : '✖ 不可');
+          headerHtml += '<div class="small" style="margin-bottom:8px;">現在の回答: <strong>' + respLabel + '</strong>' + (myMemo ? '（' + escapeHtml(myMemo) + '）' : '') + '</div>';
+        }
+
+        if (isConfirmedStatus) {
+          // 確定済み: 変更要請のみ
+          box.innerHTML = headerHtml +
+            '<div class="small text-muted mb-2 text-center">スタッフ確定済みのため、変更には要請が必要です</div>' +
+            '<div class="mb-2"><input type="text" class="form-control form-control-sm" id="srChangeMemo" placeholder="変更理由を記入"></div>' +
+            '<div class="d-flex gap-2 justify-content-center mb-2">' +
+            '<button class="btn btn-sm btn-outline-success fw-bold sr-change-btn" data-resp="◎">● 可に変更要請</button>' +
+            '<button class="btn btn-sm btn-outline-warning fw-bold sr-change-btn" data-resp="△">▲ 保留に変更要請</button>' +
+            '<button class="btn btn-sm btn-outline-danger fw-bold sr-change-btn" data-resp="×">✖ 不可に変更要請</button>' +
+            '</div>' +
+            '<button class="btn btn-sm btn-secondary w-100" id="srDialogClose">閉じる</button>';
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+          overlay.querySelector('#srDialogClose').onclick = function() { overlay.remove(); };
+          overlay.querySelectorAll('.sr-change-btn').forEach(function(btn) {
+            btn.onclick = function() {
+              var resp = btn.getAttribute('data-resp');
+              var memo = (document.getElementById('srChangeMemo').value || '').trim();
+              if (!memo) { alert('変更理由を入力してください。'); return; }
+              btn.disabled = true; btn.textContent = '送信中…';
+              google.script.run.withSuccessHandler(function(j) {
+                var res = JSON.parse(j);
+                if (res.success) {
+                  overlay.remove();
+                  alert('回答変更要請を送信しました。');
+                  loadStaffResponseCalendar(); loadAndRender();
+                } else { alert(res.error || '失敗'); btn.disabled = false; }
+              }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).requestResponseChange(recruit.id, window.currentUserName || '', window.currentUserEmail || '', resp, memo);
+            };
+          });
+        } else {
+          // 募集中: 回答ボタン
+          box.innerHTML = headerHtml +
+            '<div class="mb-2"><input type="text" class="form-control form-control-sm" id="srResponseMemo" placeholder="備考（例: 13:00以降は対応可）" value="' + escapeHtml(myMemo) + '"></div>' +
+            '<div class="d-flex gap-2 justify-content-center mb-2">' +
+            '<button class="btn btn-sm btn-success fw-bold sr-resp-btn" data-resp="◎">● 対応可</button>' +
+            '<button class="btn btn-sm btn-warning fw-bold sr-resp-btn" data-resp="△">▲ 条件付</button>' +
+            '<button class="btn btn-sm btn-danger fw-bold sr-resp-btn" data-resp="×">✖ 不可</button>' +
+            (myResp !== '未回答' ? '<button class="btn btn-sm btn-outline-secondary fw-bold" id="srRespDel">回答削除</button>' : '') +
+            '</div>' +
+            '<button class="btn btn-sm btn-secondary w-100" id="srDialogClose">閉じる</button>';
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+          overlay.querySelector('#srDialogClose').onclick = function() { overlay.remove(); };
+          overlay.querySelectorAll('.sr-resp-btn').forEach(function(btn) {
+            btn.onclick = function() {
+              var resp = btn.getAttribute('data-resp');
+              var memo = (document.getElementById('srResponseMemo').value || '').trim();
+              if (resp === '△' && !memo) { alert('「条件付」の場合は備考欄に条件を記入してください。'); return; }
+              btn.disabled = true; btn.textContent = '送信中…';
+              google.script.run.withSuccessHandler(function(j) {
+                var res = JSON.parse(j);
+                if (res.success) {
+                  overlay.remove();
+                  loadStaffResponseCalendar(); loadAndRender();
+                } else { alert(res.error || '失敗'); btn.disabled = false; }
+              }).withFailureHandler(function(e) { alert(e.message); btn.disabled = false; }).respondToRecruitment(recruit.id, window.currentUserName || '', window.currentUserEmail || '', resp, memo);
+            };
+          });
+          var delBtn = overlay.querySelector('#srRespDel');
+          if (delBtn) {
+            delBtn.onclick = function() {
+              if (!confirm('回答を削除しますか？')) return;
+              delBtn.disabled = true; delBtn.textContent = '削除中…';
+              google.script.run.withSuccessHandler(function(j) {
+                var res = JSON.parse(j);
+                if (res.success) {
+                  overlay.remove();
+                  loadStaffResponseCalendar(); loadAndRender();
+                } else { alert(res.error || '失敗'); delBtn.disabled = false; }
+              }).withFailureHandler(function(e) { alert(e.message); delBtn.disabled = false; }).cancelVolunteerForRecruitment(recruit.id, window.currentUserName || '', window.currentUserEmail || '');
+            };
+          }
+        }
+        // 背景タップで閉じる
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
       }
 
       window.recruitAddSortOrder = window.recruitAddSortOrder || 'desc';

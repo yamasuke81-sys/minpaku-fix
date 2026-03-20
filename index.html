@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1213,6 +1213,7 @@
     <ul class="nav nav-tabs mb-2" id="mainTabs">
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
       <li class="nav-item" id="navRecruit" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
+      <li class="nav-item" id="navStaffResponse" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="staffResponse">スタッフ回答一覧</a></li>
       <li class="nav-item" id="navStaffSchedule" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
       <li class="nav-item" id="navInvoice" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="invoice">請求書</a></li>
       <li class="nav-item" id="navNotifications" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
@@ -1241,6 +1242,18 @@
       <div id="recruitList"></div>
       <div id="recruitAddListArea" class="mb-3 mt-3"></div>
       <div id="recruitAddBtnArea" class="mt-2" style="display:none;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddRecruit">募集を手動で追加</button></div>
+    </div>
+    <div id="panelStaffResponse" style="display:none;">
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+        <p class="small fw-bold mb-0">スタッフ回答一覧</p>
+        <div class="d-flex gap-1 align-items-center">
+          <input type="month" class="form-control form-control-sm" id="staffResponseMonth" style="width:auto;">
+        </div>
+      </div>
+      <div class="small text-muted mb-2">
+        <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済
+      </div>
+      <div id="staffResponseContent" style="overflow-x:auto;"></div>
     </div>
     <div id="panelStaffSchedule" style="display:none;">
       <div class="mb-2"><label class="form-label small">表示月</label><input type="month" class="form-control form-control-sm" id="staffScheduleMonth" style="max-width:160px;"></div>
@@ -5184,8 +5197,8 @@
             document.querySelectorAll('#mainTabs .nav-link').forEach(function(l) { l.classList.remove('active'); });
             var activeLink = document.querySelector('#mainTabs [data-tab="' + tab + '"]');
             if (activeLink) activeLink.classList.add('active');
-            var panelIds = ['panelCalendar','panelRecruit','panelStaffSchedule','panelInvoice','panelNotifications','panelSettings','panelStaffTest'];
-            var tabMap = {'panelCalendar':'calendar','panelRecruit':'recruit','panelStaffSchedule':'staffSchedule','panelInvoice':'invoice','panelNotifications':'notifications','panelSettings':'settings','panelStaffTest':'staffTest'};
+            var panelIds = ['panelCalendar','panelRecruit','panelStaffResponse','panelStaffSchedule','panelInvoice','panelNotifications','panelSettings','panelStaffTest'];
+            var tabMap = {'panelCalendar':'calendar','panelRecruit':'recruit','panelStaffResponse':'staffResponse','panelStaffSchedule':'staffSchedule','panelInvoice':'invoice','panelNotifications':'notifications','panelSettings':'settings','panelStaffTest':'staffTest'};
             panelIds.forEach(function(id) {
               var el = document.getElementById(id);
               if (el) el.style.display = tab === tabMap[id] ? 'block' : 'none';
@@ -5198,6 +5211,7 @@
               });
             }
             if (tab === 'recruit') loadRecruitList();
+            if (tab === 'staffResponse') loadStaffResponseCalendar();
             if (tab === 'staffSchedule') loadStaffSchedule();
             if (tab === 'invoice') loadInvoiceData();
             if (tab === 'notifications') loadNotificationListMain();
@@ -5248,6 +5262,8 @@
               if (navInvoiceTab) navInvoiceTab.style.display = (window.staffMode || staffBarVisible) ? '' : 'none';
               var navRecruit = document.getElementById('navRecruit');
               if (navRecruit) navRecruit.style.display = (window.staffMode || staffBarVisible) ? 'none' : '';
+              var navStaffResp = document.getElementById('navStaffResponse');
+              if (navStaffResp) navStaffResp.style.display = (window.staffMode || staffBarVisible) ? 'none' : '';
               var btnSwitch = document.getElementById('btnAccountSwitch');
               if (btnSwitch && r.switchUrl && effectiveOwner && !window.staffMode && !window.readOnly) {
                 btnSwitch.href = r.switchUrl;
@@ -5277,6 +5293,7 @@
             notifTab.classList.add('active');
             document.getElementById('panelCalendar').style.display = 'none';
             document.getElementById('panelRecruit').style.display = 'none';
+            if (document.getElementById('panelStaffResponse')) document.getElementById('panelStaffResponse').style.display = 'none';
             if (document.getElementById('panelStaffSchedule')) document.getElementById('panelStaffSchedule').style.display = 'none';
             document.getElementById('panelInvoice').style.display = 'none';
             document.getElementById('panelNotifications').style.display = 'block';
@@ -5285,6 +5302,146 @@
             loadNotificationListMain();
           }
         });
+      }
+
+      // ===== スタッフ回答一覧カレンダー =====
+      function loadStaffResponseCalendar() {
+        var container = document.getElementById('staffResponseContent');
+        if (!container) return;
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm" role="status"></div> 読み込み中…</div>';
+        var monthInput = document.getElementById('staffResponseMonth');
+        if (monthInput && !monthInput.value) {
+          var now = new Date();
+          monthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        }
+        if (monthInput && !monthInput._bound) {
+          monthInput._bound = true;
+          monthInput.addEventListener('change', function() { loadStaffResponseCalendar(); });
+        }
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var res = JSON.parse(jsonStr);
+            if (!res.success || !res.list || !res.list.length) {
+              container.innerHTML = '<p class="text-muted small">募集データがありません。</p>';
+              return;
+            }
+            renderStaffResponseCalendar(res.list, monthInput ? monthInput.value : '');
+          } catch (e) {
+            container.innerHTML = '<p class="text-danger small">読み込みエラー</p>';
+          }
+        }).withFailureHandler(function(e) {
+          container.innerHTML = '<p class="text-danger small">通信エラー: ' + escapeHtml(String(e || '')) + '</p>';
+        }).getRecruitmentList();
+      }
+
+      function renderStaffResponseCalendar(list, monthStr) {
+        var container = document.getElementById('staffResponseContent');
+        if (!container) return;
+        // 対象月の日付リストを作成
+        var ym = monthStr ? monthStr.split('-') : null;
+        var year, month;
+        if (ym && ym.length === 2) {
+          year = parseInt(ym[0], 10);
+          month = parseInt(ym[1], 10);
+        } else {
+          var now = new Date();
+          year = now.getFullYear();
+          month = now.getMonth() + 1;
+        }
+        var daysInMonth = new Date(year, month, 0).getDate();
+        var dayNames = ['日','月','火','水','木','金','土'];
+
+        // 募集データを日付→募集情報にマッピング
+        var recruitByDate = {};
+        list.forEach(function(r) {
+          if (r.status === 'キャンセル済み') return;
+          var d = (r.checkoutDate || '').slice(0, 10);
+          // 同一日付で複数ある場合は非キャンセルを優先
+          if (recruitByDate[d]) {
+            var existing = recruitByDate[d];
+            if ((existing.status === 'キャンセル済み') && r.status !== 'キャンセル済み') {
+              recruitByDate[d] = r;
+            }
+          } else {
+            recruitByDate[d] = r;
+          }
+        });
+
+        // スタッフ名一覧を収集（全募集の volunteers から）
+        var staffSet = {};
+        var staffOrder = [];
+        list.forEach(function(r) {
+          if (!r.volunteers) return;
+          r.volunteers.forEach(function(v) {
+            if (!staffSet[v.staffName]) {
+              staffSet[v.staffName] = true;
+              staffOrder.push(v.staffName);
+            }
+          });
+        });
+
+        if (staffOrder.length === 0) {
+          container.innerHTML = '<p class="text-muted small">スタッフデータがありません。</p>';
+          return;
+        }
+
+        // テーブル構築
+        var html = '<table class="table table-bordered table-sm mb-0" style="font-size:12px;white-space:nowrap;min-width:' + (120 + daysInMonth * 38) + 'px;">';
+        // ヘッダー: 月表示
+        html += '<thead><tr><th style="position:sticky;left:0;z-index:2;background:#f8f9fa;min-width:80px;">' + month + '月</th>';
+        for (var d = 1; d <= daysInMonth; d++) {
+          var dt = new Date(year, month - 1, d);
+          var dow = dt.getDay();
+          var dowColor = dow === 0 ? 'color:#dc3545;' : (dow === 6 ? 'color:#0d6efd;' : '');
+          var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+          var hasRecruit = !!recruitByDate[dateStr];
+          var bgStyle = hasRecruit ? '' : 'background:#f5f5f5;';
+          html += '<th class="text-center" style="min-width:34px;' + dowColor + bgStyle + '"><div>' + d + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        // 各スタッフ行
+        staffOrder.forEach(function(staffName) {
+          html += '<tr><td style="position:sticky;left:0;z-index:1;background:#fff;font-weight:bold;border-right:2px solid #dee2e6;">' + escapeHtml(staffName) + '</td>';
+          for (var d = 1; d <= daysInMonth; d++) {
+            var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            var recruit = recruitByDate[dateStr];
+            if (!recruit) {
+              html += '<td class="text-center" style="background:#f5f5f5;">-</td>';
+              continue;
+            }
+            // このスタッフの回答を探す
+            var vol = null;
+            if (recruit.volunteers) {
+              for (var vi = 0; vi < recruit.volunteers.length; vi++) {
+                if (recruit.volunteers[vi].staffName === staffName) {
+                  vol = recruit.volunteers[vi];
+                  break;
+                }
+              }
+            }
+            var resp = vol ? (vol.response || '未回答') : '未回答';
+            var symbol = '', cls = '';
+            if (resp === '◎') { symbol = '●'; cls = 'text-success fw-bold'; }
+            else if (resp === '△') { symbol = '▲'; cls = 'text-warning fw-bold'; }
+            else if (resp === '×') { symbol = '✖'; cls = 'text-danger fw-bold'; }
+            else { symbol = '−'; cls = 'text-muted'; }
+            // 確定済みかどうか
+            var isConfirmed = false;
+            var selectedStaff = (recruit.selectedStaff || '').trim();
+            if (selectedStaff && (recruit.status === '選定済' || recruit.status === 'スタッフ確定済み')) {
+              // selectedStaffにこのスタッフ名が含まれるかチェック（カンマ区切り対応）
+              var confirmedNames = selectedStaff.split(/[,、\s]+/).map(function(s) { return s.trim(); });
+              isConfirmed = confirmedNames.indexOf(staffName) >= 0;
+            }
+            var cellStyle = isConfirmed ? 'border:2px solid #dc3545;background:#fff5f5;' : '';
+            html += '<td class="text-center ' + cls + '" style="' + cellStyle + '">' + symbol + '</td>';
+          }
+          html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
       }
 
       window.recruitAddSortOrder = window.recruitAddSortOrder || 'desc';
@@ -5308,10 +5465,19 @@
             var pastCount = list.filter(function(r) { return (r.checkoutDate || '') < today; }).length;
             var html = '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">';
             html += '<p class="small fw-bold mb-0">募集一覧（タップで' + (window.isOwnerUser ? '内容編集' : '詳細・回答') + '）</p>';
+            html += '<div class="d-flex gap-1 align-items-center">';
             if (pastCount > 0) {
               html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="btnTogglePastRecruit">' + (hidePast ? '経過済みを表示' : '経過済みを非表示') + '</button>';
             }
-            html += '</div>';
+            var recruitSortOrder = window.recruitSortOrder || 'desc';
+            html += '<select class="form-select form-select-sm" id="recruitSortOrder" style="width:auto;"><option value="desc"' + (recruitSortOrder==='desc'?' selected':'') + '>日付降順</option><option value="asc"' + (recruitSortOrder==='asc'?' selected':'') + '>日付昇順</option></select>';
+            html += '</div></div>';
+            // クライアント側ソート（サーバーはdesc固定）
+            if (recruitSortOrder === 'asc') {
+              list.sort(function(a, b) { return (a.checkoutDate || '').localeCompare(b.checkoutDate || ''); });
+            } else {
+              list.sort(function(a, b) { return (b.checkoutDate || '').localeCompare(a.checkoutDate || ''); });
+            }
             if (list.length) {
               var shownCount = 0;
               list.forEach(function(r) {
@@ -5334,6 +5500,8 @@
             document.getElementById('recruitList').innerHTML = html;
             var btnTogglePast = document.getElementById('btnTogglePastRecruit');
             if (btnTogglePast) btnTogglePast.onclick = function() { window.hidePastRecruitments = !window.hidePastRecruitments; loadRecruitList(); };
+            var recruitSortEl = document.getElementById('recruitSortOrder');
+            if (recruitSortEl) recruitSortEl.addEventListener('change', function() { window.recruitSortOrder = this.value; loadRecruitList(); });
             document.querySelectorAll('.recruit-card').forEach(function(card) {
               card.addEventListener('click', function() {
                 var volStr = this.getAttribute('data-volunteers') || '[]';

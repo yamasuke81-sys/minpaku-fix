@@ -870,32 +870,10 @@ function getData() {
       });
     }
 
-    // [DEBUG-FORMMERGE] 3/22 CI行のデバッグ情報
-    var debugRows = [];
-    for (var di = 0; di < data.length; di++) {
-      var d = data[di];
-      if (d.checkInParsed && d.checkInParsed === '2026-03-22') {
-        debugRows.push({
-          row: d.rowNumber,
-          ciRaw: d.checkIn,
-          ciParsed: d.checkInParsed,
-          coRaw: d.checkOut,
-          coParsed: d.checkOutParsed,
-          name: d.guestName,
-          bbq: d.bbq,
-          bed: d.bedChoice,
-          site: d.bookingSite
-        });
-      }
-    }
-    Logger.log('[DEBUG-FORMMERGE] 3/22行: ' + JSON.stringify(debugRows));
-    Logger.log('[DEBUG-FORMMERGE] 全行数: ' + data.length + ', シート最終行: ' + lastRow);
-
     return JSON.stringify({
       success: true,
       data: data,
-      columnMap: columnMap,
-      _debug322: debugRows
+      columnMap: columnMap
     });
 
   } catch (e) {

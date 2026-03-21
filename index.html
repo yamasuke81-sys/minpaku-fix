@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321v</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321w</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1305,7 +1305,7 @@
           <div id="invoiceManualItems"></div>
           <div class="mt-1">
             <div class="d-flex gap-1 align-items-center mb-1">
-              <input type="date" class="form-control form-control-sm" id="invoiceAddDate" style="flex:1;min-width:0;">
+              <input type="text" class="form-control form-control-sm" id="invoiceAddDate" placeholder="年/月/日" onfocus="this.type='date'" onblur="if(!this.value){this.type='text'}" style="flex:1;min-width:0;">
               <select class="form-select form-select-sm" id="invoiceAddJobSelect" style="flex:1;min-width:0;">
                 <option value="">選択...</option>
               </select>
@@ -7543,9 +7543,6 @@
 
         var ym = getInvoiceYm();
         var ymParts = ym.split('-');
-        // 日付入力欄のデフォルト値を今日に設定（スマホで空欄にならないように）
-        var dateInp = document.getElementById('invoiceAddDate');
-        if (dateInp && !dateInp.value) dateInp.value = new Date().toISOString().slice(0, 10);
         var ymBadge = document.getElementById('invoiceYmBadge');
         if (ymBadge) ymBadge.textContent = ymParts[0] + '年' + parseInt(ymParts[1], 10) + '月分';
 

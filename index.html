@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321q</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321r</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1269,7 +1269,7 @@
         <span><span class="sr-leg-today" style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;"></span>: 今日</span>
       </div>
       <div id="staffResponseContent" style="overflow-x:auto;"></div>
-      <div id="staffResponseCalLegendArea" style="margin-top:1.2rem;margin-bottom:0.3rem;"></div>
+      <div id="staffResponseCalLegendArea" style="margin-top:1.8rem;margin-bottom:0.2rem;"></div>
       <div id="staffResponseCalendarArea"></div>
     </div>
     <div id="panelStaffSchedule" style="display:none;">
@@ -3760,14 +3760,14 @@
               var isSelectedStatus = r.success && r.recruitRowIndex && r.status === '選定済';
               var isFullConfirmed = r.success && r.recruitRowIndex && r.status === 'スタッフ確定済み';
               var isCurrentStaffSelected = false;
-              if (isSelectedStatus && r.selectedStaff) {
-                var selName = normalizeName_(r.selectedStaff);
+              if ((isSelectedStatus || isFullConfirmed) && (r.selectedStaff || staffAssigned)) {
+                var selName = normalizeName_(r.selectedStaff || staffAssigned);
                 var curNameSel = normalizeName_(window.currentUserName);
                 isCurrentStaffSelected = (selName === curNameSel);
               }
               var isEventConfirmed = isFullConfirmed || (isSelectedStatus && isCurrentStaffSelected);
-              // 選定済みで選定スタッフ以外→回答ボタンを表示するため staffAssigned チェックを緩和
-              var showVolunteerArea = r.success && r.recruitRowIndex && (!staffAssigned || (isSelectedStatus && !isCurrentStaffSelected));
+              // 確定済み/選定済みで選定スタッフ以外→回答ボタンを表示
+              var showVolunteerArea = r.success && r.recruitRowIndex && (!staffAssigned || ((isSelectedStatus || isFullConfirmed) && !isCurrentStaffSelected));
               if (showVolunteerArea) {
                 var curName = normalizeName_(window.currentUserName);
                 var curEmail = (window.currentUserEmail || '').trim().toLowerCase();

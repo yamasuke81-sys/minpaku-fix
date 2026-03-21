@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1249,6 +1249,7 @@
         <div class="d-flex gap-1 align-items-center">
           <button type="button" class="btn btn-sm btn-outline-primary" id="btnStaffResponseToday">今日</button>
           <input type="month" class="form-control form-control-sm" id="staffResponseMonth" style="width:auto;">
+          <a href="#" target="_blank" class="btn btn-warning" id="btnStaffRespChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.2;text-decoration:none;color:#212529 !important;display:none;text-align:center;">清掃✓<br>リスト</a>
         </div>
       </div>
       <div class="small text-muted mb-2">
@@ -2630,6 +2631,8 @@
               var ds = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
               var clBtn = document.getElementById('btnTodayChecklist');
               if (clBtn && !window.readOnly) { clBtn.href = r.url + '?date=' + encodeURIComponent(ds); clBtn.style.display = ''; }
+              var clBtn2 = document.getElementById('btnStaffRespChecklist');
+              if (clBtn2 && !window.readOnly) { clBtn2.href = r.url + '?date=' + encodeURIComponent(ds); clBtn2.style.display = ''; }
             }
           } catch(e) {}
         }).withFailureHandler(function() {}).getChecklistAppUrl();
@@ -5069,7 +5072,7 @@
           var addArea = document.getElementById('calendarAddBookingArea');
           if (addArea) addArea.style.display = 'none';
           // GAS/スプシ/スタッフ画面/清掃✓リストボタンを非表示
-          ['btnTodayChecklist'].forEach(function(id) {
+          ['btnTodayChecklist', 'btnStaffRespChecklist'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.style.display = 'none';
           });

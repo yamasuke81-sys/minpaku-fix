@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5446,10 +5446,11 @@
           var hasRecruit = !!recruitByDate[dd.dateStr];
           var dowColor = dow === 0 ? C.sunColor : (dow === 6 ? C.satColor : C.dayColor);
           var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
-          var borderStyle = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
+          var borderStyle = 'border:1px solid ' + C.tableBorder + ';';
+          var todayShadow = isToday ? 'box-shadow:inset 0 0 0 2px ' + C.todayBorder + ';' : '';
           var thClass = hasRecruit ? 'text-center sr-date-header' : 'text-center';
           var thCursor = hasRecruit ? 'cursor:pointer;' : '';
-          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + todayShadow + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
         });
         html += '</tr></thead><tbody>';
 
@@ -5461,8 +5462,9 @@
             var recruit = recruitByDate[dd.dateStr];
             if (!recruit) {
               var emptyBg = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.noRecruit);
-              var emptyBorder = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
-              html += '<td class="text-center" style="background:' + emptyBg + ';' + emptyBorder + 'color:' + C.symNone + ';">-</td>';
+              var emptyBorder = 'border:1px solid ' + C.tableBorder + ';';
+              var emptyShadow = isToday ? 'box-shadow:inset 0 0 0 2px ' + C.todayBorder + ';' : '';
+              html += '<td class="text-center" style="background:' + emptyBg + ';' + emptyBorder + emptyShadow + 'color:' + C.symNone + ';">-</td>';
               return;
             }
             // このスタッフの回答を探す
@@ -5489,8 +5491,9 @@
               isConfirmed = confirmedNames.indexOf(staffName) >= 0;
             }
             var cellBg = isConfirmed ? C.confirmedBg : (isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.cellBg));
-            var cellBorder = isToday ? 'border:2px solid ' + C.todayBorder + ';' : 'border:1px solid ' + C.tableBorder + ';';
-            var cellShadow = isConfirmed ? 'box-shadow:inset 0 0 0 2px ' + C.confirmedBorder + ';' : '';
+            var cellBorder = 'border:1px solid ' + C.tableBorder + ';';
+            var cellShadow = isConfirmed ? 'box-shadow:inset 0 0 0 2px ' + C.confirmedBorder + ';' :
+                             isToday ? 'box-shadow:inset 0 0 0 2px ' + C.todayBorder + ';' : '';
             html += '<td class="text-center sr-staff-cell" data-sr-date="' + dd.dateStr + '" data-sr-staff="' + escapeHtml(staffName) + '" style="cursor:pointer;' + cellBorder + cellShadow + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
           });
           html += '</tr>';

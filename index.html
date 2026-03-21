@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321i</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321j</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1211,15 +1211,15 @@
       <div id="coMismatchList" class="mt-1"></div>
     </div>
     <ul class="nav nav-tabs mb-2" id="mainTabs">
-      <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" data-tab="calendar">カレンダー</a></li>
       <li class="nav-item" id="navRecruit" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
-      <li class="nav-item" id="navStaffResponse"><a class="nav-link" href="#" data-tab="staffResponse">スタッフ回答一覧</a></li>
+      <li class="nav-item" id="navStaffResponse"><a class="nav-link active" href="#" data-tab="staffResponse">スタッフ回答一覧</a></li>
       <li class="nav-item" id="navStaffSchedule" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
       <li class="nav-item" id="navInvoice" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="invoice">請求書</a></li>
       <li class="nav-item" id="navNotifications" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
       <li class="nav-item" id="navSettings" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
     </ul>
-    <div id="panelCalendar">
+    <div id="panelCalendar" style="display:none;">
       <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex justify-content-between align-items-start">
         <div class="d-flex flex-column gap-1">
           <div class="d-flex flex-wrap gap-3 align-items-center">
@@ -1243,7 +1243,7 @@
       <div id="recruitAddListArea" class="mb-3 mt-3"></div>
       <div id="recruitAddBtnArea" class="mt-2" style="display:none;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddRecruit">募集を手動で追加</button></div>
     </div>
-    <div id="panelStaffResponse" style="display:none;">
+    <div id="panelStaffResponse">
       <div class="d-flex justify-content-end align-items-center mb-2 flex-wrap gap-1">
         <div class="d-flex gap-1 align-items-center">
           <button type="button" class="btn btn-sm btn-outline-primary" id="btnStaffResponseToday">今日</button>
@@ -4747,6 +4747,16 @@
             sources.forEach(function(s) { s.remove(); });
             calendar.addEventSource(events);
             calendar.render();
+            // デフォルトがstaffResponseタブの場合、カレンダーをDOM移動
+            var _srArea = document.getElementById('staffResponseCalendarArea');
+            if (_srArea && document.getElementById('panelStaffResponse').style.display !== 'none') {
+              var _calEl = document.getElementById('calendar');
+              if (_calEl && _calEl.parentNode !== _srArea) {
+                _srArea.appendChild(_calEl);
+                _calEl.style.display = '';
+                requestAnimationFrame(function() { if (calendar) { calendar.render(); setTimeout(function() { if (calendar) calendar.updateSize(); }, 200); } });
+              }
+            }
           }
           // CO不一致通知バナー更新（オーナーのみ）
           try {
@@ -5302,6 +5312,7 @@
         }).withFailureHandler(function() {}).getOwnerAndSwitchUrl();
 
         loadAndRender();
+        loadStaffResponseCalendar();
 
         var bannerLink = document.getElementById('notificationBannerLink');
         if (bannerLink) bannerLink.addEventListener('click', function(e) {

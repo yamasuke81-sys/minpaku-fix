@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321i</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1244,8 +1244,7 @@
       <div id="recruitAddBtnArea" class="mt-2" style="display:none;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddRecruit">募集を手動で追加</button></div>
     </div>
     <div id="panelStaffResponse" style="display:none;">
-      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
-        <p class="small fw-bold mb-0">スタッフ回答一覧</p>
+      <div class="d-flex justify-content-end align-items-center mb-2 flex-wrap gap-1">
         <div class="d-flex gap-1 align-items-center">
           <button type="button" class="btn btn-sm btn-outline-primary" id="btnStaffResponseToday">今日</button>
           <input type="month" class="form-control form-control-sm" id="staffResponseMonth" style="width:auto;">
@@ -1256,6 +1255,8 @@
         <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済 <span style="display:inline-block;width:16px;height:16px;border-radius:3px;background:#e8f0fe;vertical-align:middle;"></span>=今日
       </div>
       <div id="staffResponseContent" style="overflow-x:auto;"></div>
+      <hr class="my-3">
+      <div id="staffResponseCalendarArea"></div>
     </div>
     <div id="panelStaffSchedule" style="display:none;">
       <div class="mb-2"><label class="form-label small">表示月</label><input type="month" class="form-control form-control-sm" id="staffScheduleMonth" style="max-width:160px;"></div>
@@ -5207,6 +5208,20 @@
               var el = document.getElementById(id);
               if (el) el.style.display = tab === tabMap[id] ? 'block' : 'none';
             });
+            // カレンダーDOM移動: staffResponseタブではカレンダーを回答一覧の下に表示
+            var calEl = document.getElementById('calendar');
+            var calOrigParent = document.getElementById('panelCalendar');
+            var calStaffArea = document.getElementById('staffResponseCalendarArea');
+            if (tab === 'staffResponse' && calEl && calStaffArea) {
+              calStaffArea.appendChild(calEl);
+              calEl.style.display = '';
+              requestAnimationFrame(function() {
+                if (calendar) { calendar.render(); setTimeout(function() { if (calendar) calendar.updateSize(); }, 200); }
+              });
+            } else if (calEl && calStaffArea && calEl.parentNode === calStaffArea) {
+              // 別タブに切り替え時はカレンダーを元の場所に戻す
+              calOrigParent.appendChild(calEl);
+            }
             if (tab === 'calendar' && calendar) {
               // display:none→block後、ブラウザの再レイアウトを待ってからサイズ再計算＋再描画
               requestAnimationFrame(function() {

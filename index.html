@@ -974,6 +974,12 @@
     .btn-change-request-ng:hover, .btn-change-request-ng:focus {
       background-color: #bb2d3b !important;
     }
+    /* シフト凡例: ライトモードデフォルト */
+    .sr-leg-ok { color: #198754; }
+    .sr-leg-hold { color: #ffc107; }
+    .sr-leg-ng { color: #dc3545; }
+    .sr-leg-none { color: #6c757d; }
+    .sr-leg-today { background: #e8f0fe; }
     /* 募集回答ボタン: ナイトモード */
     @media (prefers-color-scheme: dark) {
       .recruit-btn-ok {
@@ -1053,6 +1059,13 @@
       .recruit-status-badge.status-laundry { color: #c0c8d0 !important; }
       /* ダークモード: インラインstyleの#f8f9fa/#e9ecef背景を上書き */
       .dm-bg-subtle { background: #2d2d2d !important; color: #e0e0e0 !important; border-color: #495057 !important; }
+      /* ダークモード: シフト凡例 */
+      .sr-legend { color: #adb5bd !important; }
+      .sr-leg-ok { color: #5cb85c !important; }
+      .sr-leg-hold { color: #f0ad4e !important; }
+      .sr-leg-ng { color: #ff6b6b !important; }
+      .sr-leg-none { color: #888 !important; }
+      .sr-leg-today { background: #1a3a5c !important; }
     }
     .modal-memo-area {
       padding: 0.4rem 0;
@@ -1176,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321o</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321p</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1251,11 +1264,16 @@
           <a href="#" target="_blank" class="btn btn-warning" id="btnStaffRespChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.2;text-decoration:none;color:#212529 !important;display:none;text-align:center;">清掃✓<br>リスト</a>
         </div>
       </div>
-      <div class="small text-muted mb-2">
-        <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済 <span style="display:inline-block;width:16px;height:16px;border-radius:3px;background:#e8f0fe;vertical-align:middle;"></span>=今日
+      <div class="sr-legend d-flex flex-wrap mb-2" style="gap:0.6rem 1rem;font-size:0.7rem;color:#6c757d;">
+        <span><span class="sr-leg-ok fw-bold">●</span>: 可</span>
+        <span><span class="sr-leg-hold fw-bold">▲</span>: 保留</span>
+        <span><span class="sr-leg-ng fw-bold">✖</span>: 不可</span>
+        <span><span class="sr-leg-none">−</span>: 未回答</span>
+        <span><span style="display:inline-block;width:14px;height:14px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>: 確定済</span>
+        <span><span class="sr-leg-today" style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;"></span>: 今日</span>
       </div>
       <div id="staffResponseContent" style="overflow-x:auto;"></div>
-      <hr class="my-3">
+      <div id="staffResponseCalLegendArea" class="my-2"></div>
       <div id="staffResponseCalendarArea"></div>
     </div>
     <div id="panelStaffSchedule" style="display:none;">
@@ -5235,15 +5253,22 @@
             var calEl = document.getElementById('calendar');
             var calOrigParent = document.getElementById('panelCalendar');
             var calStaffArea = document.getElementById('staffResponseCalendarArea');
+            var calLegend = document.getElementById('calendarStatusLegend');
+            var calLegendSlot = document.getElementById('staffResponseCalLegendArea');
             if (tab === 'staffResponse' && calEl && calStaffArea) {
+              // 凡例を上カレンダーと下カレンダーの間に挿入
+              if (calLegend && calLegendSlot) calLegendSlot.appendChild(calLegend);
               calStaffArea.appendChild(calEl);
               calEl.style.display = '';
               requestAnimationFrame(function() {
                 if (calendar) { calendar.render(); setTimeout(function() { if (calendar) calendar.updateSize(); }, 200); }
               });
             } else if (calEl && calStaffArea && calEl.parentNode === calStaffArea) {
-              // 別タブに切り替え時はカレンダーを元の場所に戻す
+              // 別タブに切り替え時はカレンダー・凡例を元の場所に戻す
               calOrigParent.appendChild(calEl);
+              if (calLegend && calLegendSlot && calLegend.parentNode === calLegendSlot) {
+                calOrigParent.insertBefore(calLegend, calOrigParent.firstChild);
+              }
             }
             if (tab === 'calendar' && calendar) {
               // display:none→block後、ブラウザの再レイアウトを待ってからサイズ再計算＋再描画
@@ -5325,9 +5350,12 @@
         }).withFailureHandler(function() {}).getOwnerAndSwitchUrl();
 
         loadAndRender();
-        // 初期表示: シフトタブがデフォルトなのでカレンダーDOMを移動
+        // 初期表示: シフトタブがデフォルトなのでカレンダーDOM+凡例を移動
         var _calEl = document.getElementById('calendar');
         var _calStaffArea = document.getElementById('staffResponseCalendarArea');
+        var _calLegend = document.getElementById('calendarStatusLegend');
+        var _calLegendSlot = document.getElementById('staffResponseCalLegendArea');
+        if (_calLegend && _calLegendSlot) _calLegendSlot.appendChild(_calLegend);
         if (_calEl && _calStaffArea) {
           _calStaffArea.appendChild(_calEl);
           _calEl.style.display = '';

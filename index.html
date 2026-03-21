@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321u</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321v</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1303,14 +1303,18 @@
           <label class="form-label small fw-bold mb-1">追加項目 <span id="invoiceSaveStatus" class="small" style="display:none;"></span></label>
           <p class="text-muted mb-1" style="font-size:0.7rem;">追加した項目は自動保存されます</p>
           <div id="invoiceManualItems"></div>
-          <div class="d-flex gap-1 align-items-center flex-wrap mt-1">
-            <input type="date" class="form-control form-control-sm" id="invoiceAddDate" style="max-width:130px;">
-            <select class="form-select form-select-sm" id="invoiceAddJobSelect" style="max-width:180px;">
-              <option value="">選択...</option>
-            </select>
-            <input type="text" class="form-control form-control-sm" id="invoiceAddCustomName" placeholder="項目名" style="max-width:120px;display:none;">
-            <input type="number" class="form-control form-control-sm" id="invoiceAddAmount" placeholder="金額" style="max-width:90px;">
-            <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnInvoiceAddItem">追加</button>
+          <div class="mt-1">
+            <div class="d-flex gap-1 align-items-center mb-1">
+              <input type="date" class="form-control form-control-sm" id="invoiceAddDate" style="flex:1;min-width:0;">
+              <select class="form-select form-select-sm" id="invoiceAddJobSelect" style="flex:1;min-width:0;">
+                <option value="">選択...</option>
+              </select>
+            </div>
+            <input type="text" class="form-control form-control-sm mb-1" id="invoiceAddCustomName" placeholder="項目名" style="display:none;">
+            <div class="d-flex gap-1 align-items-center">
+              <input type="number" class="form-control form-control-sm" id="invoiceAddAmount" placeholder="金額" style="flex:1;min-width:0;max-width:120px;">
+              <button type="button" class="btn btn-sm btn-outline-primary py-0" id="btnInvoiceAddItem">追加</button>
+            </div>
           </div>
         </div>
         <!-- 備考 -->
@@ -7539,6 +7543,9 @@
 
         var ym = getInvoiceYm();
         var ymParts = ym.split('-');
+        // 日付入力欄のデフォルト値を今日に設定（スマホで空欄にならないように）
+        var dateInp = document.getElementById('invoiceAddDate');
+        if (dateInp && !dateInp.value) dateInp.value = new Date().toISOString().slice(0, 10);
         var ymBadge = document.getElementById('invoiceYmBadge');
         if (ymBadge) ymBadge.textContent = ymParts[0] + '年' + parseInt(ymParts[1], 10) + '月分';
 

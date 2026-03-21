@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321d</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1252,7 +1252,7 @@
         </div>
       </div>
       <div class="small text-muted mb-2">
-        <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済 <span style="display:inline-block;width:16px;height:16px;border:2px solid #0d6efd;border-radius:3px;background:#e8f0fe;vertical-align:middle;"></span>=今日
+        <span class="text-success fw-bold">●</span>=可 <span class="text-warning fw-bold">▲</span>=保留 <span class="text-danger fw-bold">✖</span>=不可 <span class="text-muted">−</span>=未回答 <span style="display:inline-block;width:16px;height:16px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>=確定済 <span style="display:inline-block;width:16px;height:16px;border-radius:3px;background:#e8f0fe;vertical-align:middle;"></span>=今日
       </div>
       <div id="staffResponseContent" style="overflow-x:auto;"></div>
     </div>
@@ -5397,17 +5397,17 @@
         var C = isDark ? {
           headerBg: '#1e2a3a', stickyBg: '#1e2a3a', stickyColor: '#e8e8e8', stickyBorder: '#4a5568',
           noRecruit: '#1a1a2e', cellBg: '#141425', tableBorder: '#4a5568',
-          todayBg: '#1a3a5c', todayBorder: '#4d9fff',
+          todayBg: '#1a3a5c',
           confirmedBorder: '#ff6b6b', confirmedBg: '#4a1a1e',
-          monthSepBg: '#252540', monthSepColor: '#9ca3af',
+          monthSepBg: '#252540', monthSepColor: '#9ca3af', monthCurrentColor: '#e8e8e8',
           symOk: '#4cdf7f', symHold: '#ffc107', symNg: '#ff6b6b', symNone: '#6c757d',
           sunColor: '#ff6b6b', satColor: '#6bb3ff', dayColor: '#ccc'
         } : {
           headerBg: '#f8f9fa', stickyBg: '#fff', stickyColor: '', stickyBorder: '#dee2e6',
           noRecruit: '#f5f5f5', cellBg: '', tableBorder: '#dee2e6',
-          todayBg: '#e8f0fe', todayBorder: '#0d6efd',
+          todayBg: '#e8f0fe',
           confirmedBorder: '#dc3545', confirmedBg: '#fff5f5',
-          monthSepBg: '#e9ecef', monthSepColor: '#495057',
+          monthSepBg: '#e9ecef', monthSepColor: '#495057', monthCurrentColor: '',
           symOk: '#198754', symHold: '#cc9a06', symNg: '#dc3545', symNone: '#adb5bd',
           sunColor: '#dc3545', satColor: '#0d6efd', dayColor: ''
         };
@@ -5432,7 +5432,7 @@
         months.forEach(function(m) {
           var isCurrent = m.month === month && m.year === year;
           var mBg = isCurrent ? C.headerBg : C.monthSepBg;
-          var mColor = isCurrent ? '' : C.monthSepColor;
+          var mColor = isCurrent ? C.monthCurrentColor : C.monthSepColor;
           html += '<th colspan="' + m.days + '" class="text-center" style="background:' + mBg + ';' + (mColor ? 'color:' + mColor + ';' : '') + 'border:1px solid ' + C.tableBorder + ';font-size:13px;">' + m.month + '月</th>';
         });
         html += '</tr>';
@@ -5447,10 +5447,9 @@
           var dowColor = dow === 0 ? C.sunColor : (dow === 6 ? C.satColor : C.dayColor);
           var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
           var borderStyle = 'border:1px solid ' + C.tableBorder + ';';
-          var todayShadow = isToday ? 'box-shadow:inset 0 0 0 2px ' + C.todayBorder + ';' : '';
           var thClass = hasRecruit ? 'text-center sr-date-header' : 'text-center';
           var thCursor = hasRecruit ? 'cursor:pointer;' : '';
-          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + todayShadow + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
         });
         html += '</tr></thead><tbody>';
 
@@ -5463,8 +5462,7 @@
             if (!recruit) {
               var emptyBg = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.noRecruit);
               var emptyBorder = 'border:1px solid ' + C.tableBorder + ';';
-              var emptyShadow = isToday ? 'box-shadow:inset 0 0 0 2px ' + C.todayBorder + ';' : '';
-              html += '<td class="text-center" style="background:' + emptyBg + ';' + emptyBorder + emptyShadow + 'color:' + C.symNone + ';">-</td>';
+              html += '<td class="text-center" style="background:' + emptyBg + ';' + emptyBorder + 'color:' + C.symNone + ';">-</td>';
               return;
             }
             // このスタッフの回答を探す
@@ -5492,8 +5490,7 @@
             }
             var cellBg = isConfirmed ? C.confirmedBg : (isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.cellBg));
             var cellBorder = 'border:1px solid ' + C.tableBorder + ';';
-            var cellShadow = isConfirmed ? 'box-shadow:inset 0 0 0 2px ' + C.confirmedBorder + ';' :
-                             isToday ? 'box-shadow:inset 0 0 0 2px ' + C.todayBorder + ';' : '';
+            var cellShadow = isConfirmed ? 'box-shadow:inset 0 0 0 2px ' + C.confirmedBorder + ';' : '';
             html += '<td class="text-center sr-staff-cell" data-sr-date="' + dd.dateStr + '" data-sr-staff="' + escapeHtml(staffName) + '" style="cursor:pointer;' + cellBorder + cellShadow + 'background:' + cellBg + ';color:' + symColor + ';font-weight:bold;">' + symbol + '</td>';
           });
           html += '</tr>';

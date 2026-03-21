@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321l</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321m</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3742,7 +3742,16 @@
                   }
                 }
               }
-              var isEventConfirmed = r.success && r.recruitRowIndex && (r.status === 'スタッフ確定済み' || r.status === '選定済');
+              // 選定済み: 選定スタッフには確定扱い、それ以外のスタッフには回答ボタンを表示
+              var isSelectedStatus = r.success && r.recruitRowIndex && r.status === '選定済';
+              var isFullConfirmed = r.success && r.recruitRowIndex && r.status === 'スタッフ確定済み';
+              var isCurrentStaffSelected = false;
+              if (isSelectedStatus && r.selectedStaff) {
+                var selName = normalizeName_(r.selectedStaff);
+                var curNameSel = normalizeName_(window.currentUserName);
+                isCurrentStaffSelected = (selName === curNameSel);
+              }
+              var isEventConfirmed = isFullConfirmed || (isSelectedStatus && isCurrentStaffSelected);
               if (r.success && r.recruitRowIndex && !staffAssigned) {
                 var curName = normalizeName_(window.currentUserName);
                 var curEmail = (window.currentUserEmail || '').trim().toLowerCase();

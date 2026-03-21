@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321w</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321x</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5101,7 +5101,7 @@
             showStaffSelectOverlay();
           }
         }
-        // 閲覧専用モード: カレンダータブのみ表示、タブバー自体も非表示
+        // 閲覧専用モード: シフトタブ（下カレンダーのみ）表示、タブバー自体も非表示
         if (window.readOnly) {
           ['navSettings','navNotifications','navStaffTest','navStaffSchedule','navInvoice','navRecruit'].forEach(function(id) {
             var el = document.getElementById(id);
@@ -5109,12 +5109,26 @@
           });
           var tabBar = document.getElementById('mainTabs');
           if (tabBar) tabBar.style.display = 'none';
-          // カレンダータブを確実にアクティブにする
-          var calTab = document.getElementById('navCalendar');
-          if (calTab) {
-            var calLink = calTab.querySelector('a,button');
-            if (calLink) calLink.click();
+          // シフトタブ（panelStaffResponse）を表示し、上部の回答グリッド等を非表示にして下カレンダーのみ表示
+          var srTab = document.getElementById('navStaffResponse');
+          if (srTab) {
+            var srLink = srTab.querySelector('a,button');
+            if (srLink) srLink.click();
           }
+          // 上部の回答グリッド・凡例・月切替・今日ボタン等を非表示
+          ['staffResponseContent','staffResponseMonthOverlay','staffResponseCalLegendArea'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+          });
+          // 月切替・今日ボタン・チェックリストボタンの行を非表示
+          var srControls = document.querySelector('#panelStaffResponse > .d-flex.justify-content-end');
+          if (srControls) srControls.style.display = 'none';
+          // 凡例行を非表示
+          var srLegend = document.querySelector('#panelStaffResponse > .small.text-muted.mb-1');
+          if (srLegend) srLegend.style.display = 'none';
+          // position:relative ラッパーも非表示
+          var srWrapper = document.querySelector('#staffResponseContent')
+          if (srWrapper && srWrapper.parentElement) srWrapper.parentElement.style.display = 'none';
           // スタッフバー・予約追加ボタンも非表示
           var bar = document.getElementById('staffSelectorBar');
           if (bar) bar.style.display = 'none';
@@ -5134,9 +5148,9 @@
             var el = document.getElementById(id);
             if (el) el.style.display = 'none';
           });
-          // イベントバーのカーソルポインタを無効化
+          // イベントバーのカーソルポインタを無効化 + 清掃イベントの枠線を非表示
           var style = document.createElement('style');
-          style.textContent = '.fc-event { cursor: default !important; }';
+          style.textContent = '.fc-event { cursor: default !important; } .fc-event-cleaning-selected-by-me, .fc-event-cleaning-volunteered-by-me, .fc-event-cleaning-rejected-by-me { border: none !important; }';
           document.head.appendChild(style);
         }
 
@@ -5177,7 +5191,10 @@
             var main = arg.el.querySelector('.fc-event-main');
             if (main) { main.style.border = 'none'; main.style.boxShadow = 'none'; }
             // スタッフ回答済み/確定済みの赤枠を明示的に設定（CSS !important との競合回避）
-            if (arg.el.classList.contains('fc-event-cleaning-selected-by-me')) {
+            // 閲覧専用モードでは枠線を表示しない
+            if (window.readOnly) {
+              arg.el.style.border = 'none';
+            } else if (arg.el.classList.contains('fc-event-cleaning-selected-by-me')) {
               arg.el.style.border = '3px solid #dc3545';
             } else if (arg.el.classList.contains('fc-event-cleaning-volunteered-by-me')) {
               arg.el.style.border = '3px dashed #dc3545';

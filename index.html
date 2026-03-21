@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5538,12 +5538,12 @@
             if (!recruit) return;
             var curName = (window.currentUserName || '').trim();
             var curEmail = (window.currentUserEmail || '').trim();
-            // オーナーモード → 募集編集モーダルを開く
+            // オーナーモード → 清掃詳細モーダルを開く
             if (window.isOwnerUser && !window.staffMode) {
-              openRecruitEditModalFromCalendar_(recruit);
+              openCleaningModalByDate(dateStr);
               return;
             }
-            // スタッフモード: 自分のセルでなければ無視
+            // スタッフモード: 自分のセルかチェック
             var isMyCell = false;
             if (curName && curName.toLowerCase() === cellStaff.toLowerCase()) isMyCell = true;
             if (!isMyCell && curEmail) {
@@ -5555,19 +5555,20 @@
                 }
               }
             }
-            if (!isMyCell) return;
-            // 自分のセル → 回答ダイアログを表示
-            openStaffResponseDialog_(recruit, cellStaff);
+            if (isMyCell) {
+              // 自分のセル → 回答ダイアログを表示
+              openStaffResponseDialog_(recruit, cellStaff);
+            } else {
+              // 他人のセル → 清掃詳細モーダルを開く
+              openCleaningModalByDate(dateStr);
+            }
           });
         });
-        // 日付ヘッダータップ: オーナー → 募集編集モーダル
+        // 日付ヘッダータップ: 清掃詳細モーダルを開く
         container.querySelectorAll('.sr-date-header').forEach(function(th) {
           th.addEventListener('click', function() {
-            if (!window.isOwnerUser || window.staffMode) return;
             var dateStr = this.getAttribute('data-sr-date');
-            var recruit = recruitByDate[dateStr];
-            if (!recruit) return;
-            openRecruitEditModalFromCalendar_(recruit);
+            openCleaningModalByDate(dateStr);
           });
         });
         // 今日の列まで自動スクロール

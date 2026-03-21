@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321s</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321t</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1271,7 +1271,10 @@
         <span><span style="display:inline-block;width:14px;height:14px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>: 確定済</span>
         <span><span class="sr-leg-today" style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;"></span>: 今日</span>
       </div>
-      <div id="staffResponseContent" style="overflow-x:auto;"></div>
+      <div style="position:relative;">
+        <div id="staffResponseMonthOverlay" style="display:none;position:absolute;top:0;left:0;z-index:5;background:rgba(30,42,58,0.85);color:#fff;padding:1px 8px;border-radius:0 0 6px 0;font-size:12px;font-weight:bold;pointer-events:none;"></div>
+        <div id="staffResponseContent" style="overflow-x:auto;"></div>
+      </div>
       <div id="staffResponseCalLegendArea" style="margin-top:1.8rem;margin-bottom:0.2rem;"></div>
       <div id="staffResponseCalendarArea"></div>
     </div>
@@ -5521,7 +5524,7 @@
           var isCurrent = m.month === month && m.year === year;
           var mBg = isCurrent ? C.headerBg : C.monthSepBg;
           var mColor = isCurrent ? C.monthCurrentColor : C.monthSepColor;
-          html += '<th colspan="' + m.days + '" class="text-center" style="background:' + mBg + ';' + (mColor ? 'color:' + mColor + ';' : '') + 'border:1px solid ' + C.tableBorder + ';font-size:13px;">' + m.month + '月</th>';
+          html += '<th colspan="' + m.days + '" class="text-center sr-month-header" data-sr-month="' + m.month + '月" style="background:' + mBg + ';' + (mColor ? 'color:' + mColor + ';' : '') + 'border:1px solid ' + C.tableBorder + ';font-size:13px;">' + m.month + '月</th>';
         });
         html += '</tr>';
 
@@ -5630,6 +5633,8 @@
             openCleaningModalByDate(dateStr);
           });
         });
+        // 月名オーバーレイのスクロール追従
+        setupStaffResponseMonthOverlay_(container);
         // 今日の列まで自動スクロール
         scrollStaffResponseToToday_();
         // 「今日」ボタン
@@ -5671,6 +5676,39 @@
         var stickyWidth = stickyTh ? stickyTh.offsetWidth + 2 : 92;
         var colWidth = todayTh.offsetWidth || 34;
         container.scrollLeft = todayTh.offsetLeft - stickyWidth - colWidth;
+      }
+
+      function setupStaffResponseMonthOverlay_(container) {
+        var overlay = document.getElementById('staffResponseMonthOverlay');
+        if (!overlay || !container) return;
+        var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        overlay.style.background = isDark ? 'rgba(30,42,58,0.9)' : 'rgba(248,249,250,0.95)';
+        overlay.style.color = isDark ? '#e8e8e8' : '#495057';
+        var updateOverlay = function() {
+          var headers = container.querySelectorAll('.sr-month-header');
+          if (!headers.length) { overlay.style.display = 'none'; return; }
+          var stickyTh = container.querySelector('thead th');
+          var stickyRight = stickyTh ? stickyTh.getBoundingClientRect().right : container.getBoundingClientRect().left + 90;
+          var visibleMonth = '';
+          headers.forEach(function(th) {
+            var rect = th.getBoundingClientRect();
+            // 月ヘッダーの右端がsticky列の右端より右にあれば、その月が表示されている
+            if (rect.right > stickyRight && (!visibleMonth || rect.left < stickyRight)) {
+              visibleMonth = th.getAttribute('data-sr-month') || '';
+            }
+          });
+          if (!visibleMonth) {
+            // 全ヘッダーがsticky列の左側にある場合、最後の月を表示
+            var lastH = headers[headers.length - 1];
+            visibleMonth = lastH.getAttribute('data-sr-month') || '';
+          }
+          overlay.textContent = visibleMonth;
+          overlay.style.display = visibleMonth ? '' : 'none';
+        };
+        if (container._srOverlayBound) return;
+        container._srOverlayBound = true;
+        container.addEventListener('scroll', updateOverlay);
+        setTimeout(updateOverlay, 100);
       }
 
       // 募集編集モーダルを開く（カレンダーから）

@@ -1176,7 +1176,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0320k</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0321a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1213,7 +1213,7 @@
     <ul class="nav nav-tabs mb-2" id="mainTabs">
       <li class="nav-item"><a class="nav-link active" href="#" data-tab="calendar">カレンダー</a></li>
       <li class="nav-item" id="navRecruit" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="recruit">清掃募集</a></li>
-      <li class="nav-item" id="navStaffResponse" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="staffResponse">スタッフ回答一覧</a></li>
+      <li class="nav-item" id="navStaffResponse"><a class="nav-link" href="#" data-tab="staffResponse">スタッフ回答一覧</a></li>
       <li class="nav-item" id="navStaffSchedule" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="staffSchedule">出勤一覧</a></li>
       <li class="nav-item" id="navInvoice" style="display:<?= staffModeStr === 'yes' ? '' : 'none' ?>;"><a class="nav-link" href="#" data-tab="invoice">請求書</a></li>
       <li class="nav-item" id="navNotifications" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="notifications">通知</a></li>
@@ -5601,8 +5601,6 @@
           isNew: false
         };
         openRecruitEditModal(r);
-        var modal = new bootstrap.Modal(document.getElementById('recruitEditModal'));
-        modal.show();
       }
 
       // スタッフ回答ダイアログ（スタッフ回答一覧からの簡易版）

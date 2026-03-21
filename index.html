@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1205,6 +1205,7 @@
 <? var _staffViewUrl = (savedOwnerUrl || baseUrl) ? ((savedOwnerUrl || baseUrl) + ((savedOwnerUrl || baseUrl).indexOf('?') >= 0 ? '&' : '?') + 'staff=1') : ''; ?>
         <a href="<?= _staffViewUrl ?>" target="_blank" id="btnOpenStaffView" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;<%= _staffViewUrl ? '' : 'display:none;' %>" title="スタッフ画面を開く">スタッフ画面</a>
         <a href="#" target="_blank" id="btnOpenCheckin" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;display:none;" title="チェックインアプリを開く">checkin</a>
+        <a href="#" target="_blank" id="btnOpenReadonly" class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.7rem;display:none;" title="閲覧専用ページを開く">閲覧用</a>
       </div>
 <? } ?>
     </div>
@@ -2628,6 +2629,13 @@
                   _staffBtn.href = r.url + _sep + 'staff=1';
                   _staffBtn.style.display = '';
                 }
+                // 閲覧用ボタンのhrefを更新
+                var _readonlyBtn = document.getElementById('btnOpenReadonly');
+                if (_readonlyBtn) {
+                  var _sep2 = r.url.indexOf('?') >= 0 ? '&' : '?';
+                  _readonlyBtn.href = r.url + _sep2 + 'view=readonly';
+                  _readonlyBtn.style.display = '';
+                }
               }
             } else if (r.success && !r.url && window.appBaseUrl) {
               // サーバーにURLが未保存 → appBaseUrl(デプロイURL)を自動保存
@@ -3005,14 +3013,15 @@
                 rosterAnswered: rosterAnswered,
                 statusDot: bookingStatus
               },
-              backgroundColor: isCancelled ? '#9e9e9e' : (isValid ? getPlatformColor(b.bookingSite) : INVALID_COLOR),
+              backgroundColor: isCancelled ? '#9e9e9e' : (window.readOnly ? '#dc3545' : (isValid ? getPlatformColor(b.bookingSite) : INVALID_COLOR)),
+              textColor: window.readOnly && !isCancelled ? '#fff' : undefined,
               borderColor: 'transparent',
               classNames: evtClasses
             });
           }
 
-          // 清掃イベント（チェックアウト日）
-          if (checkOut) {
+          // 清掃イベント（チェックアウト日） — 閲覧専用モードでは非表示
+          if (checkOut && !window.readOnly) {
             var rec = recruitMap[b.rowNumber] || {};
             var recStatus = rec.status || '';
             var recStaff = (rec.staff || '').trim();
@@ -5120,8 +5129,8 @@
             var srLink = srTab.querySelector('a,button');
             if (srLink) srLink.click();
           }
-          // 上部の回答グリッド・月切替・今日ボタン等を非表示（staffResponseCalLegendAreaは下カレンダー凡例用なので残す）
-          ['staffResponseContent','staffResponseMonthOverlay','btnStaffResponseToday','staffResponseMonth'].forEach(function(id) {
+          // 上部の回答グリッド・月切替・今日ボタン・凡例すべて非表示
+          ['staffResponseContent','staffResponseMonthOverlay','btnStaffResponseToday','staffResponseMonth','staffResponseCalLegendArea'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.style.display = 'none';
           });
@@ -5204,22 +5213,25 @@
               arg.el.style.border = 'none';
             }
             var sd = arg.event.extendedProps && arg.event.extendedProps.statusDot;
-            var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#dc3545' : sd === 'cleaning-decided' ? '#198754' : null;
-            if (dotColor) {
-              var dot = document.createElement('span');
-              dot.className = 'fc-event-status-dot';
-              dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
-              var titleEl = arg.el.querySelector('.fc-event-title') || arg.el.querySelector('.fc-event-main');
-              if (titleEl) {
-                if (titleEl.firstChild) titleEl.insertBefore(dot, titleEl.firstChild);
-                else titleEl.appendChild(dot);
+            // 閲覧専用モードではステータスドット・黄色背景を非表示
+            if (!window.readOnly) {
+              var dotColor = sd === 'form-answered' ? '#28a745' : sd === 'form-unanswered' ? '#dc3545' : sd === 'cleaning-recruiting' ? '#dc3545' : sd === 'cleaning-decided' ? '#198754' : null;
+              if (dotColor) {
+                var dot = document.createElement('span');
+                dot.className = 'fc-event-status-dot';
+                dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
+                var titleEl = arg.el.querySelector('.fc-event-title') || arg.el.querySelector('.fc-event-main');
+                if (titleEl) {
+                  if (titleEl.firstChild) titleEl.insertBefore(dot, titleEl.firstChild);
+                  else titleEl.appendChild(dot);
+                }
               }
-            }
-            // 募集中の清掃イベントがある日付セルの背景を黄色に
-            if (sd === 'cleaning-recruiting') {
-              var dateStr = arg.event.startStr;
-              var dayCell = document.querySelector('.fc-day[data-date="' + dateStr + '"]');
-              if (dayCell) dayCell.classList.add('fc-day-recruiting');
+              // 募集中の清掃イベントがある日付セルの背景を黄色に
+              if (sd === 'cleaning-recruiting') {
+                var dateStr = arg.event.startStr;
+                var dayCell = document.querySelector('.fc-day[data-date="' + dateStr + '"]');
+                if (dayCell) dayCell.classList.add('fc-day-recruiting');
+              }
             }
           },
           windowResize: function() {}

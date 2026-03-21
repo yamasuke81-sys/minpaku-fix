@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322b</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322c</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1264,7 +1264,7 @@
           <a href="#" target="_blank" class="btn btn-warning" id="btnStaffRespChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.2;text-decoration:none;color:#212529 !important;display:none;text-align:center;">清掃✓<br>リスト</a>
         </div>
       </div>
-      <div class="sr-legend d-flex flex-wrap mb-2" style="gap:0.6rem 1rem;font-size:0.7rem;color:#6c757d;">
+      <div id="staffResponseLegend" class="sr-legend d-flex flex-wrap mb-2" style="gap:0.6rem 1rem;font-size:0.7rem;color:#6c757d;">
         <span><span class="sr-leg-ok fw-bold">●</span>: 可</span>
         <span><span class="sr-leg-hold fw-bold">▲</span>: 保留</span>
         <span><span class="sr-leg-ng fw-bold">✖</span>: 不可</span>
@@ -5130,7 +5130,7 @@
             if (srLink) srLink.click();
           }
           // 上部の回答グリッド・月切替・今日ボタン・凡例すべて非表示
-          ['staffResponseContent','staffResponseMonthOverlay','btnStaffResponseToday','staffResponseMonth','staffResponseCalLegendArea'].forEach(function(id) {
+          ['staffResponseContent','staffResponseMonthOverlay','btnStaffResponseToday','staffResponseMonth','staffResponseCalLegendArea','staffResponseLegend'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.style.display = 'none';
           });

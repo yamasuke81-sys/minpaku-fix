@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322aa</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322ab</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7677,13 +7677,11 @@
       }
 
       function loadInvoiceData() {
-        console.log('[DEBUG-INVOICE] loadInvoiceData called. staffMode=' + window.staffMode);
-        if (!window.staffMode) { console.log('[DEBUG-INVOICE] not staffMode → return'); return; }
+        if (!window.staffMode) return;
         loadBankInfo_();
 
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
-        console.log('[DEBUG-INVOICE] staffId=' + staffId + ' currentUserName=' + window.currentUserName + ' currentUserEmail=' + window.currentUserEmail);
-        if (!staffId) { console.log('[DEBUG-INVOICE] staffId empty → return'); return; }
+        if (!staffId) return;
 
         var ym = getInvoiceYm();
         var ymParts = ym.split('-');
@@ -7707,19 +7705,6 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
-            console.log('[DEBUG-INVOICE] getInvoiceData応答: success=' + r.success + ' hasFolder=' + r.hasFolder + ' hasTemplate=' + r.hasTemplate + ' autoItems=' + (r.autoItems || []).length + ' extraItems=' + (r.extraItems || []).length + ' error=' + (r.error || ''));
-            // [DEBUG] 追加項目デバッグ情報を画面上に表示
-            if (r._extraDebug && r._extraDebug.length > 0) {
-              var dbgEl = document.getElementById('invoiceExtraDebug');
-              if (!dbgEl) {
-                dbgEl = document.createElement('div');
-                dbgEl.id = 'invoiceExtraDebug';
-                dbgEl.style.cssText = 'background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:8px;margin:8px 0;font-size:12px;white-space:pre-wrap;word-break:break-all;';
-                var panel = document.getElementById('panelInvoice');
-                if (panel) panel.insertBefore(dbgEl, panel.firstChild);
-              }
-              dbgEl.textContent = '[DEBUG 追加項目]\n' + r._extraDebug.join('\n');
-            }
             if (!r.success) {
               if (autoEl) autoEl.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
               return;
@@ -10854,24 +10839,8 @@
               if (r.success && r.verified) {
                 window._invoiceAuthenticated = true;
                 if (pwInput) pwInput.value = '';
-                console.log('[DEBUG-AUTH] 認証成功. _invoiceAuthenticated=' + window._invoiceAuthenticated);
                 hideInvoicePasswordModal();
-                var ovAfter = document.getElementById('invoicePasswordOverlay');
-                console.log('[DEBUG-AUTH] overlay display after hide=' + (ovAfter ? ovAfter.style.display : 'N/A'));
-                var panelBefore = document.getElementById('panelInvoice');
-                console.log('[DEBUG-AUTH] panelInvoice display BEFORE switchToTab=' + (panelBefore ? panelBefore.style.display : 'N/A'));
-                // 認証完了後: 少し遅延してからタブ切替（overlay非表示の反映を待つ）
-                setTimeout(function() {
-                  console.log('[DEBUG-AUTH] setTimeout fired, calling switchToTab(invoice)');
-                  switchToTab('invoice');
-                  var panelAfter = document.getElementById('panelInvoice');
-                  console.log('[DEBUG-AUTH] panelInvoice display AFTER switchToTab=' + (panelAfter ? panelAfter.style.display : 'N/A'));
-                  var contentEl = document.getElementById('invoiceContent');
-                  console.log('[DEBUG-AUTH] invoiceContent display=' + (contentEl ? contentEl.style.display : 'N/A'));
-                  var autoEl = document.getElementById('invoiceAutoItems');
-                  console.log('[DEBUG-AUTH] invoiceAutoItems innerHTML length=' + (autoEl ? autoEl.innerHTML.length : 'N/A'));
-                  console.log('[DEBUG-AUTH] staffMode=' + window.staffMode + ' isOwnerUser=' + window.isOwnerUser + ' currentUserName=' + window.currentUserName);
-                }, 50);
+                setTimeout(function() { switchToTab('invoice'); }, 50);
               } else {
                 if (msg) { msg.textContent = 'パスワードが正しくありません'; msg.style.display = 'block'; }
               }
@@ -11115,14 +11084,6 @@
               if (res.success) {
                 var area = document.getElementById('laundryCardArea');
                 if (area) renderCleaningLaundryCard(area, checkoutDate, window.staffMode);
-                // [DEBUG] ランドリー報酬追加デバッグ情報を画面表示
-                if (res._laundryDebug) {
-                  var dbg = document.createElement('div');
-                  dbg.style.cssText = 'background:#d1ecf1;color:#0c5460;border:1px solid #17a2b8;border-radius:4px;padding:6px;margin:6px 0;font-size:11px;';
-                  dbg.textContent = '[DEBUG 報酬追加] ' + res._laundryDebug;
-                  if (area) area.parentNode.insertBefore(dbg, area.nextSibling);
-                  setTimeout(function() { dbg.remove(); }, 15000);
-                }
               } else {
                 btn.textContent = 'エラー: ' + (res.error || '不明なエラー');
                 btn.classList.add('btn-danger');

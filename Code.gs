@@ -8125,27 +8125,17 @@ function getInvoiceData(yearMonth, staffIdentifier) {
     // 送信履歴（対象月分のみ）
     var history = getInvoiceHistoryInternal_(staffName, ym);
 
-    // 追加項目（シートから読み込み）
+    // 追加項目（シートから読み込み — ym列のDate型変換に対応）
     var extraItems = [];
-    var _extraDebug = []; // [DEBUG] 画面表示用
     try {
       var extraSheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
-      _extraDebug.push('sheet存在=' + !!extraSheet);
       if (extraSheet && extraSheet.getLastRow() >= 2) {
         var extraData = extraSheet.getRange(2, 1, extraSheet.getLastRow() - 1, 5).getValues();
-        _extraDebug.push('全行数=' + extraData.length + ' 検索: staffName=[' + staffName + '] ym=[' + ym + ']');
-        var _sampleCount = 0;
         for (var exi = 0; exi < extraData.length; exi++) {
           var exName = String(extraData[exi][0] || '').trim();
-          // ym列がDate型の場合はyyyy-MM形式に変換
           var exYmRaw = extraData[exi][1];
           var exYm = (exYmRaw instanceof Date) ? Utilities.formatDate(exYmRaw, 'Asia/Tokyo', 'yyyy-MM') : String(exYmRaw || '').trim();
-          if (_sampleCount < 3) {
-            _extraDebug.push('row' + (exi+2) + ': name=[' + exName + '] ymRaw=' + (exYmRaw instanceof Date ? 'Date(' + exYmRaw + ')' : '[' + exYmRaw + ']') + ' ymConverted=[' + exYm + '] nameMatch=' + (exName === staffName) + ' ymMatch=' + (exYm === ym));
-            _sampleCount++;
-          }
           if (exName === staffName && exYm === ym) {
-            // date列もDate型をハンドリング
             var exDateRaw = extraData[exi][2];
             var exDate = (exDateRaw instanceof Date) ? Utilities.formatDate(exDateRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(exDateRaw || '');
             extraItems.push({
@@ -8155,9 +8145,8 @@ function getInvoiceData(yearMonth, staffIdentifier) {
             });
           }
         }
-        _extraDebug.push('マッチ件数=' + extraItems.length);
       }
-    } catch (exErr) { _extraDebug.push('エラー: ' + exErr.toString()); }
+    } catch (exErr) {}
 
     // 除外項目（シートから読み込み）
     var excludedAuto = [];
@@ -8188,8 +8177,7 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       extraItems: extraItems,
       excludedAuto: excludedAuto,
       hasFolder: !!folderId,
-      hasTemplate: !!templateDocId,
-      _extraDebug: _extraDebug
+      hasTemplate: !!templateDocId
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -12617,12 +12605,8 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
 
     // 報酬自動追加（sent→ランドリー出し、received→ランドリー受取）
     var laundryJobMap = { sent: 'ランドリー出し', received: 'ランドリー受取' };
-    var _laundryDebug = 'step=' + step + ' staffName=[' + staffName + '] dateKey=' + dateKey + ' jobName=' + (laundryJobMap[step] || 'なし');
     if (laundryJobMap[step] && staffName) {
-      _laundryDebug += ' → addInvoiceExtraItemFromMain_呼び出し';
       addInvoiceExtraItemFromMain_(ss, staffName, dateKey, laundryJobMap[step]);
-    } else {
-      _laundryDebug += ' → スキップ';
     }
 
     // コインランドリー専用のチャンネル設定を募集設定シートから読み込み（CL_CH_コインランドリー）
@@ -12690,7 +12674,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       Logger.log('[LAUNDRY-MAIL] エラー: ' + mailErr);
     }
 
-    return JSON.stringify({ success: true, _laundryDebug: _laundryDebug });
+    return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -12763,28 +12747,25 @@ function resetCleaningLaundry(checkoutDate) {
  */
 function addInvoiceExtraItemFromMain_(ss, staffName, dateStr, jobName) {
   try {
-    Logger.log('[DEBUG-INVOICE-EXTRA] addInvoiceExtraItemFromMain_ 開始: staffName=' + staffName + ' dateStr=' + dateStr + ' jobName=' + jobName);
-    if (!staffName || !jobName) { Logger.log('[DEBUG-INVOICE-EXTRA] スキップ: staffName or jobName empty'); return; }
+    if (!staffName || !jobName) return;
     var dateKey = normDateStr_(dateStr || new Date());
     var ym = dateKey.substring(0, 7);
     var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
-    Logger.log('[DEBUG-INVOICE-EXTRA] SHEET_INVOICE_EXTRA=' + SHEET_INVOICE_EXTRA + ' sheet存在=' + !!sheet);
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_INVOICE_EXTRA);
       sheet.getRange(1, 1, 1, 5).setValues([['スタッフ名', '月', '日付', '項目名', '金額']]);
-      Logger.log('[DEBUG-INVOICE-EXTRA] シート新規作成');
     }
-    // 重複チェック
+    // 重複チェック（ym列のDate型変換に対応）
     var lastRow = sheet.getLastRow();
-    Logger.log('[DEBUG-INVOICE-EXTRA] lastRow=' + lastRow);
     if (lastRow >= 2) {
       var existing = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
       for (var i = 0; i < existing.length; i++) {
+        var exYmRaw = existing[i][1];
+        var exYm = (exYmRaw instanceof Date) ? Utilities.formatDate(exYmRaw, 'Asia/Tokyo', 'yyyy-MM') : String(exYmRaw || '').trim();
         if (String(existing[i][0] || '').trim() === staffName &&
-            String(existing[i][1] || '').trim() === ym &&
+            exYm === ym &&
             normDateStr_(existing[i][2]) === dateKey &&
             String(existing[i][3] || '').trim() === jobName) {
-          Logger.log('[DEBUG-INVOICE-EXTRA] 重複検出スキップ: row=' + (i+2));
           return; // 重複スキップ
         }
       }
@@ -12812,4 +12793,35 @@ function addInvoiceExtraItemFromMain_(ss, staffName, dateStr, jobName) {
   } catch (e) {
     Logger.log('[報酬自動追加] エラー: ' + e.toString());
   }
+}
+
+/**
+ * 請求書追加項目シートの重複エントリを削除（GASエディタから手動実行用）
+ * ym列のDate型変換に対応して正確に重複判定
+ */
+function cleanupDuplicateInvoiceExtraItems() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+  if (!sheet || sheet.getLastRow() < 2) { Logger.log('対象データなし'); return; }
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  var seen = {};
+  var rowsToDelete = [];
+  for (var i = 0; i < data.length; i++) {
+    var name = String(data[i][0] || '').trim();
+    var ymRaw = data[i][1];
+    var ym = (ymRaw instanceof Date) ? Utilities.formatDate(ymRaw, 'Asia/Tokyo', 'yyyy-MM') : String(ymRaw || '').trim();
+    var dt = normDateStr_(data[i][2]);
+    var job = String(data[i][3] || '').trim();
+    var key = name + '|' + ym + '|' + dt + '|' + job;
+    if (seen[key]) {
+      rowsToDelete.push(i + 2); // 1-based, header=1
+    } else {
+      seen[key] = true;
+    }
+  }
+  // 下から削除（行番号ずれ防止）
+  for (var j = rowsToDelete.length - 1; j >= 0; j--) {
+    sheet.deleteRow(rowsToDelete[j]);
+  }
+  Logger.log('重複削除完了: ' + rowsToDelete.length + '行削除');
 }

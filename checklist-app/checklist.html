@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322i</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322o</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6259,6 +6259,27 @@
     // プリカ管理
     // ==========================================
     var _prepaidCards = [];
+    var _prepaidSort = 'cardNo-asc'; // デフォルト: ナンバー昇順
+
+    function sortPrepaidCards_(cards, sortKey) {
+      var sorted = cards.slice();
+      sorted.sort(function(a, b) {
+        switch (sortKey) {
+          case 'cardNo-asc': return String(a.cardNo).localeCompare(String(b.cardNo));
+          case 'cardNo-desc': return String(b.cardNo).localeCompare(String(a.cardNo));
+          case 'balance-asc': return a.balance - b.balance;
+          case 'balance-desc': return b.balance - a.balance;
+          default: return 0;
+        }
+      });
+      return sorted;
+    }
+
+    function setPrepaidSort(sortKey) {
+      _prepaidSort = sortKey;
+      var container = document.getElementById('prepaidContent');
+      if (container) renderPrepaidCards(container);
+    }
 
     function loadPrepaidCards(silent) {
       var container = document.getElementById('prepaidContent');
@@ -6274,9 +6295,24 @@
     }
 
     function renderPrepaidCards(container) {
-      var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効'; });
+      var activeCards = sortPrepaidCards_(_prepaidCards.filter(function(c) { return c.status === '有効'; }), _prepaidSort);
       var inactiveCards = _prepaidCards.filter(function(c) { return c.status === '無効'; });
       var html = '';
+
+      // ソートボタン
+      if (activeCards.length > 1) {
+        var btnStyle = function(key) {
+          return _prepaidSort === key
+            ? 'padding:3px 8px;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;background:#0d6efd;color:#fff;'
+            : 'padding:3px 8px;border:1px solid #ced4da;border-radius:4px;font-size:11px;cursor:pointer;background:#f8f9fa;color:#495057;';
+        };
+        html += '<div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:6px;flex-wrap:wrap;">';
+        html += '<button onclick="setPrepaidSort(\'cardNo-asc\')" style="' + btnStyle('cardNo-asc') + '">No.↑</button>';
+        html += '<button onclick="setPrepaidSort(\'cardNo-desc\')" style="' + btnStyle('cardNo-desc') + '">No.↓</button>';
+        html += '<button onclick="setPrepaidSort(\'balance-asc\')" style="' + btnStyle('balance-asc') + '">残高↑</button>';
+        html += '<button onclick="setPrepaidSort(\'balance-desc\')" style="' + btnStyle('balance-desc') + '">残高↓</button>';
+        html += '</div>';
+      }
 
       // 有効カード一覧
       if (activeCards.length === 0) {

@@ -828,13 +828,22 @@ function getData() {
         if (cancelledAtRaw instanceof Date) cancelledAt = Utilities.formatDate(cancelledAtRaw, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
         else cancelledAt = String(cancelledAtRaw).trim();
       }
-      // 宿泊者名一覧（複数カラム対応）と年齢
+      // 宿泊者名一覧（複数カラム対応）と年齢・住所・国籍・旅券番号・パスポートURL
       var guestNames = [];
       if (columnMap.guestNameCols && columnMap.guestNameCols.length) {
         for (var gi = 0; gi < columnMap.guestNameCols.length; gi++) {
           var gn = String(row[columnMap.guestNameCols[gi]] || '').trim();
           var ga = (columnMap.ageCols && columnMap.ageCols[gi] !== undefined && columnMap.ageCols[gi] >= 0) ? String(row[columnMap.ageCols[gi]] || '').trim() : '';
-          if (gn) guestNames.push({ name: gn, age: ga });
+          var gAddr = (columnMap.addressCols && columnMap.addressCols[gi] !== undefined && columnMap.addressCols[gi] >= 0) ? String(row[columnMap.addressCols[gi]] || '').trim() : '';
+          var gNat = (columnMap.nationalityCols && columnMap.nationalityCols[gi] !== undefined && columnMap.nationalityCols[gi] >= 0) ? String(row[columnMap.nationalityCols[gi]] || '').trim() : '';
+          var gPassNum = (columnMap.passportNumberCols && columnMap.passportNumberCols[gi] !== undefined && columnMap.passportNumberCols[gi] >= 0) ? String(row[columnMap.passportNumberCols[gi]] || '').trim() : '';
+          var gPassUrl = '';
+          if (columnMap.passportCols && columnMap.passportCols[gi] !== undefined && columnMap.passportCols[gi] >= 0) {
+            var pv = row[columnMap.passportCols[gi]];
+            if (pv && typeof pv === 'string' && pv.indexOf('http') === 0) gPassUrl = pv;
+            else if (pv && pv.toString && pv.toString().indexOf('http') === 0) gPassUrl = pv.toString();
+          }
+          if (gn) guestNames.push({ name: gn, age: ga, address: gAddr, nationality: gNat, passportNumber: gPassNum, passportUrl: gPassUrl });
         }
       }
 
@@ -1006,6 +1015,9 @@ function buildColumnMap(headers) {
     cleaningNotice: -1,
     guestNameCols: [],
     ageCols: [],
+    addressCols: [],
+    nationalityCols: [],
+    passportNumberCols: [],
     cancelledAt: -1
   };
 
@@ -1029,11 +1041,14 @@ function buildColumnMap(headers) {
     if ((h === HEADERS.ICAL_SYNC || (h.indexOf('iCal') >= 0 && h.indexOf('同期') >= 0)) && map.icalSync < 0) map.icalSync = i;
     if ((h === HEADERS.ICAL_GUEST_COUNT || (h.indexOf('iCal') >= 0 && h.indexOf('宿泊人数') >= 0)) && map.icalGuestCount < 0) map.icalGuestCount = i;
     if ((h === HEADERS.CANCELLED_AT || h === 'キャンセル日時') && map.cancelledAt < 0) map.cancelledAt = i;
-    if ((h.indexOf('国籍') > -1 || h.toLowerCase().indexOf('nationality') > -1) && map.nationality < 0) map.nationality = i;
+    if ((h.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) && map.nationality < 0) map.nationality = i;
+    if (h.indexOf('国籍') > -1 || hl.indexOf('nationality') > -1) map.nationalityCols.push(i);
+    if (h.indexOf('住所') > -1 || hl.indexOf('address') > -1) map.addressCols.push(i);
+    if (h.indexOf('旅券番号') > -1 || hl.indexOf('passport number') > -1) map.passportNumberCols.push(i);
     if (h.indexOf('宿泊人数2名のお客様のみお答えください') > -1 && h.indexOf('ベッド') > -1 && map.bedChoice < 0) map.bedChoice = i;
     if (h.indexOf('宿泊人数2名') > -1 && map.twoGuestChoice < 0) map.twoGuestChoice = i;
     if (h.indexOf('ベッド数') > -1 && map.bedCount < 0) map.bedCount = i;
-    if ((h.indexOf('電話') > -1 || h.indexOf('TEL') > -1 || h.toLowerCase().indexOf('phone') > -1) && h.indexOf('オーナー') === -1) {
+    if ((h.indexOf('電話') > -1 || h.indexOf('TEL') > -1 || hl.indexOf('phone') > -1) && h.indexOf('オーナー') === -1 && h.indexOf('旅券') === -1 && hl.indexOf('passport') === -1) {
       if (map.tel1 < 0) map.tel1 = i;
       else if (map.tel2 < 0) map.tel2 = i;
     }
@@ -1041,7 +1056,8 @@ function buildColumnMap(headers) {
       if (map.email < 0) map.email = i;
       else if (map.email2 < 0) map.email2 = i;
     }
-    if (h.indexOf('パスポート') > -1 || h.indexOf('passport') > -1 || h.indexOf('Passport') > -1) {
+    // パスポート写真（「旅券番号」を含まないパスポート列）
+    if ((h.indexOf('パスポート') > -1 || hl.indexOf('passport') > -1) && h.indexOf('旅券番号') === -1 && hl.indexOf('passport number') === -1) {
       map.passportCols.push(i);
     }
     var carMatch = h.match(/お車は何台でお越しになりますか[\s　]*[?\？]\s*\[([^\]]+)\]/);

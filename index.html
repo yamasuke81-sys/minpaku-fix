@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322j</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322k</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -3351,18 +3351,30 @@
             html += '<div class="date-item"><div class="date-label"><i class="bi bi-box-arrow-right"></i> チェックアウト</div><div class="date-val">' + formatDateTimeDisplay(d.checkOut) + '</div></div>';
             html += '</div>';
 
-            // 宿泊者名（折りたたみ表示、代表者は常時表示）
+            // 宿泊者名（折りたたみ表示、代表者は常時表示）+ 各宿泊者の詳細情報
             if (!hideGuestInfoForStaff) {
               var gnList = d.guestNames && d.guestNames.length ? d.guestNames : (d.guestName ? [{ name: d.guestName, age: '' }] : []);
+              // 宿泊者の詳細情報を生成するヘルパー関数
+              var buildGuestDetail_ = function(g) {
+                var parts = [];
+                if (g.address) parts.push('<span class="text-muted" style="font-size:0.8rem;"><i class="bi bi-geo-alt"></i> ' + fmt(g.address) + '</span>');
+                if (g.nationality) parts.push('<span class="text-muted" style="font-size:0.8rem;"><i class="bi bi-flag"></i> ' + fmt(g.nationality) + '</span>');
+                if (g.passportNumber) parts.push('<span class="text-muted" style="font-size:0.8rem;"><i class="bi bi-card-text"></i> ' + fmt(g.passportNumber) + '</span>');
+                if (g.passportUrl) parts.push('<a href="' + fmt(g.passportUrl) + '" target="_blank" class="small"><i class="bi bi-file-image"></i> パスポート写真</a>');
+                return parts.length ? '<div style="margin-left:1rem;line-height:1.6;">' + parts.join('<br>') + '</div>' : '';
+              };
               if (gnList.length > 0) {
                 var rep = gnList[0];
                 var repDisp = fmt(rep.name) + (rep.age ? ' <span class="text-muted small">(' + fmt(rep.age) + ')</span>' : '');
                 html += '<div class="detail-row"><span class="detail-label"><strong><i class="bi bi-person"></i> 宿泊者名:</strong></span><span class="detail-value">' + repDisp;
+                html += buildGuestDetail_(rep);
                 if (gnList.length > 1) {
                   html += ' <a href="#" class="small text-decoration-none" data-bs-toggle="collapse" data-bs-target="#guestListCollapse" role="button">...他' + (gnList.length - 1) + '名 <i class="bi bi-chevron-down"></i></a>';
                   html += '<div class="collapse mt-1" id="guestListCollapse">';
                   for (var gni = 1; gni < gnList.length; gni++) {
-                    html += '<div>' + fmt(gnList[gni].name) + (gnList[gni].age ? ' <span class="text-muted small">(' + fmt(gnList[gni].age) + ')</span>' : '') + '</div>';
+                    html += '<div class="mb-1">' + fmt(gnList[gni].name) + (gnList[gni].age ? ' <span class="text-muted small">(' + fmt(gnList[gni].age) + ')</span>' : '');
+                    html += buildGuestDetail_(gnList[gni]);
+                    html += '</div>';
                   }
                   html += '</div>';
                 }

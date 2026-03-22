@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322r</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322s</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -2087,9 +2087,9 @@
             updateCheckAllButton();
             // スタッフ選択を反映（全端末共有）
             applyStaffSelection(res.selectedStaff, res.myStaff);
-            // 折りたたみ状態とタブを復元
+            // 折りたたみ状態とタブを復元（同期時はデータ再読み込みせずタブ表示のみ復元）
             restoreCollapseState(collapseState);
-            if (activeTab) switchTab(activeTab);
+            if (activeTab) switchTab(activeTab, true);
           }
         }).catch(function(e) { syncInProgress = false; _syncLog('SYNC失敗 ' + (Date.now() - syncStartTime) + 'ms err=' + (e && e.message || e)); });
       }
@@ -2259,7 +2259,7 @@
     }
 
     // === タブ切り替え ===
-    function switchTab(tabName) {
+    function switchTab(tabName, skipLoad) {
       document.querySelectorAll('.tab-nav-btn').forEach(function(btn) {
         btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
       });
@@ -2268,9 +2268,11 @@
       });
       var target = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (target) target.classList.add('active');
-      if (tabName === 'clSettings') { loadFolderSettings(); loadClLineNotifySettings(); }
-      if (tabName === 'nextRes') loadNextReservation();
-      if (tabName === 'laundry') { loadLaundryStatus(); loadPrepaidCards(); }
+      if (!skipLoad) {
+        if (tabName === 'clSettings') { loadFolderSettings(); loadClLineNotifySettings(); }
+        if (tabName === 'nextRes') loadNextReservation();
+        if (tabName === 'laundry') { loadLaundryStatus(); loadPrepaidCards(); }
+      }
     }
 
     // フォルダ設定の読み込み
@@ -6153,12 +6155,15 @@
       var selectedNames = getSelectedStaffNames();
       var labels = { sent: 'コインランドリーに出した', received: 'コインランドリーから回収した', returned: 'リネンを施設に戻した' };
 
-      // スタッフ未選択
-      if (selectedNames.length === 0 && !staffName) { alert('スタッフを選択してください'); return; }
-
-      // スタッフ選択 → 毎回誰が実行するか選択（1人でも表示）
-      if (selectedNames.length >= 1 && !btn._laundryStaff) {
-        showLaundryStaffPicker(selectedNames, function(picked) {
+      // 全スタッフから「民泊」を除外して表示（プリカ使用者選択と同様）
+      if (!btn._laundryStaff) {
+        var allNames = staffList.filter(function(n) { return n !== '民泊'; });
+        if (allNames.length === 0) { alert('スタッフが登録されていません'); return; }
+        // 選択中スタッフを先頭に表示
+        if (selectedNames.length > 0) {
+          allNames = selectedNames.filter(function(n) { return n !== '民泊'; }).concat(allNames.filter(function(n) { return selectedNames.indexOf(n) === -1; }));
+        }
+        showLaundryStaffPicker(allNames, function(picked) {
           btn._laundryStaff = picked;
           doLaundryStep(step, btn);
         });

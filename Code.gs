@@ -1063,6 +1063,17 @@ function buildColumnMap(headers) {
     var carMatch = h.match(/お車は何台でお越しになりますか[\s　]*[?\？]\s*\[([^\]]+)\]/);
     if (carMatch) map.carCols.push({ col: i, label: carMatch[1].trim() });
   }
+  // [DEBUG-COLMAP] 住所・国籍・旅券番号・パスポート・氏名の列検出結果をログ
+  Logger.log('[DEBUG-COLMAP] guestNameCols=' + JSON.stringify(map.guestNameCols) + ' ageCols=' + JSON.stringify(map.ageCols) + ' addressCols=' + JSON.stringify(map.addressCols) + ' nationalityCols=' + JSON.stringify(map.nationalityCols) + ' passportNumberCols=' + JSON.stringify(map.passportNumberCols) + ' passportCols=' + JSON.stringify(map.passportCols));
+  // 住所列が検出されなかった場合、全ヘッダーをダンプ
+  if (map.addressCols.length === 0) {
+    var allHeaders = [];
+    for (var hi = 0; hi < headers.length; hi++) {
+      var hv = String(headers[hi] || '').trim();
+      if (hv) allHeaders.push(hi + ':' + hv.substring(0, 40));
+    }
+    Logger.log('[DEBUG-COLMAP] addressCols empty. All headers: ' + allHeaders.join(' | '));
+  }
   return map;
 }
 

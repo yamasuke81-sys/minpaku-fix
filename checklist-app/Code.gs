@@ -2278,7 +2278,7 @@ function transferPrepaidCard(cardNo, newOwner, memo) {
 }
 
 /**
- * プリカの残高を更新（チャージ or 使用）
+ * プリカの残高を更新（使用 or 残高修正）
  */
 function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, staffName) {
   var lock = LockService.getScriptLock();

@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322a</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322b</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6258,7 +6258,6 @@
     // ==========================================
     // プリカ管理
     // ==========================================
-    var _prepaidLoaded = false;
     var _prepaidCards = [];
 
     function loadPrepaidCards() {
@@ -6266,7 +6265,6 @@
       if (!container) return;
       container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
       callGAS('getPrepaidCards', []).then(function(res) {
-        _prepaidLoaded = true;
         if (!res.success) { container.innerHTML = '<div style="color:#999;font-size:13px;">取得できませんでした</div>'; return; }
         _prepaidCards = res.cards || [];
         renderPrepaidCards(container);
@@ -6394,9 +6392,8 @@
       html += '</div>';
 
       // アクションボタン群
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">';
       html += '<button onclick="showPrepaidUseDialog(\'' + escapeHtml(cardNo) + '\')" style="padding:10px;border:none;border-radius:8px;background:#fff3cd;color:#856404;font-size:13px;font-weight:600;cursor:pointer;"><i class="bi bi-dash-circle" style="margin-right:4px;"></i>使用</button>';
-      html += '<button onclick="showPrepaidChargeDialog(\'' + escapeHtml(cardNo) + '\')" style="padding:10px;border:none;border-radius:8px;background:#d1e7dd;color:#0f5132;font-size:13px;font-weight:600;cursor:pointer;"><i class="bi bi-plus-circle" style="margin-right:4px;"></i>チャージ</button>';
       html += '<button onclick="showPrepaidTransferDialog(\'' + escapeHtml(cardNo) + '\')" style="padding:10px;border:none;border-radius:8px;background:#cfe2ff;color:#084298;font-size:13px;font-weight:600;cursor:pointer;"><i class="bi bi-arrow-left-right" style="margin-right:4px;"></i>受渡</button>';
       html += '<button onclick="doPrepaidDeactivate(\'' + escapeHtml(cardNo) + '\')" style="padding:10px;border:none;border-radius:8px;background:#f8d7da;color:#842029;font-size:13px;font-weight:600;cursor:pointer;"><i class="bi bi-x-circle" style="margin-right:4px;"></i>無効化</button>';
       html += '</div>';
@@ -6453,11 +6450,6 @@
     // 使用ダイアログ
     function showPrepaidUseDialog(cardNo) {
       showPrepaidAmountDialog(cardNo, '使用金額', 'use');
-    }
-
-    // チャージダイアログ
-    function showPrepaidChargeDialog(cardNo) {
-      showPrepaidAmountDialog(cardNo, 'チャージ金額', 'charge');
     }
 
     function showPrepaidAmountDialog(cardNo, title, operation) {
@@ -6561,30 +6553,7 @@
 
     // プリカ無効化
     function doPrepaidDeactivate(cardNo) {
-      var old = document.getElementById('prepaidAmountDialog');
-      if (old) old.remove();
-      // 2タップ方式
-      var detailDlg = document.getElementById('prepaidDetailDialog');
-      if (!detailDlg) return;
-      var deactBtn = detailDlg.querySelector('button[onclick*="doPrepaidDeactivate"]');
-      if (!deactBtn) return;
-      if (!deactBtn._confirmReady) {
-        deactBtn._confirmReady = true;
-        deactBtn._origText = deactBtn.innerHTML;
-        deactBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> 本当に無効化？';
-        deactBtn.style.background = '#dc3545';
-        deactBtn.style.color = '#fff';
-        setTimeout(function() {
-          if (deactBtn._confirmReady) {
-            deactBtn._confirmReady = false;
-            deactBtn.innerHTML = deactBtn._origText;
-            deactBtn.style.background = '#f8d7da';
-            deactBtn.style.color = '#842029';
-          }
-        }, 5000);
-        return;
-      }
-      deactBtn._confirmReady = false;
+      if (!confirm('このプリカを無効化しますか？')) return;
 
       callGAS('deactivatePrepaidCard', [cardNo]).then(function(res) {
         if (res.success) {
@@ -6633,7 +6602,7 @@
           showLaundryPrepaidAmountDialog(cardNo, staffName_);
           return;
         }
-        if (e.target.id === 'laundryPrepaidSkip' || e.target === overlay) {
+        if (e.target.id === 'laundryPrepaidSkip') {
           overlay.remove();
         }
       });

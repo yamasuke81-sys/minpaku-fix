@@ -1157,7 +1157,7 @@
 <? } ?>
 <? if (staffModeStr === 'yes') { ?>
     <!-- 請求書タブ パスワード認証モーダル -->
-    <div id="invoicePasswordOverlay" class="position-fixed top-0 start-0 w-100 h-100 align-items-center justify-content-center" style="display:none !important; background:rgba(0,0,0,0.5); z-index:9998;">
+    <div id="invoicePasswordOverlay" class="position-fixed top-0 start-0 w-100 h-100 align-items-center justify-content-center" style="display:none !important; background:rgba(255,255,255,1); z-index:9998;">
       <div class="bg-white rounded shadow p-4 m-2" style="max-width:360px;">
         <h6 class="mb-2" id="invoicePwTitle">請求書タブ - パスワード認証</h6>
         <p class="small text-muted mb-3" id="invoicePwDesc">請求書にはプライバシー情報が含まれるため、パスワードが必要です。</p>
@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322t</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322u</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5364,8 +5364,15 @@
             var tab = this.getAttribute('data-tab');
             // 請求書タブ: スタッフモードではパスワード認証を要求
             if (tab === 'invoice' && window.staffMode && !window.isOwnerUser && !window._invoiceAuthenticated) {
-              // 先にinvoiceタブのパネル表示に切り替え（認証モーダルの背後が前のタブのままにならないよう）
-              switchToTab('invoice');
+              // タブのハイライトだけ変更し、パネル内容は表示しない（認証完了まで隠す）
+              document.querySelectorAll('#mainTabs .nav-link').forEach(function(l) { l.classList.remove('active'); });
+              var invoiceLink = document.querySelector('#mainTabs [data-tab="invoice"]');
+              if (invoiceLink) invoiceLink.classList.add('active');
+              // 全パネルを非表示にする（請求書の中身が背景に見えないように）
+              ['panelCalendar','panelRecruit','panelStaffResponse','panelStaffSchedule','panelInvoice','panelNotifications','panelSettings','panelStaffTest'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+              });
               showInvoicePasswordModal();
               return;
             }

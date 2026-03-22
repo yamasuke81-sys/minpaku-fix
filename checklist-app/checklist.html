@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322t</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322u</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1635,9 +1635,12 @@
 
         <!-- プリカ管理セクション -->
         <div id="prepaidSection" style="padding:12px;background:#e2e3e5;border-radius:10px;border:1px solid #c4c8cb;margin-top:12px;">
-          <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-.125em;"><rect x="1" y="3" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="1"/><rect x="9" y="8" width="4" height="2" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
-            プリカ管理
+          <div style="font-size:0.9rem;font-weight:700;color:#41464b;text-align:center;padding:0.4rem 0.75rem;margin:-12px -12px 10px -12px;border-radius:10px 10px 0 0;border-bottom:1px solid rgba(0,0,0,0.12);letter-spacing:0.05em;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-.125em;"><rect x="1" y="3" width="14" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="1"/><rect x="9" y="8" width="4" height="2" rx="0.5" fill="currentColor" opacity="0.5"/></svg>
+              プリカ管理
+            </span>
+            <button onclick="showAddPrepaidDialog()" style="width:24px;height:24px;border:1px solid #6c757d;border-radius:50%;background:#fff;color:#495057;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">＋</button>
           </div>
           <div id="prepaidContent"><div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div></div>
         </div>
@@ -6509,10 +6512,7 @@
         html += '</div>';
       }
 
-      // +ボタン
-      html += '<div style="text-align:center;margin-top:8px;">';
-      html += '<button onclick="showAddPrepaidDialog()" style="padding:6px 16px;border:1px dashed #6c757d;border-radius:8px;background:#fff;color:#495057;font-size:13px;cursor:pointer;"><i class="bi bi-plus-circle" style="margin-right:4px;"></i>プリカ追加</button>';
-      html += '</div>';
+      // +ボタンは見出し右側に移動済み
 
       container.innerHTML = html;
     }

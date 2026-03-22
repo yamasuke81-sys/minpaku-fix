@@ -2281,7 +2281,7 @@ function transferPrepaidCard(cardNo, newOwner, memo) {
 /**
  * プリカの残高を更新（使用 or 残高修正）
  */
-function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, staffName) {
+function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, staffName, newOwner) {
   var lock = LockService.getScriptLock();
   try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
   try {
@@ -2308,7 +2308,13 @@ function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, sta
         }
         sheet.getRange(i + 2, 3).setValue(newBalance);
         var owner = String(data[i][3] || '');
-        addPrepaidLog_(cardNo, operation === 'use' ? '使用' : '残高修正', amt, owner, owner, checkoutDate || '', staffName || '', memo || '');
+        // 使用時に所有者を変更（newOwnerが指定されていて現在の所有者と異なる場合）
+        if (newOwner && newOwner !== owner) {
+          sheet.getRange(i + 2, 4).setValue(newOwner);
+          addPrepaidLog_(cardNo, '受渡', newBalance, owner, newOwner, checkoutDate || '', staffName || '', '使用に伴う自動受渡');
+        }
+        var logOwner = newOwner || owner;
+        addPrepaidLog_(cardNo, operation === 'use' ? '使用' : '残高修正', amt, logOwner, logOwner, checkoutDate || '', staffName || '', memo || '');
         return JSON.stringify({ success: true, newBalance: newBalance });
       }
     }
@@ -2322,9 +2328,10 @@ function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, sta
 
 /**
  * プリカ使用記録（コインランドリー出し時に呼ばれる）
+ * 使用後に所有者をstaffNameに自動変更
  */
 function usePrepaidForLaundry(cardNo, amount, checkoutDate, staffName) {
-  return updatePrepaidBalance(cardNo, amount, 'use', 'コインランドリー使用', checkoutDate, staffName);
+  return updatePrepaidBalance(cardNo, amount, 'use', 'コインランドリー使用', checkoutDate, staffName, staffName);
 }
 
 /**

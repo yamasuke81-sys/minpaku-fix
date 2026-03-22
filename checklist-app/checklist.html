@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322d</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322e</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6068,10 +6068,10 @@
     // ==========================================
     // コインランドリー状況
     // ==========================================
-    function loadLaundryStatus() {
+    function loadLaundryStatus(silent) {
       var container = document.getElementById('laundryContent');
       if (!container) return;
-      container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div>';
+      if (!silent) container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;">読み込み中…</div>';
       callGAS('getCleaningLaundryStatus', [checkoutDate]).then(function(res) {
         if (!res.success) { container.innerHTML = '<div style="color:#999;font-size:13px;">取得できませんでした</div>'; return; }
         renderLaundryCard(container, res.data);
@@ -6191,7 +6191,7 @@
       btn.disabled = true; btn.textContent = '処理中…';
       callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
         if (res.success) {
-          loadLaundryStatus();
+          loadLaundryStatus(true);
           // 「出した」ステップ成功時にプリカ使用ダイアログを表示
           if (step === 'sent') showLaundryPrepaidPicker(sName);
         } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
@@ -6251,7 +6251,7 @@
       btn._confirmReady = false;
       btn.disabled = true; btn.textContent = '…';
       callGAS('cancelCleaningLaundryStep', [checkoutDate, step]).then(function(res) {
-        if (res.success) { loadLaundryStatus(); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; }
+        if (res.success) { loadLaundryStatus(true); } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; }
       }).catch(function() { alert('通信エラー'); btn.disabled = false; });
     }
 
@@ -6260,10 +6260,10 @@
     // ==========================================
     var _prepaidCards = [];
 
-    function loadPrepaidCards() {
+    function loadPrepaidCards(silent) {
       var container = document.getElementById('prepaidContent');
       if (!container) return;
-      container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
+      if (!silent) container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div>';
       callGAS('getPrepaidCards', []).then(function(res) {
         if (!res.success) { container.innerHTML = '<div style="color:#999;font-size:13px;">取得できませんでした</div>'; return; }
         _prepaidCards = res.cards || [];
@@ -6285,13 +6285,13 @@
         for (var i = 0; i < activeCards.length; i++) {
           var c = activeCards[i];
           var balColor = c.balance <= 0 ? '#dc3545' : (c.balance <= 500 ? '#fd7e14' : '#198754');
-          html += '<div style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;background:#fff;border-radius:8px;border:1px solid #dee2e6;cursor:pointer;" onclick="showPrepaidDetail(\'' + escapeHtml(c.cardNo) + '\')">';
-          html += '<div style="flex-shrink:0;width:50px;text-align:center;">';
-          html += '<span style="font-size:11px;font-weight:700;color:#495057;background:#e9ecef;padding:2px 6px;border-radius:4px;">' + escapeHtml(c.cardNo) + '</span>';
+          html += '<div style="display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:6px;background:#fff;border-radius:8px;border:1px solid #dee2e6;cursor:pointer;" onclick="showPrepaidDetail(\'' + escapeHtml(c.cardNo) + '\')">';
+          html += '<div style="flex-shrink:0;width:55px;text-align:center;">';
+          html += '<span style="font-size:14px;font-weight:700;color:#495057;background:#e9ecef;padding:3px 8px;border-radius:4px;">' + escapeHtml(c.cardNo) + '</span>';
           html += '</div>';
-          html += '<div style="flex:1;min-width:0;">';
-          html += '<div style="font-size:13px;font-weight:600;color:' + balColor + ';">¥' + c.balance.toLocaleString() + '</div>';
-          html += '<div style="font-size:11px;color:#6c757d;">' + escapeHtml(c.owner) + '</div>';
+          html += '<div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;">';
+          html += '<span style="font-size:15px;font-weight:700;color:' + balColor + ';">¥' + c.balance.toLocaleString() + '</span>';
+          html += '<span style="font-size:13px;color:#6c757d;">' + escapeHtml(c.owner) + '</span>';
           html += '</div>';
           html += '<div style="flex-shrink:0;color:#adb5bd;font-size:14px;"><i class="bi bi-chevron-right"></i></div>';
           html += '</div>';
@@ -6374,7 +6374,7 @@
       callGAS('addPrepaidCard', [pDate, bal, owner]).then(function(res) {
         if (dialog) dialog.remove();
         if (res.success) {
-          loadPrepaidCards();
+          loadPrepaidCards(true);
         } else {
           alert('エラー: ' + (res.error || '不明'));
         }
@@ -6467,9 +6467,39 @@
       });
     }
 
-    // 使用ダイアログ
+    // 使用ダイアログ（スタッフ選択→金額入力の2段階）
     function showPrepaidUseDialog(cardNo) {
-      showPrepaidAmountDialog(cardNo, '使用金額', 'use');
+      // スタッフ選択ダイアログを表示
+      var old = document.getElementById('prepaidUseStaffDialog');
+      if (old) old.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'prepaidUseStaffDialog';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
+      var html = '<div style="font-weight:bold;font-size:15px;margin-bottom:14px;text-align:center;">使用者を選択</div>';
+      // 選択中スタッフを先頭に
+      var selectedNames = getSelectedStaffNames();
+      var names = staffList.slice();
+      if (selectedNames.length > 0) {
+        names = selectedNames.concat(names.filter(function(n) { return selectedNames.indexOf(n) === -1; }));
+      }
+      for (var si = 0; si < names.length; si++) {
+        html += '<button class="prepaid-use-staff-btn" data-name="' + escapeHtml(names[si]) + '" style="display:block;width:100%;padding:10px;margin:4px 0;border:1px solid #dee2e6;border-radius:8px;background:#f8f9fa;font-size:14px;cursor:pointer;text-align:center;">' + escapeHtml(names[si]) + '</button>';
+      }
+      html += '<button onclick="document.getElementById(\'prepaidUseStaffDialog\').remove()" style="display:block;width:100%;padding:10px;margin-top:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>';
+      box.innerHTML = html;
+      overlay.appendChild(box);
+      box.addEventListener('click', function(e) {
+        var btn = e.target.closest('.prepaid-use-staff-btn');
+        if (btn) {
+          var userName = btn.getAttribute('data-name');
+          overlay.remove();
+          showPrepaidAmountDialog(cardNo, '使用金額', 'use', userName);
+        }
+      });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
     }
 
     // 残高修正ダイアログ
@@ -6482,7 +6512,7 @@
       showPrepaidAmountDialog(cardNo, '残高修正（現在: ¥' + currentBal.toLocaleString() + '）', 'adjust');
     }
 
-    function showPrepaidAmountDialog(cardNo, title, operation) {
+    function showPrepaidAmountDialog(cardNo, title, operation, useStaffName) {
       var old = document.getElementById('prepaidAmountDialog');
       if (old) old.remove();
       var overlay = document.createElement('div');
@@ -6490,7 +6520,20 @@
       overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
       var box = document.createElement('div');
       box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
-      box.innerHTML = '<div style="font-weight:bold;font-size:15px;margin-bottom:14px;text-align:center;">' + title + '</div>'
+      // useStaffNameをhiddenで保持
+      var staffHidden = useStaffName ? '<input type="hidden" id="prepaidAmtStaff" value="' + escapeHtml(useStaffName) + '">' : '';
+      // 金額クイックボタン（use時のみ）
+      var quickBtns = '';
+      if (operation === 'use') {
+        quickBtns = '<div style="display:flex;gap:8px;margin-bottom:10px;">'
+          + '<button type="button" onclick="document.getElementById(\'prepaidAmtInput\').value=\'1500\'" style="flex:1;padding:8px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;font-size:14px;cursor:pointer;">¥1,500</button>'
+          + '<button type="button" onclick="document.getElementById(\'prepaidAmtInput\').value=\'2000\'" style="flex:1;padding:8px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;font-size:14px;cursor:pointer;">¥2,000</button>'
+          + '</div>';
+      }
+      box.innerHTML = staffHidden
+        + '<div style="font-weight:bold;font-size:15px;margin-bottom:14px;text-align:center;">' + title + '</div>'
+        + (useStaffName ? '<div style="font-size:12px;color:#6c757d;text-align:center;margin-bottom:10px;">使用者: ' + escapeHtml(useStaffName) + '</div>' : '')
+        + quickBtns
         + '<div style="margin-bottom:10px;"><input type="number" id="prepaidAmtInput" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:16px;text-align:center;" placeholder="金額（円）"></div>'
         + '<div style="margin-bottom:14px;"><input type="text" id="prepaidAmtMemo" style="width:100%;padding:8px;border:1px solid #ced4da;border-radius:6px;font-size:13px;" placeholder="メモ（任意）"></div>'
         + '<div style="display:flex;gap:8px;">'
@@ -6506,6 +6549,7 @@
     function doPrepaidAmount(cardNo, operation) {
       var amtEl = document.getElementById('prepaidAmtInput');
       var memoEl = document.getElementById('prepaidAmtMemo');
+      var staffEl = document.getElementById('prepaidAmtStaff');
       var amt = amtEl ? Math.floor(Number(amtEl.value)) : 0;
       var memo = memoEl ? memoEl.value.trim() : '';
       if (!amt || amt <= 0) { alert('金額を入力してください'); return; }
@@ -6516,14 +6560,16 @@
       if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '処理中…'; }
 
       var selectedNames = getSelectedStaffNames();
-      var sName = selectedNames[0] || staffName || '';
+      var sName = (staffEl ? staffEl.value : '') || selectedNames[0] || staffName || '';
+      // use時: 使用者を所有者に変更（7番目の引数）
+      var newOwner = (operation === 'use' && sName) ? sName : '';
 
-      callGAS('updatePrepaidBalance', [cardNo, amt, operation, memo, checkoutDate || '', sName]).then(function(res) {
+      callGAS('updatePrepaidBalance', [cardNo, amt, operation, memo, checkoutDate || '', sName, newOwner]).then(function(res) {
         if (dialog) dialog.remove();
         if (res.success) {
           var detailDlg = document.getElementById('prepaidDetailDialog');
           if (detailDlg) detailDlg.remove();
-          loadPrepaidCards();
+          loadPrepaidCards(true);
           // 残高フィードバック
           var opLabel = operation === 'use' ? '使用' : '残高修正';
           showPrepaidToast_(opLabel + ' ¥' + amt.toLocaleString() + ' → 残高 ¥' + (res.newBalance != null ? res.newBalance.toLocaleString() : '?'));
@@ -6533,7 +6579,7 @@
       }).catch(function() { if (dialog) dialog.remove(); alert('通信エラー'); });
     }
 
-    // 受渡ダイアログ
+    // 受渡ダイアログ（プルダウン選択式）
     function showPrepaidTransferDialog(cardNo) {
       var card = null;
       for (var i = 0; i < _prepaidCards.length; i++) {
@@ -6548,9 +6594,18 @@
       overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
       var box = document.createElement('div');
       box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
+      // プルダウン用のoptions生成（民泊 + スタッフ一覧）
+      var optionsHtml = '<option value="民泊">民泊</option>';
+      for (var si = 0; si < staffList.length; si++) {
+        optionsHtml += '<option value="' + escapeHtml(staffList[si]) + '">' + escapeHtml(staffList[si]) + '</option>';
+      }
+      // デフォルト選択: 現在民泊なら選択中スタッフ、それ以外なら民泊
+      var selectedNames = getSelectedStaffNames();
+      var defaultTo = (card.owner === '民泊') ? (selectedNames[0] || '民泊') : '民泊';
+
       box.innerHTML = '<div style="font-weight:bold;font-size:15px;margin-bottom:14px;text-align:center;">プリカ受渡</div>'
         + '<div style="font-size:13px;color:#6c757d;text-align:center;margin-bottom:10px;">現在: ' + escapeHtml(card.owner) + ' → 誰に？</div>'
-        + '<div style="margin-bottom:10px;"><input type="text" id="prepaidTransferTo" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:14px;" placeholder="新しい所有者（例: 民泊、スタッフ名）"></div>'
+        + '<div style="margin-bottom:10px;"><select id="prepaidTransferTo" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:14px;background:#fff;">' + optionsHtml + '</select></div>'
         + '<div style="margin-bottom:14px;"><input type="text" id="prepaidTransferMemo" style="width:100%;padding:8px;border:1px solid #ced4da;border-radius:6px;font-size:13px;" placeholder="メモ（任意）"></div>'
         + '<div style="display:flex;gap:8px;">'
         + '<button onclick="document.getElementById(\'prepaidTransferDialog\').remove()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>'
@@ -6559,9 +6614,6 @@
       overlay.appendChild(box);
       overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
       document.body.appendChild(overlay);
-      // 選択中スタッフか「民泊」をデフォルトに
-      var selectedNames = getSelectedStaffNames();
-      var defaultTo = (card.owner === '民泊') ? (selectedNames[0] || '') : '民泊';
       var toEl = document.getElementById('prepaidTransferTo');
       if (toEl) toEl.value = defaultTo;
     }
@@ -6571,7 +6623,7 @@
       var memoEl = document.getElementById('prepaidTransferMemo');
       var newOwner = toEl ? toEl.value.trim() : '';
       var memo = memoEl ? memoEl.value.trim() : '';
-      if (!newOwner) { alert('所有者を入力してください'); return; }
+      if (!newOwner) { alert('所有者を選択してください'); return; }
       // 同一所有者チェック
       var curCard = null;
       for (var ci = 0; ci < _prepaidCards.length; ci++) {
@@ -6589,7 +6641,7 @@
         if (res.success) {
           var detailDlg = document.getElementById('prepaidDetailDialog');
           if (detailDlg) detailDlg.remove();
-          loadPrepaidCards();
+          loadPrepaidCards(true);
           showPrepaidToast_('受渡完了: → ' + newOwner);
         } else {
           alert('エラー: ' + (res.error || '不明'));
@@ -6605,7 +6657,7 @@
         if (res.success) {
           var dlg = document.getElementById('prepaidDetailDialog');
           if (dlg) dlg.remove();
-          loadPrepaidCards();
+          loadPrepaidCards(true);
         } else {
           alert('エラー: ' + (res.error || '不明'));
         }
@@ -6626,7 +6678,7 @@
       if (!confirm('このプリカを有効に戻しますか？')) return;
       callGAS('deactivatePrepaidCard', [cardNo]).then(function(res) {
         if (res.success) {
-          loadPrepaidCards();
+          loadPrepaidCards(true);
         } else {
           alert('エラー: ' + (res.error || '不明'));
         }
@@ -6693,6 +6745,10 @@
       box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
       box.innerHTML = '<div style="font-weight:bold;font-size:15px;margin-bottom:4px;text-align:center;">' + escapeHtml(cardNo) + ' 使用金額</div>'
         + '<div style="font-size:13px;color:#6c757d;text-align:center;margin-bottom:12px;">残高: ¥' + card.balance.toLocaleString() + '</div>'
+        + '<div style="display:flex;gap:8px;margin-bottom:10px;">'
+        + '<button type="button" onclick="document.getElementById(\'laundryPrepaidAmt\').value=\'1500\'" style="flex:1;padding:8px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;font-size:14px;cursor:pointer;">¥1,500</button>'
+        + '<button type="button" onclick="document.getElementById(\'laundryPrepaidAmt\').value=\'2000\'" style="flex:1;padding:8px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;font-size:14px;cursor:pointer;">¥2,000</button>'
+        + '</div>'
         + '<div style="margin-bottom:14px;"><input type="number" id="laundryPrepaidAmt" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:16px;text-align:center;" placeholder="使用金額（円）"></div>'
         + '<div style="display:flex;gap:8px;">'
         + '<button onclick="document.getElementById(\'laundryPrepaidAmtDialog\').remove()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">スキップ</button>'
@@ -6713,7 +6769,7 @@
 
       callGAS('usePrepaidForLaundry', [cardNo, amt, checkoutDate || '', staffName_]).then(function(res) {
         if (res.success) {
-          loadPrepaidCards(); // プリカ一覧更新
+          loadPrepaidCards(true); // プリカ一覧更新
         } else {
           alert('プリカ記録エラー: ' + (res.error || '不明'));
         }

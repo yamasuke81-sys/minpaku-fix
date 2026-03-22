@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322u</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322v</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6159,62 +6159,35 @@
       var labels = { sent: 'コインランドリーに出した', received: 'コインランドリーから回収した', returned: 'リネンを施設に戻した' };
 
       // 全スタッフから「民泊」を除外して表示（プリカ使用者選択と同様）
-      if (!btn._laundryStaff) {
-        var allNames = staffList.filter(function(n) { return n !== '民泊'; });
-        if (allNames.length === 0) { alert('スタッフが登録されていません'); return; }
-        // 選択中スタッフを先頭に表示
-        if (selectedNames.length > 0) {
-          allNames = selectedNames.filter(function(n) { return n !== '民泊'; }).concat(allNames.filter(function(n) { return selectedNames.indexOf(n) === -1; }));
-        }
-        showLaundryStaffPicker(allNames, function(picked) {
-          btn._laundryStaff = picked;
-          doLaundryStep(step, btn);
-        });
-        return;
+      var allNames = staffList.filter(function(n) { return n !== '民泊'; });
+      if (allNames.length === 0) { alert('スタッフが登録されていません'); return; }
+      // 選択中スタッフを先頭に表示
+      if (selectedNames.length > 0) {
+        allNames = selectedNames.filter(function(n) { return n !== '民泊'; }).concat(allNames.filter(function(n) { return selectedNames.indexOf(n) === -1; }));
       }
+      // スタッフ選択ダイアログ表示（選択＝確認として直接記録へ進む）
+      showLaundryStaffPicker(allNames, function(picked) {
+        var sName = picked;
 
-      var sName = btn._laundryStaff || selectedNames[0] || staffName || '';
-      btn._laundryStaff = null;
-
-      // 「出した」ステップ: プリカ選択→金額選択→一括記録フロー
-      if (step === 'sent') {
-        var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効' && c.balance > 0; });
-        if (activeCards.length > 0) {
-          // プリカあり→選択フローへ
-          showLaundrySentFlow_(sName, btn, labels);
-        } else {
-          // プリカなし→確認後にステップ記録のみ
-          showLaundrySentConfirm_(sName, null, 0, btn, labels);
-        }
-        return;
-      }
-
-      // received/returned: 従来の2タップ確認方式
-      if (!btn._confirmReady) {
-        btn._confirmReady = true;
-        btn._origText = btn.textContent;
-        btn._origBg = btn.style.background || '';
-        btn._origColor = btn.style.color || '';
-        btn.textContent = sName + 'として記録？もう一度タップ';
-        btn.style.background = '#dc3545';
-        btn.style.color = '#fff';
-        setTimeout(function() {
-          if (btn._confirmReady) {
-            btn._confirmReady = false;
-            btn.textContent = btn._origText;
-            btn.style.background = btn._origBg;
-            btn.style.color = btn._origColor;
+        // 「出した」ステップ: プリカ選択→金額選択→一括記録フロー
+        if (step === 'sent') {
+          var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効' && c.balance > 0; });
+          if (activeCards.length > 0) {
+            showLaundrySentFlow_(sName, btn, labels);
+          } else {
+            showLaundrySentConfirm_(sName, null, 0, btn, labels);
           }
-        }, 5000);
-        return;
-      }
-      btn._confirmReady = false;
-      btn.disabled = true; btn.textContent = '処理中…';
-      callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
-        if (res.success) {
-          loadLaundryStatus(true);
-        } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
-      }).catch(function(e) { alert('通信エラー'); btn.disabled = false; });
+          return;
+        }
+
+        // received/returned: スタッフ選択後に直接記録
+        btn.disabled = true; btn.textContent = '処理中…';
+        callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
+          if (res.success) {
+            loadLaundryStatus(true);
+          } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
+        }).catch(function(e) { alert('通信エラー'); btn.disabled = false; });
+      });
     }
 
     // ===== 「出した」フロー: スタッフ確定済み→プリカ選択→金額→一括記録 =====

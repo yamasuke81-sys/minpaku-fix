@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322u</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322v</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5312,6 +5312,10 @@
         // タブ切り替え
         window._invoiceAuthenticated = false; // 請求書タブ認証フラグ
         function switchToTab(tab) {
+            // 請求書タブはパスワード認証済みでない限り表示しない（二重ガード）
+            if (tab === 'invoice' && window.staffMode && !window.isOwnerUser && !window._invoiceAuthenticated) {
+              return;
+            }
             document.querySelectorAll('#mainTabs .nav-link').forEach(function(l) { l.classList.remove('active'); });
             var activeLink = document.querySelector('#mainTabs [data-tab="' + tab + '"]');
             if (activeLink) activeLink.classList.add('active');
@@ -10749,8 +10753,8 @@
       if (invoicePwCancelBtn) {
         invoicePwCancelBtn.addEventListener('click', function() {
           hideInvoicePasswordModal();
-          // カレンダータブに戻す
-          switchToTab('calendar');
+          // デフォルトタブ（スタッフ回答一覧）に戻す
+          switchToTab('staffResponse');
         });
       }
       // Enterキーでパスワード送信

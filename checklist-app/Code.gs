@@ -2173,6 +2173,237 @@ function cancelCleaningLaundryStep(checkoutDate, step) {
   }
 }
 
+// ============================================
+// プリカ管理
+// ============================================
+var CL_SHEET_PREPAID = 'プリカ管理';
+var CL_SHEET_PREPAID_LOG = 'プリカ履歴';
+
+/**
+ * プリカ一覧を取得
+ */
+function getPrepaidCards() {
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID);
+    if (!sheet) return JSON.stringify({ success: true, cards: [] });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, cards: [] });
+    var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    var cards = [];
+    for (var i = 0; i < data.length; i++) {
+      cards.push({
+        cardNo: String(data[i][0]),
+        purchaseDate: data[i][1] instanceof Date ? Utilities.formatDate(data[i][1], 'Asia/Tokyo', 'yyyy/M/d') : String(data[i][1] || ''),
+        balance: Number(data[i][2]) || 0,
+        owner: String(data[i][3] || ''),
+        status: String(data[i][4] || '有効')
+      });
+    }
+    return JSON.stringify({ success: true, cards: cards });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * プリカを新規追加
+ */
+function addPrepaidCard(purchaseDate, balance, owner) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID);
+    if (!sheet) {
+      sheet = ss.insertSheet(CL_SHEET_PREPAID);
+      sheet.getRange(1, 1, 1, 5).setValues([['プリカNo', '購入日', '残高', '所有者', 'ステータス']]);
+    }
+    // 次のプリカNo算出
+    var lastRow = sheet.getLastRow();
+    var maxNum = 0;
+    if (lastRow >= 2) {
+      var nos = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < nos.length; i++) {
+        var m = String(nos[i][0]).match(/P(\d+)/);
+        if (m) { var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+      }
+    }
+    var newNo = 'P' + String(maxNum + 1).padStart(3, '0');
+    var bal = (balance !== undefined && balance !== null && balance !== '') ? Number(balance) : 2200;
+    var own = owner || '民泊';
+    var pDate = purchaseDate || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/M/d');
+    var newRow = lastRow + 1;
+    sheet.getRange(newRow, 1, 1, 5).setValues([[newNo, pDate, bal, own, '有効']]);
+
+    // 履歴記録
+    addPrepaidLog_(newNo, '登録', bal, '', own, '', '', '新規登録');
+
+    return JSON.stringify({ success: true, cardNo: newNo });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * プリカの所有者を変更（受け渡し）
+ */
+function transferPrepaidCard(cardNo, newOwner, memo) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: 'プリカが見つかりません' });
+    var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]) === cardNo) {
+        var oldOwner = String(data[i][3] || '');
+        var balance = Number(data[i][2]) || 0;
+        sheet.getRange(i + 2, 4).setValue(newOwner);
+        addPrepaidLog_(cardNo, '受渡', balance, oldOwner, newOwner, '', '', memo || '');
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: 'プリカが見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * プリカの残高を更新（チャージ or 使用）
+ */
+function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, staffName) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: 'プリカが見つかりません' });
+    var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]) === cardNo) {
+        var oldBalance = Number(data[i][2]) || 0;
+        var amt = Number(amount) || 0;
+        var newBalance;
+        if (operation === 'use') {
+          newBalance = oldBalance - amt;
+        } else if (operation === 'charge') {
+          newBalance = oldBalance + amt;
+        } else {
+          newBalance = amt; // 直接設定
+        }
+        sheet.getRange(i + 2, 3).setValue(newBalance);
+        var owner = String(data[i][3] || '');
+        addPrepaidLog_(cardNo, operation === 'use' ? '使用' : (operation === 'charge' ? 'チャージ' : '残高修正'), amt, owner, owner, checkoutDate || '', staffName || '', memo || '');
+        return JSON.stringify({ success: true, newBalance: newBalance });
+      }
+    }
+    return JSON.stringify({ success: false, error: 'プリカが見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * プリカ使用記録（コインランドリー出し時に呼ばれる）
+ */
+function usePrepaidForLaundry(cardNo, amount, checkoutDate, staffName) {
+  return updatePrepaidBalance(cardNo, amount, 'use', 'コインランドリー使用', checkoutDate, staffName);
+}
+
+/**
+ * プリカ履歴を取得
+ */
+function getPrepaidLog(cardNo) {
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID_LOG);
+    if (!sheet) return JSON.stringify({ success: true, logs: [] });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, logs: [] });
+    var data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+    var logs = [];
+    for (var i = data.length - 1; i >= 0; i--) {
+      if (!cardNo || String(data[i][1]) === cardNo) {
+        logs.push({
+          datetime: data[i][0] instanceof Date ? Utilities.formatDate(data[i][0], 'Asia/Tokyo', 'yyyy/M/d HH:mm') : String(data[i][0] || ''),
+          cardNo: String(data[i][1]),
+          operation: String(data[i][2]),
+          amount: Number(data[i][3]) || 0,
+          fromOwner: String(data[i][4] || ''),
+          toOwner: String(data[i][5] || ''),
+          checkoutDate: String(data[i][6] || ''),
+          memo: String(data[i][7] || '')
+        });
+      }
+    }
+    return JSON.stringify({ success: true, logs: logs });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * プリカを無効化（削除ではなくステータス変更）
+ */
+function deactivatePrepaidCard(cardNo) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { return JSON.stringify({ success: false, error: 'ロック取得タイムアウト' }); }
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID);
+    if (!sheet) return JSON.stringify({ success: false, error: 'シートが見つかりません' });
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: false, error: 'プリカが見つかりません' });
+    var data = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]) === cardNo) {
+        var curStatus = String(data[i][4] || '有効');
+        var newStatus = curStatus === '有効' ? '無効' : '有効';
+        sheet.getRange(i + 2, 5).setValue(newStatus);
+        addPrepaidLog_(cardNo, newStatus === '無効' ? '無効化' : '有効化', Number(data[i][2]) || 0, '', '', '', '', '');
+        return JSON.stringify({ success: true, newStatus: newStatus });
+      }
+    }
+    return JSON.stringify({ success: false, error: 'プリカが見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * プリカ履歴を追加（内部関数）
+ */
+function addPrepaidLog_(cardNo, operation, amount, fromOwner, toOwner, checkoutDate, staffName, memo) {
+  try {
+    var ss = getBookingSpreadsheet_();
+    var sheet = ss.getSheetByName(CL_SHEET_PREPAID_LOG);
+    if (!sheet) {
+      sheet = ss.insertSheet(CL_SHEET_PREPAID_LOG);
+      sheet.getRange(1, 1, 1, 8).setValues([['日時', 'プリカNo', '操作', '金額', '変更前所有者', '変更後所有者', 'チェックアウト日', 'メモ']]);
+    }
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    var newRow = sheet.getLastRow() + 1;
+    sheet.getRange(newRow, 1, 1, 8).setValues([[now, cardNo, operation, amount, fromOwner, toOwner, checkoutDate, memo]]);
+  } catch (e) {
+    Logger.log('[プリカ履歴] エラー: ' + e.toString());
+  }
+}
+
 /**
  * デフォルトチェックリスト項目を一括登録
  * ユーザー提供のNotionチェックリストを基に作成

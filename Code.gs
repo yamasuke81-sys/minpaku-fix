@@ -12592,8 +12592,11 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
 
     // 報酬自動追加（sent→ランドリー出し、received→ランドリー受取）
     var laundryJobMap = { sent: 'ランドリー出し', received: 'ランドリー受取' };
+    Logger.log('[DEBUG-INVOICE-EXTRA] step=' + step + ' staffName=' + staffName + ' dateKey=' + dateKey + ' jobName=' + (laundryJobMap[step] || 'なし'));
     if (laundryJobMap[step] && staffName) {
       addInvoiceExtraItemFromMain_(ss, staffName, dateKey, laundryJobMap[step]);
+    } else {
+      Logger.log('[DEBUG-INVOICE-EXTRA] スキップ: laundryJobMap[step]=' + laundryJobMap[step] + ' staffName=' + staffName);
     }
 
     // コインランドリー専用のチャンネル設定を募集設定シートから読み込み（CL_CH_コインランドリー）
@@ -12734,16 +12737,20 @@ function resetCleaningLaundry(checkoutDate) {
  */
 function addInvoiceExtraItemFromMain_(ss, staffName, dateStr, jobName) {
   try {
-    if (!staffName || !jobName) return;
+    Logger.log('[DEBUG-INVOICE-EXTRA] addInvoiceExtraItemFromMain_ 開始: staffName=' + staffName + ' dateStr=' + dateStr + ' jobName=' + jobName);
+    if (!staffName || !jobName) { Logger.log('[DEBUG-INVOICE-EXTRA] スキップ: staffName or jobName empty'); return; }
     var dateKey = normDateStr_(dateStr || new Date());
     var ym = dateKey.substring(0, 7);
     var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+    Logger.log('[DEBUG-INVOICE-EXTRA] SHEET_INVOICE_EXTRA=' + SHEET_INVOICE_EXTRA + ' sheet存在=' + !!sheet);
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_INVOICE_EXTRA);
       sheet.getRange(1, 1, 1, 5).setValues([['スタッフ名', '月', '日付', '項目名', '金額']]);
+      Logger.log('[DEBUG-INVOICE-EXTRA] シート新規作成');
     }
     // 重複チェック
     var lastRow = sheet.getLastRow();
+    Logger.log('[DEBUG-INVOICE-EXTRA] lastRow=' + lastRow);
     if (lastRow >= 2) {
       var existing = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
       for (var i = 0; i < existing.length; i++) {
@@ -12751,6 +12758,7 @@ function addInvoiceExtraItemFromMain_(ss, staffName, dateStr, jobName) {
             String(existing[i][1] || '').trim() === ym &&
             normDateStr_(existing[i][2]) === dateKey &&
             String(existing[i][3] || '').trim() === jobName) {
+          Logger.log('[DEBUG-INVOICE-EXTRA] 重複検出スキップ: row=' + (i+2));
           return; // 重複スキップ
         }
       }

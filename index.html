@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322y</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322z</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -7676,11 +7676,13 @@
       }
 
       function loadInvoiceData() {
-        if (!window.staffMode) return;
+        console.log('[DEBUG-INVOICE] loadInvoiceData called. staffMode=' + window.staffMode);
+        if (!window.staffMode) { console.log('[DEBUG-INVOICE] not staffMode → return'); return; }
         loadBankInfo_();
 
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
-        if (!staffId) return;
+        console.log('[DEBUG-INVOICE] staffId=' + staffId + ' currentUserName=' + window.currentUserName + ' currentUserEmail=' + window.currentUserEmail);
+        if (!staffId) { console.log('[DEBUG-INVOICE] staffId empty → return'); return; }
 
         var ym = getInvoiceYm();
         var ymParts = ym.split('-');
@@ -7704,6 +7706,7 @@
         google.script.run.withSuccessHandler(function(jsonStr) {
           try {
             var r = JSON.parse(jsonStr);
+            console.log('[DEBUG-INVOICE] getInvoiceData応答: success=' + r.success + ' hasFolder=' + r.hasFolder + ' hasTemplate=' + r.hasTemplate + ' autoItems=' + (r.autoItems || []).length + ' extraItems=' + (r.extraItems || []).length + ' error=' + (r.error || ''));
             if (!r.success) {
               if (autoEl) autoEl.innerHTML = '<span class="text-danger">' + escapeHtml(r.error || 'エラー') + '</span>';
               return;
@@ -7711,9 +7714,11 @@
             if (!r.hasFolder || !r.hasTemplate) {
               if (notReady) notReady.style.display = 'block';
               if (content) content.style.display = 'none';
+              console.log('[DEBUG-INVOICE] フォルダ/テンプレート未設定 → invoiceContent非表示');
             } else {
               if (notReady) notReady.style.display = 'none';
               if (content) content.style.display = 'block';
+              console.log('[DEBUG-INVOICE] invoiceContent表示');
             }
 
             // 自動明細の表示（削除ボタン付き）
@@ -10836,9 +10841,24 @@
               if (r.success && r.verified) {
                 window._invoiceAuthenticated = true;
                 if (pwInput) pwInput.value = '';
+                console.log('[DEBUG-AUTH] 認証成功. _invoiceAuthenticated=' + window._invoiceAuthenticated);
                 hideInvoicePasswordModal();
+                var ovAfter = document.getElementById('invoicePasswordOverlay');
+                console.log('[DEBUG-AUTH] overlay display after hide=' + (ovAfter ? ovAfter.style.display : 'N/A'));
+                var panelBefore = document.getElementById('panelInvoice');
+                console.log('[DEBUG-AUTH] panelInvoice display BEFORE switchToTab=' + (panelBefore ? panelBefore.style.display : 'N/A'));
                 // 認証完了後: 少し遅延してからタブ切替（overlay非表示の反映を待つ）
-                setTimeout(function() { switchToTab('invoice'); }, 50);
+                setTimeout(function() {
+                  console.log('[DEBUG-AUTH] setTimeout fired, calling switchToTab(invoice)');
+                  switchToTab('invoice');
+                  var panelAfter = document.getElementById('panelInvoice');
+                  console.log('[DEBUG-AUTH] panelInvoice display AFTER switchToTab=' + (panelAfter ? panelAfter.style.display : 'N/A'));
+                  var contentEl = document.getElementById('invoiceContent');
+                  console.log('[DEBUG-AUTH] invoiceContent display=' + (contentEl ? contentEl.style.display : 'N/A'));
+                  var autoEl = document.getElementById('invoiceAutoItems');
+                  console.log('[DEBUG-AUTH] invoiceAutoItems innerHTML length=' + (autoEl ? autoEl.innerHTML.length : 'N/A'));
+                  console.log('[DEBUG-AUTH] staffMode=' + window.staffMode + ' isOwnerUser=' + window.isOwnerUser + ' currentUserName=' + window.currentUserName);
+                }, 50);
               } else {
                 if (msg) { msg.textContent = 'パスワードが正しくありません'; msg.style.display = 'block'; }
               }

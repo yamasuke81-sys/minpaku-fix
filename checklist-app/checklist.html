@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322o</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322p</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6168,7 +6168,20 @@
       var sName = btn._laundryStaff || selectedNames[0] || staffName || '';
       btn._laundryStaff = null;
 
-      // confirm()はiOS Safariでブロックされるため2タップ方式
+      // 「出した」ステップ: プリカ選択→金額選択→一括記録フロー
+      if (step === 'sent') {
+        var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効' && c.balance > 0; });
+        if (activeCards.length > 0) {
+          // プリカあり→選択フローへ
+          showLaundrySentFlow_(sName, btn, labels);
+        } else {
+          // プリカなし→確認後にステップ記録のみ
+          showLaundrySentConfirm_(sName, null, 0, btn, labels);
+        }
+        return;
+      }
+
+      // received/returned: 従来の2タップ確認方式
       if (!btn._confirmReady) {
         btn._confirmReady = true;
         btn._origText = btn.textContent;
@@ -6192,10 +6205,152 @@
       callGAS('recordCleaningLaundryStep', [checkoutDate, step, sName]).then(function(res) {
         if (res.success) {
           loadLaundryStatus(true);
-          // 「出した」ステップ成功時にプリカ使用ダイアログを表示
-          if (step === 'sent') showLaundryPrepaidPicker(sName);
         } else { alert('エラー: ' + (res.error || '不明')); btn.disabled = false; btn.textContent = labels[step]; }
       }).catch(function(e) { alert('通信エラー'); btn.disabled = false; });
+    }
+
+    // ===== 「出した」フロー: スタッフ確定済み→プリカ選択→金額→一括記録 =====
+    function showLaundrySentFlow_(sName, btn, labels) {
+      var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効' && c.balance > 0; });
+      var old = document.getElementById('laundrySentFlow');
+      if (old) old.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'laundrySentFlow';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:320px;width:90%;';
+      var html = '<div style="font-weight:bold;font-size:15px;margin-bottom:4px;text-align:center;">使用するプリカを選択</div>';
+      html += '<div style="font-size:12px;color:#6c757d;text-align:center;margin-bottom:14px;">担当: <strong>' + escapeHtml(sName) + '</strong></div>';
+      for (var i = 0; i < activeCards.length; i++) {
+        var c = activeCards[i];
+        var balColor = c.balance <= 500 ? '#fd7e14' : '#198754';
+        html += '<button class="prepaid-pick-btn" data-cardno="' + escapeHtml(c.cardNo) + '" style="display:flex;align-items:center;gap:10px;width:100%;padding:12px;margin:6px 0;border:1px solid #dee2e6;border-radius:8px;background:#f8f9fa;cursor:pointer;text-align:left;">';
+        html += '<span style="font-weight:700;color:#495057;background:#e9ecef;padding:2px 8px;border-radius:4px;font-size:12px;">' + escapeHtml(c.cardNo) + '</span>';
+        html += '<span style="flex:1;font-weight:600;color:' + balColor + ';">¥' + c.balance.toLocaleString() + '</span>';
+        html += '<span style="font-size:12px;color:#6c757d;">' + escapeHtml(c.owner) + '</span>';
+        html += '</button>';
+      }
+      html += '<button id="laundrySentSkip" style="display:block;width:100%;padding:10px;margin-top:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">プリカ未使用で記録</button>';
+      box.innerHTML = html;
+      overlay.appendChild(box);
+      box.addEventListener('click', function(e) {
+        var pickBtn = e.target.closest('.prepaid-pick-btn');
+        if (pickBtn) {
+          var cardNo = pickBtn.getAttribute('data-cardno');
+          overlay.remove();
+          showLaundrySentAmountDialog_(sName, cardNo, btn, labels);
+          return;
+        }
+        if (e.target.id === 'laundrySentSkip') {
+          overlay.remove();
+          showLaundrySentConfirm_(sName, null, 0, btn, labels);
+        }
+      });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+    }
+
+    function showLaundrySentAmountDialog_(sName, cardNo, btn, labels) {
+      var card = null;
+      for (var i = 0; i < _prepaidCards.length; i++) {
+        if (_prepaidCards[i].cardNo === cardNo) { card = _prepaidCards[i]; break; }
+      }
+      if (!card) return;
+      var old = document.getElementById('laundrySentAmtDialog');
+      if (old) old.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'laundrySentAmtDialog';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
+      box.innerHTML = '<div style="font-weight:bold;font-size:15px;margin-bottom:4px;text-align:center;">' + escapeHtml(cardNo) + ' 使用金額</div>'
+        + '<div style="font-size:13px;color:#6c757d;text-align:center;margin-bottom:4px;">担当: <strong>' + escapeHtml(sName) + '</strong></div>'
+        + '<div style="font-size:13px;color:#6c757d;text-align:center;margin-bottom:12px;">残高: ¥' + card.balance.toLocaleString() + '</div>'
+        + '<div style="display:flex;gap:8px;margin-bottom:10px;">'
+        + '<button type="button" onclick="document.getElementById(\'laundrySentAmt\').value=\'1500\'" style="flex:1;padding:8px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;font-size:14px;cursor:pointer;">¥1,500</button>'
+        + '<button type="button" onclick="document.getElementById(\'laundrySentAmt\').value=\'2000\'" style="flex:1;padding:8px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;font-size:14px;cursor:pointer;">¥2,000</button>'
+        + '</div>'
+        + '<div style="margin-bottom:14px;"><input type="number" id="laundrySentAmt" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:16px;text-align:center;" placeholder="使用金額（円）"></div>'
+        + '<div style="display:flex;gap:8px;">'
+        + '<button onclick="var d=document.getElementById(\'laundrySentAmtDialog\');if(d)d.remove();showLaundrySentFlow_(\'' + escapeHtml(sName) + '\',null,{})" style="flex:1;padding:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">戻る</button>'
+        + '<button id="laundrySentAmtConfirm" style="flex:1;padding:10px;border:none;border-radius:8px;background:#0d6efd;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;">確定</button>'
+        + '</div>';
+      overlay.appendChild(box);
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+      // 確定ボタンのハンドラ
+      document.getElementById('laundrySentAmtConfirm').addEventListener('click', function() {
+        var amtEl = document.getElementById('laundrySentAmt');
+        var amt = amtEl ? Math.floor(Number(amtEl.value)) : 0;
+        if (!amt || amt <= 0) { alert('金額を入力してください'); return; }
+        if (amt > card.balance) {
+          alert('残高不足です（残高: ¥' + card.balance.toLocaleString() + '、入力: ¥' + amt.toLocaleString() + '）');
+          return;
+        }
+        overlay.remove();
+        showLaundrySentConfirm_(sName, cardNo, amt, btn, labels);
+      });
+      setTimeout(function() { var inp = document.getElementById('laundrySentAmt'); if (inp) inp.focus(); }, 100);
+    }
+
+    function showLaundrySentConfirm_(sName, cardNo, amt, btn, labels) {
+      var old = document.getElementById('laundrySentConfirmDialog');
+      if (old) old.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'laundrySentConfirmDialog';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
+      var summaryHtml = '<div style="font-weight:bold;font-size:15px;margin-bottom:12px;text-align:center;">確認</div>';
+      summaryHtml += '<div style="font-size:14px;line-height:1.8;margin-bottom:16px;">';
+      summaryHtml += '<div><strong>担当:</strong> ' + escapeHtml(sName) + '</div>';
+      if (cardNo && amt > 0) {
+        summaryHtml += '<div><strong>プリカ:</strong> ' + escapeHtml(cardNo) + '</div>';
+        summaryHtml += '<div><strong>使用金額:</strong> ¥' + amt.toLocaleString() + '</div>';
+      } else {
+        summaryHtml += '<div><strong>プリカ:</strong> 未使用</div>';
+      }
+      summaryHtml += '</div>';
+      summaryHtml += '<div style="display:flex;gap:8px;">';
+      summaryHtml += '<button id="laundrySentCancel" style="flex:1;padding:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>';
+      summaryHtml += '<button id="laundrySentExec" style="flex:1;padding:10px;border:none;border-radius:8px;background:#dc3545;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;">記録する</button>';
+      summaryHtml += '</div>';
+      box.innerHTML = summaryHtml;
+      overlay.appendChild(box);
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+
+      document.getElementById('laundrySentCancel').addEventListener('click', function() { overlay.remove(); });
+      document.getElementById('laundrySentExec').addEventListener('click', function() {
+        var execBtn = document.getElementById('laundrySentExec');
+        execBtn.disabled = true; execBtn.textContent = '処理中…';
+        // 1. ステップ記録
+        callGAS('recordCleaningLaundryStep', [checkoutDate, 'sent', sName]).then(function(res) {
+          if (!res.success) { alert('エラー: ' + (res.error || '不明')); overlay.remove(); return; }
+          // 2. プリカ記録（選択済みの場合）
+          if (cardNo && amt > 0) {
+            callGAS('usePrepaidForLaundry', [cardNo, amt, checkoutDate || '', sName]).then(function(pRes) {
+              overlay.remove();
+              if (pRes.success) {
+                loadPrepaidCards(true);
+              } else {
+                alert('プリカ記録エラー: ' + (pRes.error || '不明') + '\n（ランドリー記録は完了済み）');
+              }
+              loadLaundryStatus(true);
+            }).catch(function() {
+              overlay.remove();
+              alert('プリカ記録の通信に失敗しました（ランドリー記録は完了済み）');
+              loadLaundryStatus(true);
+            });
+          } else {
+            overlay.remove();
+            loadLaundryStatus(true);
+          }
+        }).catch(function() {
+          alert('通信エラー');
+          overlay.remove();
+        });
+      });
     }
 
     // コインランドリー実行者選択ダイアログ

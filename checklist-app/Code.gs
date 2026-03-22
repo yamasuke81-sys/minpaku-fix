@@ -2118,6 +2118,12 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       Logger.log('[DEBUG-LAUNDRY-CH] 通知無効のためスキップ');
     }
 
+    // 報酬自動追加（sent→ランドリー出し、received→ランドリー受取）
+    var laundryJobMap = { sent: 'ランドリー出し', received: 'ランドリー受取' };
+    if (laundryJobMap[step] && staffName) {
+      addInvoiceExtraItem_(staffName, dateKey, laundryJobMap[step]);
+    }
+
     // カレンダー通知欄に常に記録（通知 OFF でも）
     try {
       var bookingSs = getBookingSpreadsheet_();
@@ -2239,6 +2245,11 @@ function addPrepaidCard(purchaseDate, balance, owner) {
 
     // 履歴記録
     addPrepaidLog_(newNo, '登録', bal, '', own, '', '', '新規登録');
+
+    // 報酬自動追加（登録者＝所有者に「ランドリープリカ購入」報酬）
+    if (own && own !== '民泊') {
+      addInvoiceExtraItem_(own, pDate, 'ランドリープリカ購入');
+    }
 
     return JSON.stringify({ success: true, cardNo: newNo });
   } catch (e) {
@@ -2413,6 +2424,82 @@ function addPrepaidLog_(cardNo, operation, amount, fromOwner, toOwner, checkoutD
     sheet.getRange(newRow, 1, 1, 8).setValues([[now, cardNo, operation, amount, fromOwner, toOwner, checkoutDate, memo]]);
   } catch (e) {
     Logger.log('[プリカ履歴] エラー: ' + e.toString());
+  }
+}
+
+// ============================================
+// 報酬自動追加ヘルパー
+// ============================================
+
+/**
+ * 請求書追加項目シートに報酬エントリを自動追加する
+ * @param {string} staffName - スタッフ名
+ * @param {string} dateStr - 日付（yyyy-MM-dd等）
+ * @param {string} jobName - 仕事内容名（例: ランドリー出し）
+ */
+function addInvoiceExtraItem_(staffName, dateStr, jobName) {
+  try {
+    if (!staffName || !jobName) return;
+    var ss = getBookingSpreadsheet_();
+    var dateKey = normDateStr_(dateStr || new Date());
+    var ym = dateKey.substring(0, 7); // YYYY-MM
+
+    // 重複チェック: 同じスタッフ・月・日付・項目名が既にあればスキップ
+    var sheet = ss.getSheetByName('請求書追加項目');
+    if (!sheet) {
+      sheet = ss.insertSheet('請求書追加項目');
+      sheet.getRange(1, 1, 1, 5).setValues([['スタッフ名', '月', '日付', '項目名', '金額']]);
+    }
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var existing = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+      for (var i = 0; i < existing.length; i++) {
+        if (String(existing[i][0] || '').trim() === staffName &&
+            String(existing[i][1] || '').trim() === ym &&
+            normDateStr_(existing[i][2]) === dateKey &&
+            String(existing[i][3] || '').trim() === jobName) {
+          Logger.log('[報酬自動追加] 重複のためスキップ: ' + staffName + ' ' + dateKey + ' ' + jobName);
+          return;
+        }
+      }
+    }
+
+    // 報酬額をスタッフ報酬シートから検索
+    var amount = lookupCompensation_(ss, staffName, jobName);
+
+    // 追加
+    var newRow = sheet.getLastRow() + 1;
+    sheet.getRange(newRow, 1, 1, 5).setValues([[staffName, ym, dateKey, jobName, amount]]);
+    Logger.log('[報酬自動追加] ' + staffName + ' ' + dateKey + ' ' + jobName + ' ¥' + amount);
+  } catch (e) {
+    Logger.log('[報酬自動追加] エラー: ' + e.toString());
+  }
+}
+
+/**
+ * スタッフ報酬シートから報酬額を検索
+ * スタッフ名-仕事内容名 → 共通-仕事内容名 の順で検索
+ */
+function lookupCompensation_(ss, staffName, jobName) {
+  try {
+    var sheet = ss.getSheetByName('スタッフ報酬');
+    if (!sheet || sheet.getLastRow() < 2) return 0;
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues();
+    var exactMatch = 0;
+    var commonMatch = 0;
+    for (var i = 0; i < data.length; i++) {
+      var s = String(data[i][0] || '').trim();
+      var j = String(data[i][1] || '').trim();
+      var a = Number(data[i][2] || 0);
+      if (j === jobName) {
+        if (s === staffName) { exactMatch = a; break; }
+        if (s === '共通') { commonMatch = a; }
+      }
+    }
+    return exactMatch || commonMatch || 0;
+  } catch (e) {
+    Logger.log('[報酬検索] エラー: ' + e.toString());
+    return 0;
   }
 }
 

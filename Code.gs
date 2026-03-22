@@ -2420,20 +2420,41 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
 /**
  * 予約日付変更時の通知処理（スタッフ解除連絡・オーナー通知・メール/LINE送信）
  */
-function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoKey, platformName) {
+function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCiKeyOrCo, newCoKeyOrPlatform, platformNameOpt) {
+  // 後方互換: 旧シグネチャ(7引数)と新シグネチャ(8引数=CI変更対応)の両方に対応
+  var newCiKey, newCoKey, platformName;
+  if (platformNameOpt !== undefined) {
+    // 新シグネチャ: (formSheet, rowNumber, colMap, oldCiKey, oldCoKey, newCiKey, newCoKey, platformName)
+    newCiKey = newCiKeyOrCo;
+    newCoKey = newCoKeyOrPlatform;
+    platformName = platformNameOpt;
+  } else {
+    // 旧シグネチャ: (formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoKey, platformName) — CIは変わらない
+    newCiKey = ciKey;
+    newCoKey = newCiKeyOrCo;
+    platformName = newCoKeyOrPlatform;
+  }
   var ch = getNotifyChannel_('予約変更');
   if (!isEmailNotifyEnabled_('予約変更通知有効') && !ch.group_line && !ch.owner_line && !ch.staff_line) return;
 
   var guestName = colMap.guestName >= 0 ? String(formSheet.getRange(rowNumber, colMap.guestName + 1).getValue() || '').trim() : '';
   var cleaningStaff = colMap.cleaningStaff >= 0 ? String(formSheet.getRange(rowNumber, colMap.cleaningStaff + 1).getValue() || '').trim() : '';
-  var ciStr = formatDateForNotif_(ciKey) || ciKey;
+  var oldCiStr = formatDateForNotif_(ciKey) || ciKey;
+  var newCiStr = formatDateForNotif_(newCiKey) || newCiKey;
   var oldCoStr = formatDateForNotif_(oldCoKey) || oldCoKey;
   var newCoStr = formatDateForNotif_(newCoKey) || newCoKey;
   var guestLabel = guestName || platformName || '不明';
+  // CI変更ありの場合は「旧CI〜旧CO → 新CI〜新CO」、なしの場合は従来通り
+  var ciChanged = ciKey !== newCiKey;
+  var ciStr = ciChanged ? newCiStr : oldCiStr;
 
   // テンプレート読み込み
-  var DEFAULT_DC_SUBJECT_ = '【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}';
-  var DEFAULT_DC_BODY_ = '予約の日付が変更されました。\n\nゲスト: {ゲスト名}\nチェックイン: {チェックイン}\n変更前チェックアウト: {旧チェックアウト}\n変更後チェックアウト: {新チェックアウト}';
+  var DEFAULT_DC_SUBJECT_ = ciChanged
+    ? '【民泊】予約日付変更: {旧チェックイン}〜{旧チェックアウト} → {新チェックイン}〜{新チェックアウト}'
+    : '【民泊】予約日付変更: {旧チェックアウト} → {新チェックアウト}';
+  var DEFAULT_DC_BODY_ = ciChanged
+    ? '予約の日付が変更されました。\n\nゲスト: {ゲスト名}\n変更前: {旧チェックイン}〜{旧チェックアウト}\n変更後: {新チェックイン}〜{新チェックアウト}'
+    : '予約の日付が変更されました。\n\nゲスト: {ゲスト名}\nチェックイン: {チェックイン}\n変更前チェックアウト: {旧チェックアウト}\n変更後チェックアウト: {新チェックアウト}';
   var tplSubject = DEFAULT_DC_SUBJECT_;
   var tplBody = DEFAULT_DC_BODY_;
   try {
@@ -2451,6 +2472,8 @@ function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoK
     var dcDetailUrl = buildCleaningDetailUrl_(newCoKey) || '';
     return text.replace(/\{ゲスト名\}/g, guestLabel)
       .replace(/\{チェックイン\}/g, ciStr)
+      .replace(/\{旧チェックイン\}/g, oldCiStr)
+      .replace(/\{新チェックイン\}/g, newCiStr)
       .replace(/\{旧チェックアウト\}/g, oldCoStr)
       .replace(/\{新チェックアウト\}/g, newCoStr)
       .replace(/\{清掃詳細URL\}/g, dcDetailUrl ? '清掃詳細: ' + dcDetailUrl : '');
@@ -2494,9 +2517,9 @@ function notifyDateChange_(formSheet, rowNumber, colMap, ciKey, oldCoKey, newCoK
       staffList.forEach(function(cs) { allStaff.forEach(function(as) { if (as.staffName === cs.staffName) cs.lineUserId = as.lineUserId; }); });
       try { sendLineToStaffMembers_(staffList, subject + '\n\n' + body); } catch (e) {}
     }
-    addNotification_('予約変更', guestLabel + ' の予約日付が変更されました（' + ciStr + '～' + oldCoStr + ' → ' + ciStr + '～' + newCoStr + '）清掃スタッフ(' + cleaningStaff + ')の確定を解除しました');
+    addNotification_('予約変更', guestLabel + ' の予約日付が変更されました（' + oldCiStr + '～' + oldCoStr + ' → ' + newCiStr + '～' + newCoStr + '）清掃スタッフ(' + cleaningStaff + ')の確定を解除しました');
   } else {
-    addNotification_('予約変更', guestLabel + ' の予約日付が変更されました（' + ciStr + '～' + oldCoStr + ' → ' + ciStr + '～' + newCoStr + '）');
+    addNotification_('予約変更', guestLabel + ' の予約日付が変更されました（' + oldCiStr + '～' + oldCoStr + ' → ' + newCiStr + '～' + newCoStr + '）');
   }
 
   body += '\n\n新しいチェックアウト日の清掃募集が開始されます。';
@@ -3098,8 +3121,8 @@ function syncFromICal() {
                   }
                 }
               }
-              // 日付変更通知
-              try { notifyDateChange_(formSheet, overlapRow, colMap, overlapParts[0], oldCoKey, ev.checkOut, ev.platform); } catch (dcErr) { Logger.log('[DATECHANGE-OVERLAP] notifyDateChange_ error: ' + dcErr); }
+              // 日付変更通知（新CIも渡す）
+              try { notifyDateChange_(formSheet, overlapRow, colMap, overlapParts[0], oldCoKey, ev.checkIn, ev.checkOut, ev.platform); } catch (dcErr) { Logger.log('[DATECHANGE-OVERLAP] notifyDateChange_ error: ' + dcErr); }
               continue;
             }
           }

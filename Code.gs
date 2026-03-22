@@ -3049,18 +3049,59 @@ function syncFromICal() {
           continue;
         }
         var overlaps = false;
+        var overlapKey = '';
+        var overlapRow = 0;
         for (var ek in existingPairs) {
           var parts = ek.split('|');
           if (parts.length >= 2) {
             var exCi = parts[0], exCo = parts[1];
             if (ev.checkIn < exCo && ev.checkOut > exCi) {
               overlaps = true;
+              overlapKey = ek;
+              overlapRow = existingRowByKey[ek] || 0;
               break;
             }
           }
         }
         if (overlaps) {
-          Logger.log('[DEBUG-SYNC] OVERLAP SKIP: platform=' + ev.platform + ' CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + (ev.guestName || '') + '" overlapping with=' + ek);
+          // 同じプラットフォームの既存予約とオーバーラップ → 日付変更として既存行を更新
+          if (overlapRow > 0) {
+            var existIcalPlatform = colMap.icalSync >= 0 ? String(formSheet.getRange(overlapRow, colMap.icalSync + 1).getValue() || '').trim().toLowerCase() : '';
+            var evPlatform = String(ev.platform || '').trim().toLowerCase();
+            if (existIcalPlatform === evPlatform || (existIcalPlatform.indexOf('airbnb') >= 0 && evPlatform.indexOf('airbnb') >= 0) || (existIcalPlatform.indexOf('booking') >= 0 && evPlatform.indexOf('booking') >= 0)) {
+              // 日付変更: 既存行のCI/COを新しい日付に更新
+              Logger.log('[DATECHANGE-OVERLAP] 日付変更検出(CI変更含む): ' + overlapKey + ' → ' + key + ' platform=' + ev.platform);
+              if (colMap.checkIn >= 0) formSheet.getRange(overlapRow, colMap.checkIn + 1).setValue(ev.checkIn);
+              if (colMap.checkOut >= 0) formSheet.getRange(overlapRow, colMap.checkOut + 1).setValue(ev.checkOut);
+              // existingPairsを更新
+              delete existingPairs[overlapKey];
+              existingPairs[key] = true;
+              delete existingRowByKey[overlapKey];
+              existingRowByKey[key] = overlapRow;
+              // キャンセル済みだった場合はキャンセル解除
+              if (colMap.cancelledAt >= 0) {
+                var cancelVal = String(formSheet.getRange(overlapRow, colMap.cancelledAt + 1).getValue() || '').trim();
+                if (cancelVal) formSheet.getRange(overlapRow, colMap.cancelledAt + 1).setValue('');
+              }
+              // 旧CO/CIの募集ステータスを「キャンセル」に更新
+              var overlapParts = overlapKey.split('|');
+              var oldCoKey = overlapParts[1];
+              var ss4 = SpreadsheetApp.getActiveSpreadsheet();
+              var recruitSheet4 = ss4.getSheetByName(SHEET_RECRUIT);
+              if (recruitSheet4 && recruitSheet4.getLastRow() >= 2) {
+                var rData4 = recruitSheet4.getRange(2, 1, recruitSheet4.getLastRow() - 1, 4).getValues();
+                for (var ri4 = 0; ri4 < rData4.length; ri4++) {
+                  if (parseInt(rData4[ri4][1], 10) === overlapRow) {
+                    recruitSheet4.getRange(ri4 + 2, 4).setValue('キャンセル');
+                  }
+                }
+              }
+              // 日付変更通知
+              try { notifyDateChange_(formSheet, overlapRow, colMap, overlapParts[0], oldCoKey, ev.checkOut, ev.platform); } catch (dcErr) { Logger.log('[DATECHANGE-OVERLAP] notifyDateChange_ error: ' + dcErr); }
+              continue;
+            }
+          }
+          Logger.log('[DEBUG-SYNC] OVERLAP SKIP: platform=' + ev.platform + ' CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + (ev.guestName || '') + '" overlapping with=' + overlapKey);
           continue;
         }
         existingPairs[key] = true;

@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322e</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322i</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6764,6 +6764,15 @@
       var amtEl = document.getElementById('laundryPrepaidAmt');
       var amt = amtEl ? Math.floor(Number(amtEl.value)) : 0;
       if (!amt || amt <= 0) { alert('金額を入力してください'); return; }
+      // フロントで残高チェック
+      var card = null;
+      for (var i = 0; i < _prepaidCards.length; i++) {
+        if (_prepaidCards[i].cardNo === cardNo) { card = _prepaidCards[i]; break; }
+      }
+      if (card && amt > card.balance) {
+        alert('残高不足です（残高: ¥' + card.balance.toLocaleString() + '、入力: ¥' + amt.toLocaleString() + '）');
+        return; // ダイアログは閉じない→金額修正可能
+      }
       var dialog = document.getElementById('laundryPrepaidAmtDialog');
       if (dialog) dialog.remove();
 
@@ -6772,6 +6781,8 @@
           loadPrepaidCards(true); // プリカ一覧更新
         } else {
           alert('プリカ記録エラー: ' + (res.error || '不明'));
+          // 残高不足等のエラー時は金額ダイアログを再表示
+          showLaundryPrepaidAmountDialog(cardNo, staffName_);
         }
       }).catch(function() { alert('プリカ記録の通信に失敗しました（ランドリー記録は完了済み）'); });
     }

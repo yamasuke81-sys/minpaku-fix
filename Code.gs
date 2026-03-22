@@ -832,23 +832,29 @@ function getData() {
       // 列数が一致しない場合があるため、近接位置マッチング方式で対応
       var guestNames = [];
       if (columnMap.guestNameCols && columnMap.guestNameCols.length) {
-        // ヘルパー: detailCols配列からnameCol〜nextNameColの間にある最初の列を返す
-        var findNearestCol_ = function(detailCols, nameCol, nextNameCol) {
+        // ヘルパー: detailCols配列からnameCol〜nextNameColの間にある非空の値を持つ列を返す
+        // 同範囲に複数列がある場合、データがある方を優先
+        var findNearestCol_ = function(detailCols, nameCol, nextNameCol, rowData) {
           if (!detailCols || !detailCols.length) return -1;
+          var firstMatch = -1;
           for (var di = 0; di < detailCols.length; di++) {
-            if (detailCols[di] > nameCol && (nextNameCol < 0 || detailCols[di] < nextNameCol)) return detailCols[di];
+            if (detailCols[di] > nameCol && (nextNameCol < 0 || detailCols[di] < nextNameCol)) {
+              if (firstMatch < 0) firstMatch = detailCols[di];
+              // データがある列を優先
+              if (rowData && String(rowData[detailCols[di]] || '').trim()) return detailCols[di];
+            }
           }
-          return -1;
+          return firstMatch;
         };
         for (var gi = 0; gi < columnMap.guestNameCols.length; gi++) {
           var nameCol = columnMap.guestNameCols[gi];
           var nextNameCol = (gi + 1 < columnMap.guestNameCols.length) ? columnMap.guestNameCols[gi + 1] : -1;
           var gn = String(row[nameCol] || '').trim();
-          var ageCol = findNearestCol_(columnMap.ageCols, nameCol, nextNameCol);
-          var addrCol = findNearestCol_(columnMap.addressCols, nameCol, nextNameCol);
-          var natCol = findNearestCol_(columnMap.nationalityCols, nameCol, nextNameCol);
-          var passNumCol = findNearestCol_(columnMap.passportNumberCols, nameCol, nextNameCol);
-          var passUrlCol = findNearestCol_(columnMap.passportCols, nameCol, nextNameCol);
+          var ageCol = findNearestCol_(columnMap.ageCols, nameCol, nextNameCol, row);
+          var addrCol = findNearestCol_(columnMap.addressCols, nameCol, nextNameCol, row);
+          var natCol = findNearestCol_(columnMap.nationalityCols, nameCol, nextNameCol, row);
+          var passNumCol = findNearestCol_(columnMap.passportNumberCols, nameCol, nextNameCol, row);
+          var passUrlCol = findNearestCol_(columnMap.passportCols, nameCol, nextNameCol, row);
           var ga = ageCol >= 0 ? String(row[ageCol] || '').trim() : '';
           var gAddr = addrCol >= 0 ? String(row[addrCol] || '').trim() : '';
           var gNat = natCol >= 0 ? String(row[natCol] || '').trim() : '';

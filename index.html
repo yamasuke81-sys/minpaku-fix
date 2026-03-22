@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322ab</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322ac</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1234,18 +1234,14 @@
       <li class="nav-item" id="navSettings" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><a class="nav-link" href="#" data-tab="settings">設定</a></li>
     </ul>
     <div id="panelCalendar" style="display:none;">
-      <div id="calendarStatusLegend" class="small text-muted mb-2 d-flex justify-content-between align-items-start">
-        <div class="d-flex flex-column gap-1">
-          <div class="d-flex flex-wrap gap-3 align-items-center">
-            <span style="background:linear-gradient(90deg,#ff5a5f 50%,#003b95 50%);color:#fff;padding:1px 8px;border-radius:4px;font-weight:bold;">宿泊</span>
-            <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#dc3545;border:1px solid #fff;"></span>詳細なし</span>
-            <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#28a745;border:1px solid #fff;"></span>詳細あり</span>
-          </div>
-          <div class="d-flex flex-wrap gap-3 align-items-center">
-            <span style="background:#ffc107;color:#212529;padding:1px 8px;border-radius:4px;font-weight:bold;">清掃</span>
-            <span><span class="d-inline-block me-1" style="position:relative;width:14px;height:14px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:#dc3545;display:block;"></span></span>募集中</span>
-            <span><span class="d-inline-block rounded-circle me-1 fc-status-dot" style="width:8px;height:8px;background:#198754;border:1px solid #fff;"></span>確定済み</span>
-          </div>
+      <div id="calendarStatusLegend" class="text-muted mb-1" style="font-size:0.65rem;">
+        <div class="d-flex flex-wrap align-items-center" style="gap:0.3rem 0.8rem;">
+          <span style="background:linear-gradient(90deg,#ff5a5f 50%,#003b95 50%);color:#fff;padding:0 5px;border-radius:3px;font-weight:bold;font-size:0.6rem;">宿泊</span>
+          <span><span class="d-inline-block rounded-circle me-1" style="width:6px;height:6px;background:#dc3545;"></span>詳細なし</span>
+          <span><span class="d-inline-block rounded-circle me-1" style="width:6px;height:6px;background:#28a745;"></span>詳細あり</span>
+          <span style="background:#ffc107;color:#212529;padding:0 5px;border-radius:3px;font-weight:bold;font-size:0.6rem;">清掃</span>
+          <span><span class="d-inline-block me-1" style="position:relative;width:10px;height:10px;background:#ffff00;border:1px solid #ccc;vertical-align:middle;"><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:#dc3545;display:block;"></span></span>募集中</span>
+          <span><span class="d-inline-block rounded-circle me-1" style="width:6px;height:6px;background:#198754;"></span>確定済</span>
         </div>
       </div>
       <div id="calendarAddBookingArea" class="mb-2" style="display:<?= staffModeStr === 'yes' ? 'none' : '' ?>;"><button type="button" class="btn btn-sm btn-outline-primary" id="btnAddBooking">予約を追加</button></div>
@@ -1264,20 +1260,23 @@
           <a href="#" target="_blank" class="btn btn-warning" id="btnStaffRespChecklist" style="white-space:nowrap;font-weight:600;font-size:0.7rem;padding:0.2rem 0.5rem;line-height:1.2;text-decoration:none;color:#212529 !important;display:none;text-align:center;">清掃✓<br>リスト</a>
         </div>
       </div>
-      <div id="staffResponseLegend" class="sr-legend d-flex flex-wrap mb-2" style="gap:0.6rem 1rem;font-size:0.7rem;color:#6c757d;">
-        <span><span class="sr-leg-ok fw-bold">●</span>: 可</span>
-        <span><span class="sr-leg-hold fw-bold">▲</span>: 保留</span>
-        <span><span class="sr-leg-ng fw-bold">✖</span>: 不可</span>
-        <span><span class="sr-leg-none">−</span>: 未回答</span>
-        <span><span style="display:inline-block;width:14px;height:14px;border:2px solid #dc3545;border-radius:3px;vertical-align:middle;"></span>: 確定済</span>
-        <span><span class="sr-leg-today" style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;"></span>: 今日</span>
+      <div id="staffResponseLegend" class="sr-legend d-flex flex-wrap mb-1" style="gap:0.3rem 0.6rem;font-size:0.6rem;color:#6c757d;">
+        <span><span class="sr-leg-ok fw-bold">●</span>可</span>
+        <span><span class="sr-leg-hold fw-bold">▲</span>保留</span>
+        <span><span class="sr-leg-ng fw-bold">✖</span>不可</span>
+        <span><span class="sr-leg-none">−</span>未回答</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border:2px solid #dc3545;border-radius:2px;vertical-align:middle;"></span>確定済</span>
+        <span><span class="sr-leg-today" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;"></span>今日</span>
       </div>
       <div style="position:relative;">
         <div id="staffResponseMonthOverlay" style="display:none;position:absolute;top:0;left:0;z-index:5;background:rgba(30,42,58,0.85);color:#fff;padding:1px 8px;border-radius:0 0 6px 0;font-size:12px;font-weight:bold;pointer-events:none;"></div>
         <div id="staffResponseContent" style="overflow-x:auto;"></div>
       </div>
-      <div id="staffResponseCalLegendArea" style="margin-top:1.8rem;margin-bottom:0.2rem;"></div>
-      <div id="staffResponseCalendarArea"></div>
+      <details id="oldCalendarCollapse" style="margin-top:1rem;">
+        <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:#6c757d;padding:4px 0;">いままでのカレンダー</summary>
+        <div id="staffResponseCalLegendArea" style="margin-top:0.5rem;margin-bottom:0.2rem;"></div>
+        <div id="staffResponseCalendarArea"></div>
+      </details>
     </div>
     <div id="panelStaffSchedule" style="display:none;">
       <div class="mb-2"><label class="form-label small">表示月</label><input type="month" class="form-control form-control-sm" id="staffScheduleMonth" style="max-width:160px;"></div>
@@ -1295,13 +1294,13 @@
       <div id="invoiceContent" style="display:none;">
         <!-- 清掃実績（自動算出） -->
         <div class="mb-3">
-          <label class="form-label small fw-bold mb-1">清掃実績（自動算出） <span id="invoiceExclSaveStatus" class="small" style="display:none;"></span></label>
+          <div class="bg-primary bg-opacity-10 rounded px-2 py-1 mb-1"><label class="form-label small fw-bold mb-0">清掃実績（自動算出） <span id="invoiceExclSaveStatus" class="small" style="display:none;"></span></label></div>
           <p class="text-muted mb-1" style="font-size:0.7rem;">不要な項目は×で除外できます（カレンダーには影響しません）</p>
           <div id="invoiceAutoItems" class="small"></div>
         </div>
         <!-- 追加項目 -->
         <div class="mb-3">
-          <label class="form-label small fw-bold mb-1">追加項目 <span id="invoiceSaveStatus" class="small" style="display:none;"></span></label>
+          <div class="bg-success bg-opacity-10 rounded px-2 py-1 mb-1"><label class="form-label small fw-bold mb-0">追加項目 <span id="invoiceSaveStatus" class="small" style="display:none;"></span></label></div>
           <p class="text-muted mb-1" style="font-size:0.7rem;">追加した項目は自動保存されます</p>
           <div id="invoiceManualItems"></div>
           <div class="mt-1">
@@ -1320,11 +1319,11 @@
         </div>
         <!-- 備考 -->
         <div class="mb-2">
-          <label class="form-label small fw-bold mb-1">備考</label>
+          <div class="bg-secondary bg-opacity-10 rounded px-2 py-1 mb-1"><label class="form-label small fw-bold mb-0">備考</label></div>
           <textarea class="form-control form-control-sm" id="invoiceRemarks" rows="2" placeholder="備考があれば記入"></textarea>
         </div>
         <!-- 合計 -->
-        <div class="border-top pt-2 mb-2 d-flex justify-content-between align-items-center">
+        <div class="bg-warning bg-opacity-15 rounded px-2 py-2 mb-2 d-flex justify-content-between align-items-center" style="background-color:rgba(255,193,7,0.12) !important;">
           <span class="fw-bold">合計請求額</span>
           <span class="fw-bold fs-5" id="invoiceTotalDisplay">¥0</span>
         </div>
@@ -1335,8 +1334,8 @@
         </div>
       </div>
       <!-- 送信履歴（サーバーから都度取得） -->
-      <div class="mt-3 border-top pt-2">
-        <label class="form-label small fw-bold mb-1">送信履歴</label>
+      <div class="mt-3">
+        <div class="bg-info bg-opacity-10 rounded px-2 py-1 mb-1"><label class="form-label small fw-bold mb-0">送信履歴</label></div>
         <div class="d-flex gap-2 align-items-end mb-1 flex-wrap">
           <div>
             <label class="form-label small mb-0">対象月</label>
@@ -1357,8 +1356,8 @@
         <div id="staffHistoryDownloadResult" class="small mt-1" style="display:none;"></div>
       </div>
       <!-- 口座情報登録 -->
-      <div class="mt-3 border-top pt-2" id="bankInfoSection">
-        <label class="form-label small fw-bold mb-2">口座情報</label>
+      <div class="mt-3" id="bankInfoSection">
+        <div class="bg-secondary bg-opacity-10 rounded px-2 py-1 mb-2"><label class="form-label small fw-bold mb-0">口座情報</label></div>
         <div id="bankInfoLoading" class="text-center py-2"><div class="spinner-border spinner-border-sm text-secondary"></div><span class="small text-muted ms-2">読み込み中...</span></div>
         <div id="bankInfoForm" style="display:none;">
           <div class="mb-2"><label class="form-label small mb-0">名前</label><input type="text" class="form-control form-control-sm" id="bankInfoName"></div>
@@ -7771,7 +7770,15 @@
         }
         autoEl.innerHTML = items.map(function(item, idx) {
           var excluded = invoiceExcludedAuto.indexOf(item.date) !== -1;
-          var amtStr = item.amount > 0 ? '¥' + item.amount.toLocaleString() : '<span class="text-danger">未設定</span>';
+          var amtStr;
+          if (item.amount > 0) {
+            amtStr = '¥' + item.amount.toLocaleString();
+          } else if (!excluded) {
+            // 未設定: クリックで入力可能なフィールドを表示
+            amtStr = '<span class="text-danger auto-amt-edit" data-idx="' + idx + '" style="cursor:pointer;text-decoration:underline;" title="クリックして金額を入力">未設定</span>';
+          } else {
+            amtStr = '<span class="text-danger">未設定</span>';
+          }
           var specialHtml = '';
           if (!excluded && item.specialItems && item.specialItems.length > 0) {
             specialHtml = item.specialItems.map(function(sp) {
@@ -7788,6 +7795,43 @@
             (item.partners && item.partners.length ? ' <span class="text-muted">(' + item.partners.map(function(p) { return escapeHtml(p); }).join(', ') + ')</span>' : '') +
             '</div><div>' + (excluded ? '<s>' + amtStr + '</s>' : amtStr) + ' ' + btnHtml + '</div></div>' + specialHtml;
         }).join('');
+
+        // 未設定クリック → インライン入力に変換
+        autoEl.querySelectorAll('.auto-amt-edit').forEach(function(span) {
+          span.onclick = function() {
+            var idx = parseInt(this.getAttribute('data-idx'), 10);
+            var item = (window._invoiceAutoItems || [])[idx];
+            if (!item) return;
+            var parent = this.parentNode;
+            var input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'form-control form-control-sm d-inline-block';
+            input.style.cssText = 'width:80px;font-size:0.8em;';
+            input.placeholder = '金額';
+            input.min = '0';
+            this.replaceWith(input);
+            input.focus();
+            function saveAmount() {
+              var val = parseInt(input.value, 10);
+              if (!val || val <= 0) {
+                renderInvoiceAutoItems();
+                return;
+              }
+              item.amount = val;
+              // サーバーに保存
+              var ym = getInvoiceYm();
+              var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
+              google.script.run
+                .withSuccessHandler(function() {})
+                .withFailureHandler(function() {})
+                .saveAutoItemAmountOverride(ym, staffId, item.date, item.jobName, val);
+              renderInvoiceAutoItems();
+              updateInvoiceTotal();
+            }
+            input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); saveAmount(); } });
+            input.addEventListener('blur', saveAmount);
+          };
+        });
 
         autoEl.querySelectorAll('.btn-exclude-auto').forEach(function(btn) {
           btn.onclick = function() {

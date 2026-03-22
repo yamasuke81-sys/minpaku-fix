@@ -8106,6 +8106,15 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       });
     }
 
+    // 金額オーバーライドの適用（未設定項目に手入力された金額）
+    var overrides = getAutoAmountOverrides_(staffName, ym);
+    for (var oi = 0; oi < autoItems.length; oi++) {
+      if (autoItems[oi].amount === 0) {
+        var oKey = autoItems[oi].date + '_' + autoItems[oi].jobName;
+        if (overrides[oKey]) autoItems[oi].amount = overrides[oKey];
+      }
+    }
+
     // 仕事内容マスタから追加項目用の選択肢を取得（清掃系は自動計算なので除外）
     var jobOptions = [];
     // 全ての仕事内容（清掃系含む）の選択肢も返す
@@ -12824,4 +12833,32 @@ function cleanupDuplicateInvoiceExtraItems() {
     sheet.deleteRow(rowsToDelete[j]);
   }
   Logger.log('重複削除完了: ' + rowsToDelete.length + '行削除');
+}
+
+/**
+ * 清掃実績の金額オーバーライドを保存
+ */
+function saveAutoItemAmountOverride(ym, staffIdentifier, itemDate, jobName, amount) {
+  try {
+    var staffName = String(staffIdentifier || '').trim();
+    var key = 'autoAmtOverride_' + staffName + '_' + ym;
+    var props = PropertiesService.getDocumentProperties();
+    var current = {};
+    try { current = JSON.parse(props.getProperty(key) || '{}'); } catch (e) { current = {}; }
+    current[itemDate + '_' + jobName] = Number(amount) || 0;
+    props.setProperty(key, JSON.stringify(current));
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 清掃実績の金額オーバーライドを取得（内部関数）
+ */
+function getAutoAmountOverrides_(staffName, ym) {
+  try {
+    var key = 'autoAmtOverride_' + staffName + '_' + ym;
+    return JSON.parse(PropertiesService.getDocumentProperties().getProperty(key) || '{}');
+  } catch (e) { return {}; }
 }

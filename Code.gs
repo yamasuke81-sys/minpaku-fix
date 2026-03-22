@@ -10361,14 +10361,19 @@ function checkAndCreateRecruitments() {
       const checkoutStr = toDateKeySafe_(checkOut);
       const rowNumber = i + 2;
       if (existingRowNums[rowNumber]) continue;
-      // 同じチェックアウト日の募集エントリが既に存在し、同日の予約が1件のみの場合はスキップ（行番号ずれによる重複防止）
+      // 同じチェックアウト日の募集エントリが既に存在する場合、ユニーク予約数で判定（CI+COが同じ重複行を1件とカウント）
       if (checkoutStr && existingCheckoutDates[checkoutStr]) {
-        var sameCoFormRows = 0;
+        var uniqueCiForCo = {};
         for (var sci = 0; sci < data.length; sci++) {
           var sciCo = parseDate(data[sci][colMap.checkOut]);
-          if (sciCo && toDateKeySafe_(sciCo) === checkoutStr) sameCoFormRows++;
+          if (sciCo && toDateKeySafe_(sciCo) === checkoutStr) {
+            var sciCi = colMap.checkIn >= 0 ? parseDate(data[sci][colMap.checkIn]) : null;
+            var ciKey = sciCi ? toDateKeySafe_(sciCi) : 'row' + (sci + 2);
+            uniqueCiForCo[ciKey] = true;
+          }
         }
-        if (sameCoFormRows <= existingCheckoutDates[checkoutStr].length) continue;
+        var uniqueBookings = Object.keys(uniqueCiForCo).length;
+        if (uniqueBookings <= existingCheckoutDates[checkoutStr].length) continue;
       }
       // スタッフが既に確定済みか判定
       var assignedStaff = colMap.cleaningStaff >= 0 ? String(data[i][colMap.cleaningStaff] || '').trim() : '';
@@ -10377,6 +10382,11 @@ function checkAndCreateRecruitments() {
       const now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
       recruitSheet.getRange(nextRow, 1, 1, 15).setValues([[checkoutStr, rowNumber, '', status, assignedStaff, '', now, '', 'メール', '', '', '', '', '', '']]);
       existingRowNums[rowNumber] = true;
+      // existingCheckoutDatesも更新（同一ループ内での重複防止）
+      if (checkoutStr) {
+        if (!existingCheckoutDates[checkoutStr]) existingCheckoutDates[checkoutStr] = [];
+        existingCheckoutDates[checkoutStr].push(rowNumber);
+      }
       // 募集中の新規エントリを記録（後で自動通知に使用）
       if (status === '募集中') {
         newRecruitEntries.push({ rowIndex: nextRow, checkoutDateStr: checkoutStr, bookingRowNumber: rowNumber });

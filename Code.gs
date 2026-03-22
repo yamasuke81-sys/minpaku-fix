@@ -3313,6 +3313,7 @@ function syncFromICal() {
     // 予約追加のsetValues()をスプレッドシートに即座反映（checkAndCreateRecruitmentsが新規行を確実に読めるようにする）
     try { SpreadsheetApp.flush(); } catch (flushErr) {}
     // 同期後に募集レコードを自動作成＋通知送信（既存予約の漏れ分も含めて常に実行）
+    Logger.log('[DEBUG-RECRUIT] syncFromICal: calling checkAndCreateRecruitments (added=' + added + ' removed=' + removed + ')');
     try { checkAndCreateRecruitments(); } catch (re) { Logger.log('syncFromICal: recruitment auto-create: ' + re.toString()); }
     invalidateInitDataCache_();
 
@@ -10382,6 +10383,7 @@ function checkAndCreateRecruitments() {
       }
     }
     // 新規作成された募集中エントリに対して自動で募集開始通知を送信
+    Logger.log('[DEBUG-RECRUIT] checkAndCreateRecruitments: newRecruitEntries=' + newRecruitEntries.length + ' entries=' + JSON.stringify(newRecruitEntries.map(function(e) { return e.checkoutDateStr + '(row' + e.bookingRowNumber + ')'; })));
     if (newRecruitEntries.length > 0) {
       try {
         for (var ni = 0; ni < newRecruitEntries.length; ni++) {

@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322n</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322o</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5646,7 +5646,7 @@
             else if (bkInfo.pos === 'start') barPos = 'left:3px;right:-1px;border-radius:3px 0 0 3px;';
             else if (bkInfo.pos === 'mid') barPos = 'left:-1px;right:-1px;border-radius:0;';
             else if (bkInfo.pos === 'end') barPos = 'left:-1px;right:3px;border-radius:0 3px 3px 0;';
-            barHtml = '<div style="position:absolute;top:1px;height:3px;background:' + barColor + ';' + barPos + '"></div>';
+            barHtml = '<div style="position:absolute;top:1px;height:4px;background:' + barColor + ';box-shadow:0 0 0 1px rgba(255,255,255,0.8);' + barPos + '"></div>';
             thOverflow = 'position:relative;overflow:visible;';
           }
           var thClass = (hasRecruit || isBooking) ? 'text-center sr-date-header' : 'text-center';

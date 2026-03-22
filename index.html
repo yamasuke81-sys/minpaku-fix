@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322h</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5588,7 +5588,7 @@
         html += '</tr>';
 
         // 宿泊日セットを構築（FullCalendarのbookingイベントから）
-        // bookingPos: 'only'=1泊, 'start'=連泊初日, 'mid'=中間, 'end'=最終日
+        // bookingInfo: { pos: 'only'|'start'|'mid'|'end', platform: 'airbnb'|'booking'|'' }
         var bookingDates = {};
         if (calendar) {
           var calEvents = calendar.getEvents();
@@ -5601,9 +5601,11 @@
                 bkDays.push(cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0'));
                 cur.setDate(cur.getDate() + 1);
               }
+              var bkSite = (cev.extendedProps.data && cev.extendedProps.data.bookingSite) ? String(cev.extendedProps.data.bookingSite).toLowerCase() : '';
+              var plat = bkSite.indexOf('airbnb') >= 0 ? 'airbnb' : (bkSite.indexOf('booking') >= 0 ? 'booking' : '');
               for (var bi = 0; bi < bkDays.length; bi++) {
                 var pos = bkDays.length === 1 ? 'only' : (bi === 0 ? 'start' : (bi === bkDays.length - 1 ? 'end' : 'mid'));
-                bookingDates[bkDays[bi]] = pos;
+                bookingDates[bkDays[bi]] = { pos: pos, platform: plat };
               }
             }
           }
@@ -5616,25 +5618,25 @@
           var dow = dt.getDay();
           var isToday = dd.dateStr === todayStr;
           var hasRecruit = !!recruitByDate[dd.dateStr];
-          var bkPos = bookingDates[dd.dateStr] || '';
-          var isBooking = !!bkPos;
+          var bkInfo = bookingDates[dd.dateStr];
+          var isBooking = !!bkInfo;
           var dowColor = dow === 0 ? C.sunColor : (dow === 6 ? C.satColor : C.dayColor);
           var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
           var borderStyle = 'border:1px solid ' + C.tableBorder + ';';
-          // 連泊を1つの青枠で囲う: 左右のborderを位置に応じて制御
-          var bookingShadow = '';
-          if (bkPos === 'only') {
-            bookingShadow = 'box-shadow:inset 0 0 0 2px #0d6efd;';
-          } else if (bkPos === 'start') {
-            bookingShadow = 'box-shadow:inset 2px 2px 0 0 #0d6efd, inset 0 -2px 0 0 #0d6efd;';
-          } else if (bkPos === 'mid') {
-            bookingShadow = 'box-shadow:inset 0 2px 0 0 #0d6efd, inset 0 -2px 0 0 #0d6efd;';
-          } else if (bkPos === 'end') {
-            bookingShadow = 'box-shadow:inset -2px 2px 0 0 #0d6efd, inset 0 -2px 0 0 #0d6efd;';
+          // 予約バー: 日付の上に細いバーを表示。Airbnb=サーモンピンク, Booking.com=ネイビーブルー
+          var barHtml = '';
+          if (bkInfo) {
+            var barColor = bkInfo.platform === 'airbnb' ? '#FF5A5F' : (bkInfo.platform === 'booking' ? '#003580' : '#6c757d');
+            var barRadius = '';
+            if (bkInfo.pos === 'only') barRadius = 'border-radius:3px;';
+            else if (bkInfo.pos === 'start') barRadius = 'border-radius:3px 0 0 3px;margin-right:-1px;';
+            else if (bkInfo.pos === 'mid') barRadius = 'border-radius:0;margin-left:-1px;margin-right:-1px;';
+            else if (bkInfo.pos === 'end') barRadius = 'border-radius:0 3px 3px 0;margin-left:-1px;';
+            barHtml = '<div style="height:3px;background:' + barColor + ';' + barRadius + 'margin-bottom:1px;"></div>';
           }
           var thClass = (hasRecruit || isBooking) ? 'text-center sr-date-header' : 'text-center';
           var thCursor = (hasRecruit || isBooking) ? 'cursor:pointer;' : '';
-          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + bookingShadow + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;padding-top:2px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '">' + barHtml + '<div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
         });
         html += '</tr></thead><tbody>';
 

@@ -8127,21 +8127,37 @@ function getInvoiceData(yearMonth, staffIdentifier) {
 
     // 追加項目（シートから読み込み）
     var extraItems = [];
+    var _extraDebug = []; // [DEBUG] 画面表示用
     try {
       var extraSheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+      _extraDebug.push('sheet存在=' + !!extraSheet);
       if (extraSheet && extraSheet.getLastRow() >= 2) {
         var extraData = extraSheet.getRange(2, 1, extraSheet.getLastRow() - 1, 5).getValues();
+        _extraDebug.push('全行数=' + extraData.length + ' 検索: staffName=[' + staffName + '] ym=[' + ym + ']');
+        var _sampleCount = 0;
         for (var exi = 0; exi < extraData.length; exi++) {
-          if (String(extraData[exi][0] || '').trim() === staffName && String(extraData[exi][1] || '').trim() === ym) {
+          var exName = String(extraData[exi][0] || '').trim();
+          // ym列がDate型の場合はyyyy-MM形式に変換
+          var exYmRaw = extraData[exi][1];
+          var exYm = (exYmRaw instanceof Date) ? Utilities.formatDate(exYmRaw, 'Asia/Tokyo', 'yyyy-MM') : String(exYmRaw || '').trim();
+          if (_sampleCount < 3) {
+            _extraDebug.push('row' + (exi+2) + ': name=[' + exName + '] ymRaw=' + (exYmRaw instanceof Date ? 'Date(' + exYmRaw + ')' : '[' + exYmRaw + ']') + ' ymConverted=[' + exYm + '] nameMatch=' + (exName === staffName) + ' ymMatch=' + (exYm === ym));
+            _sampleCount++;
+          }
+          if (exName === staffName && exYm === ym) {
+            // date列もDate型をハンドリング
+            var exDateRaw = extraData[exi][2];
+            var exDate = (exDateRaw instanceof Date) ? Utilities.formatDate(exDateRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : String(exDateRaw || '');
             extraItems.push({
-              date: String(extraData[exi][2] || ''),
+              date: exDate,
               name: String(extraData[exi][3] || ''),
               amount: Number(extraData[exi][4] || 0)
             });
           }
         }
+        _extraDebug.push('マッチ件数=' + extraItems.length);
       }
-    } catch (exErr) {}
+    } catch (exErr) { _extraDebug.push('エラー: ' + exErr.toString()); }
 
     // 除外項目（シートから読み込み）
     var excludedAuto = [];
@@ -8172,7 +8188,8 @@ function getInvoiceData(yearMonth, staffIdentifier) {
       extraItems: extraItems,
       excludedAuto: excludedAuto,
       hasFolder: !!folderId,
-      hasTemplate: !!templateDocId
+      hasTemplate: !!templateDocId,
+      _extraDebug: _extraDebug
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
@@ -9023,11 +9040,19 @@ function saveMyBankInfo(staffIdentifier, info) {
         var rowNum = r + 2;
         if (colMap['名前']) sheet.getRange(rowNum, colMap['名前']).setValue(info.name || '');
         if (colMap['住所']) sheet.getRange(rowNum, colMap['住所']).setValue(info.address || '');
-        if (colMap['携帯電話番号']) sheet.getRange(rowNum, colMap['携帯電話番号']).setValue(info.phone || '');
+        if (colMap['携帯電話番号']) {
+          var phoneCell = sheet.getRange(rowNum, colMap['携帯電話番号']);
+          phoneCell.setNumberFormat('@'); // テキスト形式で保存（先頭ゼロ保持）
+          phoneCell.setValue(info.phone || '');
+        }
         if (colMap['金融機関名']) sheet.getRange(rowNum, colMap['金融機関名']).setValue(info.bankName || '');
         if (colMap['支店名']) sheet.getRange(rowNum, colMap['支店名']).setValue(info.bankBranch || '');
         if (colMap['口座種類']) sheet.getRange(rowNum, colMap['口座種類']).setValue(info.accountType || '');
-        if (colMap['口座番号']) sheet.getRange(rowNum, colMap['口座番号']).setValue(info.accountNumber || '');
+        if (colMap['口座番号']) {
+          var acctCell = sheet.getRange(rowNum, colMap['口座番号']);
+          acctCell.setNumberFormat('@'); // テキスト形式で保存（先頭ゼロ保持）
+          acctCell.setValue(info.accountNumber || '');
+        }
         if (colMap['口座名義']) sheet.getRange(rowNum, colMap['口座名義']).setValue(info.accountHolder || '');
         invalidateStaffCache_();
         return JSON.stringify({ success: true });
@@ -12592,11 +12617,12 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
 
     // 報酬自動追加（sent→ランドリー出し、received→ランドリー受取）
     var laundryJobMap = { sent: 'ランドリー出し', received: 'ランドリー受取' };
-    Logger.log('[DEBUG-INVOICE-EXTRA] step=' + step + ' staffName=' + staffName + ' dateKey=' + dateKey + ' jobName=' + (laundryJobMap[step] || 'なし'));
+    var _laundryDebug = 'step=' + step + ' staffName=[' + staffName + '] dateKey=' + dateKey + ' jobName=' + (laundryJobMap[step] || 'なし');
     if (laundryJobMap[step] && staffName) {
+      _laundryDebug += ' → addInvoiceExtraItemFromMain_呼び出し';
       addInvoiceExtraItemFromMain_(ss, staffName, dateKey, laundryJobMap[step]);
     } else {
-      Logger.log('[DEBUG-INVOICE-EXTRA] スキップ: laundryJobMap[step]=' + laundryJobMap[step] + ' staffName=' + staffName);
+      _laundryDebug += ' → スキップ';
     }
 
     // コインランドリー専用のチャンネル設定を募集設定シートから読み込み（CL_CH_コインランドリー）
@@ -12664,7 +12690,7 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       Logger.log('[LAUNDRY-MAIL] エラー: ' + mailErr);
     }
 
-    return JSON.stringify({ success: true });
+    return JSON.stringify({ success: true, _laundryDebug: _laundryDebug });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
@@ -12778,8 +12804,9 @@ function addInvoiceExtraItemFromMain_(ss, staffName, dateStr, jobName) {
         }
       }
     } catch (compErr) {}
-    // 追加
+    // 追加（ym列はテキスト形式で保存 — スプシのDate型自動変換を防止）
     var newRow = sheet.getLastRow() + 1;
+    sheet.getRange(newRow, 2).setNumberFormat('@');
     sheet.getRange(newRow, 1, 1, 5).setValues([[staffName, ym, dateKey, jobName, amount]]);
     Logger.log('[報酬自動追加] ' + staffName + ' ' + dateKey + ' ' + jobName + ' ¥' + amount);
   } catch (e) {

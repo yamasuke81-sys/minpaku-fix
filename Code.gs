@@ -8946,6 +8946,100 @@ function getMyStaffName() {
   }
 }
 
+/** スタッフシートに携帯電話番号列を保証 */
+function ensureStaffPhoneColumn_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 1) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    for (var i = 0; i < headers.length; i++) {
+      if (String(headers[i] || '').trim() === '携帯電話番号') return;
+    }
+    var nextCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, nextCol).setValue('携帯電話番号');
+  } catch (e) {}
+}
+
+/**
+ * ログインスタッフ自身の口座情報を取得
+ */
+function getMyBankInfo() {
+  try {
+    var email = (Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+    if (!email) return JSON.stringify({ success: false, error: 'メールアドレスを取得できません' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフシートが見つかりません' });
+    ensureStaffPhoneColumn_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colMap = {};
+    for (var i = 0; i < headers.length; i++) {
+      colMap[String(headers[i] || '').trim()] = i;
+    }
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    for (var r = 0; r < data.length; r++) {
+      var rowEmail = String(data[r][colMap['メール'] != null ? colMap['メール'] : 2] || '').trim().toLowerCase();
+      if (rowEmail === email) {
+        return JSON.stringify({ success: true, info: {
+          name: String(data[r][colMap['名前'] != null ? colMap['名前'] : 0] || '').trim(),
+          address: String(data[r][colMap['住所'] != null ? colMap['住所'] : 1] || '').trim(),
+          email: rowEmail,
+          phone: colMap['携帯電話番号'] != null ? String(data[r][colMap['携帯電話番号']] || '').trim() : '',
+          bankName: String(data[r][colMap['金融機関名'] != null ? colMap['金融機関名'] : 3] || '').trim(),
+          bankBranch: String(data[r][colMap['支店名'] != null ? colMap['支店名'] : 4] || '').trim(),
+          accountType: String(data[r][colMap['口座種類'] != null ? colMap['口座種類'] : 5] || '').trim(),
+          accountNumber: String(data[r][colMap['口座番号'] != null ? colMap['口座番号'] : 6] || '').trim(),
+          accountHolder: String(data[r][colMap['口座名義'] != null ? colMap['口座名義'] : 7] || '').trim()
+        }});
+      }
+    }
+    return JSON.stringify({ success: false, error: 'スタッフ情報が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * ログインスタッフ自身の口座情報を保存
+ */
+function saveMyBankInfo(info) {
+  try {
+    var email = (Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+    if (!email) return JSON.stringify({ success: false, error: 'メールアドレスを取得できません' });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_STAFF);
+    if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフシートが見つかりません' });
+    ensureStaffPhoneColumn_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colMap = {};
+    for (var i = 0; i < headers.length; i++) {
+      colMap[String(headers[i] || '').trim()] = i + 1; // 1-based for setValue
+    }
+    var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(sheet.getLastColumn(), 3)).getValues();
+    for (var r = 0; r < data.length; r++) {
+      var emailCol = colMap['メール'] || 3;
+      var rowEmail = String(data[r][emailCol - 1] || '').trim().toLowerCase();
+      if (rowEmail === email) {
+        var rowNum = r + 2;
+        if (colMap['名前']) sheet.getRange(rowNum, colMap['名前']).setValue(info.name || '');
+        if (colMap['住所']) sheet.getRange(rowNum, colMap['住所']).setValue(info.address || '');
+        if (colMap['携帯電話番号']) sheet.getRange(rowNum, colMap['携帯電話番号']).setValue(info.phone || '');
+        if (colMap['金融機関名']) sheet.getRange(rowNum, colMap['金融機関名']).setValue(info.bankName || '');
+        if (colMap['支店名']) sheet.getRange(rowNum, colMap['支店名']).setValue(info.bankBranch || '');
+        if (colMap['口座種類']) sheet.getRange(rowNum, colMap['口座種類']).setValue(info.accountType || '');
+        if (colMap['口座番号']) sheet.getRange(rowNum, colMap['口座番号']).setValue(info.accountNumber || '');
+        if (colMap['口座名義']) sheet.getRange(rowNum, colMap['口座名義']).setValue(info.accountHolder || '');
+        invalidateStaffCache_();
+        return JSON.stringify({ success: true });
+      }
+    }
+    return JSON.stringify({ success: false, error: 'スタッフ情報が見つかりません' });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 /**
  * 旧互換ラッパー: volunteerForRecruitment → respondToRecruitment('◎')
  */

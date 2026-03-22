@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322v</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322w</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1355,6 +1355,30 @@
           <span class="text-muted">検索ボタンを押してください。</span>
         </div>
         <div id="staffHistoryDownloadResult" class="small mt-1" style="display:none;"></div>
+      </div>
+      <!-- 口座情報登録 -->
+      <div class="mt-3 border-top pt-2" id="bankInfoSection">
+        <label class="form-label small fw-bold mb-2">口座情報</label>
+        <div id="bankInfoLoading" class="text-center py-2"><div class="spinner-border spinner-border-sm text-secondary"></div><span class="small text-muted ms-2">読み込み中...</span></div>
+        <div id="bankInfoForm" style="display:none;">
+          <div class="mb-2"><label class="form-label small mb-0">名前</label><input type="text" class="form-control form-control-sm" id="bankInfoName"></div>
+          <div class="mb-2"><label class="form-label small mb-0">住所</label><input type="text" class="form-control form-control-sm" id="bankInfoAddress"></div>
+          <div class="mb-2"><label class="form-label small mb-0">携帯電話番号</label><input type="tel" class="form-control form-control-sm" id="bankInfoPhone"></div>
+          <div class="mb-2"><label class="form-label small mb-0">メール</label><input type="email" class="form-control form-control-sm" id="bankInfoEmail" readonly style="background:#f8f9fa;"></div>
+          <div class="mb-2"><label class="form-label small mb-0">金融機関名</label><input type="text" class="form-control form-control-sm" id="bankInfoBankName"></div>
+          <div class="mb-2"><label class="form-label small mb-0">支店名</label><input type="text" class="form-control form-control-sm" id="bankInfoBranch"></div>
+          <div class="mb-2"><label class="form-label small mb-0">口座種類</label>
+            <select class="form-select form-select-sm" id="bankInfoAccountType">
+              <option value="">選択...</option>
+              <option value="普通">普通</option>
+              <option value="当座">当座</option>
+            </select>
+          </div>
+          <div class="mb-2"><label class="form-label small mb-0">口座番号</label><input type="text" class="form-control form-control-sm" id="bankInfoAccountNumber"></div>
+          <div class="mb-2"><label class="form-label small mb-0">口座名義（カナ）</label><input type="text" class="form-control form-control-sm" id="bankInfoAccountHolder"></div>
+          <button type="button" class="btn btn-primary btn-sm w-100 mt-1" id="btnSaveBankInfo">口座情報を保存</button>
+          <div id="bankInfoSaveResult" class="small mt-1" style="display:none;"></div>
+        </div>
       </div>
     </div>
     <div id="panelNotifications" style="display:none;">
@@ -7653,6 +7677,7 @@
 
       function loadInvoiceData() {
         if (!window.staffMode) return;
+        loadBankInfo_();
 
         var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
         if (!staffId) return;
@@ -8104,6 +8129,79 @@
           updateStaffHistorySelection_();
           if (resEl) { resEl.textContent = err.message || 'エラー'; resEl.className = 'small mt-1 text-danger'; resEl.style.display = 'block'; }
         }).createInvoiceZipDownload(fileIds);
+      });
+
+      // === 口座情報 ===
+      var _bankInfoLoaded = false;
+      function loadBankInfo_() {
+        if (_bankInfoLoaded) return;
+        var loading = document.getElementById('bankInfoLoading');
+        var form = document.getElementById('bankInfoForm');
+        if (loading) loading.style.display = '';
+        if (form) form.style.display = 'none';
+        google.script.run
+          .withSuccessHandler(function(jsonStr) {
+            _bankInfoLoaded = true;
+            if (loading) loading.style.display = 'none';
+            if (form) form.style.display = '';
+            try {
+              var res = JSON.parse(jsonStr);
+              if (res.success && res.info) {
+                document.getElementById('bankInfoName').value = res.info.name || '';
+                document.getElementById('bankInfoAddress').value = res.info.address || '';
+                document.getElementById('bankInfoPhone').value = res.info.phone || '';
+                document.getElementById('bankInfoEmail').value = res.info.email || '';
+                document.getElementById('bankInfoBankName').value = res.info.bankName || '';
+                document.getElementById('bankInfoBranch').value = res.info.bankBranch || '';
+                document.getElementById('bankInfoAccountType').value = res.info.accountType || '';
+                document.getElementById('bankInfoAccountNumber').value = res.info.accountNumber || '';
+                document.getElementById('bankInfoAccountHolder').value = res.info.accountHolder || '';
+              }
+            } catch (e) {}
+          })
+          .withFailureHandler(function() {
+            if (loading) loading.style.display = 'none';
+            if (form) form.style.display = '';
+          })
+          .getMyBankInfo();
+      }
+
+      document.getElementById('btnSaveBankInfo').addEventListener('click', function() {
+        var btn = this;
+        var resultEl = document.getElementById('bankInfoSaveResult');
+        btn.disabled = true;
+        btn.textContent = '保存中...';
+        var info = {
+          name: document.getElementById('bankInfoName').value.trim(),
+          address: document.getElementById('bankInfoAddress').value.trim(),
+          phone: document.getElementById('bankInfoPhone').value.trim(),
+          bankName: document.getElementById('bankInfoBankName').value.trim(),
+          bankBranch: document.getElementById('bankInfoBranch').value.trim(),
+          accountType: document.getElementById('bankInfoAccountType').value.trim(),
+          accountNumber: document.getElementById('bankInfoAccountNumber').value.trim(),
+          accountHolder: document.getElementById('bankInfoAccountHolder').value.trim()
+        };
+        google.script.run
+          .withSuccessHandler(function(jsonStr) {
+            btn.disabled = false;
+            btn.textContent = '口座情報を保存';
+            try {
+              var res = JSON.parse(jsonStr);
+              if (res.success) {
+                if (resultEl) { resultEl.className = 'small mt-1 text-success'; resultEl.textContent = '保存しました'; resultEl.style.display = ''; setTimeout(function() { resultEl.style.display = 'none'; }, 3000); }
+              } else {
+                if (resultEl) { resultEl.className = 'small mt-1 text-danger'; resultEl.textContent = res.error || '保存に失敗しました'; resultEl.style.display = ''; }
+              }
+            } catch (e) {
+              if (resultEl) { resultEl.className = 'small mt-1 text-danger'; resultEl.textContent = '保存に失敗しました'; resultEl.style.display = ''; }
+            }
+          })
+          .withFailureHandler(function(e) {
+            btn.disabled = false;
+            btn.textContent = '口座情報を保存';
+            if (resultEl) { resultEl.className = 'small mt-1 text-danger'; resultEl.textContent = '通信エラー'; resultEl.style.display = ''; }
+          })
+          .saveMyBankInfo(info);
       });
 
       // 送信ボタン

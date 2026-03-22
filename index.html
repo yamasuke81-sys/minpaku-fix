@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322h</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322i</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5624,19 +5624,22 @@
           var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
           var borderStyle = 'border:1px solid ' + C.tableBorder + ';';
           // 予約バー: 日付の上に細いバーを表示。Airbnb=サーモンピンク, Booking.com=ネイビーブルー
+          // position:absoluteでセル境界を越えて連結
           var barHtml = '';
+          var thOverflow = '';
           if (bkInfo) {
             var barColor = bkInfo.platform === 'airbnb' ? '#FF5A5F' : (bkInfo.platform === 'booking' ? '#003580' : '#6c757d');
-            var barRadius = '';
-            if (bkInfo.pos === 'only') barRadius = 'border-radius:3px;';
-            else if (bkInfo.pos === 'start') barRadius = 'border-radius:3px 0 0 3px;margin-right:-1px;';
-            else if (bkInfo.pos === 'mid') barRadius = 'border-radius:0;margin-left:-1px;margin-right:-1px;';
-            else if (bkInfo.pos === 'end') barRadius = 'border-radius:0 3px 3px 0;margin-left:-1px;';
-            barHtml = '<div style="height:3px;background:' + barColor + ';' + barRadius + 'margin-bottom:1px;"></div>';
+            var barPos = '';
+            if (bkInfo.pos === 'only') barPos = 'left:3px;right:3px;border-radius:3px;';
+            else if (bkInfo.pos === 'start') barPos = 'left:3px;right:-1px;border-radius:3px 0 0 3px;';
+            else if (bkInfo.pos === 'mid') barPos = 'left:-1px;right:-1px;border-radius:0;';
+            else if (bkInfo.pos === 'end') barPos = 'left:-1px;right:3px;border-radius:0 3px 3px 0;';
+            barHtml = '<div style="position:absolute;top:1px;height:3px;background:' + barColor + ';' + barPos + '"></div>';
+            thOverflow = 'position:relative;overflow:visible;';
           }
           var thClass = (hasRecruit || isBooking) ? 'text-center sr-date-header' : 'text-center';
           var thCursor = (hasRecruit || isBooking) ? 'cursor:pointer;' : '';
-          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;padding-top:2px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '">' + barHtml + '<div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;padding-top:6px;' + thOverflow + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '">' + barHtml + '<div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
         });
         html += '</tr></thead><tbody>';
 

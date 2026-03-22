@@ -3031,9 +3031,11 @@ function syncFromICal() {
       var colMap = buildColumnMap(formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0]);
       var nextRow = formSheet.getLastRow() + 1;
 
+      Logger.log('[DEBUG-SYNC] existingPairs keys: ' + JSON.stringify(Object.keys(existingPairs)));
       for (var ei = 0; ei < events.length; ei++) {
         var ev = events[ei];
         var key = ev.checkIn + '|' + ev.checkOut;
+        Logger.log('[DEBUG-SYNC] Processing event: key=' + key + ' platform=' + ev.platform + ' guest="' + (ev.guestName || '') + '"');
         if (existingPairs[key]) {
           var updateRowNum = existingRowByKey[key];
           if (updateRowNum) {

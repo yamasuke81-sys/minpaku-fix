@@ -829,17 +829,33 @@ function getData() {
         else cancelledAt = String(cancelledAtRaw).trim();
       }
       // 宿泊者名一覧（複数カラム対応）と年齢・住所・国籍・旅券番号・パスポートURL
+      // 列数が一致しない場合があるため、近接位置マッチング方式で対応
       var guestNames = [];
       if (columnMap.guestNameCols && columnMap.guestNameCols.length) {
+        // ヘルパー: detailCols配列からnameCol〜nextNameColの間にある最初の列を返す
+        var findNearestCol_ = function(detailCols, nameCol, nextNameCol) {
+          if (!detailCols || !detailCols.length) return -1;
+          for (var di = 0; di < detailCols.length; di++) {
+            if (detailCols[di] > nameCol && (nextNameCol < 0 || detailCols[di] < nextNameCol)) return detailCols[di];
+          }
+          return -1;
+        };
         for (var gi = 0; gi < columnMap.guestNameCols.length; gi++) {
-          var gn = String(row[columnMap.guestNameCols[gi]] || '').trim();
-          var ga = (columnMap.ageCols && columnMap.ageCols[gi] !== undefined && columnMap.ageCols[gi] >= 0) ? String(row[columnMap.ageCols[gi]] || '').trim() : '';
-          var gAddr = (columnMap.addressCols && columnMap.addressCols[gi] !== undefined && columnMap.addressCols[gi] >= 0) ? String(row[columnMap.addressCols[gi]] || '').trim() : '';
-          var gNat = (columnMap.nationalityCols && columnMap.nationalityCols[gi] !== undefined && columnMap.nationalityCols[gi] >= 0) ? String(row[columnMap.nationalityCols[gi]] || '').trim() : '';
-          var gPassNum = (columnMap.passportNumberCols && columnMap.passportNumberCols[gi] !== undefined && columnMap.passportNumberCols[gi] >= 0) ? String(row[columnMap.passportNumberCols[gi]] || '').trim() : '';
+          var nameCol = columnMap.guestNameCols[gi];
+          var nextNameCol = (gi + 1 < columnMap.guestNameCols.length) ? columnMap.guestNameCols[gi + 1] : -1;
+          var gn = String(row[nameCol] || '').trim();
+          var ageCol = findNearestCol_(columnMap.ageCols, nameCol, nextNameCol);
+          var addrCol = findNearestCol_(columnMap.addressCols, nameCol, nextNameCol);
+          var natCol = findNearestCol_(columnMap.nationalityCols, nameCol, nextNameCol);
+          var passNumCol = findNearestCol_(columnMap.passportNumberCols, nameCol, nextNameCol);
+          var passUrlCol = findNearestCol_(columnMap.passportCols, nameCol, nextNameCol);
+          var ga = ageCol >= 0 ? String(row[ageCol] || '').trim() : '';
+          var gAddr = addrCol >= 0 ? String(row[addrCol] || '').trim() : '';
+          var gNat = natCol >= 0 ? String(row[natCol] || '').trim() : '';
+          var gPassNum = passNumCol >= 0 ? String(row[passNumCol] || '').trim() : '';
           var gPassUrl = '';
-          if (columnMap.passportCols && columnMap.passportCols[gi] !== undefined && columnMap.passportCols[gi] >= 0) {
-            var pv = row[columnMap.passportCols[gi]];
+          if (passUrlCol >= 0) {
+            var pv = row[passUrlCol];
             if (pv && typeof pv === 'string' && pv.indexOf('http') === 0) gPassUrl = pv;
             else if (pv && pv.toString && pv.toString().indexOf('http') === 0) gPassUrl = pv.toString();
           }
@@ -1062,17 +1078,6 @@ function buildColumnMap(headers) {
     }
     var carMatch = h.match(/お車は何台でお越しになりますか[\s　]*[?\？]\s*\[([^\]]+)\]/);
     if (carMatch) map.carCols.push({ col: i, label: carMatch[1].trim() });
-  }
-  // [DEBUG-COLMAP] 住所・国籍・旅券番号・パスポート・氏名の列検出結果をログ
-  Logger.log('[DEBUG-COLMAP] guestNameCols=' + JSON.stringify(map.guestNameCols) + ' ageCols=' + JSON.stringify(map.ageCols) + ' addressCols=' + JSON.stringify(map.addressCols) + ' nationalityCols=' + JSON.stringify(map.nationalityCols) + ' passportNumberCols=' + JSON.stringify(map.passportNumberCols) + ' passportCols=' + JSON.stringify(map.passportCols));
-  // 住所列が検出されなかった場合、全ヘッダーをダンプ
-  if (map.addressCols.length === 0) {
-    var allHeaders = [];
-    for (var hi = 0; hi < headers.length; hi++) {
-      var hv = String(headers[hi] || '').trim();
-      if (hv) allHeaders.push(hi + ':' + hv.substring(0, 40));
-    }
-    Logger.log('[DEBUG-COLMAP] addressCols empty. All headers: ' + allHeaders.join(' | '));
   }
   return map;
 }

@@ -2230,7 +2230,8 @@ function addPrepaidCard(purchaseDate, balance, owner) {
       }
     }
     var newNo = 'P' + String(maxNum + 1).padStart(3, '0');
-    var bal = (balance !== undefined && balance !== null && balance !== '') ? Number(balance) : 2200;
+    var bal = (balance !== undefined && balance !== null && balance !== '') ? Math.floor(Number(balance)) : 2200;
+    if (isNaN(bal) || bal < 0) return JSON.stringify({ success: false, error: '残高は0以上の整数を入力してください' });
     var own = owner || '民泊';
     var pDate = purchaseDate || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/M/d');
     var newRow = lastRow + 1;
@@ -2293,7 +2294,7 @@ function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, sta
     for (var i = 0; i < data.length; i++) {
       if (String(data[i][0]) === cardNo) {
         var oldBalance = Number(data[i][2]) || 0;
-        var amt = Number(amount) || 0;
+        var amt = Math.floor(Number(amount) || 0);
         var newBalance;
         if (operation === 'use') {
           if (oldBalance < amt) {
@@ -2338,7 +2339,8 @@ function getPrepaidLog(cardNo) {
     if (lastRow < 2) return JSON.stringify({ success: true, logs: [] });
     var data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
     var logs = [];
-    for (var i = data.length - 1; i >= 0; i--) {
+    var maxLogs = 20;
+    for (var i = data.length - 1; i >= 0 && logs.length < maxLogs; i--) {
       if (!cardNo || String(data[i][1]) === cardNo) {
         logs.push({
           datetime: data[i][0] instanceof Date ? Utilities.formatDate(data[i][0], 'Asia/Tokyo', 'yyyy/M/d HH:mm') : String(data[i][0] || ''),

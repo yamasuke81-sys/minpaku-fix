@@ -12591,7 +12591,11 @@ function recordCleaningLaundryStep(checkoutDate, step, staffName) {
       return JSON.stringify({ success: false, error: '不明なステップ: ' + step });
     }
 
-    // デバッグ情報を収集（フロントに返す）
+    // 報酬自動追加（sent→ランドリー出し、received→ランドリー受取）
+    var laundryJobMap = { sent: 'ランドリー出し', received: 'ランドリー受取' };
+    if (laundryJobMap[step] && staffName) {
+      addInvoiceExtraItemFromMain_(ss, staffName, dateKey, laundryJobMap[step]);
+    }
 
     // コインランドリー専用のチャンネル設定を募集設定シートから読み込み（CL_CH_コインランドリー）
     // ※ getNotifyChannel_('清掃完了') ではなく、チェックリストアプリと同じキーを参照する
@@ -12722,5 +12726,56 @@ function resetCleaningLaundry(checkoutDate) {
     return JSON.stringify({ success: true });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * ランドリー等の報酬を「請求書追加項目」シートに自動追加（メインApp用）
+ * チェックリストApp側のaddInvoiceExtraItem_と同等の機能
+ */
+function addInvoiceExtraItemFromMain_(ss, staffName, dateStr, jobName) {
+  try {
+    if (!staffName || !jobName) return;
+    var dateKey = normDateStr_(dateStr || new Date());
+    var ym = dateKey.substring(0, 7);
+    var sheet = ss.getSheetByName(SHEET_INVOICE_EXTRA);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET_INVOICE_EXTRA);
+      sheet.getRange(1, 1, 1, 5).setValues([['スタッフ名', '月', '日付', '項目名', '金額']]);
+    }
+    // 重複チェック
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var existing = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+      for (var i = 0; i < existing.length; i++) {
+        if (String(existing[i][0] || '').trim() === staffName &&
+            String(existing[i][1] || '').trim() === ym &&
+            normDateStr_(existing[i][2]) === dateKey &&
+            String(existing[i][3] || '').trim() === jobName) {
+          return; // 重複スキップ
+        }
+      }
+    }
+    // 報酬額を検索（スタッフ報酬シートから）
+    var amount = 0;
+    try {
+      var compSheet = ss.getSheetByName(SHEET_COMPENSATION);
+      if (compSheet && compSheet.getLastRow() >= 2) {
+        var compData = compSheet.getRange(2, 1, compSheet.getLastRow() - 1, 3).getValues();
+        for (var ci = 0; ci < compData.length; ci++) {
+          var cStaff = String(compData[ci][0] || '').trim();
+          var cJob = String(compData[ci][1] || '').trim();
+          var cAmt = Number(compData[ci][2] || 0);
+          if (cJob === jobName && cStaff === staffName && cAmt > 0) { amount = cAmt; break; }
+          if (cJob === jobName && cStaff === '共通' && cAmt > 0 && amount === 0) { amount = cAmt; }
+        }
+      }
+    } catch (compErr) {}
+    // 追加
+    var newRow = sheet.getLastRow() + 1;
+    sheet.getRange(newRow, 1, 1, 5).setValues([[staffName, ym, dateKey, jobName, amount]]);
+    Logger.log('[報酬自動追加] ' + staffName + ' ' + dateKey + ' ' + jobName + ' ¥' + amount);
+  } catch (e) {
+    Logger.log('[報酬自動追加] エラー: ' + e.toString());
   }
 }

@@ -8962,12 +8962,12 @@ function ensureStaffPhoneColumn_() {
 }
 
 /**
- * ログインスタッフ自身の口座情報を取得
+ * スタッフの口座情報を取得（スタッフ名で検索）
  */
-function getMyBankInfo() {
+function getMyBankInfo(staffIdentifier) {
   try {
-    var email = (Session.getActiveUser().getEmail() || '').trim().toLowerCase();
-    if (!email) return JSON.stringify({ success: false, error: 'メールアドレスを取得できません' });
+    var staffName = String(staffIdentifier || '').trim();
+    if (!staffName) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_STAFF);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフシートが見つかりません' });
@@ -8979,12 +8979,12 @@ function getMyBankInfo() {
     }
     var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
     for (var r = 0; r < data.length; r++) {
-      var rowEmail = String(data[r][colMap['メール'] != null ? colMap['メール'] : 2] || '').trim().toLowerCase();
-      if (rowEmail === email) {
+      var rowName = String(data[r][colMap['名前'] != null ? colMap['名前'] : 0] || '').trim();
+      if (rowName === staffName) {
         return JSON.stringify({ success: true, info: {
-          name: String(data[r][colMap['名前'] != null ? colMap['名前'] : 0] || '').trim(),
+          name: rowName,
           address: String(data[r][colMap['住所'] != null ? colMap['住所'] : 1] || '').trim(),
-          email: rowEmail,
+          email: String(data[r][colMap['メール'] != null ? colMap['メール'] : 2] || '').trim(),
           phone: colMap['携帯電話番号'] != null ? String(data[r][colMap['携帯電話番号']] || '').trim() : '',
           bankName: String(data[r][colMap['金融機関名'] != null ? colMap['金融機関名'] : 3] || '').trim(),
           bankBranch: String(data[r][colMap['支店名'] != null ? colMap['支店名'] : 4] || '').trim(),
@@ -9001,12 +9001,12 @@ function getMyBankInfo() {
 }
 
 /**
- * ログインスタッフ自身の口座情報を保存
+ * スタッフの口座情報を保存（スタッフ名で検索）
  */
-function saveMyBankInfo(info) {
+function saveMyBankInfo(staffIdentifier, info) {
   try {
-    var email = (Session.getActiveUser().getEmail() || '').trim().toLowerCase();
-    if (!email) return JSON.stringify({ success: false, error: 'メールアドレスを取得できません' });
+    var staffName = String(staffIdentifier || '').trim();
+    if (!staffName) return JSON.stringify({ success: false, error: 'スタッフを特定できません' });
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_STAFF);
     if (!sheet || sheet.getLastRow() < 2) return JSON.stringify({ success: false, error: 'スタッフシートが見つかりません' });
@@ -9018,9 +9018,8 @@ function saveMyBankInfo(info) {
     }
     var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, Math.max(sheet.getLastColumn(), 3)).getValues();
     for (var r = 0; r < data.length; r++) {
-      var emailCol = colMap['メール'] || 3;
-      var rowEmail = String(data[r][emailCol - 1] || '').trim().toLowerCase();
-      if (rowEmail === email) {
+      var rowName = String(data[r][(colMap['名前'] || 1) - 1] || '').trim();
+      if (rowName === staffName) {
         var rowNum = r + 2;
         if (colMap['名前']) sheet.getRange(rowNum, colMap['名前']).setValue(info.name || '');
         if (colMap['住所']) sheet.getRange(rowNum, colMap['住所']).setValue(info.address || '');

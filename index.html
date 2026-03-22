@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322x</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322y</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -8135,6 +8135,8 @@
       var _bankInfoLoaded = false;
       function loadBankInfo_() {
         if (_bankInfoLoaded) return;
+        var staffId = (window.currentUserName || window.currentUserEmail || '').trim();
+        if (!staffId) return;
         var loading = document.getElementById('bankInfoLoading');
         var form = document.getElementById('bankInfoForm');
         if (loading) loading.style.display = '';
@@ -8163,7 +8165,7 @@
             if (loading) loading.style.display = 'none';
             if (form) form.style.display = '';
           })
-          .getMyBankInfo();
+          .getMyBankInfo(staffId);
       }
 
       document.getElementById('btnSaveBankInfo').addEventListener('click', function() {
@@ -8201,7 +8203,7 @@
             btn.textContent = '口座情報を保存';
             if (resultEl) { resultEl.className = 'small mt-1 text-danger'; resultEl.textContent = '通信エラー'; resultEl.style.display = ''; }
           })
-          .saveMyBankInfo(info);
+          .saveMyBankInfo((window.currentUserName || window.currentUserEmail || '').trim(), info);
       });
 
       // 送信ボタン
@@ -10592,8 +10594,9 @@
         try {
           localStorage.setItem('staffSelected', JSON.stringify({ name: window.currentUserName, email: window.currentUserEmail }));
         } catch (e) {}
-        // スタッフ変更時は請求書認証をリセット
+        // スタッフ変更時は請求書認証・口座情報キャッシュをリセット
         window._invoiceAuthenticated = false;
+        _bankInfoLoaded = false;
         var disp = document.getElementById('staffDisplayName');
         var badge = document.getElementById('currentAccountBadge');
         if (disp && disp.style.display !== 'none') {

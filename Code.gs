@@ -3060,6 +3060,7 @@ function syncFromICal() {
           }
         }
         if (overlaps) {
+          Logger.log('[DEBUG-SYNC] OVERLAP SKIP: platform=' + ev.platform + ' CI=' + ev.checkIn + ' CO=' + ev.checkOut + ' guest="' + (ev.guestName || '') + '" overlapping with=' + ek);
           continue;
         }
         existingPairs[key] = true;
@@ -3169,6 +3170,8 @@ function syncFromICal() {
               try { notifyDateChange_(formSheet, ri + 2, colMap, ciKey, coKey, newCoKey, platformName); } catch (dcErr) { Logger.log('[EXTEND] notifyDateChange_ error: ' + dcErr); }
             } else if (!cancelledVal) {
               // 本当にフィードから消えた → キャンセルマーク
+              var guestNameForLog = String(formData[ri][colMap.guestName] || '').trim();
+              Logger.log('[DEBUG-CANCEL] フィード不在でキャンセル: pairKey=' + pairKey + ' guest="' + guestNameForLog + '" platform=' + platformName + ' validPairs=' + JSON.stringify(Object.keys(validPairs)) + ' cancelledPairs=' + JSON.stringify(Object.keys(cancelledPairs)));
               if (cancelBookingFromICal_(formSheet, ri + 2, colMap, platformName)) {
                 platformCancelled++; removed++;
               }

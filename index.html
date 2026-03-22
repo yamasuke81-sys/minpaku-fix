@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0322f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5042,6 +5042,29 @@
         parentEl.appendChild(btnRow);
       }
 
+      // 日付から宿泊詳細（bookingイベント）のモーダルを開く
+      function openBookingModalByDate(dateStr) {
+        if (!calendar || !dateStr) return;
+        var events = calendar.getEvents();
+        // まずbookingイベントでCI〜CO期間にdateStrが含まれるものを探す
+        for (var i = 0; i < events.length; i++) {
+          var ev = events[i];
+          var props = ev.extendedProps;
+          if (props && props.type === 'booking' && ev.start && ev.end) {
+            var s = ev.start;
+            var e = ev.end;
+            var target = new Date(dateStr + 'T00:00:00');
+            if (target >= s && target < e) {
+              calendar.gotoDate(s);
+              showEventModal(ev);
+              return;
+            }
+          }
+        }
+        // bookingが見つからなければcleaningを試す
+        openCleaningModalByDate(dateStr);
+      }
+
       function openCleaningModalByDate(dateStr) {
         if (!calendar || !dateStr) return;
         var events = calendar.getEvents();
@@ -5564,6 +5587,23 @@
         });
         html += '</tr>';
 
+        // 宿泊日セットを構築（FullCalendarのbookingイベントから）
+        var bookingDates = {};
+        if (calendar) {
+          var calEvents = calendar.getEvents();
+          for (var ei = 0; ei < calEvents.length; ei++) {
+            var cev = calEvents[ei];
+            if (cev.extendedProps && cev.extendedProps.type === 'booking' && cev.start && cev.end) {
+              var cur = new Date(cev.start);
+              while (cur < cev.end) {
+                var bk = cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0') + '-' + String(cur.getDate()).padStart(2,'0');
+                bookingDates[bk] = true;
+                cur.setDate(cur.getDate() + 1);
+              }
+            }
+          }
+        }
+
         // ヘッダー行2: 日付+曜日（オーナーは募集日タップで確定・編集可能）
         html += '<tr>';
         allDates.forEach(function(dd) {
@@ -5571,12 +5611,14 @@
           var dow = dt.getDay();
           var isToday = dd.dateStr === todayStr;
           var hasRecruit = !!recruitByDate[dd.dateStr];
+          var isBooking = !!bookingDates[dd.dateStr];
           var dowColor = dow === 0 ? C.sunColor : (dow === 6 ? C.satColor : C.dayColor);
           var bgColor = isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : (!hasRecruit ? C.noRecruit : C.headerBg));
           var borderStyle = 'border:1px solid ' + C.tableBorder + ';';
-          var thClass = hasRecruit ? 'text-center sr-date-header' : 'text-center';
-          var thCursor = hasRecruit ? 'cursor:pointer;' : '';
-          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
+          var bookingShadow = isBooking ? 'box-shadow:inset 0 0 0 2px #0d6efd;' : '';
+          var thClass = (hasRecruit || isBooking) ? 'text-center sr-date-header' : 'text-center';
+          var thCursor = (hasRecruit || isBooking) ? 'cursor:pointer;' : '';
+          html += '<th class="' + thClass + '" data-sr-date="' + dd.dateStr + '" style="min-width:34px;' + thCursor + 'color:' + dowColor + ';background:' + bgColor + ';' + borderStyle + bookingShadow + '"><div>' + dd.day + '</div><div style="font-size:10px;">' + dayNames[dow] + '</div></th>';
         });
         html += '</tr></thead><tbody>';
 
@@ -5662,11 +5704,11 @@
             }
           });
         });
-        // 日付ヘッダータップ: 清掃詳細モーダルを開く
+        // 日付ヘッダータップ: 宿泊詳細モーダルを開く
         container.querySelectorAll('.sr-date-header').forEach(function(th) {
           th.addEventListener('click', function() {
             var dateStr = this.getAttribute('data-sr-date');
-            openCleaningModalByDate(dateStr);
+            openBookingModalByDate(dateStr);
           });
         });
         // 月名オーバーレイのスクロール追従

@@ -2296,15 +2296,18 @@ function updatePrepaidBalance(cardNo, amount, operation, memo, checkoutDate, sta
         var amt = Number(amount) || 0;
         var newBalance;
         if (operation === 'use') {
+          if (oldBalance < amt) {
+            return JSON.stringify({ success: false, error: '残高不足です（残高: ¥' + oldBalance + '、使用額: ¥' + amt + '）' });
+          }
           newBalance = oldBalance - amt;
-        } else if (operation === 'charge') {
-          newBalance = oldBalance + amt;
+        } else if (operation === 'adjust') {
+          newBalance = amt; // 直接設定（残高修正）
         } else {
-          newBalance = amt; // 直接設定
+          return JSON.stringify({ success: false, error: '不正な操作です: ' + operation });
         }
         sheet.getRange(i + 2, 3).setValue(newBalance);
         var owner = String(data[i][3] || '');
-        addPrepaidLog_(cardNo, operation === 'use' ? '使用' : (operation === 'charge' ? 'チャージ' : '残高修正'), amt, owner, owner, checkoutDate || '', staffName || '', memo || '');
+        addPrepaidLog_(cardNo, operation === 'use' ? '使用' : '残高修正', amt, owner, owner, checkoutDate || '', staffName || '', memo || '');
         return JSON.stringify({ success: true, newBalance: newBalance });
       }
     }

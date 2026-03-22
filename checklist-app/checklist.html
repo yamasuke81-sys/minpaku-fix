@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322b</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322c</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -6274,15 +6274,16 @@
     }
 
     function renderPrepaidCards(container) {
-      var cards = _prepaidCards.filter(function(c) { return c.status === '有効'; });
+      var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効'; });
+      var inactiveCards = _prepaidCards.filter(function(c) { return c.status === '無効'; });
       var html = '';
 
-      // カード一覧
-      if (cards.length === 0) {
+      // 有効カード一覧
+      if (activeCards.length === 0) {
         html += '<div style="text-align:center;color:#999;font-size:13px;padding:8px;">登録されたプリカはありません</div>';
       } else {
-        for (var i = 0; i < cards.length; i++) {
-          var c = cards[i];
+        for (var i = 0; i < activeCards.length; i++) {
+          var c = activeCards[i];
           var balColor = c.balance <= 0 ? '#dc3545' : (c.balance <= 500 ? '#fd7e14' : '#198754');
           html += '<div style="display:flex;align-items:center;gap:8px;padding:8px;margin-bottom:6px;background:#fff;border-radius:8px;border:1px solid #dee2e6;cursor:pointer;" onclick="showPrepaidDetail(\'' + escapeHtml(c.cardNo) + '\')">';
           html += '<div style="flex-shrink:0;width:50px;text-align:center;">';
@@ -6295,6 +6296,21 @@
           html += '<div style="flex-shrink:0;color:#adb5bd;font-size:14px;"><i class="bi bi-chevron-right"></i></div>';
           html += '</div>';
         }
+      }
+
+      // 無効カード表示
+      if (inactiveCards.length > 0) {
+        html += '<div style="margin-top:10px;border-top:1px dashed #ccc;padding-top:8px;">';
+        html += '<div style="font-size:11px;color:#999;text-align:center;margin-bottom:6px;">無効なプリカ（' + inactiveCards.length + '枚）</div>';
+        for (var j = 0; j < inactiveCards.length; j++) {
+          var ic = inactiveCards[j];
+          html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:#f0f0f0;border-radius:8px;border:1px solid #dee2e6;opacity:0.7;">';
+          html += '<span style="font-size:11px;font-weight:700;color:#999;background:#e0e0e0;padding:2px 6px;border-radius:4px;">' + escapeHtml(ic.cardNo) + '</span>';
+          html += '<div style="flex:1;min-width:0;font-size:12px;color:#999;">¥' + ic.balance.toLocaleString() + ' / ' + escapeHtml(ic.owner) + '</div>';
+          html += '<button onclick="event.stopPropagation();reactivatePrepaidCard(\'' + escapeHtml(ic.cardNo) + '\')" style="flex-shrink:0;padding:3px 10px;border:1px solid #198754;border-radius:6px;background:#fff;color:#198754;font-size:11px;font-weight:600;cursor:pointer;">有効化</button>';
+          html += '</div>';
+        }
+        html += '</div>';
       }
 
       // +ボタン
@@ -6460,9 +6476,8 @@
       overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
       var box = document.createElement('div');
       box.style.cssText = 'background:white;border-radius:12px;padding:20px;max-width:300px;width:90%;';
-      var defaultAmt = operation === 'charge' ? '2200' : '';
       box.innerHTML = '<div style="font-weight:bold;font-size:15px;margin-bottom:14px;text-align:center;">' + title + '</div>'
-        + '<div style="margin-bottom:10px;"><input type="number" id="prepaidAmtInput" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:16px;text-align:center;" placeholder="金額（円）" value="' + defaultAmt + '"></div>'
+        + '<div style="margin-bottom:10px;"><input type="number" id="prepaidAmtInput" style="width:100%;padding:10px;border:1px solid #ced4da;border-radius:6px;font-size:16px;text-align:center;" placeholder="金額（円）"></div>'
         + '<div style="margin-bottom:14px;"><input type="text" id="prepaidAmtMemo" style="width:100%;padding:8px;border:1px solid #ced4da;border-radius:6px;font-size:13px;" placeholder="メモ（任意）"></div>'
         + '<div style="display:flex;gap:8px;">'
         + '<button onclick="document.getElementById(\'prepaidAmountDialog\').remove()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#eee;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>'
@@ -6566,6 +6581,18 @@
       }).catch(function() { alert('通信エラー'); });
     }
 
+    // プリカ有効化（無効→有効に戻す）
+    function reactivatePrepaidCard(cardNo) {
+      if (!confirm('このプリカを有効に戻しますか？')) return;
+      callGAS('deactivatePrepaidCard', [cardNo]).then(function(res) {
+        if (res.success) {
+          loadPrepaidCards();
+        } else {
+          alert('エラー: ' + (res.error || '不明'));
+        }
+      }).catch(function() { alert('通信エラー'); });
+    }
+
     // コインランドリー出し時のプリカ選択ダイアログ
     function showLaundryPrepaidPicker(staffName_) {
       var activeCards = _prepaidCards.filter(function(c) { return c.status === '有効' && c.balance > 0; });
@@ -6650,7 +6677,7 @@
         } else {
           alert('プリカ記録エラー: ' + (res.error || '不明'));
         }
-      }).catch(function() { /* 通信エラーは無視 — ランドリー記録自体は成功済み */ });
+      }).catch(function() { alert('プリカ記録の通信に失敗しました（ランドリー記録は完了済み）'); });
     }
 
     // ==========================================

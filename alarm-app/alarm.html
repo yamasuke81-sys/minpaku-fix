@@ -9,14 +9,13 @@
   <style>
     /* ===== 共通 ===== */
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #0a0a2e; color: #fff; overflow: hidden; height: 100vh; }
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #667eea; color: #fff; overflow: hidden; height: 100vh; }
 
     /* ===== 待機画面（時計） ===== */
-    #clockScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 100%); }
-    #clockTime { font-size: 18vw; font-weight: 200; letter-spacing: 0.05em; color: #e0e0ff; text-shadow: 0 0 30px rgba(100,100,255,0.3); }
-    #clockDate { font-size: 4vw; color: #8888cc; margin-top: -2vw; }
-    #clockInfo { position: absolute; bottom: 3vh; font-size: 2.5vw; color: #6666aa; text-align: center; }
-    #clockInfo .badge { font-size: 2vw; }
+    #clockScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    #clockTime { font-size: 18vw; font-weight: 200; letter-spacing: 0.05em; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.2); }
+    #clockDate { font-size: 4vw; color: rgba(255,255,255,0.7); margin-top: -2vw; }
+    #clockPropertyName { position: absolute; bottom: 3vh; font-size: 3vw; color: rgba(255,255,255,0.4); letter-spacing: 0.1em; }
 
     /* ===== アラーム画面 ===== */
     #alarmScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; }
@@ -88,7 +87,7 @@
 <div id="clockScreen">
   <div id="clockTime">--:--</div>
   <div id="clockDate"></div>
-  <div id="clockInfo"></div>
+  <div id="clockPropertyName">the Terrace 長浜</div>
 </div>
 
 <!-- ===== アラーム画面 ===== -->
@@ -389,7 +388,10 @@ Thank you for your stay.</textarea>
 <div id="pinOverlay">
   <div style="color:#fff; font-size:5vw; margin-bottom:2vh;">PIN入力</div>
   <input type="password" id="pinInput" maxlength="8" placeholder="****" inputmode="numeric" onkeydown="if(event.key==='Enter')submitPin()">
-  <button class="btn btn-primary mt-3" style="font-size:4vw; padding:1.5vh 6vw;" onclick="submitPin()">OK</button>
+  <div class="d-flex gap-3 mt-3">
+    <button class="btn btn-primary" style="font-size:4vw; padding:1.5vh 6vw;" onclick="submitPin()">OK</button>
+    <button class="btn btn-outline-light" style="font-size:4vw; padding:1.5vh 6vw;" onclick="closePinOverlay()">戻る</button>
+  </div>
 </div>
 
 <!-- ===== 設定ボタン（右下、薄表示） ===== -->
@@ -397,7 +399,7 @@ Thank you for your stay.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323p</div>
+<div id="version">v0323q</div>
 
 <script>
 // ===== GAS通信 =====
@@ -499,24 +501,7 @@ function poll() {
 }
 
 function updateClockInfo(data) {
-  var info = document.getElementById('clockInfo');
-  var parts = [];
-
-  if (data.checkouts && data.checkouts.length > 0) {
-    parts.push('<span class="badge bg-danger me-2">CO ' + data.checkouts.length + '件</span>');
-  }
-  if (data.nextCheckins && data.nextCheckins.length > 0) {
-    parts.push('<span class="badge bg-success me-2">CI ' + data.nextCheckins.length + '件</span>');
-  }
-  if (data.currentStays && data.currentStays.length > 0) {
-    parts.push('<span class="badge bg-info">宿泊中 ' + data.currentStays.length + '件</span>');
-  }
-
-  if (parts.length === 0) {
-    info.innerHTML = '<span style="color:#4444aa;">本日の予約はありません</span>';
-  } else {
-    info.innerHTML = parts.join(' ');
-  }
+  // 予約情報の表示は不要（待機画面はシンプルに時計のみ）
 }
 
 // ===== アラーム判定 =====
@@ -814,6 +799,11 @@ function openAdmin() {
   var inp = document.getElementById('pinInput');
   inp.value = '';
   setTimeout(function() { inp.focus(); }, 100);
+}
+
+function closePinOverlay() {
+  document.getElementById('pinOverlay').classList.remove('active');
+  document.getElementById('pinInput').value = '';
 }
 
 function submitPin() {

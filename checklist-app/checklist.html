@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322v</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0322ac</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1608,6 +1608,13 @@
     <!-- 次回予約タブ -->
     <div id="tabNextRes" class="tab-content active">
       <div style="padding:12px;">
+        <!-- 当日CO予約の連絡事項 -->
+        <div style="font-size:15px;font-weight:700;color:#2c3e50;margin-bottom:8px;"><i class="bi bi-chat-left-text" style="margin-right:4px;"></i>連絡事項</div>
+        <div id="currentCleaningNoticeArea">
+          <textarea id="currentCleaningNotice" class="form-control form-control-sm" rows="3" placeholder="連絡事項を入力…" style="font-size:13px;width:100%;box-sizing:border-box;" data-row=""></textarea>
+          <div class="text-end mt-1"><button id="btnSaveCurrentNotice" class="btn btn-sm btn-primary" style="font-size:12px;">保存</button></div>
+        </div>
+        <hr style="margin:14px 0;border-color:#dee2e6;">
         <!-- 次回予約情報 -->
         <div style="font-size:15px;font-weight:700;color:#2c3e50;margin-bottom:8px;"><i class="bi bi-calendar-event" style="margin-right:4px;"></i>次回予約情報</div>
         <div id="nextResContent"><div style="text-align:center;color:#999;font-size:13px;padding:20px;"><span class="spinner-border spinner-border-sm"></span> 読み込み中…</div></div>
@@ -2082,6 +2089,12 @@
             var mergedCheckedCount = Object.keys(res.checked || {}).length; // [DEBUG-SYNC]
             _syncLog('SYNC完了 ' + elapsed + 'ms svr=' + serverCheckedCount + '件 merge後=' + mergedCheckedCount + '件 pending=' + currentPending); // [DEBUG-SYNC]
             checklistData = res;
+            // 当日CO予約の連絡事項を表示
+            var noticeTA = document.getElementById('currentCleaningNotice');
+            if (noticeTA) {
+              noticeTA.value = res.currentCleaningNotice || '';
+              noticeTA.dataset.row = res.currentNoticeRowNumber || '';
+            }
             renderChecklist();
             renderPhotoSection();
             renderMemos();
@@ -7095,19 +7108,13 @@
       html += '<div class="nres-row"><span class="nres-label">BBQ</span><span class="nres-value">' + escapeHtml(bbqDisp) + '</span></div>';
       html += '<div class="nres-row"><span class="nres-label">国籍</span><span class="nres-value">' + escapeHtml(nr.nationality || '日本') + '</span></div>';
       html += '</div>';
-      // 連絡事項（編集可能）
-      html += '<div style="margin-top:12px;">';
-      html += '<div style="font-size:13px;font-weight:700;color:#2c3e50;margin-bottom:6px;"><i class="bi bi-chat-left-text" style="margin-right:4px;"></i>連絡事項</div>';
-      html += '<textarea id="nextResNotice" class="form-control form-control-sm" rows="3" placeholder="連絡事項を入力…" style="font-size:13px;width:100%;box-sizing:border-box;" data-row="' + (nr.rowNumber || '') + '">' + escapeHtml(nr.cleaningNotice || '') + '</textarea>';
-      html += '<div class="text-end mt-1"><button id="btnSaveNextResNotice" class="btn btn-sm btn-primary" style="font-size:12px;" onclick="saveNextResNotice()">保存</button></div>';
-      html += '</div>';
       el.innerHTML = html;
     }
 
-    function saveNextResNotice() {
-      var ta = document.getElementById('nextResNotice');
-      var btn = document.getElementById('btnSaveNextResNotice');
-      if (!ta || !ta.dataset.row) return;
+    function saveCurrentCleaningNotice() {
+      var ta = document.getElementById('currentCleaningNotice');
+      var btn = document.getElementById('btnSaveCurrentNotice');
+      if (!ta || !ta.dataset.row) { alert('保存先の予約行が見つかりません'); return; }
       if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
       callGAS('saveCleaningNotice', [parseInt(ta.dataset.row, 10), ta.value]).then(function(res) {
         if (res.success) {
@@ -7122,7 +7129,8 @@
         if (btn) { btn.disabled = false; btn.textContent = '保存'; }
       });
     }
-    window.saveNextResNotice = saveNextResNotice;
+    // 保存ボタンのクリックイベントを設定
+    document.getElementById('btnSaveCurrentNotice').addEventListener('click', saveCurrentCleaningNotice);
 
     function getSelectedStaffName_() {
       // チェックボックス式: 最初にチェックされたスタッフ名を返す

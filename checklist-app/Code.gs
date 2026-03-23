@@ -797,6 +797,36 @@ function getChecklistForDate(checkoutDate, deviceId) {
     // スタッフ選択を取得（deviceId があれば自端末分も返す）
     var staffInfo = getStaffSelectionDetailed_(checkoutDate, deviceId || '');
 
+    // 当日チェックアウト予約の連絡事項を取得（メインAppと同じデータソース）
+    var currentCleaningNotice = '';
+    var currentNoticeRowNumber = 0;
+    try {
+      var bookingSs = getBookingSpreadsheet_();
+      var formSheet = bookingSs.getSheetByName(CL_BOOKING_SHEET);
+      if (formSheet && formSheet.getLastRow() >= 2) {
+        var fHeaders = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
+        var fColCo = -1, fColNotice = -1;
+        for (var fi = 0; fi < fHeaders.length; fi++) {
+          var fh = String(fHeaders[fi] || '').trim();
+          if (fh === 'チェックアウト / Check-out' && fColCo < 0) fColCo = fi;
+          if ((fh === '連絡事項' || fh === '清掃連絡事項') && fColNotice < 0) fColNotice = fi;
+        }
+        if (fColCo >= 0 && fColNotice >= 0) {
+          var fData = formSheet.getRange(2, 1, formSheet.getLastRow() - 1, formSheet.getLastColumn()).getValues();
+          for (var fr = 0; fr < fData.length; fr++) {
+            if (normDateStr_(fData[fr][fColCo]) === targetDate) {
+              var notice = String(fData[fr][fColNotice] || '').trim();
+              if (notice) {
+                currentCleaningNotice = notice;
+                currentNoticeRowNumber = fr + 2;
+              }
+              break;
+            }
+          }
+        }
+      }
+    } catch (noticeErr) {}
+
     return JSON.stringify({
       success: true,
       items: masterRes.items,
@@ -809,7 +839,9 @@ function getChecklistForDate(checkoutDate, deviceId) {
       totalItems: totalItems,
       categoryOrder: catOrderRes.success ? catOrderRes.orders : [],
       selectedStaff: staffInfo.merged,
-      myStaff: staffInfo.myStaff
+      myStaff: staffInfo.myStaff,
+      currentCleaningNotice: currentCleaningNotice,
+      currentNoticeRowNumber: currentNoticeRowNumber
     });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });

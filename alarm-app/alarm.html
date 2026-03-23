@@ -189,6 +189,7 @@
               <option value="chime">チャイム（和音）</option>
               <option value="alarm">アラーム（ノコギリ波）</option>
               <option value="bell">ベル（三角波）</option>
+              <option value="hotaru">蛍の光（メロディ）</option>
             </select>
           </div>
         </div>
@@ -232,6 +233,7 @@
               <option value="beep">ビープ（短音繰り返し）</option>
               <option value="chime">チャイム（和音）</option>
               <option value="bell">ベル（三角波）</option>
+              <option value="hotaru">蛍の光（メロディ）</option>
             </select>
           </div>
         </div>
@@ -576,9 +578,56 @@ function playNamedSound(ctx, soundType, vol) {
       playSoundSweep(ctx, vol); break;
     case 'bell':
       playSoundLoop(ctx, { type: 'triangle', freqs: [800, 600, 800], interval: 0.4, vol: vol * 0.8 }); break;
+    case 'hotaru':
+      playMelodyHotaru(ctx, vol); break;
     default:
       playSoundLoop(ctx, { type: 'sine', freqs: [880, 660], interval: 0.3, vol: vol });
   }
+}
+
+/** 蛍の光メロディ再生（ループ） */
+function playMelodyHotaru(ctx, vol) {
+  // 蛍の光 — C major, tempo ~100bpm (1拍=0.6秒)
+  // [周波数, 拍数] の配列。0=休符
+  var C4=262, D4=294, E4=330, F4=349, G4=392, A4=440;
+  var melody = [
+    // ほーたーるーの ひーかーりー
+    [C4,1],[C4,1],[C4,1.5],[E4,0.5],[G4,1],[G4,1],[G4,1.5],[E4,0.5],
+    // まーどーのーゆーき
+    [G4,1],[A4,1],[G4,1.5],[E4,0.5],[D4,2],[0,1],
+    // ふーみーよーむ つーきーひー
+    [D4,1],[D4,1],[E4,1.5],[D4,0.5],[C4,1],[C4,1],[E4,1.5],[D4,0.5],
+    // かーさーねーつーつ
+    [C4,1],[C4,1],[C4,1.5],[E4,0.5],[D4,2],[0,1]
+  ];
+  var beat = 0.5; // 1拍の秒数
+  var noteIdx = 0;
+
+  function playNote() {
+    if (!_state.alarmActive && !_state.complaintActive && !_state._testSound) return;
+    if (noteIdx >= melody.length) noteIdx = 0; // ループ
+    var note = melody[noteIdx];
+    var freq = note[0];
+    var dur = note[1] * beat;
+    noteIdx++;
+
+    if (freq > 0) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = vol * 0.7;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      gain.gain.setValueAtTime(vol * 0.7, ctx.currentTime + dur * 0.7);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + dur * 0.95);
+      osc.stop(ctx.currentTime + dur);
+    }
+
+    _state._alarmBeepTimer = setTimeout(playNote, dur * 1000);
+  }
+  playNote();
 }
 
 function playSoundLoop(ctx, opts) {

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>清掃アラーム</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    /* ===== 共通 ===== */
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #0a0a2e; color: #fff; overflow: hidden; height: 100vh; }
+
+    /* ===== 待機画面（時計） ===== */
+    #clockScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 100%); }
+    #clockTime { font-size: 18vw; font-weight: 200; letter-spacing: 0.05em; color: #e0e0ff; text-shadow: 0 0 30px rgba(100,100,255,0.3); }
+    #clockDate { font-size: 4vw; color: #8888cc; margin-top: -2vw; }
+    #clockInfo { position: absolute; bottom: 3vh; font-size: 2.5vw; color: #6666aa; text-align: center; }
+    #clockInfo .badge { font-size: 2vw; }
+
+    /* ===== アラーム画面 ===== */
+    #alarmScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; }
+    #alarmScreen.active { display: flex; }
+    #alarmScreen.alarm-checkout { background: #b71c1c; }
+    #alarmScreen.alarm-message { background: #e65100; }
+
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+    #alarmScreen .alarm-icon { font-size: 15vw; animation: shake 0.5s infinite; }
+    #alarmScreen .alarm-title { font-size: 6vw; font-weight: bold; animation: pulse 1s infinite; margin: 2vh 0; text-align: center; }
+    #alarmScreen .alarm-body { font-size: 3.5vw; text-align: center; max-width: 90vw; line-height: 1.6; }
+    #alarmScreen .alarm-body-en { font-size: 2.8vw; color: rgba(255,255,255,0.8); margin-top: 1vh; }
+    #alarmScreen .btn-dismiss { font-size: 4vw; padding: 2vh 8vw; margin-top: 4vh; border-radius: 2vw; }
+
+    /* ===== 管理画面 ===== */
+    #adminScreen { display: none; height: 100vh; overflow-y: auto; background: #f8f9fa; color: #333; }
+    #adminScreen.active { display: block; }
+    .admin-header { background: #1a237e; color: #fff; padding: 12px 16px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; }
+    .booking-card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .booking-card .form-check { margin-bottom: 4px; }
+    .msg-template-card { background: #fff; border: 2px solid #1a237e; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+
+    /* ===== PIN画面 ===== */
+    #pinOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; flex-direction: column; }
+    #pinOverlay.active { display: flex; }
+    #pinOverlay input { font-size: 8vw; text-align: center; width: 60vw; padding: 2vh; border: 2px solid #555; border-radius: 1vw; background: #222; color: #fff; }
+
+    /* ===== 設定画面 ===== */
+    #settingsScreen { display: none; height: 100vh; overflow-y: auto; background: #f8f9fa; color: #333; }
+    #settingsScreen.active { display: block; }
+
+    /* ===== Fully Kiosk用: 設定ボタン ===== */
+    #settingsBtn { position: fixed; bottom: 10px; right: 10px; z-index: 50; opacity: 0.15; font-size: 3vw; }
+    #settingsBtn:hover, #settingsBtn:active { opacity: 1; }
+
+    /* ===== バージョン ===== */
+    #version { position: fixed; bottom: 4px; left: 8px; font-size: 10px; color: rgba(255,255,255,0.2); z-index: 5; }
+  </style>
+</head>
+<body>
+
+<!-- ===== 待機画面（時計） ===== -->
+<div id="clockScreen">
+  <div id="clockTime">--:--</div>
+  <div id="clockDate"></div>
+  <div id="clockInfo"></div>
+</div>
+
+<!-- ===== アラーム画面 ===== -->
+<div id="alarmScreen">
+  <div class="alarm-icon">&#x1F6A8;</div>
+  <div class="alarm-title" id="alarmTitle"></div>
+  <div class="alarm-body" id="alarmBody"></div>
+  <div class="alarm-body-en" id="alarmBodyEn"></div>
+  <button class="btn btn-light btn-dismiss" id="btnDismiss" onclick="dismissAlarm()">
+    <i class="bi bi-check-circle"></i> 確認しました / Acknowledged
+  </button>
+</div>
+
+<!-- ===== 管理画面 ===== -->
+<div id="adminScreen">
+  <div class="admin-header">
+    <span><i class="bi bi-gear"></i> 宿泊管理・メッセージ設定</span>
+    <button class="btn btn-sm btn-outline-light" onclick="closeAdmin()"><i class="bi bi-x-lg"></i> 閉じる</button>
+  </div>
+  <div class="p-3">
+    <!-- タブ -->
+    <ul class="nav nav-tabs mb-3" id="adminTabs">
+      <li class="nav-item"><a class="nav-link active" data-tab="tabBookings" onclick="switchAdminTab(this)">宿泊一覧</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabMessages" onclick="switchAdminTab(this)">メッセージ設定</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabSettings" onclick="switchAdminTab(this)">基本設定</a></li>
+    </ul>
+
+    <!-- 宿泊一覧タブ -->
+    <div id="tabBookings" class="admin-tab-content">
+      <p class="text-muted small">チェックを入れた予約に対して、設定した時間にメッセージが表示されます。</p>
+      <div id="bookingsList">
+        <div class="text-center py-4"><div class="spinner-border text-primary"></div><br>読み込み中...</div>
+      </div>
+    </div>
+
+    <!-- メッセージ設定タブ -->
+    <div id="tabMessages" class="admin-tab-content" style="display:none;">
+      <p class="text-muted small">複数のメッセージを異なる時間帯に設定できます。</p>
+      <div id="messagesList"></div>
+      <button class="btn btn-primary mt-2" onclick="addMessageTemplate()">
+        <i class="bi bi-plus-circle"></i> メッセージを追加
+      </button>
+      <button class="btn btn-success mt-2 ms-2" onclick="saveMessages()">
+        <i class="bi bi-save"></i> 保存
+      </button>
+    </div>
+
+    <!-- 基本設定タブ -->
+    <div id="tabSettings" class="admin-tab-content" style="display:none;">
+      <div class="card p-3 mb-3">
+        <h6>スプレッドシートID</h6>
+        <input type="text" id="settSpreadsheetId" class="form-control form-control-sm" placeholder="スプレッドシートID">
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>チェックアウトアラーム</h6>
+        <div class="row g-2">
+          <div class="col-4">
+            <label class="form-label small">アラーム時刻</label>
+            <input type="time" id="settAlarmTime" class="form-control form-control-sm" value="10:00">
+          </div>
+          <div class="col-8">
+            <label class="form-label small">メッセージ</label>
+            <input type="text" id="settAlarmMessage" class="form-control form-control-sm" value="本日チェックアウトあり！清掃準備をお願いします">
+          </div>
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>PIN（管理画面のロック）</h6>
+        <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
+      </div>
+      <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PIN入力オーバーレイ ===== -->
+<div id="pinOverlay">
+  <div style="color:#fff; font-size:5vw; margin-bottom:2vh;">PIN入力</div>
+  <input type="password" id="pinInput" maxlength="8" placeholder="****" inputmode="numeric" onkeydown="if(event.key==='Enter')submitPin()">
+  <button class="btn btn-primary mt-3" style="font-size:4vw; padding:1.5vh 6vw;" onclick="submitPin()">OK</button>
+</div>
+
+<!-- ===== 設定ボタン（右下、薄表示） ===== -->
+<button id="settingsBtn" class="btn btn-outline-light btn-sm" onclick="openAdmin()">
+  <i class="bi bi-gear"></i>
+</button>
+
+<div id="version">v0323a</div>
+
+<script>
+// ===== GAS通信 =====
+function callGAS(fn, args) {
+  return new Promise(function(resolve, reject) {
+    var runner = google.script.run.withSuccessHandler(function(json) {
+      try { resolve(JSON.parse(json)); } catch(e) { resolve(json); }
+    }).withFailureHandler(reject);
+    if (args && args.length) {
+      runner[fn].apply(runner, args);
+    } else {
+      runner[fn]();
+    }
+  });
+}
+
+// ===== 状態管理 =====
+var _state = {
+  screen: 'clock',       // clock | alarm | admin
+  alarmActive: false,
+  alarmQueue: [],         // 待機中のアラーム
+  currentAlarm: null,     // 現在表示中のアラーム
+  dismissed: {},          // 本日確認済み { alarmId: time }
+  pollTimer: null,
+  clockTimer: null,
+  audioCtx: null,
+  oscillator: null,
+  lastPollData: null,
+  settings: null,
+  bookingFlags: {},       // { rowNumber: { msgId: true/false } }
+  messages: []            // スケジュールメッセージテンプレート
+};
+
+// ===== 初期化 =====
+window.addEventListener('load', function() {
+  startClock();
+  poll();
+  _state.pollTimer = setInterval(poll, 30000);
+});
+
+// ===== 時計 =====
+function startClock() {
+  updateClock();
+  _state.clockTimer = setInterval(updateClock, 1000);
+}
+
+function updateClock() {
+  var now = new Date();
+  var h = String(now.getHours()).padStart(2, '0');
+  var m = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('clockTime').textContent = h + ':' + m;
+
+  var days = ['日', '月', '火', '水', '木', '金', '土'];
+  var ds = (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
+  document.getElementById('clockDate').textContent = ds;
+
+  // アラームチェック（毎秒）
+  if (_state.lastPollData && !_state.alarmActive && _state.screen === 'clock') {
+    checkAlarmTrigger(h + ':' + m);
+  }
+}
+
+// ===== ポーリング =====
+function poll() {
+  callGAS('getTodayCheckouts').then(function(data) {
+    if (data.error) { console.warn('Poll error:', data.error); return; }
+    _state.lastPollData = data;
+    _state.dismissed = data.dismissed || {};
+    updateClockInfo(data);
+  }).catch(function(e) { console.error('Poll failed:', e); });
+}
+
+function updateClockInfo(data) {
+  var info = document.getElementById('clockInfo');
+  var parts = [];
+
+  if (data.checkouts && data.checkouts.length > 0) {
+    parts.push('<span class="badge bg-danger me-2">CO ' + data.checkouts.length + '件</span>');
+  }
+  if (data.nextCheckins && data.nextCheckins.length > 0) {
+    parts.push('<span class="badge bg-success me-2">CI ' + data.nextCheckins.length + '件</span>');
+  }
+  if (data.currentStays && data.currentStays.length > 0) {
+    parts.push('<span class="badge bg-info">宿泊中 ' + data.currentStays.length + '件</span>');
+  }
+
+  if (parts.length === 0) {
+    info.innerHTML = '<span style="color:#4444aa;">本日の予約はありません</span>';
+  } else {
+    info.innerHTML = parts.join(' ');
+  }
+}
+
+// ===== アラーム判定 =====
+function checkAlarmTrigger(nowHHMM) {
+  var data = _state.lastPollData;
+  if (!data) return;
+
+  // 1) チェックアウトアラーム
+  if (data.checkouts && data.checkouts.length > 0 && data.alarmTime) {
+    var coAlarmId = 'checkout_' + data.alarmTime;
+    if (nowHHMM === data.alarmTime && !_state.dismissed[coAlarmId]) {
+      triggerAlarm({
+        id: coAlarmId,
+        type: 'checkout',
+        title: data.alarmMessage || 'チェックアウトあり',
+        body: buildCheckoutBody(data),
+        bodyEn: ''
+      });
+      return;
+    }
+  }
+
+  // 2) スケジュールメッセージ
+  if (data.scheduledMessages && data.bookingMsgFlags) {
+    var hasCheckedBookings = hasAnyCheckedBooking(data.bookingMsgFlags, data.currentStays || []);
+
+    for (var mi = 0; mi < data.scheduledMessages.length; mi++) {
+      var msg = data.scheduledMessages[mi];
+      if (!msg.enabled) continue;
+      if (!msg.times || !msg.times.length) continue;
+      if (!hasCheckedBookings) continue;
+
+      for (var ti = 0; ti < msg.times.length; ti++) {
+        var t = msg.times[ti];
+        var msgAlarmId = msg.id + '_' + t;
+        if (nowHHMM === t && !_state.dismissed[msgAlarmId]) {
+          triggerAlarm({
+            id: msgAlarmId,
+            type: 'message',
+            title: msg.label || 'お知らせ',
+            body: msg.message || '',
+            bodyEn: msg.messageEn || ''
+          });
+          return;
+        }
+      }
+    }
+  }
+}
+
+function hasAnyCheckedBooking(flags, currentStays) {
+  for (var i = 0; i < currentStays.length; i++) {
+    var rn = String(currentStays[i].rowNumber);
+    if (flags[rn]) {
+      var f = flags[rn];
+      for (var k in f) { if (f[k]) return true; }
+    }
+  }
+  return false;
+}
+
+function buildCheckoutBody(data) {
+  var lines = [];
+  for (var i = 0; i < data.checkouts.length; i++) {
+    var co = data.checkouts[i];
+    var l = co.guestName || '(名前なし)';
+    if (co.guestCount) l += '  ' + co.guestCount + '名';
+    if (co.bookingSite) l += '  (' + co.bookingSite + ')';
+    if (co.bbq && co.bbq.indexOf('はい') >= 0) l += '  BBQ有';
+    lines.push(l);
+  }
+
+  if (data.nextCheckins && data.nextCheckins.length > 0) {
+    lines.push('');
+    lines.push('--- 本日チェックイン ---');
+    for (var j = 0; j < data.nextCheckins.length; j++) {
+      var ci = data.nextCheckins[j];
+      var cl = (ci.guestName || '(名前なし)');
+      if (ci.guestCount) cl += '  ' + ci.guestCount + '名';
+      if (ci.bbq && ci.bbq.indexOf('はい') >= 0) cl += '  BBQ有';
+      lines.push(cl);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ===== アラーム表示 =====
+function triggerAlarm(alarm) {
+  _state.alarmActive = true;
+  _state.currentAlarm = alarm;
+
+  var screen = document.getElementById('alarmScreen');
+  screen.className = alarm.type === 'checkout' ? 'active alarm-checkout' : 'active alarm-message';
+  document.getElementById('alarmTitle').textContent = alarm.title;
+  document.getElementById('alarmBody').textContent = alarm.body;
+  document.getElementById('alarmBodyEn').textContent = alarm.bodyEn;
+
+  document.getElementById('clockScreen').style.display = 'none';
+  screen.style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = 'none';
+
+  startAlarmSound(alarm.type);
+}
+
+function dismissAlarm() {
+  if (!_state.currentAlarm) return;
+
+  stopAlarmSound();
+
+  // サーバーに確認記録
+  callGAS('recordAlarmDismiss', [_state.currentAlarm.id]).catch(function() {});
+  _state.dismissed[_state.currentAlarm.id] = true;
+
+  _state.alarmActive = false;
+  _state.currentAlarm = null;
+
+  document.getElementById('alarmScreen').style.display = 'none';
+  document.getElementById('alarmScreen').className = '';
+  document.getElementById('clockScreen').style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = '';
+}
+
+// ===== アラーム音（Web Audio API） =====
+function startAlarmSound(type) {
+  try {
+    if (!_state.audioCtx) _state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = _state.audioCtx;
+
+    if (type === 'checkout') {
+      // 緊急アラーム: 高低交互
+      playAlarmPattern(ctx, [880, 660], 0.3, true);
+    } else {
+      // メッセージアラーム: チャイム風
+      playAlarmPattern(ctx, [523, 659, 784], 0.5, true);
+    }
+  } catch(e) { console.error('Audio error:', e); }
+}
+
+function playAlarmPattern(ctx, freqs, interval, loop) {
+  var idx = 0;
+  function beep() {
+    if (!_state.alarmActive) return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freqs[idx % freqs.length];
+    gain.gain.value = 0.5;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + interval * 0.8);
+    osc.stop(ctx.currentTime + interval);
+    idx++;
+    if (loop && _state.alarmActive) {
+      _state._alarmBeepTimer = setTimeout(beep, interval * 1000);
+    }
+  }
+  beep();
+}
+
+function stopAlarmSound() {
+  if (_state._alarmBeepTimer) {
+    clearTimeout(_state._alarmBeepTimer);
+    _state._alarmBeepTimer = null;
+  }
+}
+
+// ===== 管理画面 =====
+function openAdmin() {
+  document.getElementById('pinOverlay').classList.add('active');
+  var inp = document.getElementById('pinInput');
+  inp.value = '';
+  setTimeout(function() { inp.focus(); }, 100);
+}
+
+function submitPin() {
+  var pin = document.getElementById('pinInput').value;
+  callGAS('verifyPin', [pin]).then(function(res) {
+    if (res.ok) {
+      document.getElementById('pinOverlay').classList.remove('active');
+      showAdmin();
+    } else {
+      alert('PINが正しくありません');
+      document.getElementById('pinInput').value = '';
+    }
+  });
+}
+
+function showAdmin() {
+  _state.screen = 'admin';
+  document.getElementById('clockScreen').style.display = 'none';
+  document.getElementById('adminScreen').classList.add('active');
+  document.getElementById('settingsBtn').style.display = 'none';
+  loadAdminData();
+}
+
+function closeAdmin() {
+  _state.screen = 'clock';
+  document.getElementById('adminScreen').classList.remove('active');
+  document.getElementById('clockScreen').style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = '';
+}
+
+function switchAdminTab(el) {
+  var tabId = el.getAttribute('data-tab');
+  document.querySelectorAll('.admin-tab-content').forEach(function(d) { d.style.display = 'none'; });
+  document.querySelectorAll('#adminTabs .nav-link').forEach(function(a) { a.classList.remove('active'); });
+  document.getElementById(tabId).style.display = '';
+  el.classList.add('active');
+}
+
+// ===== 管理画面: データ読み込み =====
+function loadAdminData() {
+  // 宿泊一覧
+  callGAS('getActiveBookings').then(function(data) {
+    if (data.error) { document.getElementById('bookingsList').innerHTML = '<div class="alert alert-danger">' + data.error + '</div>'; return; }
+    _state.bookingFlags = data.bookingMsgFlags || {};
+    _state.messages = data.scheduledMessages || [];
+    renderBookings(data.bookings || []);
+    renderMessages();
+  });
+
+  // 設定
+  callGAS('getAlarmSettings').then(function(s) {
+    _state.settings = s;
+    document.getElementById('settSpreadsheetId').value = s.spreadsheetId || '';
+    document.getElementById('settAlarmTime').value = s.alarmTime || '10:00';
+    document.getElementById('settAlarmMessage').value = s.alarmMessage || '';
+    document.getElementById('settPin').value = s.pin || '1234';
+  });
+}
+
+// ===== 宿泊一覧レンダリング =====
+function renderBookings(bookings) {
+  var el = document.getElementById('bookingsList');
+  if (bookings.length === 0) {
+    el.innerHTML = '<div class="text-muted text-center py-3">現在宿泊中の予約はありません</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < bookings.length; i++) {
+    var b = bookings[i];
+    var rn = String(b.rowNumber);
+    html += '<div class="booking-card">';
+    html += '<div class="d-flex justify-content-between align-items-start mb-1">';
+    html += '<strong>' + esc(b.guestName || '(名前なし)') + '</strong>';
+    html += '<span class="badge bg-secondary">' + esc(b.bookingSite || '') + '</span>';
+    html += '</div>';
+    html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut) + ' / ' + esc(b.guestCount || '?') + '名';
+    if (b.bbq && b.bbq.indexOf('はい') >= 0) html += ' / <span class="text-danger">BBQ</span>';
+    html += '</div>';
+
+    // メッセージチェックボックス
+    if (_state.messages.length > 0) {
+      html += '<div class="mt-2">';
+      for (var mi = 0; mi < _state.messages.length; mi++) {
+        var msg = _state.messages[mi];
+        var checked = _state.bookingFlags[rn] && _state.bookingFlags[rn][msg.id] ? ' checked' : '';
+        html += '<div class="form-check form-check-inline">';
+        html += '<input class="form-check-input" type="checkbox" id="bf_' + rn + '_' + msg.id + '"' + checked;
+        html += ' onchange="toggleBookingFlag(\'' + rn + '\',\'' + msg.id + '\',this.checked)">';
+        html += '<label class="form-check-label small" for="bf_' + rn + '_' + msg.id + '">' + esc(msg.label) + '</label>';
+        html += '</div>';
+      }
+      html += '</div>';
+    } else {
+      html += '<div class="mt-1 text-muted small"><i class="bi bi-info-circle"></i> メッセージ設定タブでメッセージを追加してください</div>';
+    }
+
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function toggleBookingFlag(rowNumber, msgId, checked) {
+  if (!_state.bookingFlags[rowNumber]) _state.bookingFlags[rowNumber] = {};
+  _state.bookingFlags[rowNumber][msgId] = checked;
+  callGAS('saveBookingMessageFlags', [_state.bookingFlags]).catch(function(e) { console.error(e); });
+}
+
+// ===== メッセージテンプレート =====
+function renderMessages() {
+  var el = document.getElementById('messagesList');
+  if (_state.messages.length === 0) {
+    el.innerHTML = '<div class="text-muted text-center py-2">メッセージが設定されていません</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < _state.messages.length; i++) {
+    var m = _state.messages[i];
+    html += '<div class="msg-template-card" data-idx="' + i + '">';
+    html += '<div class="d-flex justify-content-between align-items-center mb-2">';
+    html += '<div class="form-check form-switch">';
+    html += '<input class="form-check-input" type="checkbox" id="msgEn_' + i + '"' + (m.enabled ? ' checked' : '') + ' onchange="updateMsg(' + i + ',\'enabled\',this.checked)">';
+    html += '<label class="form-check-label fw-bold" for="msgEn_' + i + '">有効</label>';
+    html += '</div>';
+    html += '<button class="btn btn-sm btn-outline-danger" onclick="deleteMsg(' + i + ')"><i class="bi bi-trash"></i></button>';
+    html += '</div>';
+
+    html += '<div class="mb-2"><label class="form-label small mb-0">ラベル名</label>';
+    html += '<input class="form-control form-control-sm" value="' + esc(m.label || '') + '" onchange="updateMsg(' + i + ',\'label\',this.value)"></div>';
+
+    html += '<div class="mb-2"><label class="form-label small mb-0">メッセージ（日本語）</label>';
+    html += '<textarea class="form-control form-control-sm" rows="2" onchange="updateMsg(' + i + ',\'message\',this.value)">' + esc(m.message || '') + '</textarea></div>';
+
+    html += '<div class="mb-2"><label class="form-label small mb-0">メッセージ（英語）</label>';
+    html += '<textarea class="form-control form-control-sm" rows="2" onchange="updateMsg(' + i + ',\'messageEn\',this.value)">' + esc(m.messageEn || '') + '</textarea></div>';
+
+    html += '<div class="mb-0"><label class="form-label small mb-0">配信時刻（複数可: Enterで追加）</label>';
+    html += '<div class="d-flex flex-wrap gap-1 mb-1" id="msgTimes_' + i + '">';
+    if (m.times) {
+      for (var ti = 0; ti < m.times.length; ti++) {
+        html += '<span class="badge bg-primary">' + esc(m.times[ti]) + ' <i class="bi bi-x" style="cursor:pointer" onclick="removeTime(' + i + ',' + ti + ')"></i></span>';
+      }
+    }
+    html += '</div>';
+    html += '<div class="input-group input-group-sm" style="width:200px;">';
+    html += '<input type="time" class="form-control" id="msgTimeInput_' + i + '">';
+    html += '<button class="btn btn-outline-primary" onclick="addTime(' + i + ')"><i class="bi bi-plus"></i></button>';
+    html += '</div></div>';
+
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function addMessageTemplate() {
+  var id = 'msg_' + Date.now();
+  _state.messages.push({
+    id: id,
+    label: '静音時間のお知らせ',
+    message: 'まもなく静音時間です。22時以降は大きな音や声を控えていただくようお願いいたします。',
+    messageEn: 'Quiet hours are approaching. Please keep noise to a minimum after 10 PM.',
+    times: ['21:30'],
+    enabled: true
+  });
+  renderMessages();
+}
+
+function deleteMsg(idx) {
+  if (!confirm('このメッセージを削除しますか？')) return;
+  _state.messages.splice(idx, 1);
+  renderMessages();
+}
+
+function updateMsg(idx, key, val) {
+  _state.messages[idx][key] = val;
+}
+
+function addTime(idx) {
+  var inp = document.getElementById('msgTimeInput_' + idx);
+  if (!inp.value) return;
+  if (!_state.messages[idx].times) _state.messages[idx].times = [];
+  _state.messages[idx].times.push(inp.value);
+  _state.messages[idx].times.sort();
+  inp.value = '';
+  renderMessages();
+}
+
+function removeTime(msgIdx, timeIdx) {
+  _state.messages[msgIdx].times.splice(timeIdx, 1);
+  renderMessages();
+}
+
+function saveMessages() {
+  callGAS('saveScheduledMessages', [_state.messages]).then(function() {
+    alert('メッセージ設定を保存しました');
+  }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+// ===== 基本設定保存 =====
+function saveSettings() {
+  var s = {
+    spreadsheetId: document.getElementById('settSpreadsheetId').value.trim(),
+    alarmTime: document.getElementById('settAlarmTime').value,
+    alarmMessage: document.getElementById('settAlarmMessage').value,
+    pin: document.getElementById('settPin').value
+  };
+  callGAS('saveAlarmSettings', [s]).then(function() {
+    alert('設定を保存しました');
+  }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+// ===== ユーティリティ =====
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ===== テスト用: 手動アラームトリガー（コンソールから使用） =====
+function testCheckoutAlarm() {
+  triggerAlarm({
+    id: 'test_checkout',
+    type: 'checkout',
+    title: 'テスト: チェックアウトアラーム',
+    body: 'テスト太郎  2名  (Airbnb)',
+    bodyEn: ''
+  });
+}
+
+function testMessageAlarm() {
+  triggerAlarm({
+    id: 'test_message',
+    type: 'message',
+    title: '静音時間のお知らせ',
+    body: 'まもなく静音時間です。22時以降は大きな音や声を控えていただくようお願いいたします。',
+    bodyEn: 'Quiet hours are approaching. Please keep noise to a minimum after 10 PM.'
+  });
+}
+</script>
+</body>
+</html>

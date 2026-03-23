@@ -1,0 +1,6 @@
+deploy-alarm.js
+node_modules/**
+*.md
+*.bat
+*.json
+!appsscript.json

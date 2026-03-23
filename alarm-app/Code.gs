@@ -260,8 +260,12 @@ function getTodayCheckouts() {
       }
     }
 
+    // 重複排除（CI一致でマージ、実名優先）
+    checkouts = deduplicateBookings_(checkouts);
+    currentStays = deduplicateBookings_(currentStays);
+
     // 次のチェックイン情報
-    var nextCheckins = getNextCheckins_(data, colMap, todayStr);
+    var nextCheckins = deduplicateBookings_(getNextCheckins_(data, colMap, todayStr));
 
     // アラーム設定
     var props = PropertiesService.getScriptProperties();
@@ -373,6 +377,9 @@ function getActiveBookings() {
       });
     }
 
+    // 重複排除（CI一致でマージ、実名優先）
+    bookings = deduplicateBookings_(bookings);
+
     // メッセージ配信フラグ
     var props = PropertiesService.getScriptProperties();
     var flagsJson = props.getProperty('BOOKING_MSG_FLAGS') || '{}';
@@ -393,6 +400,63 @@ function getActiveBookings() {
   } catch (e) {
     return JSON.stringify({ error: '[getActiveBookings] ' + e.message + ' | ssId=' + ssId + ' | stack=' + (e.stack || 'なし'), bookings: [] });
   }
+}
+
+// ===== 重複排除 =====
+
+/**
+ * プレースホルダ名かどうか判定（メインアプリのisPlaceholderNameと同じロジック）
+ */
+function isPlaceholderName_(name) {
+  if (!name) return true;
+  return /^(Not available|Reserved|CLOSED|Blocked|Airbnb(予約)?|Booking\.com(予約)?|Rakuten|楽天)$/i.test(String(name).trim());
+}
+
+/**
+ * 予約配列の重複排除（CI一致でマージ、実名優先）
+ * メインアプリのbuildCalendarEventsと同じロジック
+ */
+function deduplicateBookings_(bookings) {
+  var merged = [];
+  var ciKeyMap = {}; // checkIn → merged配列のindex
+
+  for (var i = 0; i < bookings.length; i++) {
+    var b = bookings[i];
+    var ci = b.checkIn;
+    if (!ci) { merged.push(b); continue; }
+
+    if (ciKeyMap[ci] !== undefined) {
+      var existing = merged[ciKeyMap[ci]];
+      // guestName: プレースホルダ名より実名を優先
+      if (isPlaceholderName_(existing.guestName) && !isPlaceholderName_(b.guestName)) {
+        existing.guestName = b.guestName;
+      }
+      // 各フィールド: 空の値を補完
+      var fields = ['guestCount', 'bookingSite', 'cleaningStaff', 'bbq'];
+      for (var f = 0; f < fields.length; f++) {
+        if (!existing[fields[f]] && b[fields[f]]) existing[fields[f]] = b[fields[f]];
+      }
+      // CO不一致時: より後の日付（有効な方）を採用
+      if (b.checkOut && existing.checkOut && b.checkOut !== existing.checkOut) {
+        var eCoValid = existing.checkOut > ci;
+        var bCoValid = b.checkOut > ci;
+        if (!eCoValid && bCoValid) {
+          existing.checkOut = b.checkOut;
+        } else if (eCoValid && bCoValid && b.checkOut > existing.checkOut) {
+          existing.checkOut = b.checkOut;
+        }
+      } else if (!existing.checkOut && b.checkOut) {
+        existing.checkOut = b.checkOut;
+      }
+      // checkOutTime補完
+      if (!existing.checkOutTime && b.checkOutTime) existing.checkOutTime = b.checkOutTime;
+      continue;
+    }
+
+    ciKeyMap[ci] = merged.length;
+    merged.push(b);
+  }
+  return merged;
 }
 
 // ===== 内部ヘルパー =====

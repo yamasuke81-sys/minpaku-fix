@@ -87,6 +87,41 @@ function verifyPin(pin) {
   return JSON.stringify({ ok: pin === stored });
 }
 
+/**
+ * 診断用関数 — GASエディタで手動実行してログを確認
+ * Script Properties、スコープ、スプレッドシートアクセスをチェック
+ */
+function diagAlarmSetup() {
+  var props = PropertiesService.getScriptProperties();
+  var ssId = props.getProperty('SPREADSHEET_ID');
+  Logger.log('=== アラームアプリ診断 ===');
+  Logger.log('SPREADSHEET_ID: ' + (ssId || '(未設定)'));
+  Logger.log('SPREADSHEET_ID length: ' + (ssId ? ssId.length : 0));
+  Logger.log('ALARM_PIN: ' + (props.getProperty('ALARM_PIN') || '(未設定→デフォルト1234)'));
+  Logger.log('ALARM_TIMES: ' + (props.getProperty('ALARM_TIMES') || '(未設定)'));
+
+  if (!ssId) {
+    Logger.log('★ エラー: SPREADSHEET_IDが設定されていません！');
+    Logger.log('★ 対処: GASエディタ左サイドバー「プロジェクトの設定」→「スクリプト プロパティ」で SPREADSHEET_ID を追加してください');
+    return;
+  }
+
+  try {
+    var ss = SpreadsheetApp.openById(ssId);
+    Logger.log('✅ SpreadsheetApp.openById 成功: ' + ss.getName());
+    var sheet = ss.getSheetByName('フォームの回答 1');
+    if (sheet) {
+      Logger.log('✅ シート「フォームの回答 1」発見: ' + sheet.getLastRow() + '行');
+    } else {
+      Logger.log('★ シート「フォームの回答 1」が見つかりません');
+    }
+  } catch (e) {
+    Logger.log('★ SpreadsheetApp.openById エラー: ' + e.message);
+    Logger.log('★ スタック: ' + e.stack);
+    Logger.log('★ 対処: 権限の再承認が必要です。https://myaccount.google.com/permissions でこのアプリのアクセス権を一旦削除してから、この関数を再実行してください');
+  }
+}
+
 // ===== スケジュールメッセージ管理 =====
 
 /**
@@ -150,10 +185,12 @@ function recordAlarmDismiss(alarmId) {
  */
 function getTodayCheckouts() {
   var ssId = getSpreadsheetId_();
-  if (!ssId) return JSON.stringify({ error: 'SPREADSHEET_ID未設定', checkouts: [] });
+  if (!ssId) return JSON.stringify({ error: 'SPREADSHEET_ID未設定。管理画面→基本設定でスプレッドシートIDを設定してください', checkouts: [], debug: { ssId: ssId, hasProps: !!PropertiesService.getScriptProperties() } });
 
   try {
+    Logger.log('[DEBUG-ALARM] ssId=' + ssId + ', length=' + ssId.length);
     var ss = SpreadsheetApp.openById(ssId);
+    Logger.log('[DEBUG-ALARM] openById success');
     var sheet = ss.getSheetByName('フォームの回答 1');
     if (!sheet) return JSON.stringify({ error: 'シートが見つかりません', checkouts: [] });
 
@@ -275,7 +312,7 @@ function getTodayCheckouts() {
     });
 
   } catch (e) {
-    return JSON.stringify({ error: e.message, checkouts: [] });
+    return JSON.stringify({ error: '[getTodayCheckouts] ' + e.message + ' | ssId=' + ssId + ' | stack=' + (e.stack || 'なし'), checkouts: [] });
   }
 }
 
@@ -284,9 +321,10 @@ function getTodayCheckouts() {
  */
 function getActiveBookings() {
   var ssId = getSpreadsheetId_();
-  if (!ssId) return JSON.stringify({ error: 'SPREADSHEET_ID未設定', bookings: [] });
+  if (!ssId) return JSON.stringify({ error: 'SPREADSHEET_ID未設定。管理画面→基本設定でスプレッドシートIDを設定してください', bookings: [] });
 
   try {
+    Logger.log('[DEBUG-ALARM] getActiveBookings ssId=' + ssId);
     var ss = SpreadsheetApp.openById(ssId);
     var sheet = ss.getSheetByName('フォームの回答 1');
     if (!sheet) return JSON.stringify({ error: 'シートが見つかりません', bookings: [] });
@@ -353,7 +391,7 @@ function getActiveBookings() {
     });
 
   } catch (e) {
-    return JSON.stringify({ error: e.message, bookings: [] });
+    return JSON.stringify({ error: '[getActiveBookings] ' + e.message + ' | ssId=' + ssId + ' | stack=' + (e.stack || 'なし'), bookings: [] });
   }
 }
 

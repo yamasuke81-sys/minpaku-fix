@@ -21,8 +21,8 @@
     /* ===== アラーム画面 ===== */
     #alarmScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; }
     #alarmScreen.active { display: flex; }
-    #alarmScreen.alarm-checkout { background: #b71c1c; }
-    #alarmScreen.alarm-message { background: #e65100; }
+    #alarmScreen.alarm-checkout { background: linear-gradient(180deg, #87CEEB 0%, #FFE4B5 30%, #FFA07A 60%, #4682B4 100%); color: #2c3e50; }
+    #alarmScreen.alarm-message { background: linear-gradient(180deg, #B0E0E6 0%, #87CEEB 50%, #4682B4 100%); color: #1a3a5c; }
 
     /* ===== 騒音クレームアラーム画面 ===== */
     #complaintScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; background: #d50000; }
@@ -43,11 +43,17 @@
 
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
     @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
-    #alarmScreen .alarm-icon { font-size: 15vw; animation: shake 0.5s infinite; }
-    #alarmScreen .alarm-title { font-size: 6vw; font-weight: bold; animation: pulse 1s infinite; margin: 2vh 0; text-align: center; }
+    #alarmScreen .alarm-icon { font-size: 15vw; animation: gentleBob 3s ease-in-out infinite; }
+    #alarmScreen .alarm-title { font-size: 6vw; font-weight: 600; margin: 2vh 0; text-align: center; text-shadow: 0 1px 4px rgba(255,255,255,0.5); }
     #alarmScreen .alarm-body { font-size: 3.5vw; text-align: center; max-width: 90vw; line-height: 1.6; white-space: pre-line; }
-    #alarmScreen .alarm-body-en { font-size: 2.8vw; color: rgba(255,255,255,0.8); margin-top: 1vh; }
-    #alarmScreen .btn-dismiss { font-size: 4vw; padding: 2vh 8vw; margin-top: 4vh; border-radius: 2vw; }
+    #alarmScreen .alarm-body-en { font-size: 2.8vw; color: rgba(44,62,80,0.6); margin-top: 1vh; }
+    #alarmScreen .btn-dismiss { font-size: 4vw; padding: 2vh 8vw; margin-top: 4vh; border-radius: 2vw; background: rgba(255,255,255,0.85); color: #2c6e8a; border: 2px solid rgba(70,130,180,0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    #alarmScreen .btn-dismiss:hover, #alarmScreen .btn-dismiss:active { background: #fff; border-color: #4682B4; }
+    @keyframes gentleBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    /* 波のSVGオーバーレイ */
+    #alarmScreen .wave-bg { position: absolute; bottom: 0; left: 0; width: 100%; height: 30vh; pointer-events: none; overflow: hidden; }
+    #alarmScreen .wave-bg svg { position: absolute; bottom: 0; width: 200%; animation: waveScroll 8s linear infinite; }
+    @keyframes waveScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 
     /* ===== 管理画面 ===== */
     #adminScreen { display: none; height: 100vh; overflow-y: auto; background: #f8f9fa; color: #333; }
@@ -86,14 +92,20 @@
 </div>
 
 <!-- ===== アラーム画面 ===== -->
-<div id="alarmScreen">
-  <div class="alarm-icon">&#x1F6A8;</div>
+<div id="alarmScreen" style="position:relative; overflow:hidden;">
+  <div class="alarm-icon" id="alarmIcon">&#x1F305;</div>
   <div class="alarm-title" id="alarmTitle"></div>
   <div class="alarm-body" id="alarmBody"></div>
   <div class="alarm-body-en" id="alarmBodyEn"></div>
-  <button class="btn btn-light btn-dismiss" id="btnDismiss" onclick="dismissAlarm()">
+  <button class="btn btn-dismiss" id="btnDismiss" onclick="dismissAlarm()">
     <i class="bi bi-check-circle"></i> 確認しました / Acknowledged
   </button>
+  <div class="wave-bg">
+    <svg viewBox="0 0 1440 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="height:100%;">
+      <path d="M0,80 C180,140 360,20 540,80 C720,140 900,20 1080,80 C1260,140 1440,20 1440,80 L1440,200 L0,200Z" fill="rgba(70,130,180,0.15)"/>
+      <path d="M0,120 C200,160 400,60 600,120 C800,160 1000,60 1200,120 C1400,160 1440,100 1440,120 L1440,200 L0,200Z" fill="rgba(70,130,180,0.1)"/>
+    </svg>
+  </div>
 </div>
 
 <!-- ===== 騒音クレームアラーム画面 ===== -->
@@ -211,9 +223,10 @@ You may be asked to leave immediately.</textarea>
         </div>
         <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('complaint')"><i class="bi bi-volume-up"></i> 試聴</button>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-success" onclick="saveComplaintSettings()"><i class="bi bi-save"></i> 保存</button>
         <button class="btn btn-outline-danger" onclick="testComplaintAlarm()"><i class="bi bi-bell"></i> テスト発報</button>
+        <button class="btn btn-outline-warning" onclick="previewComplaintScreen()"><i class="bi bi-eye"></i> 画面確認</button>
       </div>
       <div class="mt-3 pt-2 border-top">
         <div class="d-flex align-items-center flex-wrap gap-2">
@@ -235,6 +248,9 @@ You may be asked to leave immediately.</textarea>
       </button>
       <button class="btn btn-success mt-2 ms-2" onclick="saveMessages()">
         <i class="bi bi-save"></i> 保存
+      </button>
+      <button class="btn btn-outline-warning mt-2 ms-2" onclick="previewMessageScreen()">
+        <i class="bi bi-eye"></i> 画面確認
       </button>
       <div class="card p-3 mt-3">
         <h6><i class="bi bi-volume-up"></i> メッセージ共通の音設定</h6>
@@ -305,7 +321,10 @@ Thank you for your stay.</textarea>
         </div>
         <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('checkout')"><i class="bi bi-volume-up"></i> 試聴</button>
       </div>
-      <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
+        <button class="btn btn-outline-warning" onclick="previewCheckoutScreen()"><i class="bi bi-eye"></i> 画面確認</button>
+      </div>
       <div class="mt-3 pt-2 border-top">
         <div class="d-flex align-items-center flex-wrap gap-2">
           <span class="small fw-bold">テスト送信:</span>
@@ -378,7 +397,7 @@ Thank you for your stay.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323o</div>
+<div id="version">v0323p</div>
 
 <script>
 // ===== GAS通信 =====
@@ -599,6 +618,8 @@ function triggerAlarm(alarm) {
 
   var screen = document.getElementById('alarmScreen');
   screen.className = alarm.type === 'checkout' ? 'active alarm-checkout' : 'active alarm-message';
+  // チェックアウト: 朝日 🌅、メッセージ: 月と星 🌙
+  document.getElementById('alarmIcon').innerHTML = alarm.type === 'checkout' ? '&#x1F305;' : '&#x1F319;';
   document.getElementById('alarmTitle').textContent = alarm.title;
   document.getElementById('alarmBody').textContent = alarm.body;
   document.getElementById('alarmBodyEn').textContent = alarm.bodyEn || '';
@@ -615,8 +636,12 @@ function dismissAlarm() {
 
   stopAlarmSound();
 
-  // サーバーに確認記録
-  callGAS('recordAlarmDismiss', [_state.currentAlarm.id]).catch(function() {});
+  var isPreview = _state.currentAlarm.id && _state.currentAlarm.id.indexOf('preview_') === 0;
+
+  if (!isPreview) {
+    // サーバーに確認記録
+    callGAS('recordAlarmDismiss', [_state.currentAlarm.id]).catch(function() {});
+  }
   _state.dismissed[_state.currentAlarm.id] = true;
 
   _state.alarmActive = false;
@@ -624,8 +649,16 @@ function dismissAlarm() {
 
   document.getElementById('alarmScreen').style.display = 'none';
   document.getElementById('alarmScreen').className = '';
-  document.getElementById('clockScreen').style.display = 'flex';
-  document.getElementById('settingsBtn').style.display = '';
+
+  if (isPreview) {
+    // プレビューの場合は管理画面に戻る
+    document.getElementById('adminScreen').style.display = 'block';
+    document.getElementById('adminScreen').className = 'active';
+    document.getElementById('settingsBtn').style.display = '';
+  } else {
+    document.getElementById('clockScreen').style.display = 'flex';
+    document.getElementById('settingsBtn').style.display = '';
+  }
 }
 
 // ===== アラーム音（Web Audio API） =====
@@ -1219,17 +1252,28 @@ function onHoldComplete() {
 
 function confirmDismissComplaint() {
   stopComplaintAlarmSound();
+  var isPreview = _state._complaintPreview;
   _state.complaintActive = false;
+  _state._complaintPreview = false;
 
-  // サーバーに停止を記録（→オーナー+近隣住民に通知される）
-  callGAS('dismissComplaintAlarm').catch(function() {});
+  if (!isPreview) {
+    // サーバーに停止を記録（→オーナー+近隣住民に通知される）
+    callGAS('dismissComplaintAlarm').catch(function() {});
+  }
 
-  // 画面を時計に戻す
+  // 画面を戻す
   document.getElementById('complaintScreen').classList.remove('active');
   document.getElementById('complaintScreen').style.display = 'none';
-  _state.screen = 'clock';
-  document.getElementById('clockScreen').style.display = 'flex';
   document.getElementById('settingsBtn').style.display = '';
+
+  if (isPreview) {
+    // プレビューの場合は管理画面に戻る
+    document.getElementById('adminScreen').style.display = 'block';
+    document.getElementById('adminScreen').className = 'active';
+  } else {
+    _state.screen = 'clock';
+    document.getElementById('clockScreen').style.display = 'flex';
+  }
 }
 
 // === 騒音クレームアラーム音 ===
@@ -1371,6 +1415,79 @@ function sendTestComplaint() {
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
       alert('テスト送信エラー: ' + e.message);
     });
+}
+
+// ===== 画面確認プレビュー =====
+function previewCheckoutScreen() {
+  var msgJa = (document.getElementById('settAlarmMessage') || {}).value || 'チェックアウトの時間です。';
+  var msgEn = (document.getElementById('settAlarmMessageEn') || {}).value || 'It is checkout time.';
+  var vol = parseInt((document.getElementById('settCheckoutVolume') || {}).value || '80') / 100;
+  var snd = (document.getElementById('settCheckoutSound') || {}).value || 'chime';
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('adminScreen').className = '';
+  triggerAlarm({
+    id: 'preview_checkout',
+    type: 'checkout',
+    title: 'Check-out Time',
+    body: msgJa,
+    bodyEn: msgEn,
+    volume: vol * 100,
+    sound: snd
+  });
+}
+
+function previewMessageScreen() {
+  // 最初のメッセージテンプレートの値を取得
+  var label = '静音時間のお知らせ';
+  var msgJa = 'まもなく静音時間です。22時以降は大きな音や声を控えていただくようお願いいたします。';
+  var msgEn = 'Quiet hours are approaching. Please keep noise to a minimum after 10 PM.';
+  var cards = document.querySelectorAll('#messagesList .msg-template-card');
+  if (cards.length > 0) {
+    var c = cards[0];
+    var labelEl = c.querySelector('input[type="text"]');
+    var textareas = c.querySelectorAll('textarea');
+    if (labelEl && labelEl.value) label = labelEl.value;
+    if (textareas[0] && textareas[0].value) msgJa = textareas[0].value;
+    if (textareas[1] && textareas[1].value) msgEn = textareas[1].value;
+  }
+  var vol = parseInt((document.getElementById('settMessageVolume') || {}).value || '60') / 100;
+  var snd = (document.getElementById('settMessageSound') || {}).value || 'chime';
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('adminScreen').className = '';
+  triggerAlarm({
+    id: 'preview_message',
+    type: 'message',
+    title: label,
+    body: msgJa,
+    bodyEn: msgEn,
+    volume: vol * 100,
+    sound: snd
+  });
+}
+
+function previewComplaintScreen() {
+  var msgJa = (document.getElementById('compWarningJa') || {}).value || '近隣の方から騒音のクレームが入りました。';
+  var msgEn = (document.getElementById('compWarningEn') || {}).value || 'A noise complaint has been received.';
+  var vol = parseInt((document.getElementById('settComplaintVolume') || {}).value || '100') / 100;
+  var snd = (document.getElementById('settComplaintSound') || {}).value || 'alarm';
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('adminScreen').className = '';
+  // 騒音クレームは専用画面
+  _state.complaintActive = true;
+  _state._complaintWarningJa = msgJa;
+  _state._complaintWarningEn = msgEn;
+  document.getElementById('complaintBodyJa').textContent = msgJa;
+  document.getElementById('complaintBodyEn').textContent = msgEn;
+  document.getElementById('clockScreen').style.display = 'none';
+  var cs = document.getElementById('complaintScreen');
+  cs.className = 'active';
+  cs.style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = 'none';
+  document.getElementById('btnComplaintConfirm').style.display = 'none';
+  document.getElementById('holdProgressBar').style.width = '0%';
+  document.getElementById('holdInstruction').textContent = '5秒間長押ししてください / Hold for 5 seconds';
+  _state._complaintPreview = true;
+  startAlarmSound(snd, vol);
 }
 
 // ===== テスト用: 手動アラームトリガー（コンソールから使用） =====

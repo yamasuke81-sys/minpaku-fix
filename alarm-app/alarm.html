@@ -194,6 +194,15 @@
           </div>
         </div>
         <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('checkout')"><i class="bi bi-volume-up"></i> 試聴</button>
+        <div class="mt-2 pt-2 border-top">
+          <div class="d-flex align-items-center flex-wrap gap-2">
+            <span class="small fw-bold">テスト送信:</span>
+            <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailCheckout" checked><label class="form-check-label" for="testEmailCheckout">メール</label></div>
+            <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineCheckout"><label class="form-check-label" for="testLineCheckout">LINE</label></div>
+            <button class="btn btn-sm btn-outline-info" onclick="sendTestCheckout()" id="btnTestCheckout"><i class="bi bi-send"></i> 送信</button>
+          </div>
+          <div id="testCheckoutResult" class="small mt-1" style="display:none;"></div>
+        </div>
       </div>
 
       <div class="card p-3 mb-3">
@@ -302,6 +311,15 @@ You may be asked to leave immediately.</textarea>
       <div class="d-flex gap-2">
         <button class="btn btn-success" onclick="saveComplaintSettings()"><i class="bi bi-save"></i> 保存</button>
         <button class="btn btn-outline-danger" onclick="testComplaintAlarm()"><i class="bi bi-bell"></i> テスト発報</button>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <span class="small fw-bold">警告メッセージのテスト送信:</span>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailComplaint" checked><label class="form-check-label" for="testEmailComplaint">メール</label></div>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineComplaint"><label class="form-check-label" for="testLineComplaint">LINE</label></div>
+          <button class="btn btn-sm btn-outline-info" onclick="sendTestComplaint()" id="btnTestComplaint"><i class="bi bi-send"></i> 送信</button>
+        </div>
+        <div id="testComplaintResult" class="small mt-1" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -871,6 +889,17 @@ function renderMessages() {
     html += '<button class="btn btn-outline-primary" onclick="addTime(' + i + ')"><i class="bi bi-plus"></i></button>';
     html += '</div></div>';
 
+    // テスト送信セクション
+    html += '<div class="mt-2 pt-2 border-top">';
+    html += '<div class="d-flex align-items-center flex-wrap gap-2">';
+    html += '<span class="small fw-bold">テスト送信:</span>';
+    html += '<div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmail_' + i + '" checked><label class="form-check-label" for="testEmail_' + i + '">メール</label></div>';
+    html += '<div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLine_' + i + '"><label class="form-check-label" for="testLine_' + i + '">LINE</label></div>';
+    html += '<button class="btn btn-sm btn-outline-info" onclick="sendTestMsg(' + i + ')" id="btnTestMsg_' + i + '"><i class="bi bi-send"></i> 送信</button>';
+    html += '</div>';
+    html += '<div id="testMsgResult_' + i + '" class="small mt-1" style="display:none;"></div>';
+    html += '</div>';
+
     html += '</div>';
   }
   el.innerHTML = html;
@@ -918,6 +947,68 @@ function saveMessages() {
   callGAS('saveScheduledMessages', [_state.messages]).then(function() {
     alert('メッセージ設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+function sendTestCheckout() {
+  var channels = {
+    email: document.getElementById('testEmailCheckout').checked,
+    line: document.getElementById('testLineCheckout').checked
+  };
+  if (!channels.email && !channels.line) { alert('送信先を1つ以上選択してください。'); return; }
+  var btn = document.getElementById('btnTestCheckout');
+  var resEl = document.getElementById('testCheckoutResult');
+  var msg = document.getElementById('settAlarmMessage').value || 'チェックアウトアラーム';
+  var msgEn = document.getElementById('settAlarmMessageEn').value || '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送信中…'; }
+  callGAS('sendTestMessage', [{ label: 'チェックアウトアラーム', message: msg, messageEn: msgEn, channels: channels }])
+    .then(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      if (resEl) {
+        var msgs = [];
+        if (r.results) {
+          if (r.results.email) msgs.push('メール: ' + (r.results.email.success ? '✅ 送信成功' + (r.results.email.to ? ' (' + r.results.email.to + ')' : '') : '❌ ' + r.results.email.error));
+          if (r.results.line) msgs.push('LINE: ' + (r.results.line.success ? '✅ 送信成功' : '❌ ' + r.results.line.error));
+        }
+        resEl.innerHTML = msgs.join('<br>');
+        resEl.style.display = 'block';
+        setTimeout(function() { resEl.style.display = 'none'; }, 8000);
+      }
+    }).catch(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      alert('テスト送信エラー: ' + e.message);
+    });
+}
+
+function sendTestMsg(idx) {
+  var m = _state.messages[idx];
+  if (!m) { alert('メッセージが見つかりません。'); return; }
+  var chEmail = document.getElementById('testEmail_' + idx);
+  var chLine = document.getElementById('testLine_' + idx);
+  var channels = {
+    email: chEmail ? chEmail.checked : false,
+    line: chLine ? chLine.checked : false
+  };
+  if (!channels.email && !channels.line) { alert('送信先を1つ以上選択してください。'); return; }
+  var btn = document.getElementById('btnTestMsg_' + idx);
+  var resEl = document.getElementById('testMsgResult_' + idx);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送信中…'; }
+  callGAS('sendTestMessage', [{ messageId: m.id, label: m.label, message: m.message, messageEn: m.messageEn, channels: channels }])
+    .then(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      if (resEl) {
+        var msgs = [];
+        if (r.results) {
+          if (r.results.email) msgs.push('メール: ' + (r.results.email.success ? '✅ 送信成功' + (r.results.email.to ? ' (' + r.results.email.to + ')' : '') : '❌ ' + r.results.email.error));
+          if (r.results.line) msgs.push('LINE: ' + (r.results.line.success ? '✅ 送信成功' : '❌ ' + r.results.line.error));
+        }
+        resEl.innerHTML = msgs.join('<br>');
+        resEl.style.display = 'block';
+        setTimeout(function() { resEl.style.display = 'none'; }, 8000);
+      }
+    }).catch(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      alert('テスト送信エラー: ' + e.message);
+    });
 }
 
 // ===== 基本設定保存 =====
@@ -1127,6 +1218,36 @@ function testComplaintAlarm() {
   callGAS('testTriggerComplaintAlarm').then(function() {
     alert('テスト発報しました。30秒以内にアラームが表示されます。');
   }).catch(function(e) { alert('エラー: ' + e.message); });
+}
+
+function sendTestComplaint() {
+  var channels = {
+    email: document.getElementById('testEmailComplaint').checked,
+    line: document.getElementById('testLineComplaint').checked
+  };
+  if (!channels.email && !channels.line) { alert('送信先を1つ以上選択してください。'); return; }
+  var btn = document.getElementById('btnTestComplaint');
+  var resEl = document.getElementById('testComplaintResult');
+  var msgJa = document.getElementById('compWarningJa').value || '';
+  var msgEn = document.getElementById('compWarningEn').value || '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送信中…'; }
+  callGAS('sendTestMessage', [{ label: '騒音クレーム警告', message: msgJa, messageEn: msgEn, channels: channels }])
+    .then(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      if (resEl) {
+        var msgs = [];
+        if (r.results) {
+          if (r.results.email) msgs.push('メール: ' + (r.results.email.success ? '✅ 送信成功' + (r.results.email.to ? ' (' + r.results.email.to + ')' : '') : '❌ ' + r.results.email.error));
+          if (r.results.line) msgs.push('LINE: ' + (r.results.line.success ? '✅ 送信成功' : '❌ ' + r.results.line.error));
+        }
+        resEl.innerHTML = msgs.join('<br>');
+        resEl.style.display = 'block';
+        setTimeout(function() { resEl.style.display = 'none'; }, 8000);
+      }
+    }).catch(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      alert('テスト送信エラー: ' + e.message);
+    });
 }
 
 // ===== テスト用: 手動アラームトリガー（コンソールから使用） =====

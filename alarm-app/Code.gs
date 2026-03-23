@@ -638,6 +638,66 @@ function testTriggerComplaintAlarm() {
   });
 }
 
+/**
+ * メッセージのテスト送信
+ * @param {Object} params { messageId, label, message, messageEn, channels: { email, line } }
+ * @return {string} JSON { success, results: { email, line } }
+ */
+function sendTestMessage(params) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var results = {};
+    var subject = '【テスト】アラームアプリ: ' + (params.label || 'メッセージ');
+    var body = '--- テスト送信 ---\n\n'
+      + '■ ラベル: ' + (params.label || '') + '\n'
+      + '■ メッセージ（日本語）:\n' + (params.message || '') + '\n\n'
+      + '■ メッセージ（英語）:\n' + (params.messageEn || '') + '\n\n'
+      + '--- このメールはアラームアプリからのテスト送信です ---';
+
+    // メール送信
+    if (params.channels && params.channels.email) {
+      var ownerEmail = props.getProperty('OWNER_EMAIL') || '';
+      if (!ownerEmail) {
+        results.email = { success: false, error: 'OWNER_EMAILが未設定です。騒音クレーム設定タブでオーナーメールを設定してください。' };
+      } else {
+        try {
+          GmailApp.sendEmail(ownerEmail, subject, body);
+          results.email = { success: true, to: ownerEmail };
+        } catch (e) {
+          results.email = { success: false, error: e.message };
+        }
+      }
+    }
+
+    // LINE送信
+    if (params.channels && params.channels.line) {
+      var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+      var lineGroupId = props.getProperty('LINE_NOTIFY_GROUP_ID') || '';
+      if (!lineToken || !lineGroupId) {
+        results.line = { success: false, error: 'LINE設定が不完全です。騒音クレーム設定タブでトークン・グループIDを設定してください。' };
+      } else {
+        try {
+          UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'post',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineToken },
+            payload: JSON.stringify({
+              to: lineGroupId,
+              messages: [{ type: 'text', text: subject + '\n\n' + body }]
+            })
+          });
+          results.line = { success: true };
+        } catch (e) {
+          results.line = { success: false, error: e.message };
+        }
+      }
+    }
+
+    return JSON.stringify({ success: true, results: results });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 // ===== 内部ヘルパー =====
 
 function buildAlarmColumnMap_(headers) {

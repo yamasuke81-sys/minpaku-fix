@@ -519,6 +519,10 @@ function doPost(e) {
 
       for (var i = 0; i < body.events.length; i++) {
         var ev = body.events[i];
+
+        // LINE ID収集（全イベントからsource情報を記録）
+        collectLineSource_(ev, props);
+
         if (ev.type !== 'message' || ev.message.type !== 'text') continue;
 
         var text = ev.message.text || '';
@@ -798,6 +802,102 @@ function sendTestMessage(params) {
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+// ===== LINE ID収集 =====
+
+/** Webhookイベントからsource情報を収集してScript Propertiesに蓄積 */
+function collectLineSource_(ev, props) {
+  if (!ev || !ev.source) return;
+  var src = ev.source;
+  var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
+
+  var collected = [];
+  try {
+    var raw = props.getProperty('LINE_COLLECTED_SOURCES');
+    if (raw) collected = JSON.parse(raw);
+  } catch (e) { collected = []; }
+
+  // 表示名を取得（Profile API）
+  var displayName = '';
+  if (src.userId) {
+    var token = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+    if (token) {
+      try {
+        if (src.type === 'group' && src.groupId) {
+          var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/group/' + src.groupId + '/member/' + src.userId, {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          displayName = JSON.parse(res.getContentText()).displayName || '';
+        } else {
+          var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + src.userId, {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          displayName = JSON.parse(res.getContentText()).displayName || '';
+        }
+      } catch (e) { /* Profile API失敗は無視 */ }
+    }
+  }
+
+  // グループ名を取得
+  var groupName = '';
+  if (src.type === 'group' && src.groupId) {
+    var token = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+    if (token) {
+      try {
+        var res = UrlFetchApp.fetch('https://api.line.me/v2/bot/group/' + src.groupId + '/summary', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        groupName = JSON.parse(res.getContentText()).groupName || '';
+      } catch (e) { /* 失敗は無視 */ }
+    }
+  }
+
+  var entry = {
+    type: src.type || '',          // 'user', 'group', 'room'
+    userId: src.userId || '',
+    groupId: src.groupId || '',
+    roomId: src.roomId || '',
+    displayName: displayName,
+    groupName: groupName,
+    messageType: ev.type || '',
+    messageText: (ev.message && ev.message.text) ? ev.message.text.substring(0, 50) : '',
+    timestamp: now
+  };
+
+  // 既に同じuserId+groupIdの組み合わせがあれば上書き（最新のtimestampに更新）
+  var found = false;
+  for (var i = 0; i < collected.length; i++) {
+    if (collected[i].userId === entry.userId && collected[i].groupId === entry.groupId) {
+      collected[i] = entry;
+      found = true;
+      break;
+    }
+  }
+  if (!found) collected.push(entry);
+
+  // 最大50件保持
+  if (collected.length > 50) collected = collected.slice(-50);
+
+  props.setProperty('LINE_COLLECTED_SOURCES', JSON.stringify(collected));
+}
+
+/** 収集済みLINE source情報を取得 */
+function getLineCollectedSources() {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty('LINE_COLLECTED_SOURCES') || '[]';
+  try {
+    return JSON.stringify({ sources: JSON.parse(raw) });
+  } catch (e) {
+    return JSON.stringify({ sources: [] });
+  }
+}
+
+/** 収集済みLINE source情報をクリア */
+function clearLineCollectedSources() {
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('LINE_COLLECTED_SOURCES');
+  return JSON.stringify({ success: true });
 }
 
 // ===== 内部ヘルパー =====

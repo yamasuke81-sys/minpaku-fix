@@ -341,6 +341,18 @@ Thank you for your stay.</textarea>
         <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
       </div>
       <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
+
+      <div class="card p-3 mt-4">
+        <h6><i class="bi bi-collection"></i> LINE ID収集（Webhook受信ログ）</h6>
+        <p class="text-muted small">このアプリのWebhook URLにLINEメッセージが届くと、送信者のユーザーIDやグループIDを自動的に記録します。近隣住民グループIDの確認に使えます。</p>
+        <div class="d-flex gap-2 mb-2">
+          <button class="btn btn-sm btn-outline-primary" onclick="loadLineCollected()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="clearLineCollected()"><i class="bi bi-trash"></i> クリア</button>
+        </div>
+        <div id="lineCollectedList" class="small">
+          <span class="text-muted">「更新」を押すと収集データを表示します</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -357,7 +369,7 @@ Thank you for your stay.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323j</div>
+<div id="version">v0323k</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1242,6 +1254,60 @@ function saveComplaintSettings() {
     _complaintWarningEn = s.warningMessageEn;
     alert('騒音クレーム設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+// ===== LINE ID収集 =====
+function loadLineCollected() {
+  var el = document.getElementById('lineCollectedList');
+  el.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div> 読み込み中...</div>';
+  callGAS('getLineCollectedSources').then(function(data) {
+    var sources = data.sources || [];
+    if (sources.length === 0) {
+      el.innerHTML = '<div class="text-muted">まだWebhookを受信していません。<br>近隣住民にLINE公式アカウントへメッセージを送ってもらうと、ここにIDが表示されます。</div>';
+      return;
+    }
+    var html = '<table class="table table-sm table-bordered mb-2"><thead class="table-dark"><tr><th>種別</th><th>表示名</th><th>ユーザーID</th><th>グループID / グループ名</th><th>最終受信</th></tr></thead><tbody>';
+    for (var i = sources.length - 1; i >= 0; i--) {
+      var s = sources[i];
+      html += '<tr>';
+      html += '<td>' + esc(s.type) + '</td>';
+      html += '<td>' + esc(s.displayName || '-') + '</td>';
+      html += '<td class="text-break" style="max-width:200px;font-size:0.75rem;">' + esc(s.userId || '-');
+      if (s.userId) html += ' <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:0.65rem;" onclick="copyText(\'' + esc(s.userId) + '\')">コピー</button>';
+      html += '</td>';
+      html += '<td class="text-break" style="max-width:200px;font-size:0.75rem;">';
+      if (s.groupId) {
+        html += esc(s.groupId) + ' <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:0.65rem;" onclick="copyText(\'' + esc(s.groupId) + '\')">コピー</button>';
+        if (s.groupName) html += '<br><span class="text-muted">' + esc(s.groupName) + '</span>';
+      } else {
+        html += '-';
+      }
+      html += '</td>';
+      html += '<td style="font-size:0.75rem;">' + esc(s.timestamp || '-') + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    html += '<div class="text-muted" style="font-size:0.7rem;">' + sources.length + '件の記録</div>';
+    el.innerHTML = html;
+  }).catch(function(e) { el.innerHTML = '<div class="alert alert-danger small">エラー: ' + e.message + '</div>'; });
+}
+
+function clearLineCollected() {
+  if (!confirm('収集データをすべて削除しますか？')) return;
+  callGAS('clearLineCollectedSources').then(function() {
+    document.getElementById('lineCollectedList').innerHTML = '<span class="text-muted">クリアしました</span>';
+  });
+}
+
+function copyText(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() { alert('コピーしました: ' + text); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    alert('コピーしました: ' + text);
+  }
 }
 
 function testComplaintAlarm() {

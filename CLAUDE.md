@@ -218,7 +218,7 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 
 ## 現在のセッション状態
 - **ブランチ**: `claude/verify-staff-response-display-xm7Nk`
-- **最新コミット**: (次コミットで更新)
+- **最新コミット**: `2e99960`
 - **Code.gs行数**: ~12,864行（ルール8の検証用）
 - **index.html行数**: ~11,223行
 - **checklist-app/Code.gs行数**: ~4,058行
@@ -362,7 +362,7 @@ alarm-app/
 |---|---|
 | `52f1a7a` | fix: v0323a チェックリストアプリの連絡事項入力欄をメインアプリと同じスタイルに改善 |
 | `5bb3d4a` | fix: v0323b チェックリストアプリの連絡事項が初期ロードで表示されない問題を修正 |
-| (次コミット) | feat: v0323c アラームアプリ（alarm-app）骨格作成 + 騒音クレーム自動対応システム設計 |
+| `2e99960` | feat: v0323c アラームアプリ（alarm-app）骨格作成 + 騒音クレーム自動対応システム設計 |
 
 ### 変更ファイルと箇所（セッション21）
 - **alarm-app/Code.gs**: 新規作成 — doGet, getAlarmSettings, saveAlarmSettings, verifyPin, getTodayCheckouts, getActiveBookings, saveScheduledMessages, saveBookingMessageFlags, recordAlarmDismiss

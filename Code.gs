@@ -11358,6 +11358,27 @@ function saveCheckinAppUrl(url) {
   }
 }
 
+/** アラームアプリURLを取得 */
+function getAlarmAppUrl() {
+  try {
+    var url = PropertiesService.getScriptProperties().getProperty('ALARM_APP_URL') || '';
+    if (!url) return JSON.stringify({ success: false, error: 'ALARM_APP_URL が未設定です' });
+    return JSON.stringify({ success: true, url: url });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** アラームアプリURLを保存 */
+function saveAlarmAppUrl(url) {
+  try {
+    PropertiesService.getScriptProperties().setProperty('ALARM_APP_URL', String(url || '').trim());
+    return JSON.stringify({ success: true });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
 /**
  * 清掃詳細モーダルに必要なデータをまとめて取得（3回のAPI呼び出しを1回に統合）
  * @param {string} checkoutDate yyyy-MM-dd

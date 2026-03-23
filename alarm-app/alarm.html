@@ -45,7 +45,7 @@
     @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
     #alarmScreen .alarm-icon { font-size: 15vw; animation: shake 0.5s infinite; }
     #alarmScreen .alarm-title { font-size: 6vw; font-weight: bold; animation: pulse 1s infinite; margin: 2vh 0; text-align: center; }
-    #alarmScreen .alarm-body { font-size: 3.5vw; text-align: center; max-width: 90vw; line-height: 1.6; }
+    #alarmScreen .alarm-body { font-size: 3.5vw; text-align: center; max-width: 90vw; line-height: 1.6; white-space: pre-line; }
     #alarmScreen .alarm-body-en { font-size: 2.8vw; color: rgba(255,255,255,0.8); margin-top: 1vh; }
     #alarmScreen .btn-dismiss { font-size: 4vw; padding: 2vh 8vw; margin-top: 4vh; border-radius: 2vw; }
 
@@ -119,116 +119,71 @@
 <!-- ===== 管理画面 ===== -->
 <div id="adminScreen">
   <div class="admin-header">
-    <span><i class="bi bi-gear"></i> 宿泊管理・メッセージ設定</span>
+    <span><i class="bi bi-gear"></i> アラーム管理</span>
     <button class="btn btn-sm btn-outline-light" onclick="closeAdmin()"><i class="bi bi-x-lg"></i> 閉じる</button>
   </div>
   <div class="p-3">
     <!-- タブ -->
-    <ul class="nav nav-tabs mb-3" id="adminTabs">
+    <ul class="nav nav-tabs mb-3" id="adminTabs" style="font-size:0.85rem;">
       <li class="nav-item"><a class="nav-link active" data-tab="tabBookings" onclick="switchAdminTab(this)">宿泊一覧</a></li>
-      <li class="nav-item"><a class="nav-link" data-tab="tabMessages" onclick="switchAdminTab(this)">メッセージ設定</a></li>
-      <li class="nav-item"><a class="nav-link" data-tab="tabSettings" onclick="switchAdminTab(this)">基本設定</a></li>
       <li class="nav-item"><a class="nav-link" data-tab="tabComplaint" onclick="switchAdminTab(this)">騒音クレーム</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabMessages" onclick="switchAdminTab(this)">静音時間</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabCheckout" onclick="switchAdminTab(this)">チェックアウト</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabSettings" onclick="switchAdminTab(this)">基本設定</a></li>
     </ul>
 
-    <!-- 宿泊一覧タブ -->
+    <!-- ① 宿泊一覧タブ -->
     <div id="tabBookings" class="admin-tab-content">
-      <p class="text-muted small">チェックを入れた予約に対して、設定した時間にメッセージが表示されます。</p>
+      <p class="text-muted small">チェックを入れた予約に対して、静音時間タブで設定したメッセージが表示されます。</p>
       <div id="bookingsList">
         <div class="text-center py-4"><div class="spinner-border text-primary"></div><br>読み込み中...</div>
       </div>
     </div>
 
-    <!-- メッセージ設定タブ -->
-    <div id="tabMessages" class="admin-tab-content" style="display:none;">
-      <p class="text-muted small">複数のメッセージを異なる時間帯に設定できます。</p>
-      <div id="messagesList"></div>
-      <button class="btn btn-primary mt-2" onclick="addMessageTemplate()">
-        <i class="bi bi-plus-circle"></i> メッセージを追加
-      </button>
-      <button class="btn btn-success mt-2 ms-2" onclick="saveMessages()">
-        <i class="bi bi-save"></i> 保存
-      </button>
-    </div>
-
-    <!-- 基本設定タブ -->
-    <div id="tabSettings" class="admin-tab-content" style="display:none;">
+    <!-- ② 騒音クレームタブ -->
+    <div id="tabComplaint" class="admin-tab-content" style="display:none;">
       <div class="card p-3 mb-3">
-        <h6>スプレッドシートID</h6>
-        <input type="text" id="settSpreadsheetId" class="form-control form-control-sm" placeholder="スプレッドシートID">
-      </div>
-
-      <div class="card p-3 mb-3">
-        <h6><i class="bi bi-door-open"></i> チェックアウトアラーム</h6>
+        <h6><i class="bi bi-exclamation-triangle"></i> クレーム検知</h6>
         <div class="mb-2">
-          <label class="form-label small">アラーム時刻（複数設定可）</label>
-          <div class="d-flex flex-wrap gap-1 mb-1" id="settAlarmTimeTags"></div>
-          <div class="input-group input-group-sm" style="width:220px;">
-            <input type="time" class="form-control" id="settAlarmTimeInput" value="10:00">
-            <button class="btn btn-outline-primary" onclick="addCheckoutTime()"><i class="bi bi-plus"></i></button>
-          </div>
-        </div>
-        <div class="mb-2">
-          <label class="form-label small">メッセージ（日本語）</label>
-          <input type="text" id="settAlarmMessage" class="form-control form-control-sm" value="本日チェックアウトあり！清掃準備をお願いします">
-        </div>
-        <div class="mb-2">
-          <label class="form-label small">メッセージ（英語）</label>
-          <input type="text" id="settAlarmMessageEn" class="form-control form-control-sm" value="Checkout today! Please prepare for cleaning.">
-        </div>
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label small">音量 <span id="settCheckoutVolLabel">80</span>%</label>
-            <input type="range" class="form-range" min="0" max="100" step="5" id="settCheckoutVolume" value="80" oninput="document.getElementById('settCheckoutVolLabel').textContent=this.value">
-          </div>
-          <div class="col-6">
-            <label class="form-label small">音の種類</label>
-            <select class="form-select form-select-sm" id="settCheckoutSound">
-              <option value="siren">サイレン（高低交互）</option>
-              <option value="beep">ビープ（短音繰り返し）</option>
-              <option value="chime">チャイム（和音）</option>
-              <option value="alarm">アラーム（ノコギリ波）</option>
-              <option value="bell">ベル（三角波）</option>
-              <option value="hotaru">蛍の光（メロディ）</option>
-            </select>
-          </div>
-        </div>
-        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('checkout')"><i class="bi bi-volume-up"></i> 試聴</button>
-        <div class="mt-2 pt-2 border-top">
-          <div class="d-flex align-items-center flex-wrap gap-2">
-            <span class="small fw-bold">テスト送信:</span>
-            <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailCheckout" checked><label class="form-check-label" for="testEmailCheckout">メール</label></div>
-            <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineCheckout"><label class="form-check-label" for="testLineCheckout">LINE</label></div>
-            <button class="btn btn-sm btn-outline-info" onclick="sendTestCheckout()" id="btnTestCheckout"><i class="bi bi-send"></i> 送信</button>
-          </div>
-          <div id="testCheckoutResult" class="small mt-1" style="display:none;"></div>
+          <label class="form-label small">キーワード（カンマ区切り）</label>
+          <input type="text" id="compKeywords" class="form-control form-control-sm" value="騒音,うるさい,noise,noisy,loud">
+          <div class="form-text">LINEメッセージにこれらのキーワードが含まれるとアラーム発報</div>
         </div>
       </div>
-
       <div class="card p-3 mb-3">
-        <h6><i class="bi bi-chat-dots"></i> スケジュールメッセージ音設定</h6>
-        <p class="text-muted small mb-2">メッセージ設定タブで設定したメッセージ共通の音設定</p>
-        <div class="row g-2">
-          <div class="col-6">
-            <label class="form-label small">音量 <span id="settMessageVolLabel">60</span>%</label>
-            <input type="range" class="form-range" min="0" max="100" step="5" id="settMessageVolume" value="60" oninput="document.getElementById('settMessageVolLabel').textContent=this.value">
-          </div>
-          <div class="col-6">
-            <label class="form-label small">音の種類</label>
-            <select class="form-select form-select-sm" id="settMessageSound">
-              <option value="chime">チャイム（和音）</option>
-              <option value="bell">ベル（三角波）</option>
-              <option value="beep">ビープ（短音繰り返し）</option>
-              <option value="siren">サイレン（高低交互）</option>
-              <option value="alarm">アラーム（ノコギリ波）</option>
-            </select>
-          </div>
+        <h6><i class="bi bi-megaphone"></i> タブレット警告メッセージ</h6>
+        <div class="mb-2">
+          <label class="form-label small">日本語</label>
+          <textarea id="compWarningJa" class="form-control form-control-sm" rows="4">近隣の方から騒音のクレームが入りました。
+
+ただちに静かにしてください。
+
+静かにしない場合、警察に連絡します。
+即時退室していただく場合もあります。</textarea>
         </div>
-        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('message')"><i class="bi bi-volume-up"></i> 試聴</button>
-      </div>
+        <div class="mb-2">
+          <label class="form-label small">英語</label>
+          <textarea id="compWarningEn" class="form-control form-control-sm" rows="4">A noise complaint has been received from a neighbor.
 
+Please be quiet immediately.
+
+If you do not comply, the police will be called.
+You may be asked to leave immediately.</textarea>
+        </div>
+      </div>
       <div class="card p-3 mb-3">
-        <h6><i class="bi bi-exclamation-triangle"></i> 騒音クレームアラーム音設定</h6>
+        <h6><i class="bi bi-reply"></i> 自動返信メッセージ</h6>
+        <div class="mb-2">
+          <label class="form-label small">近隣住民への返信（クレーム受信時）</label>
+          <textarea id="compReplyMsg" class="form-control form-control-sm" rows="2">ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。</textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">近隣住民への通知（アラーム停止時）</label>
+          <textarea id="compDismissedMsg" class="form-control form-control-sm" rows="2">宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。</textarea>
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-volume-up"></i> アラーム音</h6>
         <div class="row g-2">
           <div class="col-6">
             <label class="form-label small">音量 <span id="settComplaintVolLabel">100</span>%</label>
@@ -248,18 +203,126 @@
         </div>
         <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('complaint')"><i class="bi bi-volume-up"></i> 試聴</button>
       </div>
-
-      <div class="card p-3 mb-3">
-        <h6>PIN（管理画面のロック）</h6>
-        <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
+      <div class="d-flex gap-2">
+        <button class="btn btn-success" onclick="saveComplaintSettings()"><i class="bi bi-save"></i> 保存</button>
+        <button class="btn btn-outline-danger" onclick="testComplaintAlarm()"><i class="bi bi-bell"></i> テスト発報</button>
       </div>
-      <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
+      <div class="mt-3 pt-2 border-top">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <span class="small fw-bold">テスト送信:</span>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailComplaint" checked><label class="form-check-label" for="testEmailComplaint">メール</label></div>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineComplaint"><label class="form-check-label" for="testLineComplaint">LINE</label></div>
+          <button class="btn btn-sm btn-outline-info" onclick="sendTestComplaint()" id="btnTestComplaint"><i class="bi bi-send"></i> 送信</button>
+        </div>
+        <div id="testComplaintResult" class="small mt-1" style="display:none;"></div>
+      </div>
     </div>
 
-    <!-- 騒音クレーム設定タブ -->
-    <div id="tabComplaint" class="admin-tab-content" style="display:none;">
+    <!-- ③ 静音時間タブ（旧メッセージ設定+音設定を統合） -->
+    <div id="tabMessages" class="admin-tab-content" style="display:none;">
+      <p class="text-muted small">宿泊者に対して、設定した時間にメッセージを表示します。宿泊一覧タブでチェックを入れた予約が対象です。</p>
+      <div id="messagesList"></div>
+      <button class="btn btn-primary mt-2" onclick="addMessageTemplate()">
+        <i class="bi bi-plus-circle"></i> メッセージを追加
+      </button>
+      <button class="btn btn-success mt-2 ms-2" onclick="saveMessages()">
+        <i class="bi bi-save"></i> 保存
+      </button>
+      <div class="card p-3 mt-3">
+        <h6><i class="bi bi-volume-up"></i> メッセージ共通の音設定</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small">音量 <span id="settMessageVolLabel">60</span>%</label>
+            <input type="range" class="form-range" min="0" max="100" step="5" id="settMessageVolume" value="60" oninput="document.getElementById('settMessageVolLabel').textContent=this.value">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">音の種類</label>
+            <select class="form-select form-select-sm" id="settMessageSound">
+              <option value="chime">チャイム（和音）</option>
+              <option value="bell">ベル（三角波）</option>
+              <option value="beep">ビープ（短音繰り返し）</option>
+              <option value="siren">サイレン（高低交互）</option>
+              <option value="alarm">アラーム（ノコギリ波）</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('message')"><i class="bi bi-volume-up"></i> 試聴</button>
+      </div>
+    </div>
+
+    <!-- ④ チェックアウトタブ -->
+    <div id="tabCheckout" class="admin-tab-content" style="display:none;">
+      <p class="text-muted small">チェックアウト時刻にタブレットで宿泊者へアラームを表示します。</p>
       <div class="card p-3 mb-3">
-        <h6>LINE連携</h6>
+        <h6><i class="bi bi-clock"></i> アラーム時刻（複数設定可）</h6>
+        <div class="d-flex flex-wrap gap-1 mb-1" id="settAlarmTimeTags"></div>
+        <div class="input-group input-group-sm" style="width:220px;">
+          <input type="time" class="form-control" id="settAlarmTimeInput" value="10:00">
+          <button class="btn btn-outline-primary" onclick="addCheckoutTime()"><i class="bi bi-plus"></i></button>
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-chat-left-text"></i> 宿泊者へのメッセージ</h6>
+        <div class="mb-2">
+          <label class="form-label small">日本語</label>
+          <textarea id="settAlarmMessage" class="form-control form-control-sm" rows="3">チェックアウトの時間です。
+お忘れ物がないかご確認のうえ、ご退室をお願いいたします。
+ご利用ありがとうございました。</textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">英語</label>
+          <textarea id="settAlarmMessageEn" class="form-control form-control-sm" rows="3">It is checkout time.
+Please make sure you have all your belongings before leaving.
+Thank you for your stay.</textarea>
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-volume-up"></i> アラーム音</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small">音量 <span id="settCheckoutVolLabel">80</span>%</label>
+            <input type="range" class="form-range" min="0" max="100" step="5" id="settCheckoutVolume" value="80" oninput="document.getElementById('settCheckoutVolLabel').textContent=this.value">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">音の種類</label>
+            <select class="form-select form-select-sm" id="settCheckoutSound">
+              <option value="chime">チャイム（和音）</option>
+              <option value="bell">ベル（三角波）</option>
+              <option value="hotaru">蛍の光（メロディ）</option>
+              <option value="siren">サイレン（高低交互）</option>
+              <option value="beep">ビープ（短音繰り返し）</option>
+              <option value="alarm">アラーム（ノコギリ波）</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('checkout')"><i class="bi bi-volume-up"></i> 試聴</button>
+      </div>
+      <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
+      <div class="mt-3 pt-2 border-top">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <span class="small fw-bold">テスト送信:</span>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailCheckout" checked><label class="form-check-label" for="testEmailCheckout">メール</label></div>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineCheckout"><label class="form-check-label" for="testLineCheckout">LINE</label></div>
+          <button class="btn btn-sm btn-outline-info" onclick="sendTestCheckout()" id="btnTestCheckout"><i class="bi bi-send"></i> 送信</button>
+        </div>
+        <div id="testCheckoutResult" class="small mt-1" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ⑤ 基本設定タブ -->
+    <div id="tabSettings" class="admin-tab-content" style="display:none;">
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-database"></i> スプレッドシートID</h6>
+        <input type="text" id="settSpreadsheetId" class="form-control form-control-sm" placeholder="スプレッドシートID">
+        <div class="form-text">予約データを読み取るスプレッドシートのID</div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-envelope"></i> オーナーメール</h6>
+        <input type="email" id="compOwnerEmail" class="form-control form-control-sm" placeholder="owner@example.com">
+        <div class="form-text">アラーム通知の送信先</div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-line"></i> LINE連携</h6>
         <div class="mb-2">
           <label class="form-label small">LINEチャネルアクセストークン</label>
           <input type="text" id="compLineToken" class="form-control form-control-sm" placeholder="LINE Messaging APIのチャネルアクセストークン">
@@ -270,57 +333,14 @@
         </div>
         <div class="mb-2">
           <label class="form-label small">近隣住民LINEグループID</label>
-          <input type="text" id="compNeighborGroupId" class="form-control form-control-sm" placeholder="近隣住民への返信先">
+          <input type="text" id="compNeighborGroupId" class="form-control form-control-sm" placeholder="近隣住民への返信先（騒音クレーム用）">
         </div>
       </div>
       <div class="card p-3 mb-3">
-        <h6>オーナーメール</h6>
-        <input type="email" id="compOwnerEmail" class="form-control form-control-sm" placeholder="owner@example.com">
+        <h6><i class="bi bi-lock"></i> PIN（管理画面のロック）</h6>
+        <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
       </div>
-      <div class="card p-3 mb-3">
-        <h6>クレーム検知キーワード（カンマ区切り）</h6>
-        <input type="text" id="compKeywords" class="form-control form-control-sm" value="騒音,うるさい,noise,noisy,loud">
-        <div class="form-text">LINEメッセージにこれらのキーワードが含まれるとアラーム発報</div>
-      </div>
-      <div class="card p-3 mb-3">
-        <h6>タブレット警告メッセージ（日本語）</h6>
-        <textarea id="compWarningJa" class="form-control form-control-sm" rows="4">近隣の方から騒音のクレームが入りました。
-
-ただちに静かにしてください。
-
-静かにしない場合、警察に連絡します。
-即時退室していただく場合もあります。</textarea>
-      </div>
-      <div class="card p-3 mb-3">
-        <h6>タブレット警告メッセージ（英語）</h6>
-        <textarea id="compWarningEn" class="form-control form-control-sm" rows="4">A noise complaint has been received from a neighbor.
-
-Please be quiet immediately.
-
-If you do not comply, the police will be called.
-You may be asked to leave immediately.</textarea>
-      </div>
-      <div class="card p-3 mb-3">
-        <h6>近隣住民への自動返信メッセージ</h6>
-        <textarea id="compReplyMsg" class="form-control form-control-sm" rows="2">ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。</textarea>
-      </div>
-      <div class="card p-3 mb-3">
-        <h6>アラーム停止時の近隣住民への通知メッセージ</h6>
-        <textarea id="compDismissedMsg" class="form-control form-control-sm" rows="2">宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。</textarea>
-      </div>
-      <div class="d-flex gap-2">
-        <button class="btn btn-success" onclick="saveComplaintSettings()"><i class="bi bi-save"></i> 保存</button>
-        <button class="btn btn-outline-danger" onclick="testComplaintAlarm()"><i class="bi bi-bell"></i> テスト発報</button>
-      </div>
-      <div class="mt-3 pt-2 border-top">
-        <div class="d-flex align-items-center flex-wrap gap-2">
-          <span class="small fw-bold">警告メッセージのテスト送信:</span>
-          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailComplaint" checked><label class="form-check-label" for="testEmailComplaint">メール</label></div>
-          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineComplaint"><label class="form-check-label" for="testLineComplaint">LINE</label></div>
-          <button class="btn btn-sm btn-outline-info" onclick="sendTestComplaint()" id="btnTestComplaint"><i class="bi bi-send"></i> 送信</button>
-        </div>
-        <div id="testComplaintResult" class="small mt-1" style="display:none;"></div>
-      </div>
+      <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
     </div>
   </div>
 </div>
@@ -337,7 +357,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323e</div>
+<div id="version">v0323j</div>
 
 <script>
 // ===== GAS通信 =====
@@ -456,9 +476,9 @@ function checkAlarmTrigger(nowHHMM) {
         triggerAlarm({
           id: coAlarmId,
           type: 'checkout',
-          title: data.alarmMessage || 'チェックアウトあり',
-          body: buildCheckoutBody(data),
-          bodyEn: data.alarmMessageEn || '',
+          title: 'Check-out Time',
+          body: data.alarmMessage || 'チェックアウトの時間です。',
+          bodyEn: data.alarmMessageEn || 'It is checkout time.',
           volume: data.checkoutVolume || 80,
           sound: data.checkoutSound || 'siren'
         });
@@ -782,8 +802,8 @@ function loadAdminData() {
     // 複数時刻
     _state._checkoutTimes = s.alarmTimes || ['10:00'];
     renderCheckoutTimes();
-    document.getElementById('settAlarmMessage').value = s.alarmMessage || '';
-    document.getElementById('settAlarmMessageEn').value = s.alarmMessageEn || '';
+    document.getElementById('settAlarmMessage').value = s.alarmMessage || 'チェックアウトの時間です。\nお忘れ物がないかご確認のうえ、ご退室をお願いいたします。\nご利用ありがとうございました。';
+    document.getElementById('settAlarmMessageEn').value = s.alarmMessageEn || 'It is checkout time.\nPlease make sure you have all your belongings before leaving.\nThank you for your stay.';
     document.getElementById('settPin').value = s.pin || '1234';
     // 音量・音種
     document.getElementById('settCheckoutVolume').value = s.checkoutVolume || 80;
@@ -1011,8 +1031,9 @@ function sendTestMsg(idx) {
     });
 }
 
-// ===== 基本設定保存 =====
+// ===== 設定保存（基本設定+チェックアウトの両方から呼ばれる） =====
 function saveSettings() {
+  // アラーム設定（チェックアウトタブ）
   var s = {
     spreadsheetId: document.getElementById('settSpreadsheetId').value.trim(),
     alarmTimes: _state._checkoutTimes || ['10:00'],
@@ -1026,7 +1047,17 @@ function saveSettings() {
     complaintVolume: Number(document.getElementById('settComplaintVolume').value),
     complaintSound: document.getElementById('settComplaintSound').value
   };
-  callGAS('saveAlarmSettings', [s]).then(function() {
+  // 基本設定タブのLINE連携・メールも一緒に保存
+  var cs = {
+    lineChannelToken: document.getElementById('compLineToken').value.trim(),
+    lineNotifyGroupId: document.getElementById('compNotifyGroupId').value.trim(),
+    neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),
+    ownerEmail: document.getElementById('compOwnerEmail').value.trim()
+  };
+  Promise.all([
+    callGAS('saveAlarmSettings', [s]),
+    callGAS('saveComplaintSettings', [cs])
+  ]).then(function() {
     alert('設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
 }

@@ -46,13 +46,13 @@ function getAlarmSettings() {
   return JSON.stringify({
     spreadsheetId: props.getProperty('SPREADSHEET_ID') || '',
     alarmTimes: alarmTimes,
-    alarmMessage: props.getProperty('ALARM_MESSAGE') || '本日チェックアウトあり！清掃準備をお願いします',
-    alarmMessageEn: props.getProperty('ALARM_MESSAGE_EN') || 'Checkout today! Please prepare for cleaning.',
+    alarmMessage: props.getProperty('ALARM_MESSAGE') || 'チェックアウトの時間です。\nお忘れ物がないかご確認のうえ、ご退室をお願いいたします。\nご利用ありがとうございました。',
+    alarmMessageEn: props.getProperty('ALARM_MESSAGE_EN') || 'It is checkout time.\nPlease make sure you have all your belongings before leaving.\nThank you for your stay.',
     pin: props.getProperty('ALARM_PIN') || '1234',
     scheduledMessages: schedules,
     // 音量・音種設定（各アラームタイプ別）
     checkoutVolume: Number(props.getProperty('CHECKOUT_VOLUME') || '80'),
-    checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'siren',
+    checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'chime',
     messageVolume: Number(props.getProperty('MESSAGE_VOLUME') || '60'),
     messageSound: props.getProperty('MESSAGE_SOUND') || 'chime',
     complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),
@@ -276,8 +276,8 @@ function getTodayCheckouts() {
     } else {
       alarmTimes = [(props.getProperty('ALARM_TIME') || '10:00')];
     }
-    var alarmMessage = props.getProperty('ALARM_MESSAGE') || '本日チェックアウトあり！清掃準備をお願いします';
-    var alarmMessageEn = props.getProperty('ALARM_MESSAGE_EN') || 'Checkout today! Please prepare for cleaning.';
+    var alarmMessage = props.getProperty('ALARM_MESSAGE') || 'チェックアウトの時間です。\nお忘れ物がないかご確認のうえ、ご退室をお願いいたします。\nご利用ありがとうございました。';
+    var alarmMessageEn = props.getProperty('ALARM_MESSAGE_EN') || 'It is checkout time.\nPlease make sure you have all your belongings before leaving.\nThank you for your stay.';
 
     // スケジュールメッセージ設定
     var schedulesJson = props.getProperty('SCHEDULED_MESSAGES') || '[]';
@@ -308,7 +308,7 @@ function getTodayCheckouts() {
       serverTime: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'),
       serverTimeHHMM: nowTime,
       checkoutVolume: Number(props.getProperty('CHECKOUT_VOLUME') || '80'),
-      checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'siren',
+      checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'chime',
       messageVolume: Number(props.getProperty('MESSAGE_VOLUME') || '60'),
       messageSound: props.getProperty('MESSAGE_SOUND') || 'chime',
       complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),

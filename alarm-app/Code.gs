@@ -536,14 +536,24 @@ function doPost(e) {
         }
 
         if (isComplaint) {
+          // 返信先を特定（グループならグループID、個人ならユーザーID）
+          var replyTo = '';
+          if (ev.source.type === 'group') {
+            replyTo = ev.source.groupId || '';
+          } else if (ev.source.type === 'room') {
+            replyTo = ev.source.roomId || '';
+          } else {
+            replyTo = ev.source.userId || '';
+          }
+
           triggerComplaintAlarm_({
             source: 'LINE',
             senderName: ev.source.userId || 'LINE User',
             message: text,
-            replyToken: ev.replyToken
+            replyTo: replyTo
           });
 
-          // 近隣住民にLINE自動返信
+          // 近隣住民にLINE自動返信（reply APIで即時返信）
           replyToComplaint_(ev.replyToken, props);
         }
       }
@@ -586,7 +596,8 @@ function triggerComplaintAlarm_(info) {
     triggeredAt: nowStr,
     source: info.source,
     senderName: info.senderName,
-    message: info.message
+    message: info.message,
+    replyTo: info.replyTo || ''  // 停止時の返信先（ユーザーID or グループID）
   };
   props.setProperty('COMPLAINT_ALARM', JSON.stringify(alarm));
 
@@ -602,7 +613,7 @@ function replyToComplaint_(replyToken, props) {
   if (!token || !replyToken) return;
 
   var replyMsg = props.getProperty('COMPLAINT_REPLY_MESSAGE') ||
-    'ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。';
+    '【自動送信です】\nご連絡ありがとうございます。\nご迷惑をおかけし大変申し訳ありません。\n宿泊者に注意喚起いたしました。\n（室内でアラーム発報、注意メッセージ表示）\n引き続きご迷惑をおかけする場合は、再度ご連絡ください。';
 
   try {
     UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
@@ -672,32 +683,41 @@ function dismissComplaintAlarm() {
   var now = new Date();
   var nowStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
 
+  // アラーム状態から返信先を取得してからクリア
+  var alarmData = {};
+  try { alarmData = JSON.parse(props.getProperty('COMPLAINT_ALARM') || '{}'); } catch(e) {}
+  var replyTo = alarmData.replyTo || '';
+
   // アラーム状態をクリア
   props.setProperty('COMPLAINT_ALARM', JSON.stringify({ active: false, dismissedAt: nowStr }));
 
   // オーナー+近隣住民に停止通知
   notifyOwnerComplaint_({}, 'dismissed', nowStr);
-  notifyNeighborDismissed_(nowStr);
+  notifyNeighborDismissed_(nowStr, replyTo);
 
   return JSON.stringify({ success: true });
 }
 
-/** 近隣住民にアラーム停止（確認済み）通知 */
-function notifyNeighborDismissed_(timeStr) {
+/** 近隣住民にアラーム停止（確認済み）通知
+ *  @param {string} timeStr 停止日時
+ *  @param {string} replyTo クレーム送信元のLINE ID（ユーザーID or グループID）
+ */
+function notifyNeighborDismissed_(timeStr, replyTo) {
   var props = PropertiesService.getScriptProperties();
   var token = props.getProperty('LINE_CHANNEL_TOKEN') || '';
-  var neighborGroupId = props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '';
-  if (!token || !neighborGroupId) return;
+  // 送信先: クレーム送信元 → 設定のグループID → なければ送信しない
+  var sendTo = replyTo || props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '';
+  if (!token || !sendTo) return;
 
   var msg = props.getProperty('COMPLAINT_DISMISSED_MESSAGE') ||
-    '宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。';
+    '【自動送信です】\n宿泊者が騒音についての注意を確認しました。\n引き続きご迷惑な場合は、お手数ですが再度ご連絡ください。\nご迷惑おかけして大変申し訳ありませんでした。';
 
   try {
     UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
       method: 'post',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       payload: JSON.stringify({
-        to: neighborGroupId,
+        to: sendTo,
         messages: [{ type: 'text', text: msg }]
       })
     });
@@ -713,8 +733,8 @@ function getComplaintSettings() {
     lineNotifyGroupId: props.getProperty('LINE_NOTIFY_GROUP_ID') || '',
     neighborLineGroupId: props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '',
     complaintKeywords: props.getProperty('COMPLAINT_KEYWORDS') || '騒音,うるさい,noise,noisy,loud',
-    complaintReplyMessage: props.getProperty('COMPLAINT_REPLY_MESSAGE') || 'ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。',
-    complaintDismissedMessage: props.getProperty('COMPLAINT_DISMISSED_MESSAGE') || '宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。',
+    complaintReplyMessage: props.getProperty('COMPLAINT_REPLY_MESSAGE') || '【自動送信です】\nご連絡ありがとうございます。\nご迷惑をおかけし大変申し訳ありません。\n宿泊者に注意喚起いたしました。\n（室内でアラーム発報、注意メッセージ表示）\n引き続きご迷惑をおかけする場合は、再度ご連絡ください。',
+    complaintDismissedMessage: props.getProperty('COMPLAINT_DISMISSED_MESSAGE') || '【自動送信です】\n宿泊者が騒音についての注意を確認しました。\n引き続きご迷惑な場合は、お手数ですが再度ご連絡ください。\nご迷惑おかけして大変申し訳ありませんでした。',
     warningMessageJa: props.getProperty('COMPLAINT_WARNING_JA') || '近隣の方から騒音のクレームが入りました。\n\nただちに静かにしてください。\n\n静かにしない場合、警察に連絡します。\n即時退室していただく場合もあります。',
     warningMessageEn: props.getProperty('COMPLAINT_WARNING_EN') || 'A noise complaint has been received from a neighbor.\n\nPlease be quiet immediately.\n\nIf you do not comply, the police will be called.\nYou may be asked to leave immediately.'
   });

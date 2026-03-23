@@ -378,7 +378,7 @@ Thank you for your stay.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323n</div>
+<div id="version">v0323o</div>
 
 <script>
 // ===== GAS通信 =====
@@ -425,6 +425,23 @@ window.addEventListener('load', function() {
     _complaintWarningJa = s.warningMessageJa || '';
     _complaintWarningEn = s.warningMessageEn || '';
   }).catch(function() {});
+});
+
+// ===== タブ復帰・画面ON時の再初期化 =====
+// ブラウザがバックグラウンドタブやスリープ中はsetIntervalが停止するため、
+// 復帰時に時計とポーリングを即座に再開する
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    // 時計を即座に更新（表示が止まっていた分を補正）
+    updateClock();
+    // ポーリングを即座に実行（バックグラウンド中に来たアラームを検知）
+    poll();
+    // setIntervalが死んでいる場合に備えて再設定
+    if (_state.clockTimer) clearInterval(_state.clockTimer);
+    _state.clockTimer = setInterval(updateClock, 1000);
+    if (_state.pollTimer) clearInterval(_state.pollTimer);
+    _state.pollTimer = setInterval(poll, 30000);
+  }
 });
 
 // ===== 時計 =====

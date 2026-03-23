@@ -32,12 +32,31 @@ function getAlarmSettings() {
   var schedules;
   try { schedules = JSON.parse(schedulesJson); } catch (e) { schedules = []; }
 
+  // ALARM_TIMES（複数時刻）対応。旧ALARM_TIME（単一）からの移行もサポート
+  var alarmTimesJson = props.getProperty('ALARM_TIMES') || '';
+  var alarmTimes;
+  if (alarmTimesJson) {
+    try { alarmTimes = JSON.parse(alarmTimesJson); } catch (e) { alarmTimes = []; }
+  } else {
+    // 旧形式（単一時刻）からの移行
+    var singleTime = props.getProperty('ALARM_TIME') || '10:00';
+    alarmTimes = [singleTime];
+  }
+
   return JSON.stringify({
     spreadsheetId: props.getProperty('SPREADSHEET_ID') || '',
-    alarmTime: props.getProperty('ALARM_TIME') || '10:00',
+    alarmTimes: alarmTimes,
     alarmMessage: props.getProperty('ALARM_MESSAGE') || '本日チェックアウトあり！清掃準備をお願いします',
+    alarmMessageEn: props.getProperty('ALARM_MESSAGE_EN') || 'Checkout today! Please prepare for cleaning.',
     pin: props.getProperty('ALARM_PIN') || '1234',
-    scheduledMessages: schedules
+    scheduledMessages: schedules,
+    // 音量・音種設定（各アラームタイプ別）
+    checkoutVolume: Number(props.getProperty('CHECKOUT_VOLUME') || '80'),
+    checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'siren',
+    messageVolume: Number(props.getProperty('MESSAGE_VOLUME') || '60'),
+    messageSound: props.getProperty('MESSAGE_SOUND') || 'chime',
+    complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),
+    complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm'
   });
 }
 
@@ -45,12 +64,20 @@ function getAlarmSettings() {
 function saveAlarmSettings(settings) {
   var props = PropertiesService.getScriptProperties();
   if (settings.spreadsheetId !== undefined) props.setProperty('SPREADSHEET_ID', settings.spreadsheetId);
-  if (settings.alarmTime !== undefined) props.setProperty('ALARM_TIME', settings.alarmTime);
+  if (settings.alarmTimes !== undefined) props.setProperty('ALARM_TIMES', JSON.stringify(settings.alarmTimes));
   if (settings.alarmMessage !== undefined) props.setProperty('ALARM_MESSAGE', settings.alarmMessage);
+  if (settings.alarmMessageEn !== undefined) props.setProperty('ALARM_MESSAGE_EN', settings.alarmMessageEn);
   if (settings.pin !== undefined) props.setProperty('ALARM_PIN', settings.pin);
   if (settings.scheduledMessages !== undefined) {
     props.setProperty('SCHEDULED_MESSAGES', JSON.stringify(settings.scheduledMessages));
   }
+  // 音量・音種設定
+  if (settings.checkoutVolume !== undefined) props.setProperty('CHECKOUT_VOLUME', String(settings.checkoutVolume));
+  if (settings.checkoutSound !== undefined) props.setProperty('CHECKOUT_SOUND', settings.checkoutSound);
+  if (settings.messageVolume !== undefined) props.setProperty('MESSAGE_VOLUME', String(settings.messageVolume));
+  if (settings.messageSound !== undefined) props.setProperty('MESSAGE_SOUND', settings.messageSound);
+  if (settings.complaintVolume !== undefined) props.setProperty('COMPLAINT_VOLUME', String(settings.complaintVolume));
+  if (settings.complaintSound !== undefined) props.setProperty('COMPLAINT_SOUND', settings.complaintSound);
   return JSON.stringify({ success: true });
 }
 
@@ -201,8 +228,15 @@ function getTodayCheckouts() {
 
     // アラーム設定
     var props = PropertiesService.getScriptProperties();
-    var alarmTime = props.getProperty('ALARM_TIME') || '10:00';
+    var alarmTimesJson = props.getProperty('ALARM_TIMES') || '';
+    var alarmTimes;
+    if (alarmTimesJson) {
+      try { alarmTimes = JSON.parse(alarmTimesJson); } catch (e) { alarmTimes = []; }
+    } else {
+      alarmTimes = [(props.getProperty('ALARM_TIME') || '10:00')];
+    }
     var alarmMessage = props.getProperty('ALARM_MESSAGE') || '本日チェックアウトあり！清掃準備をお願いします';
+    var alarmMessageEn = props.getProperty('ALARM_MESSAGE_EN') || 'Checkout today! Please prepare for cleaning.';
 
     // スケジュールメッセージ設定
     var schedulesJson = props.getProperty('SCHEDULED_MESSAGES') || '[]';
@@ -224,13 +258,20 @@ function getTodayCheckouts() {
       checkouts: checkouts,
       currentStays: currentStays,
       nextCheckins: nextCheckins,
-      alarmTime: alarmTime,
+      alarmTimes: alarmTimes,
       alarmMessage: alarmMessage,
+      alarmMessageEn: alarmMessageEn,
       scheduledMessages: schedules,
       bookingMsgFlags: flags,
       dismissed: dismissed,
       serverTime: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'),
-      serverTimeHHMM: nowTime
+      serverTimeHHMM: nowTime,
+      checkoutVolume: Number(props.getProperty('CHECKOUT_VOLUME') || '80'),
+      checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'siren',
+      messageVolume: Number(props.getProperty('MESSAGE_VOLUME') || '60'),
+      messageSound: props.getProperty('MESSAGE_SOUND') || 'chime',
+      complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),
+      complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm'
     });
 
   } catch (e) {

@@ -52,10 +52,12 @@
     /* ===== 管理画面 ===== */
     #adminScreen { display: none; height: 100vh; overflow-y: auto; background: #f8f9fa; color: #333; }
     #adminScreen.active { display: block; }
-    .admin-header { background: #1a237e; color: #fff; padding: 12px 16px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; }
+    .admin-header { background: #2c3e50; color: #fff; padding: 12px 16px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     .booking-card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
     .booking-card .form-check { margin-bottom: 4px; }
-    .msg-template-card { background: #fff; border: 2px solid #1a237e; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .msg-template-card { background: #fff; border: 2px solid #2c3e50; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .nav-tabs .nav-link.active { background: #2c3e50; color: #fff; border-color: #2c3e50; }
+    .nav-tabs .nav-link { color: #2c3e50; }
 
     /* ===== PIN画面 ===== */
     #pinOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; flex-direction: column; }
@@ -155,19 +157,87 @@
         <h6>スプレッドシートID</h6>
         <input type="text" id="settSpreadsheetId" class="form-control form-control-sm" placeholder="スプレッドシートID">
       </div>
+
       <div class="card p-3 mb-3">
-        <h6>チェックアウトアラーム</h6>
-        <div class="row g-2">
-          <div class="col-4">
-            <label class="form-label small">アラーム時刻</label>
-            <input type="time" id="settAlarmTime" class="form-control form-control-sm" value="10:00">
-          </div>
-          <div class="col-8">
-            <label class="form-label small">メッセージ</label>
-            <input type="text" id="settAlarmMessage" class="form-control form-control-sm" value="本日チェックアウトあり！清掃準備をお願いします">
+        <h6><i class="bi bi-door-open"></i> チェックアウトアラーム</h6>
+        <div class="mb-2">
+          <label class="form-label small">アラーム時刻（複数設定可）</label>
+          <div class="d-flex flex-wrap gap-1 mb-1" id="settAlarmTimeTags"></div>
+          <div class="input-group input-group-sm" style="width:220px;">
+            <input type="time" class="form-control" id="settAlarmTimeInput" value="10:00">
+            <button class="btn btn-outline-primary" onclick="addCheckoutTime()"><i class="bi bi-plus"></i></button>
           </div>
         </div>
+        <div class="mb-2">
+          <label class="form-label small">メッセージ（日本語）</label>
+          <input type="text" id="settAlarmMessage" class="form-control form-control-sm" value="本日チェックアウトあり！清掃準備をお願いします">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">メッセージ（英語）</label>
+          <input type="text" id="settAlarmMessageEn" class="form-control form-control-sm" value="Checkout today! Please prepare for cleaning.">
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small">音量 <span id="settCheckoutVolLabel">80</span>%</label>
+            <input type="range" class="form-range" min="0" max="100" step="5" id="settCheckoutVolume" value="80" oninput="document.getElementById('settCheckoutVolLabel').textContent=this.value">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">音の種類</label>
+            <select class="form-select form-select-sm" id="settCheckoutSound">
+              <option value="siren">サイレン（高低交互）</option>
+              <option value="beep">ビープ（短音繰り返し）</option>
+              <option value="chime">チャイム（和音）</option>
+              <option value="alarm">アラーム（ノコギリ波）</option>
+              <option value="bell">ベル（三角波）</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('checkout')"><i class="bi bi-volume-up"></i> 試聴</button>
       </div>
+
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-chat-dots"></i> スケジュールメッセージ音設定</h6>
+        <p class="text-muted small mb-2">メッセージ設定タブで設定したメッセージ共通の音設定</p>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small">音量 <span id="settMessageVolLabel">60</span>%</label>
+            <input type="range" class="form-range" min="0" max="100" step="5" id="settMessageVolume" value="60" oninput="document.getElementById('settMessageVolLabel').textContent=this.value">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">音の種類</label>
+            <select class="form-select form-select-sm" id="settMessageSound">
+              <option value="chime">チャイム（和音）</option>
+              <option value="bell">ベル（三角波）</option>
+              <option value="beep">ビープ（短音繰り返し）</option>
+              <option value="siren">サイレン（高低交互）</option>
+              <option value="alarm">アラーム（ノコギリ波）</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('message')"><i class="bi bi-volume-up"></i> 試聴</button>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-exclamation-triangle"></i> 騒音クレームアラーム音設定</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small">音量 <span id="settComplaintVolLabel">100</span>%</label>
+            <input type="range" class="form-range" min="0" max="100" step="5" id="settComplaintVolume" value="100" oninput="document.getElementById('settComplaintVolLabel').textContent=this.value">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">音の種類</label>
+            <select class="form-select form-select-sm" id="settComplaintSound">
+              <option value="alarm">アラーム（ノコギリ波）</option>
+              <option value="siren">サイレン（高低交互）</option>
+              <option value="beep">ビープ（短音繰り返し）</option>
+              <option value="chime">チャイム（和音）</option>
+              <option value="bell">ベル（三角波）</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="testSound('complaint')"><i class="bi bi-volume-up"></i> 試聴</button>
+      </div>
+
       <div class="card p-3 mb-3">
         <h6>PIN（管理画面のロック）</h6>
         <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
@@ -247,7 +317,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323d</div>
+<div id="version">v0323e</div>
 
 <script>
 // ===== GAS通信 =====
@@ -279,7 +349,8 @@ var _state = {
   lastPollData: null,
   settings: null,
   bookingFlags: {},       // { rowNumber: { msgId: true/false } }
-  messages: []            // スケジュールメッセージテンプレート
+  messages: [],           // スケジュールメッセージテンプレート
+  _checkoutTimes: ['10:00']
 };
 
 // ===== 初期化 =====
@@ -356,18 +427,23 @@ function checkAlarmTrigger(nowHHMM) {
   var data = _state.lastPollData;
   if (!data) return;
 
-  // 1) チェックアウトアラーム
-  if (data.checkouts && data.checkouts.length > 0 && data.alarmTime) {
-    var coAlarmId = 'checkout_' + data.alarmTime;
-    if (nowHHMM === data.alarmTime && !_state.dismissed[coAlarmId]) {
-      triggerAlarm({
-        id: coAlarmId,
-        type: 'checkout',
-        title: data.alarmMessage || 'チェックアウトあり',
-        body: buildCheckoutBody(data),
-        bodyEn: ''
-      });
-      return;
+  // 1) チェックアウトアラーム（複数時刻対応）
+  if (data.checkouts && data.checkouts.length > 0 && data.alarmTimes) {
+    for (var ti = 0; ti < data.alarmTimes.length; ti++) {
+      var t = data.alarmTimes[ti];
+      var coAlarmId = 'checkout_' + t;
+      if (nowHHMM === t && !_state.dismissed[coAlarmId]) {
+        triggerAlarm({
+          id: coAlarmId,
+          type: 'checkout',
+          title: data.alarmMessage || 'チェックアウトあり',
+          body: buildCheckoutBody(data),
+          bodyEn: data.alarmMessageEn || '',
+          volume: data.checkoutVolume || 80,
+          sound: data.checkoutSound || 'siren'
+        });
+        return;
+      }
     }
   }
 
@@ -390,7 +466,9 @@ function checkAlarmTrigger(nowHHMM) {
             type: 'message',
             title: msg.label || 'お知らせ',
             body: msg.message || '',
-            bodyEn: msg.messageEn || ''
+            bodyEn: msg.messageEn || '',
+            volume: data.messageVolume || 60,
+            sound: data.messageSound || 'chime'
           });
           return;
         }
@@ -445,13 +523,13 @@ function triggerAlarm(alarm) {
   screen.className = alarm.type === 'checkout' ? 'active alarm-checkout' : 'active alarm-message';
   document.getElementById('alarmTitle').textContent = alarm.title;
   document.getElementById('alarmBody').textContent = alarm.body;
-  document.getElementById('alarmBodyEn').textContent = alarm.bodyEn;
+  document.getElementById('alarmBodyEn').textContent = alarm.bodyEn || '';
 
   document.getElementById('clockScreen').style.display = 'none';
   screen.style.display = 'flex';
   document.getElementById('settingsBtn').style.display = 'none';
 
-  startAlarmSound(alarm.type);
+  startAlarmSound(alarm.sound || 'siren', (alarm.volume || 80) / 100);
 }
 
 function dismissAlarm() {
@@ -473,41 +551,73 @@ function dismissAlarm() {
 }
 
 // ===== アラーム音（Web Audio API） =====
-function startAlarmSound(type) {
+// soundType: 'siren'|'beep'|'chime'|'alarm'|'bell'
+// vol: 0.0〜1.0
+function startAlarmSound(soundType, vol) {
   try {
     if (!_state.audioCtx) _state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     var ctx = _state.audioCtx;
-
-    if (type === 'checkout') {
-      // 緊急アラーム: 高低交互
-      playAlarmPattern(ctx, [880, 660], 0.3, true);
-    } else {
-      // メッセージアラーム: チャイム風
-      playAlarmPattern(ctx, [523, 659, 784], 0.5, true);
-    }
+    if (typeof vol !== 'number' || vol < 0) vol = 0.8;
+    _state._alarmVol = vol;
+    _state._alarmSoundType = soundType;
+    playNamedSound(ctx, soundType, vol);
   } catch(e) { console.error('Audio error:', e); }
 }
 
-function playAlarmPattern(ctx, freqs, interval, loop) {
+function playNamedSound(ctx, soundType, vol) {
+  switch (soundType) {
+    case 'siren':
+      playSoundLoop(ctx, { type: 'sine', freqs: [880, 660], interval: 0.3, vol: vol }); break;
+    case 'beep':
+      playSoundLoop(ctx, { type: 'square', freqs: [1000], interval: 0.2, vol: vol * 0.6 }); break;
+    case 'chime':
+      playSoundLoop(ctx, { type: 'sine', freqs: [523, 659, 784], interval: 0.5, vol: vol * 0.7 }); break;
+    case 'alarm':
+      playSoundSweep(ctx, vol); break;
+    case 'bell':
+      playSoundLoop(ctx, { type: 'triangle', freqs: [800, 600, 800], interval: 0.4, vol: vol * 0.8 }); break;
+    default:
+      playSoundLoop(ctx, { type: 'sine', freqs: [880, 660], interval: 0.3, vol: vol });
+  }
+}
+
+function playSoundLoop(ctx, opts) {
   var idx = 0;
-  function beep() {
-    if (!_state.alarmActive) return;
+  function tick() {
+    if (!_state.alarmActive && !_state.complaintActive && !_state._testSound) return;
     var osc = ctx.createOscillator();
     var gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freqs[idx % freqs.length];
-    gain.gain.value = 0.5;
+    osc.type = opts.type || 'sine';
+    osc.frequency.value = opts.freqs[idx % opts.freqs.length];
+    gain.gain.value = opts.vol;
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + interval * 0.8);
-    osc.stop(ctx.currentTime + interval);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + opts.interval * 0.8);
+    osc.stop(ctx.currentTime + opts.interval);
     idx++;
-    if (loop && _state.alarmActive) {
-      _state._alarmBeepTimer = setTimeout(beep, interval * 1000);
-    }
+    _state._alarmBeepTimer = setTimeout(tick, opts.interval * 1000);
   }
-  beep();
+  tick();
+}
+
+function playSoundSweep(ctx, vol) {
+  function sweep() {
+    if (!_state.alarmActive && !_state.complaintActive && !_state._testSound) return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.5);
+    osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 1.0);
+    gain.gain.value = vol;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 1.0);
+    _state._alarmBeepTimer = setTimeout(sweep, 1000);
+  }
+  sweep();
 }
 
 function stopAlarmSound() {
@@ -515,6 +625,29 @@ function stopAlarmSound() {
     clearTimeout(_state._alarmBeepTimer);
     _state._alarmBeepTimer = null;
   }
+  _state._testSound = false;
+}
+
+/** 基本設定画面からの試聴 */
+function testSound(alarmType) {
+  stopAlarmSound();
+  stopComplaintAlarmSound();
+  if (!_state.audioCtx) _state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  var ctx = _state.audioCtx;
+  var vol, sound;
+  if (alarmType === 'checkout') {
+    vol = Number(document.getElementById('settCheckoutVolume').value) / 100;
+    sound = document.getElementById('settCheckoutSound').value;
+  } else if (alarmType === 'message') {
+    vol = Number(document.getElementById('settMessageVolume').value) / 100;
+    sound = document.getElementById('settMessageSound').value;
+  } else {
+    vol = Number(document.getElementById('settComplaintVolume').value) / 100;
+    sound = document.getElementById('settComplaintSound').value;
+  }
+  _state._testSound = true;
+  playNamedSound(ctx, sound, vol);
+  setTimeout(function() { _state._testSound = false; stopAlarmSound(); }, 3000);
 }
 
 // ===== 管理画面 =====
@@ -579,9 +712,22 @@ function loadAdminData() {
   callGAS('getAlarmSettings').then(function(s) {
     _state.settings = s;
     document.getElementById('settSpreadsheetId').value = s.spreadsheetId || '';
-    document.getElementById('settAlarmTime').value = s.alarmTime || '10:00';
+    // 複数時刻
+    _state._checkoutTimes = s.alarmTimes || ['10:00'];
+    renderCheckoutTimes();
     document.getElementById('settAlarmMessage').value = s.alarmMessage || '';
+    document.getElementById('settAlarmMessageEn').value = s.alarmMessageEn || '';
     document.getElementById('settPin').value = s.pin || '1234';
+    // 音量・音種
+    document.getElementById('settCheckoutVolume').value = s.checkoutVolume || 80;
+    document.getElementById('settCheckoutVolLabel').textContent = s.checkoutVolume || 80;
+    document.getElementById('settCheckoutSound').value = s.checkoutSound || 'siren';
+    document.getElementById('settMessageVolume').value = s.messageVolume || 60;
+    document.getElementById('settMessageVolLabel').textContent = s.messageVolume || 60;
+    document.getElementById('settMessageSound').value = s.messageSound || 'chime';
+    document.getElementById('settComplaintVolume').value = s.complaintVolume || 100;
+    document.getElementById('settComplaintVolLabel').textContent = s.complaintVolume || 100;
+    document.getElementById('settComplaintSound').value = s.complaintSound || 'alarm';
   });
 }
 
@@ -729,13 +875,47 @@ function saveMessages() {
 function saveSettings() {
   var s = {
     spreadsheetId: document.getElementById('settSpreadsheetId').value.trim(),
-    alarmTime: document.getElementById('settAlarmTime').value,
+    alarmTimes: _state._checkoutTimes || ['10:00'],
     alarmMessage: document.getElementById('settAlarmMessage').value,
-    pin: document.getElementById('settPin').value
+    alarmMessageEn: document.getElementById('settAlarmMessageEn').value,
+    pin: document.getElementById('settPin').value,
+    checkoutVolume: Number(document.getElementById('settCheckoutVolume').value),
+    checkoutSound: document.getElementById('settCheckoutSound').value,
+    messageVolume: Number(document.getElementById('settMessageVolume').value),
+    messageSound: document.getElementById('settMessageSound').value,
+    complaintVolume: Number(document.getElementById('settComplaintVolume').value),
+    complaintSound: document.getElementById('settComplaintSound').value
   };
   callGAS('saveAlarmSettings', [s]).then(function() {
     alert('設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+// ===== チェックアウトアラーム複数時刻管理 =====
+function renderCheckoutTimes() {
+  var el = document.getElementById('settAlarmTimeTags');
+  var times = _state._checkoutTimes || [];
+  var html = '';
+  for (var i = 0; i < times.length; i++) {
+    html += '<span class="badge bg-primary">' + esc(times[i]) + ' <i class="bi bi-x" style="cursor:pointer" onclick="removeCheckoutTime(' + i + ')"></i></span>';
+  }
+  if (times.length === 0) html = '<span class="text-muted small">時刻が設定されていません</span>';
+  el.innerHTML = html;
+}
+
+function addCheckoutTime() {
+  var inp = document.getElementById('settAlarmTimeInput');
+  if (!inp.value) return;
+  if (!_state._checkoutTimes) _state._checkoutTimes = [];
+  if (_state._checkoutTimes.indexOf(inp.value) >= 0) { alert('既に追加済みです'); return; }
+  _state._checkoutTimes.push(inp.value);
+  _state._checkoutTimes.sort();
+  renderCheckoutTimes();
+}
+
+function removeCheckoutTime(idx) {
+  _state._checkoutTimes.splice(idx, 1);
+  renderCheckoutTimes();
 }
 
 // ===== ユーティリティ =====
@@ -843,39 +1023,16 @@ function confirmDismissComplaint() {
   document.getElementById('settingsBtn').style.display = '';
 }
 
-// === 騒音クレームアラーム音（高音量・不快音） ===
-var _complaintSoundTimer = null;
+// === 騒音クレームアラーム音 ===
 function startComplaintAlarmSound() {
-  try {
-    if (!_state.audioCtx) _state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    var ctx = _state.audioCtx;
-
-    function siren() {
-      if (!_state.complaintActive) return;
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.5);
-      osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 1.0);
-      gain.gain.value = 0.8;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 1.0);
-      if (_state.complaintActive) {
-        _complaintSoundTimer = setTimeout(siren, 1000);
-      }
-    }
-    siren();
-  } catch(e) { console.error('Complaint sound error:', e); }
+  var data = _state.lastPollData || {};
+  var vol = (data.complaintVolume || 100) / 100;
+  var sound = data.complaintSound || 'alarm';
+  startAlarmSound(sound, vol);
 }
 
 function stopComplaintAlarmSound() {
-  if (_complaintSoundTimer) {
-    clearTimeout(_complaintSoundTimer);
-    _complaintSoundTimer = null;
-  }
+  stopAlarmSound();
 }
 
 // === 管理画面: 騒音クレーム設定 ===

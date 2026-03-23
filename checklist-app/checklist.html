@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0323a</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0323b</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -2612,6 +2612,12 @@
           checklistData = checklistRes;
           if (checklistRes.items.length === 0 && checklistRes.totalRows > 0) {
             console.warn('チェックリスト: シートに' + checklistRes.totalRows + '行あるが表示可能な項目が0件');
+          }
+          // 当日CO予約の連絡事項を表示
+          var noticeTA = document.getElementById('currentCleaningNotice');
+          if (noticeTA) {
+            noticeTA.value = checklistRes.currentCleaningNotice || '';
+            noticeTA.dataset.row = checklistRes.currentNoticeRowNumber || '';
           }
           try {
             renderChecklist();

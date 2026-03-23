@@ -5,7 +5,8 @@
  * 1. メインアプリ: clasp push → clasp deploy
  * 2. チェックリストアプリ: deploy-checklist.js を呼び出し（push → deploy）
  * 3. チェックインアプリ: deploy-checkin.js を呼び出し（push → deploy）
- * 4. ブラウザでメインアプリを自動オープン（オーナー用=通常、スタッフ用=シークレット）
+ * 4. アラームアプリ: deploy-alarm.js を呼び出し（push → deploy）
+ * 5. ブラウザでメインアプリを自動オープン（オーナー用=通常、スタッフ用=シークレット）
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -14,6 +15,7 @@ const path = require('path');
 const rootDir = __dirname;
 const checklistDir = path.join(rootDir, 'checklist-app');
 const checkinDir = path.join(rootDir, 'checkin-app');
+const alarmDir = path.join(rootDir, 'alarm-app');
 
 // clasp コマンドのパスを解決
 const binDir = path.join(rootDir, 'node_modules', '.bin');
@@ -226,7 +228,7 @@ function main() {
   var urls = [];
 
   // === メインアプリ ===
-  console.log('[1/3] メインアプリ: コードをプッシュ...');
+  console.log('[1/4] メインアプリ: コードをプッシュ...');
   var mainPush = run(clasp + ' push --force', rootDir);
   // EPERM: clasp pushは成功するが、トークンリフレッシュ後の.clasprc.json書き込みで
   // Windows権限エラー(EPERM)が発生しexit code非ゼロになることがある。
@@ -265,7 +267,7 @@ function main() {
   }
   console.log('');
 
-  console.log('[2/3] メインアプリ: デプロイを更新...');
+  console.log('[2/4] メインアプリ: デプロイを更新...');
   var today = new Date().toISOString().slice(0, 10);
 
   // deploy-config.json から保存済みIDを読み込む（URL固定のため最優先）
@@ -430,7 +432,7 @@ function main() {
   }
 
   // === チェックリストアプリ（deploy-checklist.js に委譲） ===
-  console.log('[3/3] チェックリストアプリ: deploy-checklist.js を実行...');
+  console.log('[3/4] チェックリストアプリ: deploy-checklist.js を実行...');
   console.log('');
   var clDeployScript = path.join(checklistDir, 'deploy-checklist.js');
   if (fs.existsSync(clDeployScript)) {
@@ -475,7 +477,7 @@ function main() {
   var ciClaspConfig = {};
   try { ciClaspConfig = JSON.parse(fs.readFileSync(ciClaspJson, 'utf8')); } catch (e) {}
   if (ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
-    console.log('[4/4] チェックインアプリ: deploy-checkin.js を実行...');
+    console.log('[4a/4] チェックインアプリ: deploy-checkin.js を実行...');
     console.log('');
     var ciDeployScript = path.join(checkinDir, 'deploy-checkin.js');
     if (fs.existsSync(ciDeployScript)) {
@@ -512,7 +514,52 @@ function main() {
       console.error('  エラー: ' + ciDeployScript + ' が見つかりません');
     }
   } else {
-    console.log('[4/4] チェックインアプリ: スキップ（scriptId未設定）');
+    console.log('[4a/4] チェックインアプリ: スキップ（scriptId未設定）');
+  }
+
+  // === アラームアプリ（deploy-alarm.js に委譲） ===
+  var alClaspJson = path.join(alarmDir, '.clasp.json');
+  var alClaspConfig = {};
+  try { alClaspConfig = JSON.parse(fs.readFileSync(alClaspJson, 'utf8')); } catch (e) {}
+  if (alClaspConfig.scriptId && alClaspConfig.scriptId !== 'YOUR_ALARM_SCRIPT_ID_HERE') {
+    console.log('[4b/4] アラームアプリ: deploy-alarm.js を実行...');
+    console.log('');
+    var alDeployScript = path.join(alarmDir, 'deploy-alarm.js');
+    if (fs.existsSync(alDeployScript)) {
+      try {
+        var sep4 = process.platform === 'win32' ? ';' : ':';
+        var envPath4 = binDir + sep4 + (process.env.PATH || '');
+        execSync('node "' + alDeployScript + '"', {
+          shell: true,
+          cwd: alarmDir,
+          stdio: 'inherit',
+          timeout: 120000,
+          env: Object.assign({}, process.env, { PATH: envPath4 })
+        });
+        console.log('');
+        console.log('  アラームアプリ: デプロイ完了');
+        try {
+          var configPath4 = path.join(rootDir, 'deploy-config.json');
+          if (fs.existsSync(configPath4)) {
+            var cfg4 = JSON.parse(fs.readFileSync(configPath4, 'utf8'));
+            if (cfg4.alarmDeploymentId) {
+              urls.push({ label: 'アラーム', url: 'https://script.google.com/macros/s/' + cfg4.alarmDeploymentId + '/exec' });
+            }
+          }
+        } catch (cfgErr4) {}
+      } catch (alErr) {
+        console.log('');
+        if (alErr.killed) {
+          console.error('  アラームアプリ: タイムアウト（120秒）で強制終了');
+        } else {
+          console.error('  アラームアプリのデプロイに失敗');
+        }
+      }
+    } else {
+      console.error('  エラー: ' + alDeployScript + ' が見つかりません');
+    }
+  } else {
+    console.log('[4b/4] アラームアプリ: スキップ（scriptId未設定）');
   }
 
   // === デプロイ数チェック（200件上限） ===
@@ -525,6 +572,9 @@ function main() {
   if (fs.existsSync(checkinDir) && ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
     checkDeployCount('チェックイン', checkinDir);
   }
+  if (fs.existsSync(alarmDir) && alClaspConfig.scriptId && alClaspConfig.scriptId !== 'YOUR_ALARM_SCRIPT_ID_HERE') {
+    checkDeployCount('アラーム', alarmDir);
+  }
 
   // === バージョン数チェック（200件上限） ===
   console.log('[バージョン数チェック（上限200件）]');
@@ -534,6 +584,9 @@ function main() {
   }
   if (fs.existsSync(checkinDir) && ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
     checkVersionCount('チェックイン', checkinDir);
+  }
+  if (fs.existsSync(alarmDir) && alClaspConfig.scriptId && alClaspConfig.scriptId !== 'YOUR_ALARM_SCRIPT_ID_HERE') {
+    checkVersionCount('アラーム', alarmDir);
   }
 
   console.log('');

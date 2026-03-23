@@ -355,6 +355,250 @@ function getNextCheckins_(data, colMap, todayStr) {
   return checkins;
 }
 
+// ===== 騒音クレームアラーム =====
+
+/**
+ * 外部から騒音クレームを受信するWebhookエンドポイント
+ * LINE Messaging API Webhook or メール転送からPOSTで呼ばれる
+ */
+function doPost(e) {
+  var props = PropertiesService.getScriptProperties();
+
+  // LINE Messaging API Webhook
+  if (e.postData && e.postData.type === 'application/json') {
+    try {
+      var body = JSON.parse(e.postData.contents);
+      // LINE Webhook検証（チャレンジ応答）
+      if (!body.events || body.events.length === 0) {
+        return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      for (var i = 0; i < body.events.length; i++) {
+        var ev = body.events[i];
+        if (ev.type !== 'message' || ev.message.type !== 'text') continue;
+
+        var text = ev.message.text || '';
+        var keywords = (props.getProperty('COMPLAINT_KEYWORDS') || '騒音,うるさい,noise,noisy,loud').split(',');
+        var isComplaint = false;
+        for (var k = 0; k < keywords.length; k++) {
+          if (text.toLowerCase().indexOf(keywords[k].trim().toLowerCase()) >= 0) {
+            isComplaint = true;
+            break;
+          }
+        }
+
+        if (isComplaint) {
+          triggerComplaintAlarm_({
+            source: 'LINE',
+            senderName: ev.source.userId || 'LINE User',
+            message: text,
+            replyToken: ev.replyToken
+          });
+
+          // 近隣住民にLINE自動返信
+          replyToComplaint_(ev.replyToken, props);
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      Logger.log('doPost LINE error: ' + err.message);
+      return ContentService.createTextOutput(JSON.stringify({ error: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // URLパラメータ形式（メール転送やカスタムトリガー）
+  var params = e.parameter || {};
+  if (params.action === 'complaint') {
+    triggerComplaintAlarm_({
+      source: params.source || 'manual',
+      senderName: params.sender || '不明',
+      message: params.message || '騒音クレームが報告されました'
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'alarm_triggered' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ignored' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** 騒音クレームアラームを発報する */
+function triggerComplaintAlarm_(info) {
+  var props = PropertiesService.getScriptProperties();
+  var now = new Date();
+  var nowStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
+
+  // アラーム状態を保存（フロントエンドがポーリングで検知）
+  var alarm = {
+    active: true,
+    triggeredAt: nowStr,
+    source: info.source,
+    senderName: info.senderName,
+    message: info.message
+  };
+  props.setProperty('COMPLAINT_ALARM', JSON.stringify(alarm));
+
+  // オーナーに通知
+  notifyOwnerComplaint_(info, 'triggered', nowStr);
+
+  Logger.log('Complaint alarm triggered: ' + JSON.stringify(info));
+}
+
+/** 近隣住民にLINE自動返信 */
+function replyToComplaint_(replyToken, props) {
+  var token = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+  if (!token || !replyToken) return;
+
+  var replyMsg = props.getProperty('COMPLAINT_REPLY_MESSAGE') ||
+    'ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。';
+
+  try {
+    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      payload: JSON.stringify({
+        replyToken: replyToken,
+        messages: [{ type: 'text', text: replyMsg }]
+      })
+    });
+  } catch (e) {
+    Logger.log('LINE reply error: ' + e.message);
+  }
+}
+
+/** オーナーにクレーム通知（発報時/停止時） */
+function notifyOwnerComplaint_(info, event, timeStr) {
+  var props = PropertiesService.getScriptProperties();
+  var ownerEmail = props.getProperty('OWNER_EMAIL') || '';
+  var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+  var lineGroupId = props.getProperty('LINE_NOTIFY_GROUP_ID') || '';
+
+  var subject, body;
+  if (event === 'triggered') {
+    subject = '【騒音クレーム】アラーム発報';
+    body = '騒音クレームを受信し、施設タブレットにアラームを発報しました。\n\n'
+      + '受信元: ' + info.source + '\n'
+      + '送信者: ' + info.senderName + '\n'
+      + 'メッセージ: ' + info.message + '\n'
+      + '発報時刻: ' + timeStr;
+  } else {
+    subject = '【騒音クレーム】アラーム停止確認';
+    body = '宿泊者がアラームを停止しました。\n\n'
+      + '停止時刻: ' + timeStr;
+  }
+
+  // メール送信
+  if (ownerEmail) {
+    try { GmailApp.sendEmail(ownerEmail, subject, body); } catch (e) { Logger.log('Owner email error: ' + e.message); }
+  }
+
+  // LINE送信
+  if (lineToken && lineGroupId) {
+    try {
+      UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'post',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineToken },
+        payload: JSON.stringify({
+          to: lineGroupId,
+          messages: [{ type: 'text', text: subject + '\n\n' + body }]
+        })
+      });
+    } catch (e) { Logger.log('Owner LINE error: ' + e.message); }
+  }
+}
+
+/** フロントエンドからポーリングで呼ばれる: 騒音クレームアラーム状態取得 */
+function getComplaintAlarmStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var json = props.getProperty('COMPLAINT_ALARM') || '{"active":false}';
+  return json;
+}
+
+/** フロントエンドからアラーム停止時に呼ばれる */
+function dismissComplaintAlarm() {
+  var props = PropertiesService.getScriptProperties();
+  var now = new Date();
+  var nowStr = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
+
+  // アラーム状態をクリア
+  props.setProperty('COMPLAINT_ALARM', JSON.stringify({ active: false, dismissedAt: nowStr }));
+
+  // オーナー+近隣住民に停止通知
+  notifyOwnerComplaint_({}, 'dismissed', nowStr);
+  notifyNeighborDismissed_(nowStr);
+
+  return JSON.stringify({ success: true });
+}
+
+/** 近隣住民にアラーム停止（確認済み）通知 */
+function notifyNeighborDismissed_(timeStr) {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+  var neighborGroupId = props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '';
+  if (!token || !neighborGroupId) return;
+
+  var msg = props.getProperty('COMPLAINT_DISMISSED_MESSAGE') ||
+    '宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。';
+
+  try {
+    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      payload: JSON.stringify({
+        to: neighborGroupId,
+        messages: [{ type: 'text', text: msg }]
+      })
+    });
+  } catch (e) { Logger.log('Neighbor LINE error: ' + e.message); }
+}
+
+/** 騒音クレーム設定を取得 */
+function getComplaintSettings() {
+  var props = PropertiesService.getScriptProperties();
+  return JSON.stringify({
+    ownerEmail: props.getProperty('OWNER_EMAIL') || '',
+    lineChannelToken: props.getProperty('LINE_CHANNEL_TOKEN') || '',
+    lineNotifyGroupId: props.getProperty('LINE_NOTIFY_GROUP_ID') || '',
+    neighborLineGroupId: props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '',
+    complaintKeywords: props.getProperty('COMPLAINT_KEYWORDS') || '騒音,うるさい,noise,noisy,loud',
+    complaintReplyMessage: props.getProperty('COMPLAINT_REPLY_MESSAGE') || 'ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。',
+    complaintDismissedMessage: props.getProperty('COMPLAINT_DISMISSED_MESSAGE') || '宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。',
+    warningMessageJa: props.getProperty('COMPLAINT_WARNING_JA') || '近隣の方から騒音のクレームが入りました。\n\nただちに静かにしてください。\n\n静かにしない場合、警察に連絡します。\n即時退室していただく場合もあります。',
+    warningMessageEn: props.getProperty('COMPLAINT_WARNING_EN') || 'A noise complaint has been received from a neighbor.\n\nPlease be quiet immediately.\n\nIf you do not comply, the police will be called.\nYou may be asked to leave immediately.'
+  });
+}
+
+/** 騒音クレーム設定を保存 */
+function saveComplaintSettings(settings) {
+  var props = PropertiesService.getScriptProperties();
+  if (settings.ownerEmail !== undefined) props.setProperty('OWNER_EMAIL', settings.ownerEmail);
+  if (settings.lineChannelToken !== undefined) props.setProperty('LINE_CHANNEL_TOKEN', settings.lineChannelToken);
+  if (settings.lineNotifyGroupId !== undefined) props.setProperty('LINE_NOTIFY_GROUP_ID', settings.lineNotifyGroupId);
+  if (settings.neighborLineGroupId !== undefined) props.setProperty('NEIGHBOR_LINE_GROUP_ID', settings.neighborLineGroupId);
+  if (settings.complaintKeywords !== undefined) props.setProperty('COMPLAINT_KEYWORDS', settings.complaintKeywords);
+  if (settings.complaintReplyMessage !== undefined) props.setProperty('COMPLAINT_REPLY_MESSAGE', settings.complaintReplyMessage);
+  if (settings.complaintDismissedMessage !== undefined) props.setProperty('COMPLAINT_DISMISSED_MESSAGE', settings.complaintDismissedMessage);
+  if (settings.warningMessageJa !== undefined) props.setProperty('COMPLAINT_WARNING_JA', settings.warningMessageJa);
+  if (settings.warningMessageEn !== undefined) props.setProperty('COMPLAINT_WARNING_EN', settings.warningMessageEn);
+  return JSON.stringify({ success: true });
+}
+
+/** 手動でクレームアラームを発報するテスト用関数 */
+function testTriggerComplaintAlarm() {
+  triggerComplaintAlarm_({
+    source: 'test',
+    senderName: 'テスト',
+    message: 'テスト: 騒音クレームアラーム発報テスト'
+  });
+}
+
+// ===== 内部ヘルパー =====
+
 function buildAlarmColumnMap_(headers) {
   var map = {
     checkIn: -1, checkOut: -1, guestName: -1, bookingSite: -1,

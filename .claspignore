@@ -8,6 +8,7 @@ deploy-all.js
 **/.git/**
 checklist-app/**
 checkin-app/**
+alarm-app/**
 manual-generator/**
 ChecklistApp.gs
 HANDOFF.md

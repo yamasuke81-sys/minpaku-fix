@@ -24,6 +24,23 @@
     #alarmScreen.alarm-checkout { background: #b71c1c; }
     #alarmScreen.alarm-message { background: #e65100; }
 
+    /* ===== 騒音クレームアラーム画面 ===== */
+    #complaintScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; background: #d50000; }
+    #complaintScreen.active { display: flex; }
+    @keyframes flash { 0%,100% { background: #d50000; } 50% { background: #ff1744; } }
+    #complaintScreen.active { animation: flash 1s infinite; }
+    #complaintScreen .complaint-icon { font-size: 20vw; animation: shake 0.3s infinite; }
+    #complaintScreen .complaint-title { font-size: 5vw; font-weight: bold; margin: 1vh 0; text-align: center; line-height: 1.4; }
+    #complaintScreen .complaint-body { font-size: 4vw; font-weight: bold; text-align: center; max-width: 90vw; line-height: 1.6; white-space: pre-line; margin: 2vh 0; }
+    #complaintScreen .complaint-body-en { font-size: 3vw; color: rgba(255,255,255,0.85); text-align: center; max-width: 90vw; line-height: 1.5; white-space: pre-line; }
+    #complaintDismissArea { margin-top: 3vh; text-align: center; }
+    #btnComplaintHold { font-size: 3.5vw; padding: 2vh 6vw; border-radius: 2vw; user-select: none; -webkit-user-select: none; }
+    #btnComplaintHold.holding { background: #ff9800 !important; border-color: #ff9800 !important; }
+    #holdProgress { width: 60vw; height: 1.5vh; background: rgba(255,255,255,0.3); border-radius: 1vh; margin: 1vh auto 0; overflow: hidden; }
+    #holdProgressBar { height: 100%; width: 0; background: #fff; border-radius: 1vh; transition: width 0.1s linear; }
+    #btnComplaintConfirm { display: none; font-size: 4vw; padding: 2.5vh 8vw; border-radius: 2vw; margin-top: 2vh; }
+    #holdInstruction { font-size: 2.5vw; color: rgba(255,255,255,0.7); margin-top: 1vh; }
+
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
     @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
     #alarmScreen .alarm-icon { font-size: 15vw; animation: shake 0.5s infinite; }
@@ -77,6 +94,26 @@
   </button>
 </div>
 
+<!-- ===== 騒音クレームアラーム画面 ===== -->
+<div id="complaintScreen">
+  <div class="complaint-icon">&#x1F6A8;</div>
+  <div class="complaint-title">&#x26A0;&#xFE0F; 騒音クレーム / NOISE COMPLAINT &#x26A0;&#xFE0F;</div>
+  <div class="complaint-body" id="complaintBodyJa"></div>
+  <div class="complaint-body-en" id="complaintBodyEn"></div>
+  <div id="complaintDismissArea">
+    <button class="btn btn-warning btn-lg" id="btnComplaintHold"
+      ontouchstart="startHold(event)" ontouchend="endHold(event)" ontouchcancel="endHold(event)"
+      onmousedown="startHold(event)" onmouseup="endHold(event)" onmouseleave="endHold(event)">
+      &#x1F4A4; 長押しして確認 / Press &amp; Hold
+    </button>
+    <div id="holdProgress"><div id="holdProgressBar"></div></div>
+    <div id="holdInstruction">5秒間長押ししてください / Hold for 5 seconds</div>
+    <button class="btn btn-danger btn-lg" id="btnComplaintConfirm" onclick="confirmDismissComplaint()">
+      &#x2705; アラームを停止する / Stop Alarm
+    </button>
+  </div>
+</div>
+
 <!-- ===== 管理画面 ===== -->
 <div id="adminScreen">
   <div class="admin-header">
@@ -89,6 +126,7 @@
       <li class="nav-item"><a class="nav-link active" data-tab="tabBookings" onclick="switchAdminTab(this)">宿泊一覧</a></li>
       <li class="nav-item"><a class="nav-link" data-tab="tabMessages" onclick="switchAdminTab(this)">メッセージ設定</a></li>
       <li class="nav-item"><a class="nav-link" data-tab="tabSettings" onclick="switchAdminTab(this)">基本設定</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabComplaint" onclick="switchAdminTab(this)">騒音クレーム</a></li>
     </ul>
 
     <!-- 宿泊一覧タブ -->
@@ -136,6 +174,64 @@
       </div>
       <button class="btn btn-success" onclick="saveSettings()"><i class="bi bi-save"></i> 設定を保存</button>
     </div>
+
+    <!-- 騒音クレーム設定タブ -->
+    <div id="tabComplaint" class="admin-tab-content" style="display:none;">
+      <div class="card p-3 mb-3">
+        <h6>LINE連携</h6>
+        <div class="mb-2">
+          <label class="form-label small">LINEチャネルアクセストークン</label>
+          <input type="text" id="compLineToken" class="form-control form-control-sm" placeholder="LINE Messaging APIのチャネルアクセストークン">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">オーナー通知先LINEグループID</label>
+          <input type="text" id="compNotifyGroupId" class="form-control form-control-sm" placeholder="オーナーへの通知送信先">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">近隣住民LINEグループID</label>
+          <input type="text" id="compNeighborGroupId" class="form-control form-control-sm" placeholder="近隣住民への返信先">
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>オーナーメール</h6>
+        <input type="email" id="compOwnerEmail" class="form-control form-control-sm" placeholder="owner@example.com">
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>クレーム検知キーワード（カンマ区切り）</h6>
+        <input type="text" id="compKeywords" class="form-control form-control-sm" value="騒音,うるさい,noise,noisy,loud">
+        <div class="form-text">LINEメッセージにこれらのキーワードが含まれるとアラーム発報</div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>タブレット警告メッセージ（日本語）</h6>
+        <textarea id="compWarningJa" class="form-control form-control-sm" rows="4">近隣の方から騒音のクレームが入りました。
+
+ただちに静かにしてください。
+
+静かにしない場合、警察に連絡します。
+即時退室していただく場合もあります。</textarea>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>タブレット警告メッセージ（英語）</h6>
+        <textarea id="compWarningEn" class="form-control form-control-sm" rows="4">A noise complaint has been received from a neighbor.
+
+Please be quiet immediately.
+
+If you do not comply, the police will be called.
+You may be asked to leave immediately.</textarea>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>近隣住民への自動返信メッセージ</h6>
+        <textarea id="compReplyMsg" class="form-control form-control-sm" rows="2">ご連絡ありがとうございます。宿泊者に注意喚起いたしました。引き続きご迷惑をおかけする場合は、再度ご連絡ください。</textarea>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6>アラーム停止時の近隣住民への通知メッセージ</h6>
+        <textarea id="compDismissedMsg" class="form-control form-control-sm" rows="2">宿泊者が騒音についての注意を確認しました。引き続きご迷惑な場合は、再度ご連絡ください。</textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-success" onclick="saveComplaintSettings()"><i class="bi bi-save"></i> 保存</button>
+        <button class="btn btn-outline-danger" onclick="testComplaintAlarm()"><i class="bi bi-bell"></i> テスト発報</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -151,7 +247,7 @@
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323a</div>
+<div id="version">v0323d</div>
 
 <script>
 // ===== GAS通信 =====
@@ -172,6 +268,7 @@ function callGAS(fn, args) {
 var _state = {
   screen: 'clock',       // clock | alarm | admin
   alarmActive: false,
+  complaintActive: false,
   alarmQueue: [],         // 待機中のアラーム
   currentAlarm: null,     // 現在表示中のアラーム
   dismissed: {},          // 本日確認済み { alarmId: time }
@@ -190,6 +287,12 @@ window.addEventListener('load', function() {
   startClock();
   poll();
   _state.pollTimer = setInterval(poll, 30000);
+  // 騒音クレーム警告メッセージをキャッシュ
+  callGAS('getComplaintSettings').then(function(s) {
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
+    _complaintWarningJa = s.warningMessageJa || '';
+    _complaintWarningEn = s.warningMessageEn || '';
+  }).catch(function() {});
 });
 
 // ===== 時計 =====
@@ -208,8 +311,8 @@ function updateClock() {
   var ds = (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
   document.getElementById('clockDate').textContent = ds;
 
-  // アラームチェック（毎秒）
-  if (_state.lastPollData && !_state.alarmActive && _state.screen === 'clock') {
+  // アラームチェック（毎秒）— 騒音クレームアラーム中はスキップ
+  if (_state.lastPollData && !_state.alarmActive && !_state.complaintActive && _state.screen === 'clock') {
     checkAlarmTrigger(h + ':' + m);
   }
 }
@@ -222,6 +325,9 @@ function poll() {
     _state.dismissed = data.dismissed || {};
     updateClockInfo(data);
   }).catch(function(e) { console.error('Poll failed:', e); });
+
+  // 騒音クレームアラーム状態もチェック
+  checkComplaintAlarm();
 }
 
 function updateClockInfo(data) {
@@ -466,6 +572,9 @@ function loadAdminData() {
     renderMessages();
   });
 
+  // 騒音クレーム設定
+  loadComplaintSettings();
+
   // 設定
   callGAS('getAlarmSettings').then(function(s) {
     _state.settings = s;
@@ -634,6 +743,184 @@ function esc(s) {
   var d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
+}
+
+// ===== 騒音クレームアラーム =====
+var _holdTimer = null;
+var _holdStart = 0;
+var _holdDuration = 5000; // 5秒
+var _holdProgressTimer = null;
+var _complaintWarningJa = '';
+var _complaintWarningEn = '';
+
+function checkComplaintAlarm() {
+  if (_state.complaintActive) return; // 既にアラーム表示中
+  callGAS('getComplaintAlarmStatus').then(function(data) {
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data); } catch(e) { return; }
+    }
+    if (data.active && !_state.complaintActive) {
+      showComplaintAlarm();
+    }
+  }).catch(function() {});
+}
+
+function showComplaintAlarm() {
+  _state.complaintActive = true;
+  _state.screen = 'complaint';
+
+  // 警告メッセージを設定から取得（キャッシュがなければデフォルト）
+  var jaMsg = _complaintWarningJa || '近隣の方から騒音のクレームが入りました。\n\nただちに静かにしてください。\n\n静かにしない場合、警察に連絡します。\n即時退室していただく場合もあります。';
+  var enMsg = _complaintWarningEn || 'A noise complaint has been received from a neighbor.\n\nPlease be quiet immediately.\n\nIf you do not comply, the police will be called.\nYou may be asked to leave immediately.';
+
+  document.getElementById('complaintBodyJa').textContent = jaMsg;
+  document.getElementById('complaintBodyEn').textContent = enMsg;
+
+  // 画面切替
+  document.getElementById('clockScreen').style.display = 'none';
+  document.getElementById('alarmScreen').style.display = 'none';
+  document.getElementById('complaintScreen').classList.add('active');
+  document.getElementById('settingsBtn').style.display = 'none';
+
+  // 停止ボタンをリセット
+  document.getElementById('btnComplaintHold').style.display = '';
+  document.getElementById('holdProgress').style.display = '';
+  document.getElementById('holdInstruction').style.display = '';
+  document.getElementById('btnComplaintConfirm').style.display = 'none';
+  document.getElementById('holdProgressBar').style.width = '0';
+
+  startComplaintAlarmSound();
+}
+
+function startHold(e) {
+  e.preventDefault();
+  _holdStart = Date.now();
+  document.getElementById('btnComplaintHold').classList.add('holding');
+
+  _holdProgressTimer = setInterval(function() {
+    var elapsed = Date.now() - _holdStart;
+    var pct = Math.min(100, (elapsed / _holdDuration) * 100);
+    document.getElementById('holdProgressBar').style.width = pct + '%';
+
+    if (elapsed >= _holdDuration) {
+      clearInterval(_holdProgressTimer);
+      _holdProgressTimer = null;
+      onHoldComplete();
+    }
+  }, 50);
+}
+
+function endHold(e) {
+  e.preventDefault();
+  if (_holdProgressTimer) {
+    clearInterval(_holdProgressTimer);
+    _holdProgressTimer = null;
+  }
+  document.getElementById('btnComplaintHold').classList.remove('holding');
+  document.getElementById('holdProgressBar').style.width = '0';
+}
+
+function onHoldComplete() {
+  // 長押し完了 → 確認ボタンを表示
+  document.getElementById('btnComplaintHold').style.display = 'none';
+  document.getElementById('holdProgress').style.display = 'none';
+  document.getElementById('holdInstruction').style.display = 'none';
+  document.getElementById('btnComplaintConfirm').style.display = '';
+}
+
+function confirmDismissComplaint() {
+  stopComplaintAlarmSound();
+  _state.complaintActive = false;
+
+  // サーバーに停止を記録（→オーナー+近隣住民に通知される）
+  callGAS('dismissComplaintAlarm').catch(function() {});
+
+  // 画面を時計に戻す
+  document.getElementById('complaintScreen').classList.remove('active');
+  document.getElementById('complaintScreen').style.display = 'none';
+  _state.screen = 'clock';
+  document.getElementById('clockScreen').style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = '';
+}
+
+// === 騒音クレームアラーム音（高音量・不快音） ===
+var _complaintSoundTimer = null;
+function startComplaintAlarmSound() {
+  try {
+    if (!_state.audioCtx) _state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var ctx = _state.audioCtx;
+
+    function siren() {
+      if (!_state.complaintActive) return;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.5);
+      osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 1.0);
+      gain.gain.value = 0.8;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 1.0);
+      if (_state.complaintActive) {
+        _complaintSoundTimer = setTimeout(siren, 1000);
+      }
+    }
+    siren();
+  } catch(e) { console.error('Complaint sound error:', e); }
+}
+
+function stopComplaintAlarmSound() {
+  if (_complaintSoundTimer) {
+    clearTimeout(_complaintSoundTimer);
+    _complaintSoundTimer = null;
+  }
+}
+
+// === 管理画面: 騒音クレーム設定 ===
+function loadComplaintSettings() {
+  callGAS('getComplaintSettings').then(function(s) {
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
+    document.getElementById('compLineToken').value = s.lineChannelToken || '';
+    document.getElementById('compNotifyGroupId').value = s.lineNotifyGroupId || '';
+    document.getElementById('compNeighborGroupId').value = s.neighborLineGroupId || '';
+    document.getElementById('compOwnerEmail').value = s.ownerEmail || '';
+    document.getElementById('compKeywords').value = s.complaintKeywords || '';
+    document.getElementById('compWarningJa').value = s.warningMessageJa || '';
+    document.getElementById('compWarningEn').value = s.warningMessageEn || '';
+    document.getElementById('compReplyMsg').value = s.complaintReplyMessage || '';
+    document.getElementById('compDismissedMsg').value = s.complaintDismissedMessage || '';
+    // フロントエンド用にキャッシュ
+    _complaintWarningJa = s.warningMessageJa || '';
+    _complaintWarningEn = s.warningMessageEn || '';
+  });
+}
+
+function saveComplaintSettings() {
+  var s = {
+    lineChannelToken: document.getElementById('compLineToken').value.trim(),
+    lineNotifyGroupId: document.getElementById('compNotifyGroupId').value.trim(),
+    neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),
+    ownerEmail: document.getElementById('compOwnerEmail').value.trim(),
+    complaintKeywords: document.getElementById('compKeywords').value.trim(),
+    warningMessageJa: document.getElementById('compWarningJa').value,
+    warningMessageEn: document.getElementById('compWarningEn').value,
+    complaintReplyMessage: document.getElementById('compReplyMsg').value,
+    complaintDismissedMessage: document.getElementById('compDismissedMsg').value
+  };
+  callGAS('saveComplaintSettings', [s]).then(function() {
+    _complaintWarningJa = s.warningMessageJa;
+    _complaintWarningEn = s.warningMessageEn;
+    alert('騒音クレーム設定を保存しました');
+  }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+function testComplaintAlarm() {
+  if (!confirm('テストアラームを発報しますか？\n（オーナーにも通知が送信されます）')) return;
+  callGAS('testTriggerComplaintAlarm').then(function() {
+    alert('テスト発報しました。30秒以内にアラームが表示されます。');
+  }).catch(function(e) { alert('エラー: ' + e.message); });
 }
 
 // ===== テスト用: 手動アラームトリガー（コンソールから使用） =====

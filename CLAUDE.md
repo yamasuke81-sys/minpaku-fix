@@ -206,8 +206,8 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 6. **LINE通知機能追加**: LINE Messaging API経由でグループにメッセージ送信する機能を実装。メール通知と同タイミング・同内容でLINEグループにも送信。設定タブに「LINE通知」サブタブ追加（ON/OFF・チャネルアクセストークン・グループID・テスト送信）。募集設定シートに`LINE通知有効`・`LINEチャネルアクセストークン`・`LINEグループID`を保存
 
 ## 次回やること（優先度順）
-1. **[最高・進行中]** アラームアプリ（alarm-app）の開発を完了する — Code.gsとalarm.htmlの骨格は作成済み。残タスク: deploy-alarm.js作成、deploy-all.jsへの統合、.claspignore更新、GASプロジェクト作成＋デプロイ
-2. **[最高]** 騒音クレーム自動対応システムの設計・開発 — 近隣住民からLINE/メールでクレーム受信→宿泊者に自動電話発信（Twilio TTS）+メール/SMS→近隣住民に「注意喚起しました」と自動返信。詳細は下記「騒音クレーム自動対応システム設計」参照
+1. **[最高・完了]** ~~アラームアプリ（alarm-app）の開発を完了する~~ — v0323dで完了（deploy-alarm.js+deploy-all.js統合+騒音クレームアラーム機能）
+2. **[最高・完了]** ~~騒音クレーム自動対応システム~~ — Twilio方式からタブレットアラーム方式に変更し、alarm-appに統合済み（v0323d）。残: GASプロジェクト作成+scriptId設定+デプロイ+Fully Kiosk Browser設定
 3. **[高]** Beds24導入に伴う新アプリ設計・作成 — Beds24にない独自機能（下記「Beds24との機能比較」参照）を新アプリとして再構築
 4. **[中]** UIデバッグパネルの削除 — 通知デバッグパネル（index.html 1131行付近）と清掃モーダルDEBUGパネル（3202行付近）
 5. **[中]** v0310nデバッグコード削除 — [DEBUG-CONFIRM]/[DEBUG-CAL]/[DEBUG-DAYCELL]ログ
@@ -217,17 +217,18 @@ Google Apps Script + スプレッドシート製の民泊予約・清掃管理We
 9. **[低]** セッション8のデバッグログ残存箇所のクリーンアップ
 
 ## 現在のセッション状態
-- **ブランチ**: `claude/verify-staff-response-display-xm7Nk`
-- **最新コミット**: `2e99960`
+- **ブランチ**: `claude/verify-staff-response-display-n8C19`
+- **最新コミット**: (セッション22進行中)
 - **Code.gs行数**: ~12,864行（ルール8の検証用）
 - **index.html行数**: ~11,223行
 - **checklist-app/Code.gs行数**: ~4,058行
 - **checklist-app/checklist.html行数**: ~7,218行
 - **checkin-app/Code.gs行数**: ~765行
 - **checkin-app/checkin.html行数**: ~972行
-- **alarm-app/Code.gs行数**: ~377行（作成途中）
-- **alarm-app/alarm.html行数**: ~661行（作成途中）
-- **進行中タスク**: アラームアプリ開発 + 騒音クレーム自動対応システム設計
+- **alarm-app/Code.gs行数**: ~621行
+- **alarm-app/alarm.html行数**: ~948行
+- **alarm-app/deploy-alarm.js行数**: ~211行
+- **進行中タスク**: アラームアプリ開発完了 + 騒音クレームアラーム実装
 - **デバッグコード残存**: UIデバッグパネル2つ（通知+清掃モーダル）+ LINE ID収集のデバッグバナー + v0310nの[DEBUG-CONFIRM]/[DEBUG-CAL]/[DEBUG-DAYCELL]ログ + checkin.htmlの[DEBUG-CONFIRM]ログ(v0318j)
 - **未修正バグ**: 手動LINE送信ボタン（📤）が反応しない問題（原因未特定、自動送信で代替）
 - **解決済み**: 幽霊予約 + clasp push失敗
@@ -346,6 +347,44 @@ alarm-app/
 9. **予約日付変更時の自動再募集** — 延長/短縮時にスタッフ解除→再募集
 10. **通知テンプレートのカスタマイズ** — 13種類の通知の件名・本文をプレースホルダー付きで編集
 11. **スタッフ非表示機能** — 退職・休止スタッフを選択肢から除外しつつ報酬履歴は保持
+
+## 2026-03-23（セッション22）修正内容
+1. **alarm-appデプロイ環境整備（v0323d）**: deploy-alarm.js作成（deploy-checkin.jsベース）、deploy-all.jsにalarm-appデプロイステップ追加（4b/4）、メインアプリの.claspignoreにalarm-app除外追加
+2. **騒音クレームアラーム機能（v0323d）**: alarm-appに騒音クレームアラーム機能を統合。LINE Messaging API Webhookで近隣住民からのクレームを受信→タブレットにアラーム発報→宿泊者が5秒長押し+確認ボタンの2段階で停止→オーナー/近隣住民に通知。管理画面に騒音クレーム設定タブ追加（LINE連携・警告メッセージ・キーワード設定・テスト発報）
+
+### 騒音クレームアラームの全体フロー
+```
+近隣住民 → LINE公式アカウントにメッセージ送信（キーワード検知）
+  ↓
+GAS(doPost) → Webhookで受信
+  ├── 1. COMPLAINT_ALARMプロパティにアラーム状態を保存
+  ├── 2. 近隣住民にLINE自動返信（「注意喚起しました」）
+  └── 3. オーナーにメール+LINE通知（「アラーム発報」）
+  ↓
+タブレット（30秒ポーリング）→ アラーム状態を検知
+  ├── 赤点滅画面 + 警告メッセージ（日本語+英語）
+  ├── サイレン音（Web Audio API、不快なノコギリ波）
+  └── 停止手順: ボタン5秒長押し → 確認ボタン押下
+  ↓
+宿泊者がアラーム停止
+  ├── GAS(dismissComplaintAlarm) でアラーム状態クリア
+  ├── オーナーにメール+LINE通知（「アラーム停止確認」）
+  └── 近隣住民にLINE通知（「宿泊者が確認しました」）
+```
+
+## 2026-03-23（セッション22）コミット履歴（コミットハッシュ付き）
+| コミット | 内容 |
+|---|---|
+| (後で追記) | feat: v0323d alarm-appデプロイ環境整備+騒音クレームアラーム機能追加 |
+
+### 変更ファイルと箇所（セッション22）
+- **alarm-app/Code.gs**: doPost（LINE Webhook受信）、triggerComplaintAlarm_、replyToComplaint_、notifyOwnerComplaint_、getComplaintAlarmStatus、dismissComplaintAlarm、notifyNeighborDismissed_、getComplaintSettings、saveComplaintSettings、testTriggerComplaintAlarm を追加
+- **alarm-app/alarm.html**: 騒音クレームアラーム画面（#complaintScreen）、5秒長押し+確認の2段階停止、サイレン音、管理画面に騒音クレーム設定タブ追加
+- **alarm-app/deploy-alarm.js**: 新規作成
+- **alarm-app/appsscript.json**: OAuthスコープにexternal_request+gmail.send追加
+- **deploy-all.js**: alarm-appデプロイステップ追加（4b/4）+デプロイ/バージョン数チェック追加
+- **.claspignore**: alarm-app/**除外追加
+- **index.html**: バージョンバッジ v0323c → v0323d
 
 ## 2026-03-23（セッション21）修正内容
 1. **チェックリストアプリの連絡事項入力欄改善（v0323a）**: メインアプリと同じスタイルに統一

@@ -819,8 +819,10 @@ function getChecklistForDate(checkoutDate, deviceId) {
               if (notice) {
                 currentCleaningNotice = notice;
                 currentNoticeRowNumber = fr + 2;
+              } else if (!currentNoticeRowNumber) {
+                // notice空でも行番号は保存用に記録（最初の一致行）
+                currentNoticeRowNumber = fr + 2;
               }
-              break;
             }
           }
         }

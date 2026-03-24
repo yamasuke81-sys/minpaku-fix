@@ -510,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324o</div>
+<div id="version">v0324p</div>
 
 <script>
 // ===== GAS通信 =====
@@ -993,16 +993,25 @@ function submitPin() {
 function showAdmin() {
   _state.screen = 'admin';
   document.getElementById('clockScreen').style.display = 'none';
+  document.getElementById('coNotifyScreen').style.display = 'none';
+  _state.coNotifyActive = false;
+  _state._coNotifySuspended = true; // 管理画面を閉じた後に復帰させるフラグ
   document.getElementById('adminScreen').classList.add('active');
   document.getElementById('settingsBtn').style.display = 'none';
   loadAdminData();
 }
 
 function closeAdmin() {
-  _state.screen = 'clock';
   document.getElementById('adminScreen').classList.remove('active');
-  document.getElementById('clockScreen').style.display = 'flex';
   document.getElementById('settingsBtn').style.display = '';
+  // CO連絡画面が中断されていた場合は復帰
+  if (_state._coNotifySuspended && !_state.coNotifyDismissed) {
+    _state._coNotifySuspended = false;
+    showCoNotifyScreen();
+  } else {
+    _state.screen = 'clock';
+    document.getElementById('clockScreen').style.display = 'flex';
+  }
 }
 
 function switchAdminTab(el) {

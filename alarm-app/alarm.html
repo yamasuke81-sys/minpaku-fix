@@ -536,7 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325g</div>
+<div id="version">v0325h</div>
 
 <script>
 // ===== GAS通信 =====
@@ -610,6 +610,12 @@ window.addEventListener('load', function() {
   callGAS('getCheckoutNotifySettings').then(function(s) {
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
     _state.coNotifySettings = s || {};
+  }).catch(function() {});
+  // チェックインapp連携設定をキャッシュ（管理画面を開かなくてもリダイレクトが動くように）
+  callGAS('getAlarmSettings').then(function(s) {
+    _state.checkinAppUrl = s.checkinAppUrl || '';
+    _state.checkinEnabled = !!s.checkinEnabled;
+    _state.checkinReturnTime = s.checkinReturnTime || '14:01';
   }).catch(function() {});
 });
 

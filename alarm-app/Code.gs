@@ -892,6 +892,94 @@ function sendTestMessage(params) {
   }
 }
 
+// ===== チェックアウト連絡通知 =====
+
+/**
+ * 宿泊者がチェックアウト時に「退室連絡」ボタンを押した際に呼ばれる
+ * 設定された送信先（LINE清掃グループ、オーナーLINE、オーナーメール）に通知を送信
+ */
+function sendCheckoutNotify(bookingInfo) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var settJson = props.getProperty('CHECKOUT_NOTIFY_SETTINGS') || '{}';
+    var sett;
+    try { sett = JSON.parse(settJson); } catch (e) { sett = {}; }
+
+    var results = {};
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+    var guestName = bookingInfo.guestName || '(名前なし)';
+    var guestCount = bookingInfo.guestCount || '?';
+
+    var subject = '【退室連絡】' + guestName + ' 様が退室しました';
+    var body = '退室連絡がありました。\n\n'
+      + '■ ゲスト名: ' + guestName + '\n'
+      + '■ 宿泊人数: ' + guestCount + '名\n'
+      + '■ チェックアウト日: ' + (bookingInfo.checkOut || '') + '\n'
+      + '■ 退室連絡時刻: ' + now + '\n';
+
+    var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
+
+    // 1) LINE清掃グループ
+    if (sett.lineCleaningGroup && lineToken) {
+      var cleaningGroupId = sett.lineCleaningGroupId || '';
+      if (cleaningGroupId) {
+        try {
+          UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'post',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineToken },
+            payload: JSON.stringify({ to: cleaningGroupId, messages: [{ type: 'text', text: subject + '\n\n' + body }] })
+          });
+          results.lineCleaningGroup = { success: true };
+        } catch (e) { results.lineCleaningGroup = { success: false, error: e.message }; }
+      }
+    }
+
+    // 2) オーナー個別LINE
+    if (sett.lineOwner && lineToken) {
+      var ownerLineId = sett.ownerLineId || '';
+      if (ownerLineId) {
+        try {
+          UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'post',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineToken },
+            payload: JSON.stringify({ to: ownerLineId, messages: [{ type: 'text', text: subject + '\n\n' + body }] })
+          });
+          results.lineOwner = { success: true };
+        } catch (e) { results.lineOwner = { success: false, error: e.message }; }
+      }
+    }
+
+    // 3) オーナーメール
+    if (sett.ownerEmail) {
+      var emails = sett.ownerEmailAddresses || '';
+      if (emails) {
+        try {
+          GmailApp.sendEmail(emails, subject, body);
+          results.email = { success: true, to: emails };
+        } catch (e) { results.email = { success: false, error: e.message }; }
+      }
+    }
+
+    return JSON.stringify({ success: true, results: results });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/** チェックアウト連絡設定を取得 */
+function getCheckoutNotifySettings() {
+  var props = PropertiesService.getScriptProperties();
+  var json = props.getProperty('CHECKOUT_NOTIFY_SETTINGS') || '{}';
+  try { return json; } catch (e) { return '{}'; }
+}
+
+/** チェックアウト連絡設定を保存 */
+function saveCheckoutNotifySettings(settings) {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('CHECKOUT_NOTIFY_SETTINGS', JSON.stringify(settings));
+  return JSON.stringify({ success: true });
+}
+
 // ===== LINE ID収集 =====
 
 /** Webhookイベントからsource情報を収集してScript Propertiesに蓄積 */

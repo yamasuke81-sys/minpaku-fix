@@ -147,6 +147,28 @@
   </div>
 </div>
 
+<!-- ===== 退室連絡画面 ===== -->
+<div id="coNotifyScreen" style="display:none; height:100vh; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(135deg,#f5f0e8 0%,#e8e0d4 50%,#ddd6cc 100%); color:#3e3832;">
+  <div style="font-size:12vw; margin-bottom:2vh;">&#x1F3E0;</div>
+  <div id="coNotifyClockSmall" style="font-size:8vw; font-weight:200; color:#5a4e46; margin-bottom:1vh;">--:--</div>
+  <div style="font-size:3.5vw; color:#6b5e54; margin-bottom:4vh; text-align:center; line-height:1.6;">
+    <span id="coNotifyDateLabel"></span>
+  </div>
+  <button class="btn btn-lg" id="btnCoNotify" onclick="sendCoNotify()" style="font-size:5vw; padding:3vh 10vw; border-radius:2vw; background:rgba(255,255,255,0.85); color:#5a4e46; border:2px solid rgba(160,140,120,0.4); box-shadow:0 6px 20px rgba(0,0,0,0.08);">
+    <div id="coNotifyBtnJa" style="font-weight:600;">退室のご連絡</div>
+    <div id="coNotifyBtnEn" style="font-size:3vw; color:#8a7e74; margin-top:0.5vh;">Check-out Notification</div>
+  </button>
+  <div id="coNotifySending" style="display:none; margin-top:3vh;">
+    <div class="spinner-border text-secondary" role="status"></div>
+    <div style="font-size:3vw; color:#6b5e54; margin-top:1vh;">送信中...</div>
+  </div>
+  <div id="coNotifyDone" style="display:none; margin-top:3vh; text-align:center;">
+    <div style="font-size:10vw;">&#x2705;</div>
+    <div style="font-size:4vw; font-weight:600; margin-top:1vh;">ご連絡ありがとうございました</div>
+    <div style="font-size:3vw; color:#8a7e74;">Thank you for letting us know</div>
+  </div>
+</div>
+
 <!-- ===== 管理画面 ===== -->
 <div id="adminScreen">
   <div class="admin-header">
@@ -160,6 +182,7 @@
       <li class="nav-item"><a class="nav-link" data-tab="tabComplaint" onclick="switchAdminTab(this)">騒音クレーム</a></li>
       <li class="nav-item"><a class="nav-link" data-tab="tabMessages" onclick="switchAdminTab(this)">静音時間</a></li>
       <li class="nav-item"><a class="nav-link" data-tab="tabCheckout" onclick="switchAdminTab(this)">チェックアウト</a></li>
+      <li class="nav-item"><a class="nav-link" data-tab="tabCoNotify" onclick="switchAdminTab(this)">退室連絡</a></li>
       <li class="nav-item"><a class="nav-link" data-tab="tabSettings" onclick="switchAdminTab(this)">基本設定</a></li>
     </ul>
 
@@ -324,6 +347,56 @@ You may be asked to leave immediately.</textarea>
     </div>
 
     <!-- ⑤ 基本設定タブ -->
+    <!-- ⑤ 退室連絡タブ -->
+    <div id="tabCoNotify" class="admin-tab-content" style="display:none;">
+      <p class="text-muted small">チェックアウト当日の朝、待機画面に「退室連絡」ボタンを表示します。宿泊者がボタンを押すと指定先に通知が送られます。</p>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-clock"></i> 表示設定</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small">表示開始時刻</label>
+            <input type="time" class="form-control form-control-sm" id="coNotifyStartTime" value="07:00">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">自動非表示時刻</label>
+            <input type="time" class="form-control form-control-sm" id="coNotifyEndTime" value="14:00">
+          </div>
+        </div>
+        <div class="form-text">開始時刻〜非表示時刻の間、チェックアウト当日の予約がある場合にボタンを表示します。</div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-send"></i> 通知先（複数選択可）</h6>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="coNotifyLineCleaningGroup">
+          <label class="form-check-label" for="coNotifyLineCleaningGroup">LINE 清掃グループ</label>
+          <input type="text" class="form-control form-control-sm mt-1" id="coNotifyCleaningGroupId" placeholder="清掃グループID">
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="coNotifyLineOwner">
+          <label class="form-check-label" for="coNotifyLineOwner">オーナー個別LINE</label>
+          <input type="text" class="form-control form-control-sm mt-1" id="coNotifyOwnerLineId" placeholder="オーナーLINE ID">
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="coNotifyOwnerEmail">
+          <label class="form-check-label" for="coNotifyOwnerEmail">オーナーメール</label>
+          <input type="text" class="form-control form-control-sm mt-1" id="coNotifyEmailAddresses" placeholder="owner@example.com（カンマ区切りで複数可）">
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-chat-left-text"></i> ボタン表示テキスト</h6>
+        <div class="mb-2">
+          <label class="form-label small">日本語</label>
+          <input type="text" class="form-control form-control-sm" id="coNotifyBtnTextJa" value="退室のご連絡">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">英語</label>
+          <input type="text" class="form-control form-control-sm" id="coNotifyBtnTextEn" value="Check-out Notification">
+        </div>
+      </div>
+      <button class="btn btn-success" onclick="saveCoNotifySettings()"><i class="bi bi-save"></i> 保存</button>
+    </div>
+
+    <!-- ⑥ 基本設定タブ -->
     <div id="tabSettings" class="admin-tab-content" style="display:none;">
       <div class="card p-3 mb-3">
         <h6><i class="bi bi-database"></i> スプレッドシートID</h6>
@@ -387,7 +460,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324d</div>
+<div id="version">v0324e</div>
 
 <script>
 // ===== GAS通信 =====
@@ -422,6 +495,9 @@ var _state = {
   bookingCoFlags: {},     // { rowNumber: { coMsgId: true/false } }
   messages: [],           // スケジュールメッセージテンプレート
   coMessages: [],         // チェックアウトメッセージテンプレート
+  coNotifySettings: {},   // 退室連絡設定
+  coNotifyActive: false,  // 退室連絡画面表示中
+  coNotifyDismissed: false, // 退室連絡ボタン押下済み
   _checkoutTimes: ['10:00']
 };
 
@@ -435,6 +511,11 @@ window.addEventListener('load', function() {
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
     _complaintWarningJa = s.warningMessageJa || '';
     _complaintWarningEn = s.warningMessageEn || '';
+  }).catch(function() {});
+  // 退室連絡設定をキャッシュ
+  callGAS('getCheckoutNotifySettings').then(function(s) {
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
+    _state.coNotifySettings = s || {};
   }).catch(function() {});
 });
 
@@ -472,8 +553,18 @@ function updateClock() {
   document.getElementById('clockDate').textContent = ds;
 
   // アラームチェック（毎秒）— 騒音クレームアラーム中はスキップ
-  if (_state.lastPollData && !_state.alarmActive && !_state.complaintActive && _state.screen === 'clock') {
-    checkAlarmTrigger(h + ':' + m);
+  var hhmm = h + ':' + m;
+  if (_state.lastPollData && !_state.alarmActive && !_state.complaintActive) {
+    if (_state.screen === 'clock' || _state.screen === 'coNotify') {
+      checkAlarmTrigger(hhmm);
+    }
+  }
+  // 退室連絡画面の表示判定（毎秒チェック）
+  checkCoNotifyScreen(hhmm);
+  // 退室連絡画面の時計も更新
+  if (_state.coNotifyActive) {
+    var csEl = document.getElementById('coNotifyClockSmall');
+    if (csEl) csEl.textContent = h + ':' + m;
   }
 }
 
@@ -888,6 +979,9 @@ function loadAdminData() {
 
   // 騒音クレーム設定
   loadComplaintSettings();
+
+  // 退室連絡設定
+  loadCoNotifySettings();
 
   // 設定
   callGAS('getAlarmSettings').then(function(s) {
@@ -1755,6 +1849,154 @@ function testMessageAlarm() {
     body: 'まもなく静音時間です。22時以降は大きな音や声を控えていただくようお願いいたします。',
     bodyEn: 'Quiet hours are approaching. Please keep noise to a minimum after 10 PM.'
   });
+}
+
+// ===== 退室連絡画面 =====
+
+function checkCoNotifyScreen(nowHHMM) {
+  // アラーム中・管理画面中・既にボタン押下済みはスキップ
+  if (_state.alarmActive || _state.complaintActive || _state.coNotifyDismissed) return;
+  if (_state.screen === 'admin') return;
+
+  var data = _state.lastPollData;
+  var sett = _state.coNotifySettings;
+  if (!data || !sett) return;
+
+  var startTime = sett.startTime || '07:00';
+  var endTime = sett.endTime || '14:00';
+  var hasCoToday = data.checkouts && data.checkouts.length > 0;
+
+  // 表示条件: CO当日 & 開始時間〜終了時間の間
+  var shouldShow = hasCoToday && nowHHMM >= startTime && nowHHMM < endTime;
+
+  if (shouldShow && !_state.coNotifyActive && _state.screen === 'clock') {
+    showCoNotifyScreen();
+  } else if (!shouldShow && _state.coNotifyActive) {
+    hideCoNotifyScreen();
+  }
+}
+
+function showCoNotifyScreen() {
+  _state.coNotifyActive = true;
+  _state.screen = 'coNotify';
+  document.getElementById('clockScreen').style.display = 'none';
+  var screen = document.getElementById('coNotifyScreen');
+  screen.style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = '';
+
+  // ボタンテキスト設定
+  var sett = _state.coNotifySettings;
+  var jaEl = document.getElementById('coNotifyBtnJa');
+  var enEl = document.getElementById('coNotifyBtnEn');
+  if (jaEl && sett.btnTextJa) jaEl.textContent = sett.btnTextJa;
+  if (enEl && sett.btnTextEn) enEl.textContent = sett.btnTextEn;
+
+  // 日付ラベル
+  var now = new Date();
+  var days = ['日', '月', '火', '水', '木', '金', '土'];
+  document.getElementById('coNotifyDateLabel').textContent =
+    (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
+
+  // UI初期化
+  document.getElementById('btnCoNotify').style.display = '';
+  document.getElementById('coNotifySending').style.display = 'none';
+  document.getElementById('coNotifyDone').style.display = 'none';
+}
+
+function hideCoNotifyScreen() {
+  _state.coNotifyActive = false;
+  _state.screen = 'clock';
+  document.getElementById('coNotifyScreen').style.display = 'none';
+  document.getElementById('clockScreen').style.display = 'flex';
+}
+
+function sendCoNotify() {
+  var data = _state.lastPollData;
+  if (!data || !data.checkouts || data.checkouts.length === 0) return;
+
+  // 最初のCO予約の情報を送信
+  var co = data.checkouts[0];
+  document.getElementById('btnCoNotify').style.display = 'none';
+  document.getElementById('coNotifySending').style.display = '';
+
+  callGAS('sendCheckoutNotify', [{
+    guestName: co.guestName,
+    guestCount: co.guestCount,
+    checkOut: co.checkOut,
+    bookingSite: co.bookingSite
+  }]).then(function(r) {
+    document.getElementById('coNotifySending').style.display = 'none';
+    document.getElementById('coNotifyDone').style.display = '';
+    _state.coNotifyDismissed = true;
+    // 3秒後に時計画面に戻る
+    setTimeout(function() {
+      hideCoNotifyScreen();
+    }, 3000);
+  }).catch(function(e) {
+    document.getElementById('coNotifySending').style.display = 'none';
+    document.getElementById('btnCoNotify').style.display = '';
+    console.error('CO notify error:', e);
+  });
+}
+
+// アラーム発火時にCO連絡画面を一時中断
+var _origTriggerAlarm = triggerAlarm;
+triggerAlarm = function(alarm) {
+  if (_state.coNotifyActive) {
+    document.getElementById('coNotifyScreen').style.display = 'none';
+    _state.coNotifyActive = false;
+    // アラーム解除後にCO連絡画面に戻れるようフラグ保持
+    _state._coNotifySuspended = true;
+  }
+  _origTriggerAlarm(alarm);
+};
+
+// アラーム解除時にCO連絡画面に復帰
+var _origDismissAlarm = dismissAlarm;
+dismissAlarm = function() {
+  _origDismissAlarm();
+  if (_state._coNotifySuspended && !_state.coNotifyDismissed) {
+    _state._coNotifySuspended = false;
+    showCoNotifyScreen();
+  }
+};
+
+// ===== 退室連絡設定の読み込み・保存 =====
+
+function loadCoNotifySettings() {
+  callGAS('getCheckoutNotifySettings').then(function(s) {
+    if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { s = {}; } }
+    _state.coNotifySettings = s;
+    document.getElementById('coNotifyStartTime').value = s.startTime || '07:00';
+    document.getElementById('coNotifyEndTime').value = s.endTime || '14:00';
+    document.getElementById('coNotifyLineCleaningGroup').checked = !!s.lineCleaningGroup;
+    document.getElementById('coNotifyCleaningGroupId').value = s.lineCleaningGroupId || '';
+    document.getElementById('coNotifyLineOwner').checked = !!s.lineOwner;
+    document.getElementById('coNotifyOwnerLineId').value = s.ownerLineId || '';
+    document.getElementById('coNotifyOwnerEmail').checked = !!s.ownerEmail;
+    document.getElementById('coNotifyEmailAddresses').value = s.ownerEmailAddresses || '';
+    document.getElementById('coNotifyBtnTextJa').value = s.btnTextJa || '退室のご連絡';
+    document.getElementById('coNotifyBtnTextEn').value = s.btnTextEn || 'Check-out Notification';
+  }).catch(function() {});
+}
+
+function saveCoNotifySettings() {
+  var s = {
+    startTime: document.getElementById('coNotifyStartTime').value || '07:00',
+    endTime: document.getElementById('coNotifyEndTime').value || '14:00',
+    lineCleaningGroup: document.getElementById('coNotifyLineCleaningGroup').checked,
+    lineCleaningGroupId: document.getElementById('coNotifyCleaningGroupId').value.trim(),
+    lineOwner: document.getElementById('coNotifyLineOwner').checked,
+    ownerLineId: document.getElementById('coNotifyOwnerLineId').value.trim(),
+    ownerEmail: document.getElementById('coNotifyOwnerEmail').checked,
+    ownerEmailAddresses: document.getElementById('coNotifyEmailAddresses').value.trim(),
+    btnTextJa: document.getElementById('coNotifyBtnTextJa').value || '退室のご連絡',
+    btnTextEn: document.getElementById('coNotifyBtnTextEn').value || 'Check-out Notification'
+  };
+  callGAS('saveCheckoutNotifySettings', [s]).then(function() {
+    _state.coNotifySettings = s;
+    alert('退室連絡設定を保存しました');
+  }).catch(function(e) { alert('保存エラー: ' + e.message); });
 }
 </script>
 </body>

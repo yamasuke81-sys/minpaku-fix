@@ -1141,9 +1141,10 @@ function renderBookings(bookings) {
     html += '<strong>' + esc(b.guestName || '(名前なし)') + '</strong>';
     html += '<span class="badge bg-secondary">' + esc(b.bookingSite || '') + '</span>';
     html += '</div>';
-    var _gc = b.guestCountDisplay || b.guestCount || '';
-    html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut);
-    if (_gc && _gc !== '-') html += ' / ' + esc(_gc);
+    var _gcAdults = (b.guestCountAdults != null && b.guestCountAdults !== '') ? b.guestCountAdults : '?';
+    var _gcInfants = (b.guestCountInfants != null && b.guestCountInfants !== '') ? b.guestCountInfants : '?';
+    var _gc = (b.guestCountDisplay && b.guestCountDisplay !== '-') ? b.guestCountDisplay : ('大人' + _gcAdults + '名、3歳以下' + _gcInfants + '名');
+    html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut) + ' / ' + esc(_gc);
     if (b.ages && b.ages.length > 0) html += ' / 年齢: ' + b.ages.join(', ');
     if (b.bbq && b.bbq.indexOf('はい') >= 0) html += ' / <span class="text-danger">BBQ</span>';
     html += '</div>';

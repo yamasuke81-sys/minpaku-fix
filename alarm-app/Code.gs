@@ -513,10 +513,18 @@ function deduplicateBookings_(bookings) {
       if (isPlaceholderName_(existing.guestName) && !isPlaceholderName_(b.guestName)) {
         existing.guestName = b.guestName;
       }
-      // 各フィールド: 空の値を補完
-      var fields = ['guestCount', 'bookingSite', 'cleaningStaff', 'bbq'];
+      // 各フィールド: 空の値を補完（メインアプリと同じロジック）
+      var fields = ['guestCount', 'guestCountAdults', 'guestCountInfants', 'bookingSite', 'cleaningStaff', 'bbq'];
       for (var f = 0; f < fields.length; f++) {
         if (!existing[fields[f]] && b[fields[f]]) existing[fields[f]] = b[fields[f]];
+      }
+      // guestCountDisplay: 「-」より実データを優先
+      if (b.guestCountDisplay && b.guestCountDisplay !== '-' && (!existing.guestCountDisplay || existing.guestCountDisplay === '-')) {
+        existing.guestCountDisplay = b.guestCountDisplay;
+      }
+      // ages: より多いデータを優先
+      if (b.ages && b.ages.length > 0 && (!existing.ages || existing.ages.length === 0)) {
+        existing.ages = b.ages;
       }
       // CO不一致時: より後の日付（有効な方）を採用
       if (b.checkOut && existing.checkOut && b.checkOut !== existing.checkOut) {

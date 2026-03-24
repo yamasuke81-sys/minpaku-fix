@@ -105,14 +105,7 @@
 
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0325d</div>
-<!-- ===== デバッグ（ホワイトアウト調査・左下黒背景で必ず視認可能） ===== -->
-<div id="dbgInfo" style="position:fixed;bottom:2.5rem;left:.5rem;right:.5rem;font-size:10px;color:#0f0;background:rgba(0,0,0,.85);z-index:99999;font-family:monospace;padding:4px 8px;border-radius:4px;pointer-events:none;white-space:pre-wrap;"></div>
-<script>
-(function(){
-  // 旧デバッグは末尾の[DEBUG-WHITEOUT]ブロックに統合
-})();
-</script>
+<div class="version-badge" id="deployVersion">v0325f</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -685,39 +678,10 @@ function doConfirm() {
 }
 
 function showConfirmScreen() {
-  // [DEBUG-CONFIRM] 画面切替前の状態をチェック
-  var confirmEl = document.getElementById('confirmScreen');
-  console.log('[DEBUG-CONFIRM] confirmScreen exists=' + !!confirmEl + ' _currentRow=' + _currentRow);
-  if (confirmEl) {
-    console.log('[DEBUG-CONFIRM] confirmScreen classList before=' + confirmEl.className);
-  }
-
   showScreen('confirmScreen');
 
-  // [DEBUG-CONFIRM] 画面切替後の状態をチェック
-  if (confirmEl) {
-    console.log('[DEBUG-CONFIRM] confirmScreen classList after=' + confirmEl.className);
-    console.log('[DEBUG-CONFIRM] confirmScreen display=' + getComputedStyle(confirmEl).display);
-    console.log('[DEBUG-CONFIRM] confirmScreen offsetHeight=' + confirmEl.offsetHeight);
-  }
-
-  // [DEBUG-CONFIRM] 全screen要素の状態
-  var allScreens = document.querySelectorAll('.screen');
-  allScreens.forEach(function(s) {
-    console.log('[DEBUG-CONFIRM] screen #' + s.id + ' class=' + s.className + ' display=' + getComputedStyle(s).display);
-  });
-
   var dbgEl = document.getElementById('callButtons');
-  console.log('[DEBUG-CONFIRM] callButtons exists=' + !!dbgEl);
-  if (!dbgEl) {
-    console.error('[DEBUG-CONFIRM] callButtons NOT FOUND! document.body.innerHTML length=' + document.body.innerHTML.length);
-    // DOM構造をログ
-    var bodyChildren = document.body.children;
-    for (var ci = 0; ci < bodyChildren.length; ci++) {
-      console.log('[DEBUG-CONFIRM] body child[' + ci + '] tag=' + bodyChildren[ci].tagName + ' id=' + (bodyChildren[ci].id || '') + ' class=' + (bodyChildren[ci].className || ''));
-    }
-    return;
-  }
+  if (!dbgEl) return;
   dbgEl.innerHTML =
     '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">読み込み中... / Loading...</p></div>';
 
@@ -728,14 +692,12 @@ function showConfirmScreen() {
 
   // 通知送信
   callGAS('notifyMeetCall', [_currentRow]).then(function(r) {
-    console.log('[DEBUG-CONFIRM] notifyMeetCall success:', JSON.stringify(r));
     if (!(r && r.success)) {
       notifyHtml = '<div class="alert alert-warning mb-3" style="font-size:.8rem;"><i class="bi bi-exclamation-triangle-fill"></i> 通知送信: ' + (r && r.error || '不明なエラー') + '</div>';
     }
     notifyDone = true;
     if (contactDone) renderCallButtons_(notifyHtml, contactHtml);
   }).catch(function(e) {
-    console.log('[DEBUG-CONFIRM] notifyMeetCall error:', e);
     notifyHtml = '<div class="alert alert-danger mb-3" style="font-size:.8rem;"><i class="bi bi-x-circle-fill"></i> 通知送信エラー: ' + (e.message || e) + '</div>';
     notifyDone = true;
     if (contactDone) renderCallButtons_(notifyHtml, contactHtml);
@@ -743,7 +705,6 @@ function showConfirmScreen() {
 
   // 連絡先ボタン読み込み
   callGAS('getContactSettings').then(function(settings) {
-    console.log('[DEBUG-CONFIRM] getContactSettings success:', JSON.stringify(settings));
     var html = '';
     var type = settings.contactType || 'line';
     var showLine = (type === 'line' || type === 'line_meet' || type === 'line_phone' || type === 'all');
@@ -772,7 +733,6 @@ function showConfirmScreen() {
     contactDone = true;
     if (notifyDone) renderCallButtons_(notifyHtml, contactHtml);
   }).catch(function(e) {
-    console.log('[DEBUG-CONFIRM] getContactSettings error:', e);
     contactHtml = '<p class="text-muted" style="font-size:.85rem;">連絡先の読み込みに失敗しました<br>Error: ' + (e.message || e) + '</p>';
     contactDone = true;
     if (notifyDone) renderCallButtons_(notifyHtml, contactHtml);
@@ -780,15 +740,8 @@ function showConfirmScreen() {
 }
 
 function renderCallButtons_(notifyHtml, contactHtml) {
-  console.log('[DEBUG-CONFIRM] renderCallButtons_ called, notifyHtml length=' + notifyHtml.length + ' contactHtml length=' + contactHtml.length);
   var cb = document.getElementById('callButtons');
-  if (!cb) {
-    console.error('[DEBUG-CONFIRM] renderCallButtons_: callButtons NOT FOUND!');
-    // フォールバック: confirmScreen内を探す
-    var cs = document.getElementById('confirmScreen');
-    console.log('[DEBUG-CONFIRM] confirmScreen exists=' + !!cs + ' display=' + (cs ? getComputedStyle(cs).display : 'N/A'));
-    return;
-  }
+  if (!cb) return;
   cb.innerHTML = notifyHtml + contactHtml;
   // 「連絡完了」ボタンを表示（連絡先ボタンが表示された後に）
   var doneBtn = document.getElementById('btnContactDone');
@@ -1005,99 +958,6 @@ function escapeHtml(str) {
 var pinEl = document.getElementById('pinInput');
 if (pinEl) pinEl.addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPinAndOpen(); });
 
-// タブ切替復帰対策: バックグラウンドから復帰した際にGASセッション切れで白画面になる問題を防止
-(function() {
-  // [DEBUG-WHITEOUT] ホワイトアウト根本原因調査
-  var _dbg = document.getElementById('dbgInfo');
-  var _logs = [];
-  function wlog(msg) {
-    var t = new Date().toLocaleTimeString();
-    _logs.push(t + ' ' + msg);
-    if (_logs.length > 15) _logs.shift();
-    if (_dbg) _dbg.textContent = _logs.join('\n');
-    console.log('[DEBUG-WHITEOUT] ' + msg);
-  }
-
-  // 1. visibilitychange: タブ切替時の状態をログ
-  document.addEventListener('visibilitychange', function() {
-    if (document.hidden) {
-      wlog('TAB HIDDEN');
-    } else {
-      var active = document.querySelector('.screen.active');
-      var body = document.body;
-      var bodyStyle = getComputedStyle(body);
-      wlog('TAB VISIBLE active=' + (active ? active.id : 'NONE') +
-        ' bodyDisplay=' + bodyStyle.display +
-        ' bodyVisibility=' + bodyStyle.visibility +
-        ' bodyOpacity=' + bodyStyle.opacity +
-        ' bodyH=' + body.offsetHeight +
-        ' bodyW=' + body.offsetWidth);
-
-      // GAS構造を調査: bodyの全直下子要素
-      var children = body.children;
-      for (var i = 0; i < children.length; i++) {
-        var c = children[i];
-        var cs = getComputedStyle(c);
-        wlog('  body>child[' + i + '] tag=' + c.tagName + ' id=' + (c.id||'') +
-          ' class=' + (c.className||'').substring(0,30) +
-          ' display=' + cs.display + ' h=' + c.offsetHeight);
-      }
-
-      // active screenの親チェーン: 隠れている要素がないか
-      if (active) {
-        var el = active;
-        while (el && el !== document.body) {
-          var es = getComputedStyle(el);
-          if (es.display === 'none' || es.visibility === 'hidden' || es.opacity === '0') {
-            wlog('  HIDDEN ANCESTOR: tag=' + el.tagName + ' id=' + (el.id||'') + ' display=' + es.display + ' vis=' + es.visibility + ' opacity=' + es.opacity);
-          }
-          el = el.parentElement;
-        }
-      }
-    }
-  });
-
-  // 2. MutationObserver: body直下のDOM変更を監視
-  var obs = new MutationObserver(function(mutations) {
-    mutations.forEach(function(m) {
-      if (m.type === 'childList') {
-        if (m.removedNodes.length > 0) {
-          for (var r = 0; r < m.removedNodes.length; r++) {
-            var rn = m.removedNodes[r];
-            wlog('DOM REMOVED: tag=' + (rn.tagName||'text') + ' id=' + (rn.id||'') + ' class=' + ((rn.className||'')+'').substring(0,30));
-          }
-        }
-        if (m.addedNodes.length > 0) {
-          for (var a = 0; a < m.addedNodes.length; a++) {
-            var an = m.addedNodes[a];
-            if (an.nodeType === 1) wlog('DOM ADDED: tag=' + an.tagName + ' id=' + (an.id||'') + ' class=' + ((an.className||'')+'').substring(0,30));
-          }
-        }
-      }
-      if (m.type === 'attributes') {
-        wlog('ATTR CHANGED: tag=' + m.target.tagName + ' id=' + (m.target.id||'') + ' attr=' + m.attributeName + ' new=' + (m.target.getAttribute(m.attributeName)||'').substring(0,50));
-      }
-    });
-  });
-  obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
-
-  // 3. 定期チェック: 2秒ごとにactive screenの視認性を確認
-  setInterval(function() {
-    var active = document.querySelector('.screen.active');
-    if (!active) {
-      wlog('CHECK: no .active screen!');
-      return;
-    }
-    var rect = active.getBoundingClientRect();
-    var bodyRect = document.body.getBoundingClientRect();
-    var vis = active.offsetHeight > 0 && active.offsetWidth > 0;
-    wlog('CHECK: #' + active.id + ' vis=' + vis + ' rect=' + Math.round(rect.width) + 'x' + Math.round(rect.height) + '@' + Math.round(rect.top) + ' bodyRect=' + Math.round(bodyRect.width) + 'x' + Math.round(bodyRect.height));
-  }, 3000);
-
-  // 4. エラーキャッチ（bootstrap autoInit等）
-  window.addEventListener('error', function(e) { wlog('ERROR: ' + e.message + ' @' + (e.filename||'').split('/').pop() + ':' + e.lineno); });
-  window.addEventListener('unhandledrejection', function(e) { wlog('REJECT: ' + (e.reason ? (e.reason.message || e.reason) : '?')); });
-})();
 </script>
 
 </body>

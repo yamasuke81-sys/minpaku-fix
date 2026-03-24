@@ -153,7 +153,11 @@
 <div id="coNotifyScreen" style="display:none; height:100vh; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(135deg,#f5f0e8 0%,#e8e0d4 50%,#ddd6cc 100%); color:#3e3832; position:relative;">
   <button onclick="dismissCoNotify()" style="position:absolute;top:1.5vh;right:1.5vw;background:none;border:none;font-size:5vw;color:rgba(90,78,70,0.3);padding:1vh 1.5vw;line-height:1;z-index:10;" title="閉じる">&times;</button>
   <div style="font-size:12vw; margin-bottom:2vh;">&#x1F3E0;</div>
-  <div id="coNotifyClockSmall" style="font-size:8vw; font-weight:200; color:#5a4e46; margin-bottom:1vh;">--:--</div>
+  <div style="display:flex; align-items:baseline; justify-content:center; margin-bottom:1vh;">
+    <span id="coNotifyClockPad" style="min-width:0.9em; font-size:3.2vw; visibility:hidden;">00</span>
+    <span id="coNotifyClockSmall" style="font-size:8vw; font-weight:200; color:#5a4e46;">--:--</span>
+    <span id="coNotifyClockSec" style="font-size:3.2vw; font-weight:200; color:#5a4e46; opacity:0.5; margin-left:0.2em; min-width:0.9em;">--</span>
+  </div>
   <div style="font-size:3.5vw; color:#6b5e54; margin-bottom:4vh; text-align:center; line-height:1.6;">
     <span id="coNotifyDateLabel"></span>
   </div>
@@ -532,7 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325f</div>
+<div id="version">v0325g</div>
 
 <script>
 // ===== GAS通信 =====
@@ -647,12 +651,13 @@ function updateClock() {
   if (_state.checkinEnabled && _state.checkinAppUrl && _state.checkinReturnTime) {
     var nowHM = h + ':' + m;
     if (nowHM === _state.checkinReturnTime && !_state._checkinRedirected) {
-      // アラーム画面・管理画面・CO連絡画面が表示中の場合はリダイレクトしない
+      // アラーム画面・管理画面が表示中の場合はリダイレクトしない
       var adminActive = document.getElementById('adminScreen') && document.getElementById('adminScreen').classList.contains('active');
       var alarmActive = document.getElementById('alarmScreen') && document.getElementById('alarmScreen').classList.contains('active');
       var complaintActive = document.getElementById('complaintAlarmScreen') && document.getElementById('complaintAlarmScreen').classList.contains('active');
-      var coNotifyActive = _state.coNotifyActive;
-      if (!adminActive && !alarmActive && !complaintActive && !coNotifyActive) {
+      if (!adminActive && !alarmActive && !complaintActive) {
+        // CO連絡画面表示中なら通知なしで終了扱いにしてからリダイレクト
+        if (_state.coNotifyActive) dismissCoNotify();
         _state._checkinRedirected = true;
         window.open(_state.checkinAppUrl, '_top');
       }
@@ -675,6 +680,8 @@ function updateClock() {
   if (_state.coNotifyActive) {
     var csEl = document.getElementById('coNotifyClockSmall');
     if (csEl) csEl.textContent = h + ':' + m;
+    var csSecEl = document.getElementById('coNotifyClockSec');
+    if (csSecEl) csSecEl.textContent = s;
   }
 }
 

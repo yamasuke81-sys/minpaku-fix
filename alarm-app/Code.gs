@@ -471,12 +471,23 @@ function getActiveBookings() {
     var coFlags;
     try { coFlags = JSON.parse(coFlagsJson); } catch (e) { coFlags = {}; }
 
+    // [DEBUG-COLMAP] カラムマッピングの結果をレスポンスに含める
+    var _debugHeaders = [];
+    for (var di = 0; di < Math.min(headers.length, 60); di++) {
+      _debugHeaders.push(di + ':' + String(headers[di] || '').substring(0, 30));
+    }
+
     return JSON.stringify({
       bookings: bookings,
       bookingMsgFlags: flags,
       bookingCoFlags: coFlags,
       scheduledMessages: schedules,
-      checkoutMessages: checkoutMessages
+      checkoutMessages: checkoutMessages,
+      _debug: {
+        colMap: { guestCount: colMap.guestCount, guestCountInfants: colMap.guestCountInfants, guestName: colMap.guestName, checkIn: colMap.checkIn, checkOut: colMap.checkOut, bookingSite: colMap.bookingSite },
+        headers: _debugHeaders,
+        firstBookingRaw: bookings.length > 0 ? { guestCount: bookings[0].guestCount, guestCountAdults: bookings[0].guestCountAdults, guestCountDisplay: bookings[0].guestCountDisplay } : null
+      }
     });
 
   } catch (e) {

@@ -1034,6 +1034,17 @@ function loadAdminData() {
   // 宿泊一覧
   callGAS('getActiveBookings').then(function(data) {
     if (data.error) { document.getElementById('bookingsList').innerHTML = '<div class="alert alert-danger">' + data.error + '</div>'; return; }
+    // [DEBUG-COLMAP] カラムマッピングのデバッグ表示
+    if (data._debug) {
+      var dbg = data._debug;
+      var debugHtml = '<div class="alert alert-info small" style="font-size:.7rem;white-space:pre-wrap;">';
+      debugHtml += '[DEBUG-COLMAP] guestCount=' + dbg.colMap.guestCount + ' guestCountInfants=' + dbg.colMap.guestCountInfants;
+      debugHtml += '\nguestName=' + dbg.colMap.guestName + ' checkIn=' + dbg.colMap.checkIn + ' checkOut=' + dbg.colMap.checkOut + ' bookingSite=' + dbg.colMap.bookingSite;
+      if (dbg.firstBookingRaw) debugHtml += '\nfirstBooking: guestCount=' + dbg.firstBookingRaw.guestCount + ' adults=' + dbg.firstBookingRaw.guestCountAdults + ' display=' + dbg.firstBookingRaw.guestCountDisplay;
+      debugHtml += '\nheaders: ' + (dbg.headers || []).join(' | ');
+      debugHtml += '</div>';
+      document.getElementById('bookingsList').innerHTML = debugHtml;
+    }
     _state.bookingFlags = data.bookingMsgFlags || {};
     _state.bookingCoFlags = data.bookingCoFlags || {};
     _state.messages = data.scheduledMessages || [];

@@ -453,12 +453,8 @@ You may be asked to leave immediately.</textarea>
           <div class="form-text">コンソール → プロバイダー → チャネル → Messaging API設定 → チャネルアクセストークン（長期）</div>
         </div>
         <div class="mb-2">
-          <label class="form-label small">オーナー通知先LINEグループID</label>
-          <input type="text" id="compNotifyGroupId" class="form-control form-control-sm" placeholder="オーナーへの通知送信先">
-        </div>
-        <div class="mb-2">
           <label class="form-label small">オーナー個別LINE ID</label>
-          <input type="text" id="settOwnerLineId" class="form-control form-control-sm" placeholder="オーナー個人のLINE ID（退室連絡用）">
+          <input type="text" id="settOwnerLineId" class="form-control form-control-sm" placeholder="オーナーへの通知送信先LINE ID">
         </div>
         <div class="mb-2">
           <label class="form-label small">清掃グループID</label>
@@ -505,7 +501,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324i</div>
+<div id="version">v0324j</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1504,7 +1500,6 @@ function saveSettings() {
   // 基本設定タブのLINE連携・メールも一緒に保存
   var cs = {
     lineChannelToken: document.getElementById('compLineToken').value.trim(),
-    lineNotifyGroupId: document.getElementById('compNotifyGroupId').value.trim(),
     ownerLineId: document.getElementById('settOwnerLineId').value.trim(),
     cleaningGroupId: document.getElementById('settCleaningGroupId').value.trim(),
     neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),
@@ -1678,7 +1673,6 @@ function loadComplaintSettings() {
   callGAS('getComplaintSettings').then(function(s) {
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
     document.getElementById('compLineToken').value = s.lineChannelToken || '';
-    document.getElementById('compNotifyGroupId').value = s.lineNotifyGroupId || '';
     document.getElementById('settOwnerLineId').value = s.ownerLineId || '';
     document.getElementById('settCleaningGroupId').value = s.cleaningGroupId || '';
     document.getElementById('compNeighborGroupId').value = s.neighborLineGroupId || '';
@@ -1697,7 +1691,6 @@ function loadComplaintSettings() {
 function saveComplaintSettings() {
   var s = {
     lineChannelToken: document.getElementById('compLineToken').value.trim(),
-    lineNotifyGroupId: document.getElementById('compNotifyGroupId').value.trim(),
     ownerLineId: document.getElementById('settOwnerLineId').value.trim(),
     cleaningGroupId: document.getElementById('settCleaningGroupId').value.trim(),
     neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),

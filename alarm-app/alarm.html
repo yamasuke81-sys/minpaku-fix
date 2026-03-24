@@ -510,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324s</div>
+<div id="version">v0324t</div>
 
 <script>
 // ===== GAS通信 =====
@@ -809,10 +809,12 @@ function dismissAlarm() {
 
   if (isPreview) {
     // プレビューの場合は管理画面に戻る
+    _state.screen = 'admin';
     document.getElementById('adminScreen').style.display = 'block';
     document.getElementById('adminScreen').className = 'active';
     document.getElementById('settingsBtn').style.display = '';
   } else {
+    _state.screen = 'clock';
     document.getElementById('clockScreen').style.display = 'flex';
     document.getElementById('settingsBtn').style.display = '';
   }
@@ -1706,6 +1708,7 @@ function confirmDismissComplaint() {
 
   if (isPreview) {
     // プレビューの場合は管理画面に戻る
+    _state.screen = 'admin';
     document.getElementById('adminScreen').style.display = 'block';
     document.getElementById('adminScreen').className = 'active';
   } else {
@@ -1867,6 +1870,7 @@ function previewCheckoutScreen() {
   var snd = (document.getElementById('settCheckoutSound') || {}).value || 'chime';
   document.getElementById('adminScreen').style.display = 'none';
   document.getElementById('adminScreen').className = '';
+  _state.screen = 'preview';
   triggerAlarm({
     id: 'preview_checkout',
     type: 'checkout',
@@ -1898,6 +1902,7 @@ function previewMessageByIdx(idx) {
   var snd = (document.getElementById('settMessageSound') || {}).value || 'chime';
   document.getElementById('adminScreen').style.display = 'none';
   document.getElementById('adminScreen').className = '';
+  _state.screen = 'preview';
   triggerAlarm({
     id: 'preview_message',
     type: 'message',
@@ -1916,6 +1921,7 @@ function previewComplaintScreen() {
   var snd = (document.getElementById('settComplaintSound') || {}).value || 'alarm';
   document.getElementById('adminScreen').style.display = 'none';
   document.getElementById('adminScreen').className = '';
+  _state.screen = 'preview';
   // 騒音クレームは専用画面
   _state.complaintActive = true;
   _state._complaintWarningJa = msgJa;

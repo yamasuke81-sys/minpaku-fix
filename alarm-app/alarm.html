@@ -130,7 +130,7 @@
 <!-- ===== 騒音クレームアラーム画面 ===== -->
 <div id="complaintScreen">
   <div class="complaint-icon">&#x1F6A8;</div>
-  <div class="complaint-title">&#x26A0;&#xFE0F; 騒音クレーム / NOISE COMPLAINT &#x26A0;&#xFE0F;</div>
+  <div class="complaint-title">&#x26A0;&#xFE0F; 騒音クレーム &#x26A0;&#xFE0F;<br>&#x26A0;&#xFE0F; NOISE COMPLAINT &#x26A0;&#xFE0F;</div>
   <div class="complaint-body" id="complaintBodyJa"></div>
   <div class="complaint-body-en" id="complaintBodyEn"></div>
   <div id="complaintDismissArea">
@@ -510,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324q</div>
+<div id="version">v0324r</div>
 
 <script>
 // ===== GAS通信 =====
@@ -545,6 +545,7 @@ var _state = {
   bookingCoFlags: {},     // { rowNumber: { coMsgId: true/false } }
   messages: [],           // スケジュールメッセージテンプレート
   coMessages: [],         // チェックアウトメッセージテンプレート
+  adminBookings: [],      // 管理画面の宿泊一覧データ（ソート用キャッシュ）
   coNotifySettings: {},   // 退室連絡設定
   coNotifyActive: false,  // 退室連絡画面表示中
   coNotifyDismissed: false, // 退室連絡ボタン押下済み
@@ -1031,7 +1032,8 @@ function loadAdminData() {
     _state.bookingCoFlags = data.bookingCoFlags || {};
     _state.messages = data.scheduledMessages || [];
     _state.coMessages = data.checkoutMessages || [];
-    renderBookings(data.bookings || []);
+    _state.adminBookings = data.bookings || [];
+    renderBookings(_state.adminBookings);
     renderMessages();
     renderCoMessages();
   });
@@ -1081,25 +1083,49 @@ function renderBookings(bookings) {
     return;
   }
 
+  // ソート（CI日で昇順/降順）
+  var sortOrder = localStorage.getItem('alarm_booking_sort') || 'asc';
+  bookings.sort(function(a, b) {
+    var cmp = (a.checkIn || '').localeCompare(b.checkIn || '');
+    return sortOrder === 'desc' ? -cmp : cmp;
+  });
+
   // 自動チェック適用（フラグ未設定の予約のみ）
   var autoSaved = false;
+  var coAutoSaved = false;
   for (var ai = 0; ai < bookings.length; ai++) {
     var bk = bookings[ai];
     var rnKey = String(bk.rowNumber);
-    if (_state.bookingFlags[rnKey]) continue; // 既にフラグ設定済み → ユーザー操作を尊重
-    if (shouldAutoCheckMessage_(bk) && _state.messages.length > 0) {
+    // 静音時間: 25歳以下3人以上 → 自動チェック
+    if (!_state.bookingFlags[rnKey] && shouldAutoCheckMessage_(bk) && _state.messages.length > 0) {
       _state.bookingFlags[rnKey] = {};
       for (var ami = 0; ami < _state.messages.length; ami++) {
         _state.bookingFlags[rnKey][_state.messages[ami].id] = true;
       }
       autoSaved = true;
     }
+    // CO通知: すべての予約をデフォルトでチェックON
+    if (!_state.bookingCoFlags[rnKey] && _state.coMessages.length > 0) {
+      _state.bookingCoFlags[rnKey] = {};
+      for (var aci = 0; aci < _state.coMessages.length; aci++) {
+        _state.bookingCoFlags[rnKey][_state.coMessages[aci].id] = true;
+      }
+      coAutoSaved = true;
+    }
   }
   if (autoSaved) {
     callGAS('saveBookingMessageFlags', [_state.bookingFlags]).catch(function(e) { console.error(e); });
   }
+  if (coAutoSaved) {
+    callGAS('saveBookingCoFlags', [_state.bookingCoFlags]).catch(function(e) { console.error(e); });
+  }
 
-  var html = '';
+  // ソート切替ボタン
+  var html = '<div class="d-flex justify-content-end mb-2">';
+  html += '<button class="btn btn-sm btn-outline-secondary" onclick="toggleBookingSort()">';
+  html += '<i class="bi bi-sort-down"></i> CI日 ' + (sortOrder === 'asc' ? '昇順 ▲' : '降順 ▼');
+  html += '</button></div>';
+
   for (var i = 0; i < bookings.length; i++) {
     var b = bookings[i];
     var rn = String(b.rowNumber);
@@ -1166,6 +1192,17 @@ function toggleCoFlag(rowNumber, msgId, checked) {
   if (!_state.bookingCoFlags[rowNumber]) _state.bookingCoFlags[rowNumber] = {};
   _state.bookingCoFlags[rowNumber][msgId] = checked;
   callGAS('saveBookingCoFlags', [_state.bookingCoFlags]).catch(function(e) { console.error(e); });
+}
+
+function toggleBookingSort() {
+  var current = localStorage.getItem('alarm_booking_sort') || 'asc';
+  localStorage.setItem('alarm_booking_sort', current === 'asc' ? 'desc' : 'asc');
+  // 再レンダリング（データはキャッシュ済み）
+  if (_state.adminBookings && _state.adminBookings.length > 0) {
+    renderBookings(_state.adminBookings);
+  } else {
+    loadAdminData();
+  }
 }
 
 // ===== メッセージテンプレート =====

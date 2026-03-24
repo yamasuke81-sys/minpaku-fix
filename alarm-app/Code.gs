@@ -702,7 +702,7 @@ function notifyOwnerComplaint_(info, event, timeStr) {
   var props = PropertiesService.getScriptProperties();
   var ownerEmail = props.getProperty('OWNER_EMAIL') || '';
   var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
-  var lineGroupId = props.getProperty('OWNER_LINE_ID') || '';
+  var lineGroupId = props.getProperty('LINE_NOTIFY_GROUP_ID') || '';
 
   var subject, body;
   if (event === 'triggered') {
@@ -798,6 +798,7 @@ function getComplaintSettings() {
   return JSON.stringify({
     ownerEmail: props.getProperty('OWNER_EMAIL') || '',
     lineChannelToken: props.getProperty('LINE_CHANNEL_TOKEN') || '',
+    lineNotifyGroupId: props.getProperty('LINE_NOTIFY_GROUP_ID') || '',
     ownerLineId: props.getProperty('OWNER_LINE_ID') || '',
     cleaningGroupId: props.getProperty('CLEANING_GROUP_ID') || '',
     neighborLineGroupId: props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '',
@@ -814,6 +815,7 @@ function saveComplaintSettings(settings) {
   var props = PropertiesService.getScriptProperties();
   if (settings.ownerEmail !== undefined) props.setProperty('OWNER_EMAIL', settings.ownerEmail);
   if (settings.lineChannelToken !== undefined) props.setProperty('LINE_CHANNEL_TOKEN', settings.lineChannelToken);
+  if (settings.lineNotifyGroupId !== undefined) props.setProperty('LINE_NOTIFY_GROUP_ID', settings.lineNotifyGroupId);
   if (settings.ownerLineId !== undefined) props.setProperty('OWNER_LINE_ID', settings.ownerLineId);
   if (settings.cleaningGroupId !== undefined) props.setProperty('CLEANING_GROUP_ID', settings.cleaningGroupId);
   if (settings.neighborLineGroupId !== undefined) props.setProperty('NEIGHBOR_LINE_GROUP_ID', settings.neighborLineGroupId);
@@ -868,9 +870,9 @@ function sendTestMessage(params) {
     // LINE送信
     if (params.channels && params.channels.line) {
       var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
-      var lineGroupId = props.getProperty('OWNER_LINE_ID') || '';
+      var lineGroupId = props.getProperty('LINE_NOTIFY_GROUP_ID') || '';
       if (!lineToken || !lineGroupId) {
-        results.line = { success: false, error: 'LINE設定が不完全です。基本設定タブでトークン・オーナーLINE IDを設定してください。' };
+        results.line = { success: false, error: 'LINE設定が不完全です。基本設定タブでトークン・オーナー通知先LINEグループIDを設定してください。' };
       } else {
         try {
           UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {

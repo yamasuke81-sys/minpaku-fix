@@ -510,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324p</div>
+<div id="version">v0324q</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1890,6 +1890,10 @@ function previewComplaintScreen() {
   cs.className = 'active';
   cs.style.display = 'flex';
   document.getElementById('settingsBtn').style.display = 'none';
+  document.getElementById('btnComplaintHold').style.display = '';
+  document.getElementById('btnComplaintHold').classList.remove('holding');
+  document.getElementById('holdProgress').style.display = '';
+  document.getElementById('holdInstruction').style.display = '';
   document.getElementById('btnComplaintConfirm').style.display = 'none';
   document.getElementById('holdProgressBar').style.width = '0%';
   document.getElementById('holdInstruction').textContent = '5秒間長押ししてください / Hold for 5 seconds';

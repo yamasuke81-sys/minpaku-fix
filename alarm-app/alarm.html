@@ -13,7 +13,9 @@
 
     /* ===== 待機画面（時計） ===== */
     #clockScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(200deg, #d4c08e 0%, #5a8fa8 25%, #2a6a8a 50%, #1a4a7a 75%, #0d3468 100%); }
-    #clockTime { font-size: 18vw; font-weight: 200; letter-spacing: 0.05em; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.2); position: relative; left: -0.45em; }
+    #clockTime { font-size: 18vw; font-weight: 200; letter-spacing: 0.05em; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.2); display: flex; align-items: baseline; justify-content: center; }
+    #clockSeconds { font-size: 0.4em; opacity: 0.6; margin-left: 0.1em; min-width: 1.2em; }
+    #clockPad { min-width: 1.2em; font-size: 0.4em; visibility: hidden; }
     #clockDate { font-size: 4vw; color: rgba(255,255,255,0.7); margin-top: -2vw; }
 
 
@@ -105,7 +107,7 @@
 
 <!-- ===== 待機画面（時計） ===== -->
 <div id="clockScreen">
-  <div id="clockTime">--:--<span style="font-size:0.4em;opacity:0.6;margin-left:0.1em">--</span></div>
+  <div id="clockTime"><span id="clockPad">00</span><span id="clockHM">--:--</span><span id="clockSeconds">--</span></div>
   <div id="clockDate"></div>
   <!-- clockPropertyName removed -->
 </div>
@@ -598,7 +600,8 @@ function updateClock() {
   var h = String(now.getHours()).padStart(2, '0');
   var m = String(now.getMinutes()).padStart(2, '0');
   var s = String(now.getSeconds()).padStart(2, '0');
-  document.getElementById('clockTime').innerHTML = h + ':' + m + '<span style="font-size:0.4em;opacity:0.6;margin-left:0.1em">' + s + '</span>';
+  document.getElementById('clockHM').textContent = h + ':' + m;
+  document.getElementById('clockSeconds').textContent = s;
 
   var days = ['日', '月', '火', '水', '木', '金', '土'];
   var ds = (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';

@@ -61,7 +61,10 @@ function getAlarmSettings() {
     messageVolume: Number(props.getProperty('MESSAGE_VOLUME') || '60'),
     messageSound: props.getProperty('MESSAGE_SOUND') || 'chime',
     complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),
-    complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm'
+    complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm',
+    checkinAppUrl: props.getProperty('CHECKIN_APP_URL') || '',
+    checkinEnabled: props.getProperty('CHECKIN_ENABLED') === 'true',
+    checkinReturnTime: props.getProperty('CHECKIN_RETURN_TIME') || '14:01'
   });
 }
 
@@ -83,6 +86,9 @@ function saveAlarmSettings(settings) {
   if (settings.messageSound !== undefined) props.setProperty('MESSAGE_SOUND', settings.messageSound);
   if (settings.complaintVolume !== undefined) props.setProperty('COMPLAINT_VOLUME', String(settings.complaintVolume));
   if (settings.complaintSound !== undefined) props.setProperty('COMPLAINT_SOUND', settings.complaintSound);
+  if (settings.checkinAppUrl !== undefined) props.setProperty('CHECKIN_APP_URL', settings.checkinAppUrl);
+  if (settings.checkinEnabled !== undefined) props.setProperty('CHECKIN_ENABLED', settings.checkinEnabled ? 'true' : 'false');
+  if (settings.checkinReturnTime !== undefined) props.setProperty('CHECKIN_RETURN_TIME', settings.checkinReturnTime);
   return JSON.stringify({ success: true });
 }
 

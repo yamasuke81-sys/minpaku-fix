@@ -477,6 +477,25 @@ You may be asked to leave immediately.</textarea>
         </div>
       </div>
       <div class="card p-3 mb-3">
+        <h6><i class="bi bi-link-45deg"></i> チェックインapp連携</h6>
+        <div class="mb-2">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="settCheckinEnabled">
+            <label class="form-check-label" for="settCheckinEnabled">チェックインappと連携する</label>
+          </div>
+          <div class="form-text">ONにすると、設定時刻にチェックインapp画面へ自動遷移します</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">チェックインapp URL</label>
+          <input type="text" id="settCheckinAppUrl" class="form-control form-control-sm" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">チェックインappへの遷移時刻</label>
+          <input type="time" id="settCheckinReturnTime" class="form-control form-control-sm" style="width:120px;" value="14:01">
+          <div class="form-text">この時刻にチェックインapp画面に自動遷移します（CO完了後の切替タイミング）</div>
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
         <h6><i class="bi bi-lock"></i> PIN（管理画面のロック）</h6>
         <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
       </div>
@@ -512,7 +531,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325b</div>
+<div id="version">v0325d</div>
 
 <script>
 // ===== GAS通信 =====
@@ -551,10 +570,23 @@ var _state = {
   coNotifySettings: {},   // 退室連絡設定
   coNotifyActive: false,  // 退室連絡画面表示中
   coNotifyDismissed: false, // 退室連絡ボタン押下済み
-  _checkoutTimes: ['10:00']
+  _checkoutTimes: ['10:00'],
+  checkinAppUrl: '',        // チェックインapp連携
+  checkinEnabled: false,
+  checkinReturnTime: '14:01',
+  _checkinRedirected: false,
+  _fromCheckin: false       // ?from=checkin で遷移してきたか
 };
 
 // ===== 初期化 =====
+// ?from=checkin パラメータを検知（チェックインappからの遷移）
+(function() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('from') === 'checkin') _state._fromCheckin = true;
+  } catch (e) {}
+})();
+
 window.addEventListener('load', function() {
   startClock();
   poll();
@@ -605,6 +637,23 @@ function updateClock() {
   var days = ['日', '月', '火', '水', '木', '金', '土'];
   var ds = (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
   document.getElementById('clockDate').textContent = ds;
+
+  // チェックインapp連携: 設定時刻になったらチェックインappに遷移
+  if (_state.checkinEnabled && _state.checkinAppUrl && _state.checkinReturnTime) {
+    var nowHM = h + ':' + m;
+    if (nowHM === _state.checkinReturnTime && !_state._checkinRedirected) {
+      // アラーム画面・管理画面が表示中の場合はリダイレクトしない
+      var adminActive = document.getElementById('adminScreen') && document.getElementById('adminScreen').classList.contains('active');
+      var alarmActive = document.getElementById('alarmScreen') && document.getElementById('alarmScreen').classList.contains('active');
+      var complaintActive = document.getElementById('complaintAlarmScreen') && document.getElementById('complaintAlarmScreen').classList.contains('active');
+      if (!adminActive && !alarmActive && !complaintActive) {
+        _state._checkinRedirected = true;
+        window.open(_state.checkinAppUrl, '_top');
+      }
+    }
+    // 時刻が変わったらフラグリセット
+    if (nowHM !== _state.checkinReturnTime) _state._checkinRedirected = false;
+  }
 
   // アラームチェック（毎秒）— 騒音クレームアラーム中はスキップ
   var hhmm = h + ':' + m;
@@ -1054,6 +1103,12 @@ function loadAdminData() {
     _state.settings = s;
     document.getElementById('settSpreadsheetId').value = s.spreadsheetId || '';
     document.getElementById('settPin').value = s.pin || '1234';
+    document.getElementById('settCheckinAppUrl').value = s.checkinAppUrl || '';
+    document.getElementById('settCheckinEnabled').checked = !!s.checkinEnabled;
+    document.getElementById('settCheckinReturnTime').value = s.checkinReturnTime || '14:01';
+    _state.checkinAppUrl = s.checkinAppUrl || '';
+    _state.checkinEnabled = !!s.checkinEnabled;
+    _state.checkinReturnTime = s.checkinReturnTime || '14:01';
     // 音量・音種
     document.getElementById('settCheckoutVolume').value = s.checkoutVolume || 80;
     document.getElementById('settCheckoutVolLabel').textContent = s.checkoutVolume || 80;
@@ -1559,7 +1614,10 @@ function saveSettings() {
     messageVolume: Number(document.getElementById('settMessageVolume').value),
     messageSound: document.getElementById('settMessageSound').value,
     complaintVolume: Number(document.getElementById('settComplaintVolume').value),
-    complaintSound: document.getElementById('settComplaintSound').value
+    complaintSound: document.getElementById('settComplaintSound').value,
+    checkinAppUrl: document.getElementById('settCheckinAppUrl').value.trim(),
+    checkinEnabled: document.getElementById('settCheckinEnabled').checked,
+    checkinReturnTime: document.getElementById('settCheckinReturnTime').value || '14:01'
   };
   // 基本設定タブのLINE連携・メールも一緒に保存
   var cs = {

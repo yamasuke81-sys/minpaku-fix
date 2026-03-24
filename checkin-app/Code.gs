@@ -52,7 +52,9 @@ function getCheckinSettings() {
     notifyEmail: props.getProperty('NOTIFY_EMAIL') || '',
     settingsPin: props.getProperty('SETTINGS_PIN') || '0000',
     sheetName: props.getProperty('SHEET_NAME') || 'フォームの回答 1',
-    displayFields: fields
+    displayFields: fields,
+    alarmAppUrl: props.getProperty('ALARM_APP_URL') || '',
+    alarmEnabled: props.getProperty('ALARM_ENABLED') === 'true'
   });
 }
 
@@ -71,6 +73,8 @@ function saveCheckinSettings(settingsJson) {
   if (s.settingsPin !== undefined) props.setProperty('SETTINGS_PIN', s.settingsPin);
   if (s.sheetName !== undefined) props.setProperty('SHEET_NAME', s.sheetName);
   if (s.displayFields !== undefined) props.setProperty('DISPLAY_FIELDS', JSON.stringify(s.displayFields));
+  if (s.alarmAppUrl !== undefined) props.setProperty('ALARM_APP_URL', s.alarmAppUrl);
+  if (s.alarmEnabled !== undefined) props.setProperty('ALARM_ENABLED', s.alarmEnabled ? 'true' : 'false');
   return JSON.stringify({ success: true });
 }
 

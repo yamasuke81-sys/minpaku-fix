@@ -105,7 +105,7 @@
 
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0325b</div>
+<div class="version-badge" id="deployVersion">v0325d</div>
 <!-- ===== デバッグ（ホワイトアウト調査・左下黒背景で必ず視認可能） ===== -->
 <div id="dbgInfo" style="position:fixed;bottom:2.5rem;left:.5rem;right:.5rem;font-size:10px;color:#0f0;background:rgba(0,0,0,.85);z-index:99999;font-family:monospace;padding:4px 8px;border-radius:4px;pointer-events:none;white-space:pre-wrap;"></div>
 <script>
@@ -177,9 +177,14 @@
     <i class="bi bi-check-circle-fill"></i>
     <h2>確認完了<br><small style="font-size:.8rem;color:#666;">Information Confirmed</small></h2>
     <div id="callButtons"></div>
-    <button class="btn btn-outline-secondary mt-3" onclick="resetToSearch()" style="border-radius:.8rem;">
-      <i class="bi bi-arrow-counterclockwise"></i> 最初に戻る / Back to Start
-    </button>
+    <div id="confirmNextArea" class="mt-3">
+      <button class="btn btn-success btn-lg w-100" id="btnContactDone" onclick="onContactDone()" style="border-radius:.8rem;padding:.8rem;font-size:1.1rem;display:none;">
+        <i class="bi bi-arrow-right-circle-fill"></i> 連絡完了 / Contact Done
+      </button>
+      <button class="btn btn-outline-secondary mt-2" onclick="resetToSearch()" style="border-radius:.8rem;">
+        <i class="bi bi-arrow-counterclockwise"></i> 最初に戻る / Back to Start
+      </button>
+    </div>
   </div>
 </div>
 
@@ -264,6 +269,22 @@
       </div>
     </div>
 
+    <!-- アラームapp連携 -->
+    <div class="settings-section">
+      <h3><i class="bi bi-link-45deg"></i> アラームapp連携</h3>
+      <div class="mb-2">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="settAlarmEnabled">
+          <label class="form-check-label" for="settAlarmEnabled">アラームappと連携する</label>
+        </div>
+        <div class="form-text">ONにすると、スタッフ連絡完了後にアラームappの時計画面に自動遷移します</div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">アラームapp URL</label>
+        <input type="text" class="form-control" id="settAlarmAppUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+    </div>
+
     <!-- PIN設定 -->
     <div class="settings-section">
       <h3><i class="bi bi-lock"></i> セキュリティ</h3>
@@ -336,6 +357,14 @@ function callGAS(fn, args) {
     runner[fn].apply(runner, args || []);
   });
 }
+
+// ===== 初回ロード: アラーム連携設定を取得 =====
+window._alarmAppUrl = '';
+window._alarmEnabled = false;
+callGAS('getCheckinSettings').then(function(s) {
+  window._alarmAppUrl = s.alarmAppUrl || '';
+  window._alarmEnabled = !!s.alarmEnabled;
+}).catch(function() {});
 
 // ===== 画面切替 =====
 function showScreen(id) {
@@ -761,11 +790,20 @@ function renderCallButtons_(notifyHtml, contactHtml) {
     return;
   }
   cb.innerHTML = notifyHtml + contactHtml;
-  console.log('[DEBUG-CONFIRM] renderCallButtons_ done, cb.innerHTML length=' + cb.innerHTML.length);
-  // 画面が見えているか確認
-  var cs = document.getElementById('confirmScreen');
-  if (cs) {
-    console.log('[DEBUG-CONFIRM] confirmScreen display after render=' + getComputedStyle(cs).display + ' offsetHeight=' + cs.offsetHeight);
+  // 「連絡完了」ボタンを表示（連絡先ボタンが表示された後に）
+  var doneBtn = document.getElementById('btnContactDone');
+  if (doneBtn) doneBtn.style.display = '';
+}
+
+// 連絡完了ボタン: アラーム連携ONならアラームappへ遷移、OFFなら検索画面に戻る
+function onContactDone() {
+  if (window._alarmEnabled && window._alarmAppUrl) {
+    var url = window._alarmAppUrl;
+    if (url.indexOf('?') >= 0) url += '&from=checkin';
+    else url += '?from=checkin';
+    window.open(url, '_top');
+  } else {
+    resetToSearch();
   }
 }
 
@@ -829,6 +867,11 @@ function loadSettings() {
     document.getElementById('settDevicePhone').value = settings.devicePhone || '';
     document.getElementById('settNotifyEmail').value = settings.notifyEmail || '';
     document.getElementById('settPin').value = settings.settingsPin || '0000';
+    document.getElementById('settAlarmAppUrl').value = settings.alarmAppUrl || '';
+    document.getElementById('settAlarmEnabled').checked = !!settings.alarmEnabled;
+    // 連携設定をグローバルに保持（リダイレクト判定用）
+    window._alarmAppUrl = settings.alarmAppUrl || '';
+    window._alarmEnabled = !!settings.alarmEnabled;
 
     // 表示フィールド設定を描画
     var fields = settings.displayFields || [];
@@ -877,6 +920,8 @@ function saveSettings() {
     devicePhone: document.getElementById('settDevicePhone').value.trim(),
     notifyEmail: document.getElementById('settNotifyEmail').value.trim(),
     settingsPin: document.getElementById('settPin').value.trim(),
+    alarmAppUrl: document.getElementById('settAlarmAppUrl').value.trim(),
+    alarmEnabled: document.getElementById('settAlarmEnabled').checked,
     displayFields: fields
   };
 

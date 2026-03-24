@@ -20,7 +20,18 @@
     /* ===== アラーム画面 ===== */
     #alarmScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; }
     #alarmScreen.active { display: flex; }
-    #alarmScreen.alarm-checkout { background: linear-gradient(180deg, #87CEEB 0%, #FFE4B5 30%, #FFA07A 60%, #4682B4 100%); color: #2c3e50; }
+    /* チェックアウト: 薄ベージュ⇔グレーの波打つグラデーション */
+    @keyframes coBgWave {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    #alarmScreen.alarm-checkout {
+      background: linear-gradient(135deg, #f5f0e8 0%, #e8e0d4 20%, #d5cec4 40%, #c8c0b8 60%, #ddd6cc 80%, #f0ebe3 100%);
+      background-size: 300% 300%;
+      animation: coBgWave 12s ease-in-out infinite;
+      color: #4a4340;
+    }
     #alarmScreen.alarm-message { background: linear-gradient(180deg, #B0E0E6 0%, #87CEEB 50%, #4682B4 100%); color: #1a3a5c; }
 
     /* ===== 騒音クレームアラーム画面 ===== */
@@ -45,7 +56,16 @@
     #alarmScreen .alarm-icon { font-size: 15vw; animation: gentleBob 3s ease-in-out infinite; }
     #alarmScreen .alarm-title { font-size: 6vw; font-weight: 600; margin: 2vh 0; text-align: center; text-shadow: 0 1px 4px rgba(255,255,255,0.5); }
     #alarmScreen .alarm-body { font-size: 3.5vw; text-align: center; max-width: 90vw; line-height: 1.6; white-space: pre-line; }
-    #alarmScreen .alarm-body-en { font-size: 2.8vw; color: rgba(44,62,80,0.6); margin-top: 1vh; }
+    #alarmScreen .alarm-body-en { font-size: 2.8vw; margin-top: 1vh; }
+    /* チェックアウト用: ベージュ/グレー系のテキスト・ボタン */
+    #alarmScreen.alarm-checkout .alarm-title { color: #3e3832; text-shadow: 0 1px 3px rgba(255,255,255,0.6); }
+    #alarmScreen.alarm-checkout .alarm-body { color: #4a4340; }
+    #alarmScreen.alarm-checkout .alarm-body-en { color: rgba(74,67,64,0.55); }
+    #alarmScreen.alarm-checkout .btn-dismiss { background: rgba(255,255,255,0.8); color: #5a4e46; border: 2px solid rgba(160,140,120,0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.06); }
+    #alarmScreen.alarm-checkout .btn-dismiss:hover, #alarmScreen.alarm-checkout .btn-dismiss:active { background: #fff; border-color: #a08c78; }
+    /* メッセージ用: 従来の青系 */
+    #alarmScreen.alarm-message .alarm-body-en { color: rgba(44,62,80,0.6); }
+    /* 共通フォールバック */
     #alarmScreen .btn-dismiss { font-size: 4vw; padding: 2vh 8vw; margin-top: 4vh; border-radius: 2vw; background: rgba(255,255,255,0.85); color: #2c6e8a; border: 2px solid rgba(70,130,180,0.4); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
     #alarmScreen .btn-dismiss:hover, #alarmScreen .btn-dismiss:active { background: #fff; border-color: #4682B4; }
     @keyframes gentleBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
@@ -99,10 +119,10 @@
   <button class="btn btn-dismiss" id="btnDismiss" onclick="dismissAlarm()">
     <i class="bi bi-check-circle"></i> 確認しました / Acknowledged
   </button>
-  <div class="wave-bg">
+  <div class="wave-bg" id="alarmWaveBg">
     <svg viewBox="0 0 1440 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="height:100%;">
-      <path d="M0,80 C180,140 360,20 540,80 C720,140 900,20 1080,80 C1260,140 1440,20 1440,80 L1440,200 L0,200Z" fill="rgba(70,130,180,0.15)"/>
-      <path d="M0,120 C200,160 400,60 600,120 C800,160 1000,60 1200,120 C1400,160 1440,100 1440,120 L1440,200 L0,200Z" fill="rgba(70,130,180,0.1)"/>
+      <path class="wave-path1" d="M0,80 C180,140 360,20 540,80 C720,140 900,20 1080,80 C1260,140 1440,20 1440,80 L1440,200 L0,200Z" fill="rgba(70,130,180,0.15)"/>
+      <path class="wave-path2" d="M0,120 C200,160 400,60 600,120 C800,160 1000,60 1200,120 C1400,160 1440,100 1440,120 L1440,200 L0,200Z" fill="rgba(70,130,180,0.1)"/>
     </svg>
   </div>
 </div>
@@ -396,7 +416,7 @@ Thank you for your stay.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0323q</div>
+<div id="version">v0324b</div>
 
 <script>
 // ===== GAS通信 =====
@@ -605,6 +625,17 @@ function triggerAlarm(alarm) {
   document.getElementById('alarmTitle').textContent = alarm.title;
   document.getElementById('alarmBody').textContent = alarm.body;
   document.getElementById('alarmBodyEn').textContent = alarm.bodyEn || '';
+
+  // 波SVGの色をアラームタイプに合わせる
+  var w1 = document.querySelector('#alarmWaveBg .wave-path1');
+  var w2 = document.querySelector('#alarmWaveBg .wave-path2');
+  if (alarm.type === 'checkout') {
+    if (w1) w1.setAttribute('fill', 'rgba(160,140,120,0.12)');
+    if (w2) w2.setAttribute('fill', 'rgba(140,125,110,0.08)');
+  } else {
+    if (w1) w1.setAttribute('fill', 'rgba(70,130,180,0.15)');
+    if (w2) w2.setAttribute('fill', 'rgba(70,130,180,0.1)');
+  }
 
   document.getElementById('clockScreen').style.display = 'none';
   screen.style.display = 'flex';

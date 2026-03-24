@@ -799,6 +799,8 @@ function getComplaintSettings() {
     ownerEmail: props.getProperty('OWNER_EMAIL') || '',
     lineChannelToken: props.getProperty('LINE_CHANNEL_TOKEN') || '',
     lineNotifyGroupId: props.getProperty('LINE_NOTIFY_GROUP_ID') || '',
+    ownerLineId: props.getProperty('OWNER_LINE_ID') || '',
+    cleaningGroupId: props.getProperty('CLEANING_GROUP_ID') || '',
     neighborLineGroupId: props.getProperty('NEIGHBOR_LINE_GROUP_ID') || '',
     complaintKeywords: props.getProperty('COMPLAINT_KEYWORDS') || '騒音,うるさい,noise,noisy,loud',
     complaintReplyMessage: props.getProperty('COMPLAINT_REPLY_MESSAGE') || '【自動送信です】\nご連絡ありがとうございます。\nご迷惑をおかけし大変申し訳ありません。\n宿泊者に注意喚起いたしました。\n（室内でアラーム発報、注意メッセージ表示）\n引き続きご迷惑をおかけする場合は、再度ご連絡ください。',
@@ -814,6 +816,8 @@ function saveComplaintSettings(settings) {
   if (settings.ownerEmail !== undefined) props.setProperty('OWNER_EMAIL', settings.ownerEmail);
   if (settings.lineChannelToken !== undefined) props.setProperty('LINE_CHANNEL_TOKEN', settings.lineChannelToken);
   if (settings.lineNotifyGroupId !== undefined) props.setProperty('LINE_NOTIFY_GROUP_ID', settings.lineNotifyGroupId);
+  if (settings.ownerLineId !== undefined) props.setProperty('OWNER_LINE_ID', settings.ownerLineId);
+  if (settings.cleaningGroupId !== undefined) props.setProperty('CLEANING_GROUP_ID', settings.cleaningGroupId);
   if (settings.neighborLineGroupId !== undefined) props.setProperty('NEIGHBOR_LINE_GROUP_ID', settings.neighborLineGroupId);
   if (settings.complaintKeywords !== undefined) props.setProperty('COMPLAINT_KEYWORDS', settings.complaintKeywords);
   if (settings.complaintReplyMessage !== undefined) props.setProperty('COMPLAINT_REPLY_MESSAGE', settings.complaintReplyMessage);
@@ -927,9 +931,9 @@ function sendCheckoutNotify(bookingInfo) {
 
     var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
 
-    // 1) LINE清掃グループ
+    // 1) LINE清掃グループ（IDは基本設定から取得）
     if (sett.lineCleaningGroup && lineToken) {
-      var cleaningGroupId = sett.lineCleaningGroupId || '';
+      var cleaningGroupId = props.getProperty('CLEANING_GROUP_ID') || '';
       if (cleaningGroupId) {
         try {
           UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
@@ -942,9 +946,9 @@ function sendCheckoutNotify(bookingInfo) {
       }
     }
 
-    // 2) オーナー個別LINE
+    // 2) オーナー個別LINE（IDは基本設定から取得）
     if (sett.lineOwner && lineToken) {
-      var ownerLineId = sett.ownerLineId || '';
+      var ownerLineId = props.getProperty('OWNER_LINE_ID') || '';
       if (ownerLineId) {
         try {
           UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
@@ -957,9 +961,9 @@ function sendCheckoutNotify(bookingInfo) {
       }
     }
 
-    // 3) オーナーメール
+    // 3) オーナーメール（アドレスは基本設定から取得）
     if (sett.ownerEmail) {
-      var emails = sett.ownerEmailAddresses || '';
+      var emails = props.getProperty('OWNER_EMAIL') || '';
       if (emails) {
         try {
           GmailApp.sendEmail(emails, subject, body);

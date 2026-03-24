@@ -376,20 +376,18 @@ You may be asked to leave immediately.</textarea>
       </div>
       <div class="card p-3 mb-3">
         <h6><i class="bi bi-send"></i> 通知先（複数選択可）</h6>
+        <div class="form-text mb-2">各IDは基本設定タブで設定してください。</div>
         <div class="form-check mb-2">
           <input class="form-check-input" type="checkbox" id="coNotifyLineCleaningGroup">
           <label class="form-check-label" for="coNotifyLineCleaningGroup">LINE 清掃グループ</label>
-          <input type="text" class="form-control form-control-sm mt-1" id="coNotifyCleaningGroupId" placeholder="清掃グループID">
         </div>
         <div class="form-check mb-2">
           <input class="form-check-input" type="checkbox" id="coNotifyLineOwner">
           <label class="form-check-label" for="coNotifyLineOwner">オーナー個別LINE</label>
-          <input type="text" class="form-control form-control-sm mt-1" id="coNotifyOwnerLineId" placeholder="オーナーLINE ID">
         </div>
         <div class="form-check mb-2">
           <input class="form-check-input" type="checkbox" id="coNotifyOwnerEmail">
           <label class="form-check-label" for="coNotifyOwnerEmail">オーナーメール</label>
-          <input type="text" class="form-control form-control-sm mt-1" id="coNotifyEmailAddresses" placeholder="owner@example.com（カンマ区切りで複数可）">
         </div>
       </div>
       <div class="card p-3 mb-3">
@@ -459,6 +457,14 @@ You may be asked to leave immediately.</textarea>
           <input type="text" id="compNotifyGroupId" class="form-control form-control-sm" placeholder="オーナーへの通知送信先">
         </div>
         <div class="mb-2">
+          <label class="form-label small">オーナー個別LINE ID</label>
+          <input type="text" id="settOwnerLineId" class="form-control form-control-sm" placeholder="オーナー個人のLINE ID（退室連絡用）">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">清掃グループID</label>
+          <input type="text" id="settCleaningGroupId" class="form-control form-control-sm" placeholder="清掃スタッフLINEグループID（退室連絡用）">
+        </div>
+        <div class="mb-2">
           <label class="form-label small">近隣住民LINEグループID</label>
           <input type="text" id="compNeighborGroupId" class="form-control form-control-sm" placeholder="近隣住民への返信先（騒音クレーム用）">
         </div>
@@ -499,7 +505,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324h</div>
+<div id="version">v0324i</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1499,6 +1505,8 @@ function saveSettings() {
   var cs = {
     lineChannelToken: document.getElementById('compLineToken').value.trim(),
     lineNotifyGroupId: document.getElementById('compNotifyGroupId').value.trim(),
+    ownerLineId: document.getElementById('settOwnerLineId').value.trim(),
+    cleaningGroupId: document.getElementById('settCleaningGroupId').value.trim(),
     neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),
     ownerEmail: document.getElementById('compOwnerEmail').value.trim()
   };
@@ -1671,6 +1679,8 @@ function loadComplaintSettings() {
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
     document.getElementById('compLineToken').value = s.lineChannelToken || '';
     document.getElementById('compNotifyGroupId').value = s.lineNotifyGroupId || '';
+    document.getElementById('settOwnerLineId').value = s.ownerLineId || '';
+    document.getElementById('settCleaningGroupId').value = s.cleaningGroupId || '';
     document.getElementById('compNeighborGroupId').value = s.neighborLineGroupId || '';
     document.getElementById('compOwnerEmail').value = s.ownerEmail || '';
     document.getElementById('compKeywords').value = s.complaintKeywords || '';
@@ -1688,6 +1698,8 @@ function saveComplaintSettings() {
   var s = {
     lineChannelToken: document.getElementById('compLineToken').value.trim(),
     lineNotifyGroupId: document.getElementById('compNotifyGroupId').value.trim(),
+    ownerLineId: document.getElementById('settOwnerLineId').value.trim(),
+    cleaningGroupId: document.getElementById('settCleaningGroupId').value.trim(),
     neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),
     ownerEmail: document.getElementById('compOwnerEmail').value.trim(),
     complaintKeywords: document.getElementById('compKeywords').value.trim(),
@@ -2047,11 +2059,8 @@ function loadCoNotifySettings() {
     document.getElementById('coNotifyStartTime').value = s.startTime || '07:00';
     document.getElementById('coNotifyEndTime').value = s.endTime || '14:00';
     document.getElementById('coNotifyLineCleaningGroup').checked = !!s.lineCleaningGroup;
-    document.getElementById('coNotifyCleaningGroupId').value = s.lineCleaningGroupId || '';
     document.getElementById('coNotifyLineOwner').checked = !!s.lineOwner;
-    document.getElementById('coNotifyOwnerLineId').value = s.ownerLineId || '';
     document.getElementById('coNotifyOwnerEmail').checked = !!s.ownerEmail;
-    document.getElementById('coNotifyEmailAddresses').value = s.ownerEmailAddresses || '';
     document.getElementById('coNotifyBtnTextJa').value = s.btnTextJa || '退室のご連絡';
     document.getElementById('coNotifyBtnTextEn').value = s.btnTextEn || 'Check-out Notification';
     document.getElementById('coNotifySubject').value = s.notifySubject || _coNotifyDefaults.subject;
@@ -2064,11 +2073,8 @@ function saveCoNotifySettings() {
     startTime: document.getElementById('coNotifyStartTime').value || '07:00',
     endTime: document.getElementById('coNotifyEndTime').value || '14:00',
     lineCleaningGroup: document.getElementById('coNotifyLineCleaningGroup').checked,
-    lineCleaningGroupId: document.getElementById('coNotifyCleaningGroupId').value.trim(),
     lineOwner: document.getElementById('coNotifyLineOwner').checked,
-    ownerLineId: document.getElementById('coNotifyOwnerLineId').value.trim(),
     ownerEmail: document.getElementById('coNotifyOwnerEmail').checked,
-    ownerEmailAddresses: document.getElementById('coNotifyEmailAddresses').value.trim(),
     btnTextJa: document.getElementById('coNotifyBtnTextJa').value || '退室のご連絡',
     btnTextEn: document.getElementById('coNotifyBtnTextEn').value || 'Check-out Notification',
     notifySubject: document.getElementById('coNotifySubject').value || _coNotifyDefaults.subject,

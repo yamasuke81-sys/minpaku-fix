@@ -689,13 +689,41 @@ function doConfirm() {
 }
 
 function showConfirmScreen() {
+  // [DEBUG-CONFIRM] 画面切替前の状態をチェック
+  var confirmEl = document.getElementById('confirmScreen');
+  console.log('[DEBUG-CONFIRM] confirmScreen exists=' + !!confirmEl + ' _currentRow=' + _currentRow);
+  if (confirmEl) {
+    console.log('[DEBUG-CONFIRM] confirmScreen classList before=' + confirmEl.className);
+  }
+
   showScreen('confirmScreen');
 
-  // [DEBUG-CONFIRM] デバッグ: 画面表示状態を確認
+  // [DEBUG-CONFIRM] 画面切替後の状態をチェック
+  if (confirmEl) {
+    console.log('[DEBUG-CONFIRM] confirmScreen classList after=' + confirmEl.className);
+    console.log('[DEBUG-CONFIRM] confirmScreen display=' + getComputedStyle(confirmEl).display);
+    console.log('[DEBUG-CONFIRM] confirmScreen offsetHeight=' + confirmEl.offsetHeight);
+  }
+
+  // [DEBUG-CONFIRM] 全screen要素の状態
+  var allScreens = document.querySelectorAll('.screen');
+  allScreens.forEach(function(s) {
+    console.log('[DEBUG-CONFIRM] screen #' + s.id + ' class=' + s.className + ' display=' + getComputedStyle(s).display);
+  });
+
   var dbgEl = document.getElementById('callButtons');
+  console.log('[DEBUG-CONFIRM] callButtons exists=' + !!dbgEl);
+  if (!dbgEl) {
+    console.error('[DEBUG-CONFIRM] callButtons NOT FOUND! document.body.innerHTML length=' + document.body.innerHTML.length);
+    // DOM構造をログ
+    var bodyChildren = document.body.children;
+    for (var ci = 0; ci < bodyChildren.length; ci++) {
+      console.log('[DEBUG-CONFIRM] body child[' + ci + '] tag=' + bodyChildren[ci].tagName + ' id=' + (bodyChildren[ci].id || '') + ' class=' + (bodyChildren[ci].className || ''));
+    }
+    return;
+  }
   dbgEl.innerHTML =
     '<div class="text-center p-2"><span class="spinner-border spinner-border-sm"></span><p class="mt-1" style="font-size:.85rem;color:#888;">読み込み中... / Loading...</p></div>';
-  console.log('[DEBUG-CONFIRM] showConfirmScreen called, _currentRow=' + _currentRow);
 
   // 通知送信とボタン読み込みを並行実行
   var notifyDone = false, contactDone = false;
@@ -756,9 +784,22 @@ function showConfirmScreen() {
 }
 
 function renderCallButtons_(notifyHtml, contactHtml) {
+  console.log('[DEBUG-CONFIRM] renderCallButtons_ called, notifyHtml length=' + notifyHtml.length + ' contactHtml length=' + contactHtml.length);
   var cb = document.getElementById('callButtons');
-  if (!cb) return;
+  if (!cb) {
+    console.error('[DEBUG-CONFIRM] renderCallButtons_: callButtons NOT FOUND!');
+    // フォールバック: confirmScreen内を探す
+    var cs = document.getElementById('confirmScreen');
+    console.log('[DEBUG-CONFIRM] confirmScreen exists=' + !!cs + ' display=' + (cs ? getComputedStyle(cs).display : 'N/A'));
+    return;
+  }
   cb.innerHTML = notifyHtml + contactHtml;
+  console.log('[DEBUG-CONFIRM] renderCallButtons_ done, cb.innerHTML length=' + cb.innerHTML.length);
+  // 画面が見えているか確認
+  var cs = document.getElementById('confirmScreen');
+  if (cs) {
+    console.log('[DEBUG-CONFIRM] confirmScreen display after render=' + getComputedStyle(cs).display + ' offsetHeight=' + cs.offsetHeight);
+  }
 }
 
 function resetToSearch() {

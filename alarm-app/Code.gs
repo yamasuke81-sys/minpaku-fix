@@ -14,7 +14,7 @@
 
 function doGet(e) {
   return HtmlService.createHtmlOutputFromFile('alarm')
-    .setTitle('清掃アラーム')
+    .setTitle('騒音アラーム')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }

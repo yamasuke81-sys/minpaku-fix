@@ -575,7 +575,8 @@ var _state = {
   checkinEnabled: false,
   checkinReturnTime: '14:01',
   _checkinRedirected: false,
-  _fromCheckin: false       // ?from=checkin で遷移してきたか
+  _fromCheckin: false,      // ?from=checkin で遷移してきたか
+  _suspendedAlarm: null     // 騒音クレームで一時退避した静音アラーム
 };
 
 // ===== 初期化 =====
@@ -659,9 +660,10 @@ function updateClock() {
   }
 
   // アラームチェック（毎秒）— 騒音クレームアラーム中はスキップ
+  // 静音アラーム表示中でも新しいアラームで上書き可能（②が①を上書き）
   var hhmm = h + ':' + m;
-  if (_state.lastPollData && !_state.alarmActive && !_state.complaintActive) {
-    if (_state.screen === 'clock' || _state.screen === 'coNotify') {
+  if (_state.lastPollData && !_state.complaintActive) {
+    if (_state.screen === 'clock' || _state.screen === 'coNotify' || _state.alarmActive) {
       checkAlarmTrigger(hhmm);
     }
   }
@@ -814,6 +816,13 @@ function buildCheckoutBody(data) {
 
 // ===== アラーム表示 =====
 function triggerAlarm(alarm) {
+  // 既存アラーム表示中なら前のを永久スキップして上書き
+  if (_state.alarmActive && _state.currentAlarm) {
+    _state.dismissed[_state.currentAlarm.id] = true;
+    stopAlarmSound();
+    // サーバーにも記録（スキップ扱い）
+    callGAS('recordAlarmDismiss', [_state.currentAlarm.id]).catch(function() {});
+  }
   _state.alarmActive = true;
   _state.currentAlarm = alarm;
 
@@ -1694,6 +1703,15 @@ function checkComplaintAlarm() {
 }
 
 function showComplaintAlarm() {
+  // 静音アラーム表示中なら音を止めて退避（騒音解除後に復帰）
+  if (_state.alarmActive && _state.currentAlarm) {
+    _state._suspendedAlarm = _state.currentAlarm;
+    stopAlarmSound();
+    _state.alarmActive = false;
+    _state.currentAlarm = null;
+    document.getElementById('alarmScreen').style.display = 'none';
+    document.getElementById('alarmScreen').className = '';
+  }
   _state.complaintActive = true;
   _state.screen = 'complaint';
 
@@ -1779,6 +1797,11 @@ function confirmDismissComplaint() {
     _state.screen = 'admin';
     document.getElementById('adminScreen').style.display = 'block';
     document.getElementById('adminScreen').className = 'active';
+  } else if (_state._suspendedAlarm) {
+    // 退避していた静音アラームを復帰
+    var suspended = _state._suspendedAlarm;
+    _state._suspendedAlarm = null;
+    triggerAlarm(suspended);
   } else {
     _state.screen = 'clock';
     document.getElementById('clockScreen').style.display = 'flex';

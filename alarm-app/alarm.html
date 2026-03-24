@@ -154,10 +154,20 @@
   <div style="font-size:3.5vw; color:#6b5e54; margin-bottom:4vh; text-align:center; line-height:1.6;">
     <span id="coNotifyDateLabel"></span>
   </div>
-  <button class="btn btn-lg" id="btnCoNotify" onclick="sendCoNotify()" style="font-size:5vw; padding:3vh 10vw; border-radius:2vw; background:rgba(255,255,255,0.85); color:#5a4e46; border:2px solid rgba(160,140,120,0.4); box-shadow:0 6px 20px rgba(0,0,0,0.08);">
+  <button class="btn btn-lg" id="btnCoNotify" onclick="handleCoNotifyClick()" style="font-size:5vw; padding:3vh 10vw; border-radius:2vw; background:rgba(255,255,255,0.85); color:#5a4e46; border:2px solid rgba(160,140,120,0.4); box-shadow:0 6px 20px rgba(0,0,0,0.08);">
     <div id="coNotifyBtnJa" style="font-weight:600;">退室のご連絡</div>
     <div id="coNotifyBtnEn" style="font-size:3vw; color:#8a7e74; margin-top:0.5vh;">Check-out Notification</div>
   </button>
+  <div id="coNotifyConfirm" style="display:none; text-align:center; margin-top:2vh;">
+    <div style="font-size:3.5vw; color:#5a4e46; line-height:1.6; margin-bottom:2vh;">連絡をすると清掃スタッフが入室します。<br>よろしいですか？<br><span style="font-size:2.5vw; color:#8a7e74;">Cleaning staff will enter the room after notification.<br>Are you sure?</span></div>
+    <button class="btn btn-lg" onclick="sendCoNotify()" style="font-size:4.5vw; padding:2.5vh 8vw; border-radius:2vw; background:#5a4e46; color:#fff; border:none; box-shadow:0 4px 15px rgba(0,0,0,0.12);">
+      <div style="font-weight:600;">はい、連絡する</div>
+      <div style="font-size:2.5vw; opacity:0.8; margin-top:0.3vh;">Yes, notify staff</div>
+    </button>
+    <div style="margin-top:1.5vh;">
+      <button class="btn btn-sm" onclick="cancelCoNotifyConfirm()" style="font-size:2.5vw; color:#8a7e74; text-decoration:underline; background:none; border:none;">キャンセル / Cancel</button>
+    </div>
+  </div>
   <div id="coNotifySending" style="display:none; margin-top:3vh;">
     <div class="spinner-border text-secondary" role="status"></div>
     <div style="font-size:3vw; color:#6b5e54; margin-top:1vh;">送信中...</div>
@@ -489,7 +499,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324g</div>
+<div id="version">v0324h</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1928,6 +1938,7 @@ function showCoNotifyScreen() {
 
   // UI初期化
   document.getElementById('btnCoNotify').style.display = '';
+  document.getElementById('coNotifyConfirm').style.display = 'none';
   document.getElementById('coNotifySending').style.display = 'none';
   document.getElementById('coNotifyDone').style.display = 'none';
 }
@@ -1940,8 +1951,8 @@ function hideCoNotifyScreen() {
   document.getElementById('settingsBtn').style.display = '';
 }
 
-function sendCoNotify() {
-  // プレビューモードの場合は通知を送らず管理画面に戻る
+function handleCoNotifyClick() {
+  // プレビューモードの場合は管理画面に戻る
   if (_state._coNotifyPreview) {
     _state._coNotifyPreview = false;
     _state.coNotifyActive = false;
@@ -1952,6 +1963,19 @@ function sendCoNotify() {
     document.getElementById('settingsBtn').style.display = '';
     return;
   }
+  // 1段階目→確認画面に切替
+  document.getElementById('btnCoNotify').style.display = 'none';
+  document.getElementById('coNotifyConfirm').style.display = '';
+}
+
+function cancelCoNotifyConfirm() {
+  document.getElementById('coNotifyConfirm').style.display = 'none';
+  document.getElementById('btnCoNotify').style.display = '';
+}
+
+function sendCoNotify() {
+  // 確認画面を非表示にして送信中表示に切替
+  document.getElementById('coNotifyConfirm').style.display = 'none';
 
   var data = _state.lastPollData;
   if (!data || !data.checkouts || data.checkouts.length === 0) return;
@@ -2080,6 +2104,7 @@ function previewCoNotifyScreen() {
 
   // UI初期化
   document.getElementById('btnCoNotify').style.display = '';
+  document.getElementById('coNotifyConfirm').style.display = 'none';
   document.getElementById('coNotifySending').style.display = 'none';
   document.getElementById('coNotifyDone').style.display = 'none';
 }

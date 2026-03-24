@@ -1,5 +1,7 @@
 {
   "ownerDeploymentId": "オーナー用デプロイのID（デプロイ管理で確認）",
   "staffDeploymentId": "スタッフ用デプロイのID（デプロイ管理で確認）",
-  "urlUpdateSecret": "任意。設定すると npm run deploy 時にスタッフ用URLをオーナー画面に自動反映。GASで setUrlUpdateSecretForDeploy('同じ値') を実行しておく"
+  "urlUpdateSecret": "任意。設定すると npm run deploy 時にスタッフ用URLをオーナー画面に自動反映。GASで setUrlUpdateSecretForDeploy('同じ値') を実行しておく",
+  "tabletFullyKioskIp": "タブレットのローカルIP（例: 192.168.1.100）。設定するとデプロイ後に自動リロード",
+  "tabletFullyKioskPassword": "Fully Kiosk BrowserのRemote Admin Password"
 }

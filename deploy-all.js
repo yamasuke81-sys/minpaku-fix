@@ -601,6 +601,24 @@ function main() {
   });
   console.log('');
 
+  // === タブレット（Fully Kiosk Browser）リモートリロード ===
+  var tabletIp = (config.tabletFullyKioskIp || '').trim();
+  var tabletPassword = (config.tabletFullyKioskPassword || '').trim();
+  if (tabletIp && tabletPassword) {
+    console.log('[タブレットリロード] Fully Kiosk Browser にリロード指示を送信...');
+    var reloadUrl = 'http://' + tabletIp + ':2323/?cmd=loadStartUrl&password=' + encodeURIComponent(tabletPassword);
+    try {
+      execSync('curl -sL --connect-timeout 5 --max-time 10 "' + reloadUrl + '"', { encoding: 'utf8', timeout: 15000 });
+      console.log('  OK - タブレット(' + tabletIp + ')にリロード指示を送信しました');
+    } catch (e) {
+      console.log('  タブレットに接続できませんでした（オフラインまたは同一ネットワーク外）');
+      console.log('  手動リロード: http://' + tabletIp + ':2323/?cmd=loadStartUrl&password=' + tabletPassword);
+    }
+  } else if (tabletIp) {
+    console.log('[タブレットリロード] スキップ — tabletFullyKioskPassword が未設定です');
+  }
+  console.log('');
+
   // ブラウザで2つだけ開く: オーナー(通常)、スタッフ(シークレット)
   urls.forEach(function(u) {
     if (u.label === 'オーナー用') {

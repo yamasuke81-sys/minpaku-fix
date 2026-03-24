@@ -1273,7 +1273,7 @@
         <div id="staffResponseMonthOverlay" style="display:none;position:absolute;top:0;left:0;z-index:5;background:rgba(30,42,58,0.85);color:#fff;padding:1px 8px;border-radius:0 0 6px 0;font-size:12px;font-weight:bold;pointer-events:none;"></div>
         <div id="staffResponseContent" style="overflow-x:auto;"></div>
       </div>
-      <details id="oldCalendarCollapse" style="margin-top:1rem;">
+      <details id="oldCalendarCollapse" style="margin-top:1rem;" open>
         <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:#6c757d;padding:4px 0;">いままでのカレンダー</summary>
         <div id="staffResponseCalLegendArea" style="margin-top:0.5rem;margin-bottom:0.2rem;"></div>
         <div id="staffResponseCalendarArea"></div>
@@ -5501,6 +5501,18 @@
         if (_calEl && _calStaffArea) {
           _calStaffArea.appendChild(_calEl);
           _calEl.style.display = '';
+        }
+        // 「いままでのカレンダー」折りたたみが開いたらFullCalendarを再描画
+        var _oldCalCollapse = document.getElementById('oldCalendarCollapse');
+        if (_oldCalCollapse) {
+          _oldCalCollapse.addEventListener('toggle', function() {
+            if (_oldCalCollapse.open && calendar) {
+              requestAnimationFrame(function() {
+                calendar.render();
+                setTimeout(function() { if (calendar) calendar.updateSize(); }, 200);
+              });
+            }
+          });
         }
         loadStaffResponseCalendar();
 

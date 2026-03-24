@@ -510,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324n</div>
+<div id="version">v0324o</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1591,7 +1591,9 @@ function showComplaintAlarm() {
   // 画面切替
   document.getElementById('clockScreen').style.display = 'none';
   document.getElementById('alarmScreen').style.display = 'none';
-  document.getElementById('complaintScreen').classList.add('active');
+  var cs = document.getElementById('complaintScreen');
+  cs.style.display = 'flex';
+  cs.classList.add('active');
   document.getElementById('settingsBtn').style.display = 'none';
 
   // 停止ボタンをリセット

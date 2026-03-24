@@ -87,7 +87,7 @@
 <div id="clockScreen">
   <div id="clockTime">--:--</div>
   <div id="clockDate"></div>
-  <div id="clockPropertyName">the Terrace 長浜</div>
+  <div id="clockPropertyName"></div>
 </div>
 
 <!-- ===== アラーム画面 ===== -->
@@ -247,9 +247,6 @@ You may be asked to leave immediately.</textarea>
       </button>
       <button class="btn btn-success mt-2 ms-2" onclick="saveMessages()">
         <i class="bi bi-save"></i> 保存
-      </button>
-      <button class="btn btn-outline-warning mt-2 ms-2" onclick="previewMessageScreen()">
-        <i class="bi bi-eye"></i> 画面確認
       </button>
       <div class="card p-3 mt-3">
         <h6><i class="bi bi-volume-up"></i> メッセージ共通の音設定</h6>
@@ -970,6 +967,11 @@ function renderMessages() {
     html += '<button class="btn btn-outline-primary" onclick="addTime(' + i + ')"><i class="bi bi-plus"></i></button>';
     html += '</div></div>';
 
+    // 画面確認ボタン
+    html += '<div class="mt-2 d-flex gap-2">';
+    html += '<button class="btn btn-sm btn-outline-warning" onclick="previewMessageByIdx(' + i + ')"><i class="bi bi-eye"></i> 画面確認</button>';
+    html += '</div>';
+
     // テスト送信セクション
     html += '<div class="mt-2 pt-2 border-top">';
     html += '<div class="d-flex align-items-center flex-wrap gap-2">';
@@ -1426,14 +1428,16 @@ function previewCheckoutScreen() {
   });
 }
 
-function previewMessageScreen() {
-  // 最初のメッセージテンプレートの値を取得
-  var label = '静音時間のお知らせ';
-  var msgJa = 'まもなく静音時間です。22時以降は大きな音や声を控えていただくようお願いいたします。';
-  var msgEn = 'Quiet hours are approaching. Please keep noise to a minimum after 10 PM.';
+function previewMessageByIdx(idx) {
+  var m = _state.messages[idx];
+  if (!m) return;
+  // カード内の現在の入力値を取得
   var cards = document.querySelectorAll('#messagesList .msg-template-card');
-  if (cards.length > 0) {
-    var c = cards[0];
+  var label = m.label || '静音時間のお知らせ';
+  var msgJa = m.message || '';
+  var msgEn = m.messageEn || '';
+  if (cards[idx]) {
+    var c = cards[idx];
     var labelEl = c.querySelector('input[type="text"]');
     var textareas = c.querySelectorAll('textarea');
     if (labelEl && labelEl.value) label = labelEl.value;

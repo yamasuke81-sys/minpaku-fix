@@ -580,12 +580,15 @@ var _state = {
 
 // ===== 初期化 =====
 // ?from=checkin パラメータを検知（チェックインappからの遷移）
-(function() {
-  try {
-    var params = new URLSearchParams(window.location.search);
-    if (params.get('from') === 'checkin') _state._fromCheckin = true;
-  } catch (e) {}
-})();
+// GAS HTML serviceではwindow.location.searchではなくgoogle.script.url.getLocationを使う
+try {
+  google.script.url.getLocation(function(loc) {
+    if (loc.parameter && loc.parameter.from === 'checkin') {
+      _state._fromCheckin = true;
+      console.log('[INTEGRATION] Loaded from checkin app');
+    }
+  });
+} catch (e) { console.log('[INTEGRATION] getLocation error:', e); }
 
 window.addEventListener('load', function() {
   startClock();

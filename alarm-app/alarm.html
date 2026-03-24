@@ -9,8 +9,6 @@
   <style>
     /* ===== 共通 ===== */
     * { box-sizing: border-box; }
-    /* GAS HTMLサービスが挿入するwarning-bar-tableを非表示（上部の白い線の原因） */
-    #warning-bar-table, table.full_size[cellspacing="0"] { display: none !important; height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }
     body { margin: 0; padding: 0; font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #667eea; color: #fff; overflow: hidden; height: 100vh; }
 
     /* ===== 待機画面（時計） ===== */
@@ -577,9 +575,17 @@ window.addEventListener('load', function() {
 // ===== タブ復帰・画面ON時の再初期化 =====
 // ブラウザがバックグラウンドタブやスリープ中はsetIntervalが停止するため、
 // 復帰時に時計とポーリングを即座に再開する
-// GAS sandboxed iframe はタブ切替で描画レイヤーを失う → リロードで確実に復帰
+// ブラウザがバックグラウンドタブやスリープ中はsetIntervalが停止するため、
+// 復帰時に時計とポーリングを即座に再開する
 document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) location.reload();
+  if (!document.hidden) {
+    updateClock();
+    poll();
+    if (_state.clockTimer) clearInterval(_state.clockTimer);
+    _state.clockTimer = setInterval(updateClock, 1000);
+    if (_state.pollTimer) clearInterval(_state.pollTimer);
+    _state.pollTimer = setInterval(poll, 30000);
+  }
 });
 
 // ===== 時計 =====

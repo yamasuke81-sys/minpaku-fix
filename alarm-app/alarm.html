@@ -536,7 +536,8 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325h</div>
+<div id="version">v0325i</div>
+<div id="dbgCheckin" style="position:fixed;top:4px;left:4px;font-size:9px;color:#0f0;background:rgba(0,0,0,.8);z-index:99999;font-family:monospace;padding:3px 6px;border-radius:3px;pointer-events:none;white-space:pre;"></div>
 
 <script>
 // ===== GAS通信 =====
@@ -652,6 +653,17 @@ function updateClock() {
   var days = ['日', '月', '火', '水', '木', '金', '土'];
   var ds = (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
   document.getElementById('clockDate').textContent = ds;
+
+  // [DEBUG] チェックインapp連携の状態を表示
+  var _dbgEl = document.getElementById('dbgCheckin');
+  if (_dbgEl) {
+    _dbgEl.textContent = 'now=' + h + ':' + m + ':' + s +
+      ' target=' + (_state.checkinReturnTime || 'N/A') +
+      '\nenabled=' + _state.checkinEnabled +
+      ' url=' + (_state.checkinAppUrl ? _state.checkinAppUrl.substring(0, 30) + '...' : 'empty') +
+      '\nredirected=' + _state._checkinRedirected +
+      ' screen=' + _state.screen;
+  }
 
   // チェックインapp連携: 設定時刻になったらチェックインappに遷移
   if (_state.checkinEnabled && _state.checkinAppUrl && _state.checkinReturnTime) {

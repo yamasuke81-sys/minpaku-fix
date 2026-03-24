@@ -1144,8 +1144,6 @@ function renderBookings(bookings) {
     var _gcAdults = (b.guestCountAdults != null && b.guestCountAdults !== '') ? b.guestCountAdults : '?';
     var _gcInfants = (b.guestCountInfants != null && b.guestCountInfants !== '') ? b.guestCountInfants : '?';
     var _gc = (b.guestCountDisplay && b.guestCountDisplay !== '-') ? b.guestCountDisplay : ('大人' + _gcAdults + '名、3歳以下' + _gcInfants + '名');
-    // [DEBUG-GUESTCOUNT] 人数データのデバッグ表示
-    html += '<div class="small" style="color:#c90;font-size:.7rem;">[DEBUG] guestCount=' + esc(String(b.guestCount)) + ' adults=' + esc(String(b.guestCountAdults)) + ' infants=' + esc(String(b.guestCountInfants)) + ' display=' + esc(String(b.guestCountDisplay)) + ' _gc=' + esc(_gc) + '</div>';
     html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut) + ' / ' + esc(_gc);
     if (b.ages && b.ages.length > 0) html += ' / 年齢: ' + b.ages.join(', ');
     if (b.bbq && b.bbq.indexOf('はい') >= 0) html += ' / <span class="text-danger">BBQ</span>';

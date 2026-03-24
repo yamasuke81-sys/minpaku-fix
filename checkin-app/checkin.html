@@ -8,7 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --primary: #2c6fbb; --success: #28a745; --danger: #dc3545; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f5f7fa; margin: 0; padding: 0; min-height: 100vh; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: linear-gradient(200deg, #f0dfa0 0%, #5a8fa8 25%, #2a6a8a 50%, #1a4a7a 75%, #0d3468 100%); margin: 0; padding: 0; min-height: 100vh; }
     .screen { display: none; height: 100vh; overflow: hidden; }
     .screen.active { display: flex; flex-direction: column; }
 
@@ -105,24 +105,45 @@
 
 <!-- ===== バージョンバッジ ===== -->
 <div class="version-badge" id="deployVersion">v0324x</div>
-<!-- ===== デバッグ（ホワイトアウト調査・左下表示） ===== -->
-<div id="dbgInfo" style="position:fixed;bottom:2.5rem;left:1rem;font-size:10px;color:rgba(255,255,255,.7);z-index:100;font-family:monospace;max-width:80vw;word-break:break-all;pointer-events:none;"></div>
+<!-- ===== デバッグ（ホワイトアウト調査・左下黒背景で必ず視認可能） ===== -->
+<div id="dbgInfo" style="position:fixed;bottom:2.5rem;left:.5rem;right:.5rem;font-size:10px;color:#0f0;background:rgba(0,0,0,.85);z-index:99999;font-family:monospace;padding:4px 8px;border-radius:4px;pointer-events:none;white-space:pre-wrap;"></div>
 <script>
 (function(){
   var dbg = document.getElementById('dbgInfo');
   var logs = [];
-  function addLog(msg) { logs.push(new Date().toLocaleTimeString() + ' ' + msg); if (logs.length > 5) logs.shift(); if (dbg) dbg.textContent = logs.join(' | '); }
-  addLog('loaded');
-  // 画面状態を定期チェック
+  function addLog(msg) { logs.push(new Date().toLocaleTimeString() + ' ' + msg); if (logs.length > 8) logs.shift(); if (dbg) dbg.textContent = logs.join('\n'); }
+  addLog('loaded v0324x');
+
+  // 画面状態を定期チェック + active消失時に自動復帰
+  var _lastScreen = 'searchScreen';
   setInterval(function(){
     var active = document.querySelector('.screen.active');
-    var id = active ? active.id : 'NONE';
-    var vis = active ? (active.offsetHeight > 0 ? 'vis' : 'h=0') : 'no-active';
-    addLog('scr=' + id + '/' + vis);
-  }, 3000);
+    if (!active) {
+      addLog('WHITEOUT! no .active screen → restoring ' + _lastScreen);
+      var el = document.getElementById(_lastScreen) || document.getElementById('searchScreen');
+      if (el) el.classList.add('active');
+    } else {
+      _lastScreen = active.id;
+      addLog('ok scr=' + active.id + ' h=' + active.offsetHeight);
+    }
+  }, 2000);
+
+  // pageshow（bfcache復帰）対策
+  window.addEventListener('pageshow', function(e) {
+    addLog('pageshow persisted=' + e.persisted);
+    if (e.persisted) {
+      var active = document.querySelector('.screen.active');
+      if (!active) {
+        addLog('pageshow restore: ' + _lastScreen);
+        var el = document.getElementById(_lastScreen) || document.getElementById('searchScreen');
+        if (el) el.classList.add('active');
+      }
+    }
+  });
+
   // エラーキャッチ
-  window.addEventListener('error', function(e) { addLog('ERR:' + e.message); });
-  window.addEventListener('unhandledrejection', function(e) { addLog('REJ:' + (e.reason ? e.reason.message || e.reason : '?')); });
+  window.addEventListener('error', function(e) { addLog('ERR: ' + e.message); });
+  window.addEventListener('unhandledrejection', function(e) { addLog('REJ: ' + (e.reason ? e.reason.message || e.reason : '?')); });
 })();
 </script>
 

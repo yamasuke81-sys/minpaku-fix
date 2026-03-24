@@ -392,8 +392,8 @@ function getActiveBookings() {
       var coStr = Utilities.formatDate(coDate, 'Asia/Tokyo', 'yyyy/MM/dd');
       var ciStr = Utilities.formatDate(ciDate, 'Asia/Tokyo', 'yyyy/MM/dd');
 
-      // 現在宿泊中（CI <= 今日 かつ CO >= 今日）またはCI==今日
-      if (!(ciStr <= todayStr && coStr >= todayStr)) continue;
+      // 宿泊中 or 今後の予約（CO >= 今日）を表示。過去の予約は除外
+      if (coStr < todayStr) continue;
 
       var guestName = colMap.guestName >= 0 ? String(row[colMap.guestName] || '') : '';
       var guestCount = colMap.guestCount >= 0 ? String(row[colMap.guestCount] || '') : '';

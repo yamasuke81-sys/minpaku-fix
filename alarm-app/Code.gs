@@ -43,6 +43,10 @@ function getAlarmSettings() {
     alarmTimes = [singleTime];
   }
 
+  var coMsgJson = props.getProperty('CHECKOUT_MESSAGES') || '[]';
+  var checkoutMessages;
+  try { checkoutMessages = JSON.parse(coMsgJson); } catch (e) { checkoutMessages = []; }
+
   return JSON.stringify({
     spreadsheetId: props.getProperty('SPREADSHEET_ID') || '',
     alarmTimes: alarmTimes,
@@ -50,6 +54,7 @@ function getAlarmSettings() {
     alarmMessageEn: props.getProperty('ALARM_MESSAGE_EN') || 'It is checkout time.\nPlease make sure you have all your belongings before leaving.\nThank you for your stay.',
     pin: props.getProperty('ALARM_PIN') || '1234',
     scheduledMessages: schedules,
+    checkoutMessages: checkoutMessages,
     // 音量・音種設定（各アラームタイプ別）
     checkoutVolume: Number(props.getProperty('CHECKOUT_VOLUME') || '80'),
     checkoutSound: props.getProperty('CHECKOUT_SOUND') || 'chime',
@@ -144,6 +149,13 @@ function saveScheduledMessages(messages) {
   return JSON.stringify({ success: true });
 }
 
+/** チェックアウトメッセージテンプレートの保存 */
+function saveCheckoutMessages(messages) {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('CHECKOUT_MESSAGES', JSON.stringify(messages));
+  return JSON.stringify({ success: true });
+}
+
 /** 予約のメッセージ配信チェック状態を取得 */
 function getBookingMessageFlags() {
   var props = PropertiesService.getScriptProperties();
@@ -158,6 +170,16 @@ function getBookingMessageFlags() {
 function saveBookingMessageFlags(flags) {
   var props = PropertiesService.getScriptProperties();
   props.setProperty('BOOKING_MSG_FLAGS', JSON.stringify(flags));
+  return JSON.stringify({ success: true });
+}
+
+/**
+ * 予約のチェックアウト配信チェック状態を保存
+ * flags: { "rowNumber": { "co_msg_1": true }, ... }
+ */
+function saveBookingCoFlags(flags) {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('BOOKING_CO_FLAGS', JSON.stringify(flags));
   return JSON.stringify({ success: true });
 }
 
@@ -284,10 +306,20 @@ function getTodayCheckouts() {
     var schedules;
     try { schedules = JSON.parse(schedulesJson); } catch (e) { schedules = []; }
 
+    // チェックアウトメッセージ設定
+    var coMsgJson = props.getProperty('CHECKOUT_MESSAGES') || '[]';
+    var checkoutMessages;
+    try { checkoutMessages = JSON.parse(coMsgJson); } catch (e) { checkoutMessages = []; }
+
     // 予約のメッセージ配信フラグ
     var flagsJson = props.getProperty('BOOKING_MSG_FLAGS') || '{}';
     var flags;
     try { flags = JSON.parse(flagsJson); } catch (e) { flags = {}; }
+
+    // 予約のCO配信フラグ
+    var coFlagsJson = props.getProperty('BOOKING_CO_FLAGS') || '{}';
+    var coFlags;
+    try { coFlags = JSON.parse(coFlagsJson); } catch (e) { coFlags = {}; }
 
     // 本日の確認済みアラーム
     var todayKey = 'DISMISSED_' + Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd');
@@ -303,7 +335,9 @@ function getTodayCheckouts() {
       alarmMessage: alarmMessage,
       alarmMessageEn: alarmMessageEn,
       scheduledMessages: schedules,
+      checkoutMessages: checkoutMessages,
       bookingMsgFlags: flags,
+      bookingCoFlags: coFlags,
       dismissed: dismissed,
       serverTime: Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss'),
       serverTimeHHMM: nowTime,
@@ -413,10 +447,22 @@ function getActiveBookings() {
     var schedules;
     try { schedules = JSON.parse(schedulesJson); } catch (e) { schedules = []; }
 
+    // チェックアウトメッセージ
+    var coMsgJson = props.getProperty('CHECKOUT_MESSAGES') || '[]';
+    var checkoutMessages;
+    try { checkoutMessages = JSON.parse(coMsgJson); } catch (e) { checkoutMessages = []; }
+
+    // CO配信フラグ
+    var coFlagsJson = props.getProperty('BOOKING_CO_FLAGS') || '{}';
+    var coFlags;
+    try { coFlags = JSON.parse(coFlagsJson); } catch (e) { coFlags = {}; }
+
     return JSON.stringify({
       bookings: bookings,
       bookingMsgFlags: flags,
-      scheduledMessages: schedules
+      bookingCoFlags: coFlags,
+      scheduledMessages: schedules,
+      checkoutMessages: checkoutMessages
     });
 
   } catch (e) {

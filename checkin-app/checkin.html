@@ -105,6 +105,26 @@
 
 <!-- ===== バージョンバッジ ===== -->
 <div class="version-badge" id="deployVersion">v0324x</div>
+<!-- ===== デバッグ（ホワイトアウト調査・左下表示） ===== -->
+<div id="dbgInfo" style="position:fixed;bottom:2.5rem;left:1rem;font-size:10px;color:rgba(255,255,255,.7);z-index:100;font-family:monospace;max-width:80vw;word-break:break-all;pointer-events:none;"></div>
+<script>
+(function(){
+  var dbg = document.getElementById('dbgInfo');
+  var logs = [];
+  function addLog(msg) { logs.push(new Date().toLocaleTimeString() + ' ' + msg); if (logs.length > 5) logs.shift(); if (dbg) dbg.textContent = logs.join(' | '); }
+  addLog('loaded');
+  // 画面状態を定期チェック
+  setInterval(function(){
+    var active = document.querySelector('.screen.active');
+    var id = active ? active.id : 'NONE';
+    var vis = active ? (active.offsetHeight > 0 ? 'vis' : 'h=0') : 'no-active';
+    addLog('scr=' + id + '/' + vis);
+  }, 3000);
+  // エラーキャッチ
+  window.addEventListener('error', function(e) { addLog('ERR:' + e.message); });
+  window.addEventListener('unhandledrejection', function(e) { addLog('REJ:' + (e.reason ? e.reason.message || e.reason : '?')); });
+})();
+</script>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>

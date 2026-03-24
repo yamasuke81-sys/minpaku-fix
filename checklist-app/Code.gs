@@ -456,9 +456,13 @@ function getNextReservation(checkoutDate) {
         if (adult || infant) {
           guestFmt = (adult ? '大人' + adult + '名' : '') + (infant ? (adult ? '、' : '') + '3歳以下' + infant + '名' : '');
         }
+        var ciTime = extractTimeStr_(data[r][col.ci]);
+        var coTime = col.co >= 0 ? extractTimeStr_(data[r][col.co]) : '';
         best = {
           checkIn: ciStr,
           checkOut: coStr,
+          checkInTime: ciTime,
+          checkOutTime: coTime,
           dateRange: ciStr + ' ～ ' + coStr,
           guestName: col.guest >= 0 ? String(data[r][col.guest] || '') : '',
           guestCount: guestFmt || '-',
@@ -551,6 +555,17 @@ function saveCleaningNotice(rowNumber, noticeText) {
 function extractCount_(str) {
   if (!str) return '';
   var m = str.match(/(\d+)/);
+  return m ? m[1] : '';
+}
+
+// Date値から時刻文字列を抽出（HH:mm形式）
+function extractTimeStr_(v) {
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    return Utilities.formatDate(v, 'Asia/Tokyo', 'HH:mm');
+  }
+  // 文字列から時刻部分を抽出（"2026-03-28 10:00" や "10:00" など）
+  var s = String(v || '');
+  var m = s.match(/(\d{1,2}:\d{2})/);
   return m ? m[1] : '';
 }
 

@@ -1096,7 +1096,7 @@ function extractGuestCount_(str) {
   const trimmed = str.trim();
   if (!trimmed) return '';
   const match = trimmed.match(/\d+/);
-  return match ? match[0] : trimmed;
+  return match ? match[0] : '';
 }
 
 /**

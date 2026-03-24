@@ -13,7 +13,7 @@
     .screen.active { display: flex; flex-direction: column; }
 
     /* 検索画面 */
-    #searchScreen { justify-content: center; align-items: center; padding: 2rem 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    #searchScreen { justify-content: center; align-items: center; padding: 2rem 1rem; background: linear-gradient(200deg, #f0dfa0 0%, #5a8fa8 25%, #2a6a8a 50%, #1a4a7a 75%, #0d3468 100%); }
     #searchScreen .search-card { background: #fff; border-radius: 1.2rem; padding: 2rem 1.5rem; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.15); }
     #searchScreen h1 { font-size: 1.4rem; font-weight: 700; color: #333; text-align: center; margin-bottom: 1.5rem; }
     #searchScreen .form-control { border-radius: .8rem; padding: .75rem 1rem; font-size: 1rem; border: 2px solid #e0e0e0; }
@@ -102,40 +102,9 @@
 </head>
 <body>
 
-<!-- ===== デバッグバナー（ホワイトアウト調査） ===== -->
-<div id="debugWhiteout" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#ff0;color:#000;font-size:12px;padding:4px 8px;font-family:monospace;">
-  [DEBUG] HTML loaded, v0319k, <span id="dbgTime"></span>
-  <span id="dbgScreenState"></span>
-  <span id="dbgErrors" style="color:red;"></span>
-</div>
-<script>
-(function(){
-  document.getElementById('dbgTime').textContent = new Date().toLocaleTimeString();
-  // 画面の状態を1秒後にチェック
-  setTimeout(function(){
-    var ss = document.getElementById('searchScreen');
-    var dbg = document.getElementById('dbgScreenState');
-    if (ss) {
-      var cs = window.getComputedStyle(ss);
-      dbg.textContent = ' | searchScreen: display=' + cs.display + ' class="' + ss.className + '" h=' + ss.offsetHeight;
-    } else {
-      dbg.textContent = ' | searchScreen NOT FOUND';
-    }
-  }, 1000);
-  // エラーキャッチ
-  window.addEventListener('error', function(e) {
-    var el = document.getElementById('dbgErrors');
-    if (el) el.textContent += ' | ERR: ' + e.message + ' @' + (e.filename||'').split('/').pop() + ':' + e.lineno;
-  });
-  window.addEventListener('unhandledrejection', function(e) {
-    var el = document.getElementById('dbgErrors');
-    if (el) el.textContent += ' | REJECT: ' + (e.reason ? e.reason.message || e.reason : 'unknown');
-  });
-})();
-</script>
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0319k</div>
+<div class="version-badge" id="deployVersion">v0324x</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>

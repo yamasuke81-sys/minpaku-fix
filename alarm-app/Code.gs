@@ -1124,7 +1124,7 @@ function extractGuestCount_(str) {
   var trimmed = str.trim();
   if (!trimmed) return '';
   var match = trimmed.match(/\d+/);
-  return match ? match[0] : trimmed;
+  return match ? match[0] : '';
 }
 
 function formatGuestCountDisplay_(guestCountAdults, guestCountInfants) {

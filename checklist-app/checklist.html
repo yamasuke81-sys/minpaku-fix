@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0323b</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0324x</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -7096,7 +7096,10 @@
         var d = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
         return parseInt(m[2],10) + '/' + parseInt(m[3],10) + '(' + days[d.getDay()] + ')';
       }
-      var dateDisp = fmtDate(ci) + ' ～ ' + fmtDate(co);
+      var ciTime = nr.checkInTime || '';
+      var coTime = nr.checkOutTime || '';
+      var ciDisp = fmtDate(ci) + (ciTime ? ' ' + ciTime : '');
+      var coDisp = fmtDate(co) + (coTime ? ' ' + coTime : '');
       var bbqVal = (nr.bbq || '').trim();
       var bbqDisp = '';
       if (bbqVal === '有' || bbqVal === 'あり' || bbqVal === 'yes' || bbqVal === 'Yes' || bbqVal === '○') bbqDisp = 'あり';
@@ -7108,7 +7111,7 @@
         html += '<div style="text-align:center;margin-bottom:10px;"><span style="display:inline-block;background:#dc3545;color:#fff;font-weight:700;font-size:14px;padding:4px 16px;border-radius:20px;">本日チェックイン</span></div>';
       }
       html += '<div class="nres-card">';
-      html += '<div class="nres-row"><span class="nres-label">日付</span><span class="nres-value">' + escapeHtml(dateDisp) + '</span></div>';
+      html += '<div class="nres-row"><span class="nres-label">日付</span><span class="nres-value">CI：' + escapeHtml(ciDisp) + '<br>CO：' + escapeHtml(coDisp) + '</span></div>';
       html += '<div class="nres-row"><span class="nres-label">人数</span><span class="nres-value">' + escapeHtml(nr.guestCount || '-') + '</span></div>';
       if (nr.bedCount) html += '<div class="nres-row"><span class="nres-label">ベッド</span><span class="nres-value">' + escapeHtml(nr.bedCount) + '</span></div>';
       html += '<div class="nres-row"><span class="nres-label">BBQ</span><span class="nres-value">' + escapeHtml(bbqDisp) + '</span></div>';

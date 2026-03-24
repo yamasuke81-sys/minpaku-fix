@@ -577,22 +577,9 @@ window.addEventListener('load', function() {
 // ===== タブ復帰・画面ON時の再初期化 =====
 // ブラウザがバックグラウンドタブやスリープ中はsetIntervalが停止するため、
 // 復帰時に時計とポーリングを即座に再開する
+// GAS sandboxed iframe はタブ切替で描画レイヤーを失う → リロードで確実に復帰
 document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) {
-    // GAS iframe はバックグラウンドで描画レイヤーを失う → 強制リペイント
-    document.body.style.display = 'none';
-    void document.body.offsetHeight;
-    document.body.style.display = '';
-    // 時計を即座に更新（表示が止まっていた分を補正）
-    updateClock();
-    // ポーリングを即座に実行（バックグラウンド中に来たアラームを検知）
-    poll();
-    // setIntervalが死んでいる場合に備えて再設定
-    if (_state.clockTimer) clearInterval(_state.clockTimer);
-    _state.clockTimer = setInterval(updateClock, 1000);
-    if (_state.pollTimer) clearInterval(_state.pollTimer);
-    _state.pollTimer = setInterval(poll, 30000);
-  }
+  if (!document.hidden) location.reload();
 });
 
 // ===== 時計 =====
@@ -1040,8 +1027,6 @@ function loadAdminData() {
   // 宿泊一覧
   callGAS('getActiveBookings').then(function(data) {
     if (data.error) { document.getElementById('bookingsList').innerHTML = '<div class="alert alert-danger">' + data.error + '</div>'; return; }
-    // [DEBUG-COLMAP] デバッグデータを保存（renderBookings内で表示）
-    _state._debugColmap = data._debug || null;
     _state.bookingFlags = data.bookingMsgFlags || {};
     _state.bookingCoFlags = data.bookingCoFlags || {};
     _state.messages = data.scheduledMessages || [];
@@ -1134,20 +1119,8 @@ function renderBookings(bookings) {
     callGAS('saveBookingCoFlags', [_state.bookingCoFlags]).catch(function(e) { console.error(e); });
   }
 
-  // [DEBUG-COLMAP] カラムマッピングのデバッグ表示
-  var html = '';
-  if (_state._debugColmap) {
-    var dbg = _state._debugColmap;
-    html += '<div class="alert alert-info small" style="font-size:.7rem;white-space:pre-wrap;">';
-    html += '[DEBUG-COLMAP] guestCount=' + dbg.colMap.guestCount + ' guestCountInfants=' + dbg.colMap.guestCountInfants;
-    html += '\nguestName=' + dbg.colMap.guestName + ' checkIn=' + dbg.colMap.checkIn + ' checkOut=' + dbg.colMap.checkOut + ' bookingSite=' + dbg.colMap.bookingSite;
-    if (dbg.firstBookingRaw) html += '\nfirstBooking: guestCount=' + dbg.firstBookingRaw.guestCount + ' adults=' + dbg.firstBookingRaw.guestCountAdults + ' display=' + dbg.firstBookingRaw.guestCountDisplay;
-    html += '\nheaders: ' + (dbg.headers || []).join(' | ');
-    html += '</div>';
-  }
-
   // ソート切替ボタン
-  html += '<div class="d-flex justify-content-end mb-2">';
+  var html = '<div class="d-flex justify-content-end mb-2">';
   html += '<button class="btn btn-sm btn-outline-secondary" onclick="toggleBookingSort()">';
   html += '<i class="bi bi-sort-down"></i> CI日 ' + (sortOrder === 'asc' ? '昇順 ▲' : '降順 ▼');
   html += '</button></div>';

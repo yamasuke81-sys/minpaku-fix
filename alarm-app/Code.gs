@@ -471,23 +471,12 @@ function getActiveBookings() {
     var coFlags;
     try { coFlags = JSON.parse(coFlagsJson); } catch (e) { coFlags = {}; }
 
-    // [DEBUG-COLMAP] カラムマッピングの結果をレスポンスに含める
-    var _debugHeaders = [];
-    for (var di = 0; di < Math.min(headers.length, 60); di++) {
-      _debugHeaders.push(di + ':' + String(headers[di] || '').substring(0, 30));
-    }
-
     return JSON.stringify({
       bookings: bookings,
       bookingMsgFlags: flags,
       bookingCoFlags: coFlags,
       scheduledMessages: schedules,
-      checkoutMessages: checkoutMessages,
-      _debug: {
-        colMap: { guestCount: colMap.guestCount, guestCountInfants: colMap.guestCountInfants, guestName: colMap.guestName, checkIn: colMap.checkIn, checkOut: colMap.checkOut, bookingSite: colMap.bookingSite },
-        headers: _debugHeaders,
-        firstBookingRaw: bookings.length > 0 ? { guestCount: bookings[0].guestCount, guestCountAdults: bookings[0].guestCountAdults, guestCountDisplay: bookings[0].guestCountDisplay } : null
-      }
+      checkoutMessages: checkoutMessages
     });
 
   } catch (e) {
@@ -1170,8 +1159,8 @@ function buildAlarmColumnMap_(headers) {
     if (h.indexOf('氏名') > -1 || h.indexOf('名前') > -1 || hl === 'full name') map.guestNameCols.push(i);
     if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) map.ageCols.push(i);
     if (h.indexOf('どこでこのホテルを予約') > -1 && map.bookingSite < 0) map.bookingSite = i;
-    if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && map.guestCount < 0) map.guestCount = i;
-    if (h.indexOf('3才以下') > -1 && map.guestCountInfants < 0) map.guestCountInfants = i;
+    if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下の乳幼児') === -1 && map.guestCount < 0) map.guestCount = i;
+    if (h.indexOf('3才以下の乳幼児') > -1 && map.guestCountInfants < 0) map.guestCountInfants = i;
     if (h === '清掃担当' && map.cleaningStaff < 0) map.cleaningStaff = i;
     if (h.indexOf('バーベキュー') > -1 && map.bbq < 0) map.bbq = i;
     if (h === 'キャンセル日時' && map.cancelledAt < 0) map.cancelledAt = i;

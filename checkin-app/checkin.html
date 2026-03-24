@@ -998,21 +998,11 @@ if (pinEl) pinEl.addEventListener('keydown', function(e) { if (e.key === 'Enter'
 
 // タブ切替復帰対策: バックグラウンドから復帰した際にGASセッション切れで白画面になる問題を防止
 (function() {
-  var _hiddenAt = 0;
-  var STALE_THRESHOLD = 30000; // 30秒以上バックグラウンドならリロード対象
-
+  // GAS sandboxed iframe はタブ切替で描画レイヤーを失う
+  // キオスクアプリなのでタブ復帰時は常にリロードして確実に復帰
   document.addEventListener('visibilitychange', function() {
-    if (document.hidden) {
-      _hiddenAt = Date.now();
-    } else {
-      // GAS iframe はバックグラウンドで描画レイヤーを失う → 強制リペイント
-      document.body.style.display = 'none';
-      void document.body.offsetHeight; // force reflow
-      document.body.style.display = '';
-      // 5秒以上バックグラウンドならリロード（より確実）
-      if (_hiddenAt && (Date.now() - _hiddenAt > 5000)) {
-        location.reload();
-      }
+    if (!document.hidden) {
+      location.reload();
     }
   });
 

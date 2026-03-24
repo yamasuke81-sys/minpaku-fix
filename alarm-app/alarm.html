@@ -510,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324r</div>
+<div id="version">v0324s</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1064,7 +1064,7 @@ function loadAdminData() {
 
 // ===== 自動チェック判定: 全員25歳以下 かつ 宿泊人数3人以上 =====
 function shouldAutoCheckMessage_(booking) {
-  var count = parseInt(booking.guestCount, 10);
+  var count = parseInt(booking.guestCountAdults || booking.guestCount, 10);
   if (isNaN(count) || count < 3) return false;
   var ages = booking.ages || [];
   if (ages.length === 0) return false;
@@ -1135,7 +1135,7 @@ function renderBookings(bookings) {
     html += '<strong>' + esc(b.guestName || '(名前なし)') + '</strong>';
     html += '<span class="badge bg-secondary">' + esc(b.bookingSite || '') + '</span>';
     html += '</div>';
-    html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut) + ' / ' + esc(b.guestCount || '?') + '名';
+    html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut) + ' / ' + esc(b.guestCountDisplay || b.guestCount || '?');
     if (b.ages && b.ages.length > 0) html += ' / 年齢: ' + b.ages.join(', ');
     if (b.bbq && b.bbq.indexOf('はい') >= 0) html += ' / <span class="text-danger">BBQ</span>';
     html += '</div>';

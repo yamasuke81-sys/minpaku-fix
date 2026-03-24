@@ -255,7 +255,11 @@ function getTodayCheckouts() {
 
       var guestName = colMap.guestName >= 0 ? String(row[colMap.guestName] || '') : '';
       var bookingSite = colMap.bookingSite >= 0 ? String(row[colMap.bookingSite] || '') : '';
-      var guestCount = colMap.guestCount >= 0 ? String(row[colMap.guestCount] || '') : '';
+      var guestCountAdultsRaw = colMap.guestCount >= 0 ? String(row[colMap.guestCount] || '').trim() : '';
+      var guestCountInfantsRaw = colMap.guestCountInfants >= 0 ? String(row[colMap.guestCountInfants] || '').trim() : '';
+      var guestCountAdults = extractGuestCount_(guestCountAdultsRaw);
+      var guestCountInfants = extractGuestCount_(guestCountInfantsRaw);
+      var guestCountDisplay = formatGuestCountDisplay_(guestCountAdults, guestCountInfants);
       var cleaningStaff = colMap.cleaningStaff >= 0 ? String(row[colMap.cleaningStaff] || '') : '';
       var bbq = colMap.bbq >= 0 ? String(row[colMap.bbq] || '') : '';
 
@@ -266,7 +270,10 @@ function getTodayCheckouts() {
         checkOut: coStr,
         checkOutTime: Utilities.formatDate(coDate, 'Asia/Tokyo', 'HH:mm'),
         bookingSite: bookingSite,
-        guestCount: guestCount,
+        guestCount: guestCountAdults || guestCountDisplay,
+        guestCountAdults: guestCountAdults,
+        guestCountInfants: guestCountInfants,
+        guestCountDisplay: guestCountDisplay,
         cleaningStaff: cleaningStaff,
         bbq: bbq
       };
@@ -396,7 +403,11 @@ function getActiveBookings() {
       if (coStr < todayStr) continue;
 
       var guestName = colMap.guestName >= 0 ? String(row[colMap.guestName] || '') : '';
-      var guestCount = colMap.guestCount >= 0 ? String(row[colMap.guestCount] || '') : '';
+      var guestCountAdultsRaw = colMap.guestCount >= 0 ? String(row[colMap.guestCount] || '').trim() : '';
+      var guestCountInfantsRaw = colMap.guestCountInfants >= 0 ? String(row[colMap.guestCountInfants] || '').trim() : '';
+      var guestCountAdults = extractGuestCount_(guestCountAdultsRaw);
+      var guestCountInfants = extractGuestCount_(guestCountInfantsRaw);
+      var guestCountDisplay = formatGuestCountDisplay_(guestCountAdults, guestCountInfants);
       var bookingSite = colMap.bookingSite >= 0 ? String(row[colMap.bookingSite] || '') : '';
       var bbq = colMap.bbq >= 0 ? String(row[colMap.bbq] || '') : '';
 
@@ -426,7 +437,10 @@ function getActiveBookings() {
         guestName: guestName,
         checkIn: ciStr,
         checkOut: coStr,
-        guestCount: guestCount,
+        guestCount: guestCountAdults || guestCountDisplay,
+        guestCountAdults: guestCountAdults,
+        guestCountInfants: guestCountInfants,
+        guestCountDisplay: guestCountDisplay,
         bookingSite: bookingSite,
         bbq: bbq,
         ages: ages
@@ -912,7 +926,7 @@ function sendCheckoutNotify(bookingInfo) {
     var results = {};
     var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
     var guestName = bookingInfo.guestName || '(名前なし)';
-    var guestCount = bookingInfo.guestCount || '?';
+    var guestCount = bookingInfo.guestCountDisplay || bookingInfo.guestCount || '?';
 
     // テンプレートから件名・本文を生成（プレースホルダー置換）
     var subjectTpl = sett.notifySubject || '【退室連絡】{ゲスト名} 様が退室しました';
@@ -1105,10 +1119,26 @@ function clearLineCollectedSources() {
 
 // ===== 内部ヘルパー =====
 
+function extractGuestCount_(str) {
+  if (!str || typeof str !== 'string') return '';
+  var trimmed = str.trim();
+  if (!trimmed) return '';
+  var match = trimmed.match(/\d+/);
+  return match ? match[0] : trimmed;
+}
+
+function formatGuestCountDisplay_(guestCountAdults, guestCountInfants) {
+  if (!guestCountAdults && !guestCountInfants) return '-';
+  var parts = [];
+  if (guestCountAdults) parts.push('大人' + guestCountAdults + '名');
+  if (guestCountInfants) parts.push('3歳以下' + guestCountInfants + '名');
+  return parts.join('、');
+}
+
 function buildAlarmColumnMap_(headers) {
   var map = {
     checkIn: -1, checkOut: -1, guestName: -1, bookingSite: -1,
-    guestCount: -1, cleaningStaff: -1, bbq: -1, cancelledAt: -1,
+    guestCount: -1, guestCountInfants: -1, cleaningStaff: -1, bbq: -1, cancelledAt: -1,
     guestNameCols: [], ageCols: []
   };
 
@@ -1122,6 +1152,7 @@ function buildAlarmColumnMap_(headers) {
     if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) map.ageCols.push(i);
     if (h.indexOf('どこでこのホテルを予約') > -1 && map.bookingSite < 0) map.bookingSite = i;
     if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && map.guestCount < 0) map.guestCount = i;
+    if (h.indexOf('3才以下') > -1 && map.guestCountInfants < 0) map.guestCountInfants = i;
     if (h === '清掃担当' && map.cleaningStaff < 0) map.cleaningStaff = i;
     if (h.indexOf('バーベキュー') > -1 && map.bbq < 0) map.bbq = i;
     if (h === 'キャンセル日時' && map.cancelledAt < 0) map.cancelledAt = i;

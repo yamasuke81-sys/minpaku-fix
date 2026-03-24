@@ -366,6 +366,27 @@ function getActiveBookings() {
       var bookingSite = colMap.bookingSite >= 0 ? String(row[colMap.bookingSite] || '') : '';
       var bbq = colMap.bbq >= 0 ? String(row[colMap.bbq] || '') : '';
 
+      // 年齢データ収集（複数ゲスト対応）
+      var ages = [];
+      if (colMap.guestNameCols.length > 0 && colMap.ageCols.length > 0) {
+        for (var gi = 0; gi < colMap.guestNameCols.length; gi++) {
+          var nameCol = colMap.guestNameCols[gi];
+          var nextNameCol = (gi + 1 < colMap.guestNameCols.length) ? colMap.guestNameCols[gi + 1] : -1;
+          var gn = String(row[nameCol] || '').trim();
+          if (!gn) continue;
+          // 名前カラムに最も近い年齢カラムを探す
+          var ageCol = -1;
+          for (var ai = 0; ai < colMap.ageCols.length; ai++) {
+            if (colMap.ageCols[ai] > nameCol && (nextNameCol < 0 || colMap.ageCols[ai] < nextNameCol)) {
+              if (ageCol < 0) ageCol = colMap.ageCols[ai];
+              if (String(row[colMap.ageCols[ai]] || '').trim()) { ageCol = colMap.ageCols[ai]; break; }
+            }
+          }
+          var ageVal = ageCol >= 0 ? String(row[ageCol] || '').trim() : '';
+          if (ageVal) ages.push(ageVal);
+        }
+      }
+
       bookings.push({
         rowNumber: i + 2,
         guestName: guestName,
@@ -373,7 +394,8 @@ function getActiveBookings() {
         checkOut: coStr,
         guestCount: guestCount,
         bookingSite: bookingSite,
-        bbq: bbq
+        bbq: bbq,
+        ages: ages
       });
     }
 
@@ -925,14 +947,18 @@ function clearLineCollectedSources() {
 function buildAlarmColumnMap_(headers) {
   var map = {
     checkIn: -1, checkOut: -1, guestName: -1, bookingSite: -1,
-    guestCount: -1, cleaningStaff: -1, bbq: -1, cancelledAt: -1
+    guestCount: -1, cleaningStaff: -1, bbq: -1, cancelledAt: -1,
+    guestNameCols: [], ageCols: []
   };
 
   for (var i = 0; i < headers.length; i++) {
     var h = String(headers[i] || '').trim();
+    var hl = h.toLowerCase();
     if (h === 'チェックイン / Check-in' && map.checkIn < 0) map.checkIn = i;
     if (h === 'チェックアウト / Check-out' && map.checkOut < 0) map.checkOut = i;
     if (h.indexOf('氏名') > -1 && map.guestName < 0) map.guestName = i;
+    if (h.indexOf('氏名') > -1 || h.indexOf('名前') > -1 || hl === 'full name') map.guestNameCols.push(i);
+    if (h.indexOf('年齢') > -1 || (hl.indexOf('age') > -1 && hl.indexOf('page') === -1)) map.ageCols.push(i);
     if (h.indexOf('どこでこのホテルを予約') > -1 && map.bookingSite < 0) map.bookingSite = i;
     if (h.indexOf('宿泊人数') > -1 && h.indexOf('3才以下') === -1 && map.guestCount < 0) map.guestCount = i;
     if (h === '清掃担当' && map.cleaningStaff < 0) map.cleaningStaff = i;

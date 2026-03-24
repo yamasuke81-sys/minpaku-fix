@@ -15,7 +15,7 @@
     #clockScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     #clockTime { font-size: 18vw; font-weight: 200; letter-spacing: 0.05em; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,0.2); }
     #clockDate { font-size: 4vw; color: rgba(255,255,255,0.7); margin-top: -2vw; }
-    #clockPropertyName { position: absolute; bottom: 3vh; font-size: 3vw; color: rgba(255,255,255,0.4); letter-spacing: 0.1em; }
+
 
     /* ===== アラーム画面 ===== */
     #alarmScreen { display: none; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 3vh; }
@@ -107,7 +107,7 @@
 <div id="clockScreen">
   <div id="clockTime">--:--</div>
   <div id="clockDate"></div>
-  <div id="clockPropertyName"></div>
+  <!-- clockPropertyName removed -->
 </div>
 
 <!-- ===== アラーム画面 ===== -->
@@ -416,7 +416,7 @@ Thank you for your stay.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324b</div>
+<div id="version">v0324c</div>
 
 <script>
 // ===== GAS通信 =====
@@ -907,6 +907,19 @@ function loadAdminData() {
   });
 }
 
+// ===== 自動チェック判定: 全員25歳以下 かつ 宿泊人数3人以上 =====
+function shouldAutoCheckMessage_(booking) {
+  var count = parseInt(booking.guestCount, 10);
+  if (isNaN(count) || count < 3) return false;
+  var ages = booking.ages || [];
+  if (ages.length === 0) return false;
+  for (var i = 0; i < ages.length; i++) {
+    var age = parseInt(ages[i], 10);
+    if (isNaN(age) || age > 25) return false;
+  }
+  return true;
+}
+
 // ===== 宿泊一覧レンダリング =====
 function renderBookings(bookings) {
   var el = document.getElementById('bookingsList');
@@ -915,18 +928,41 @@ function renderBookings(bookings) {
     return;
   }
 
+  // 自動チェック適用（フラグ未設定の予約のみ）
+  var autoSaved = false;
+  for (var ai = 0; ai < bookings.length; ai++) {
+    var bk = bookings[ai];
+    var rnKey = String(bk.rowNumber);
+    if (_state.bookingFlags[rnKey]) continue; // 既にフラグ設定済み → ユーザー操作を尊重
+    if (shouldAutoCheckMessage_(bk) && _state.messages.length > 0) {
+      _state.bookingFlags[rnKey] = {};
+      for (var ami = 0; ami < _state.messages.length; ami++) {
+        _state.bookingFlags[rnKey][_state.messages[ami].id] = true;
+      }
+      autoSaved = true;
+    }
+  }
+  if (autoSaved) {
+    callGAS('saveBookingMessageFlags', [_state.bookingFlags]).catch(function(e) { console.error(e); });
+  }
+
   var html = '';
   for (var i = 0; i < bookings.length; i++) {
     var b = bookings[i];
     var rn = String(b.rowNumber);
-    html += '<div class="booking-card">';
+    var isAutoTarget = shouldAutoCheckMessage_(b);
+    html += '<div class="booking-card' + (isAutoTarget ? ' border-warning' : '') + '">';
     html += '<div class="d-flex justify-content-between align-items-start mb-1">';
     html += '<strong>' + esc(b.guestName || '(名前なし)') + '</strong>';
     html += '<span class="badge bg-secondary">' + esc(b.bookingSite || '') + '</span>';
     html += '</div>';
     html += '<div class="small text-muted">CI: ' + esc(b.checkIn) + ' → CO: ' + esc(b.checkOut) + ' / ' + esc(b.guestCount || '?') + '名';
+    if (b.ages && b.ages.length > 0) html += ' / 年齢: ' + b.ages.join(', ');
     if (b.bbq && b.bbq.indexOf('はい') >= 0) html += ' / <span class="text-danger">BBQ</span>';
     html += '</div>';
+    if (isAutoTarget) {
+      html += '<div class="small text-warning mt-1"><i class="bi bi-exclamation-triangle"></i> 全員25歳以下 &amp; 3人以上 → 静音時間通知ON</div>';
+    }
 
     // メッセージチェックボックス
     if (_state.messages.length > 0) {

@@ -8,6 +8,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --primary: #2c6fbb; --success: #28a745; --danger: #dc3545; }
+    /* GAS HTMLサービスが挿入するwarning-bar-tableを非表示（上部の白い線の原因） */
+    #warning-bar-table, table.full_size[cellspacing="0"] { display: none !important; height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: linear-gradient(200deg, #f0dfa0 0%, #5a8fa8 25%, #2a6a8a 50%, #1a4a7a 75%, #0d3468 100%); margin: 0; padding: 0; min-height: 100vh; }
     .screen { display: none; height: 100vh; overflow: hidden; }
     .screen.active { display: flex; flex-direction: column; }
@@ -1002,9 +1004,15 @@ if (pinEl) pinEl.addEventListener('keydown', function(e) { if (e.key === 'Enter'
   document.addEventListener('visibilitychange', function() {
     if (document.hidden) {
       _hiddenAt = Date.now();
-    } else if (_hiddenAt && (Date.now() - _hiddenAt > STALE_THRESHOLD)) {
-      // 詳細編集中は自動保存済みなのでリロードしても安全
-      location.reload();
+    } else {
+      // GAS iframe はバックグラウンドで描画レイヤーを失う → 強制リペイント
+      document.body.style.display = 'none';
+      void document.body.offsetHeight; // force reflow
+      document.body.style.display = '';
+      // 5秒以上バックグラウンドならリロード（より確実）
+      if (_hiddenAt && (Date.now() - _hiddenAt > 5000)) {
+        location.reload();
+      }
     }
   });
 

@@ -9,6 +9,8 @@
   <style>
     /* ===== 共通 ===== */
     * { box-sizing: border-box; }
+    /* GAS HTMLサービスが挿入するwarning-bar-tableを非表示（上部の白い線の原因） */
+    #warning-bar-table, table.full_size[cellspacing="0"] { display: none !important; height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }
     body { margin: 0; padding: 0; font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #667eea; color: #fff; overflow: hidden; height: 100vh; }
 
     /* ===== 待機画面（時計） ===== */
@@ -96,11 +98,11 @@
     #settingsScreen.active { display: block; }
 
     /* ===== Fully Kiosk用: 設定ボタン ===== */
-    #settingsBtn { position: fixed; bottom: 10px; right: 10px; z-index: 50; opacity: 0.15; transition: opacity .3s; background: none; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; display: flex; align-items: center; justify-content: center; padding: 0; }
+    #settingsBtn { position: fixed; bottom: 10px; right: 10px; z-index: 100; opacity: 0.15; transition: opacity .3s; background: none; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
     #settingsBtn:hover, #settingsBtn:active { opacity: 1; }
 
     /* ===== バージョン ===== */
-    #version { position: fixed; bottom: 4px; left: 8px; font-size: 10px; color: rgba(255,255,255,0.2); z-index: 5; }
+    #version { position: fixed; bottom: 4px; left: 8px; font-size: 10px; color: rgba(255,255,255,0.2); z-index: 100; }
   </style>
 </head>
 <body>
@@ -509,7 +511,7 @@ You may be asked to leave immediately.</textarea>
 
 <!-- ===== 設定ボタン（右下、薄表示） ===== -->
 <button id="settingsBtn" onclick="openAdmin()">
-  <i class="bi bi-gear"></i>
+  <i class="bi bi-gear-fill"></i>
 </button>
 
 <div id="version">v0324y</div>
@@ -577,6 +579,10 @@ window.addEventListener('load', function() {
 // 復帰時に時計とポーリングを即座に再開する
 document.addEventListener('visibilitychange', function() {
   if (!document.hidden) {
+    // GAS iframe はバックグラウンドで描画レイヤーを失う → 強制リペイント
+    document.body.style.display = 'none';
+    void document.body.offsetHeight;
+    document.body.style.display = '';
     // 時計を即座に更新（表示が止まっていた分を補正）
     updateClock();
     // ポーリングを即座に実行（バックグラウンド中に来たアラームを検知）

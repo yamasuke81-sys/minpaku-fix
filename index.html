@@ -1273,7 +1273,7 @@
         <div id="staffResponseMonthOverlay" style="display:none;position:absolute;top:0;left:0;z-index:5;background:rgba(30,42,58,0.85);color:#fff;padding:1px 8px;border-radius:0 0 6px 0;font-size:12px;font-weight:bold;pointer-events:none;"></div>
         <div id="staffResponseContent" style="overflow-x:auto;"></div>
       </div>
-      <details id="oldCalendarCollapse" style="margin-top:1rem;" open>
+      <details id="oldCalendarCollapse" style="margin-top:1rem;">
         <summary style="cursor:pointer;font-size:0.85rem;font-weight:600;color:#6c757d;padding:4px 0;">いままでのカレンダー</summary>
         <div id="staffResponseCalLegendArea" style="margin-top:0.5rem;margin-bottom:0.2rem;"></div>
         <div id="staffResponseCalendarArea"></div>
@@ -4888,6 +4888,15 @@
           } catch(e) { console.log('[CO mismatch banner error] ' + e); }
           updateNotificationBanner();
 
+          // カレンダーイベント読み込み完了 → 上カレンダーの予約バーを更新
+          // （loadStaffResponseCalendarが先に完了した場合、予約バーが表示されないため再描画）
+          if (document.getElementById('panelStaffResponse') && document.getElementById('panelStaffResponse').style.display !== 'none') {
+            var _srCache = window._staffResponseCache;
+            if (_srCache && _srCache.list) {
+              renderStaffResponseCalendar(_srCache.list, _srCache.month);
+            }
+          }
+
           // 募集エントリのない清掃イベントの次回予約を一括プリロード
           var nonRecruitRows = [];
           (res.data || []).forEach(function(b) {
@@ -5327,6 +5336,11 @@
           if (!document.hidden && calendar) {
             calendar.render();
             setTimeout(function() { if (calendar) calendar.updateSize(); }, 200);
+            // 上カレンダーの予約バーも再描画
+            var _srCache = window._staffResponseCache;
+            if (_srCache && _srCache.list) {
+              renderStaffResponseCalendar(_srCache.list, _srCache.month);
+            }
           }
         });
 

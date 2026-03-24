@@ -378,6 +378,10 @@ You may be asked to leave immediately.</textarea>
         <h6><i class="bi bi-send"></i> 通知先（複数選択可）</h6>
         <div class="form-text mb-2">各IDは基本設定タブで設定してください。</div>
         <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="coNotifyLineNotifyGroup">
+          <label class="form-check-label" for="coNotifyLineNotifyGroup">オーナー通知先LINEグループ</label>
+        </div>
+        <div class="form-check mb-2">
           <input class="form-check-input" type="checkbox" id="coNotifyLineCleaningGroup">
           <label class="form-check-label" for="coNotifyLineCleaningGroup">LINE 清掃グループ</label>
         </div>
@@ -506,7 +510,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324k</div>
+<div id="version">v0324l</div>
 
 <script>
 // ===== GAS通信 =====
@@ -2059,6 +2063,7 @@ function loadCoNotifySettings() {
     _state.coNotifySettings = s;
     document.getElementById('coNotifyStartTime').value = s.startTime || '07:00';
     document.getElementById('coNotifyEndTime').value = s.endTime || '14:00';
+    document.getElementById('coNotifyLineNotifyGroup').checked = !!s.lineNotifyGroup;
     document.getElementById('coNotifyLineCleaningGroup').checked = !!s.lineCleaningGroup;
     document.getElementById('coNotifyLineOwner').checked = !!s.lineOwner;
     document.getElementById('coNotifyOwnerEmail').checked = !!s.ownerEmail;
@@ -2073,6 +2078,7 @@ function saveCoNotifySettings() {
   var s = {
     startTime: document.getElementById('coNotifyStartTime').value || '07:00',
     endTime: document.getElementById('coNotifyEndTime').value || '14:00',
+    lineNotifyGroup: document.getElementById('coNotifyLineNotifyGroup').checked,
     lineCleaningGroup: document.getElementById('coNotifyLineCleaningGroup').checked,
     lineOwner: document.getElementById('coNotifyLineOwner').checked,
     ownerEmail: document.getElementById('coNotifyOwnerEmail').checked,

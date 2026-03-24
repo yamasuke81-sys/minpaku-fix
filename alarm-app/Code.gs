@@ -931,7 +931,22 @@ function sendCheckoutNotify(bookingInfo) {
 
     var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
 
-    // 1) LINE清掃グループ（IDは基本設定から取得）
+    // 1) オーナー通知先LINEグループ（IDは基本設定から取得）
+    if (sett.lineNotifyGroup && lineToken) {
+      var notifyGroupId = props.getProperty('LINE_NOTIFY_GROUP_ID') || '';
+      if (notifyGroupId) {
+        try {
+          UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'post',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + lineToken },
+            payload: JSON.stringify({ to: notifyGroupId, messages: [{ type: 'text', text: subject + '\n\n' + body }] })
+          });
+          results.lineNotifyGroup = { success: true };
+        } catch (e) { results.lineNotifyGroup = { success: false, error: e.message }; }
+      }
+    }
+
+    // 2) LINE清掃グループ
     if (sett.lineCleaningGroup && lineToken) {
       var cleaningGroupId = props.getProperty('CLEANING_GROUP_ID') || '';
       if (cleaningGroupId) {
@@ -946,7 +961,7 @@ function sendCheckoutNotify(bookingInfo) {
       }
     }
 
-    // 2) オーナー個別LINE（IDは基本設定から取得）
+    // 3) オーナー個別LINE
     if (sett.lineOwner && lineToken) {
       var ownerLineId = props.getProperty('OWNER_LINE_ID') || '';
       if (ownerLineId) {
@@ -961,7 +976,7 @@ function sendCheckoutNotify(bookingInfo) {
       }
     }
 
-    // 3) オーナーメール（アドレスは基本設定から取得）
+    // 4) オーナーメール
     if (sett.ownerEmail) {
       var emails = props.getProperty('OWNER_EMAIL') || '';
       if (emails) {

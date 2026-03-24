@@ -96,7 +96,7 @@
     #settingsScreen.active { display: block; }
 
     /* ===== Fully Kiosk用: 設定ボタン ===== */
-    #settingsBtn { position: fixed; bottom: 10px; right: 10px; z-index: 50; opacity: 0.15; font-size: 3vw; }
+    #settingsBtn { position: fixed; bottom: 10px; right: 10px; z-index: 50; opacity: 0.15; transition: opacity .3s; background: none; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; display: flex; align-items: center; justify-content: center; padding: 0; }
     #settingsBtn:hover, #settingsBtn:active { opacity: 1; }
 
     /* ===== バージョン ===== */
@@ -508,11 +508,11 @@ You may be asked to leave immediately.</textarea>
 </div>
 
 <!-- ===== 設定ボタン（右下、薄表示） ===== -->
-<button id="settingsBtn" class="btn btn-outline-light btn-sm" onclick="openAdmin()">
+<button id="settingsBtn" onclick="openAdmin()">
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324t</div>
+<div id="version">v0324y</div>
 
 <script>
 // ===== GAS通信 =====

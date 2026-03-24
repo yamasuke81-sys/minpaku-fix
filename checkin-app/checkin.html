@@ -84,8 +84,9 @@
     /* 共通 */
     .btn-back { background: none; border: none; color: #fff; font-size: 1.2rem; padding: .2rem .5rem; }
     .spinner-sm { width: 1rem; height: 1rem; border-width: .15rem; }
-    .settings-gear { position: fixed; top: .5rem; right: .5rem; background: rgba(0,0,0,.2); color: #fff; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: .85rem; z-index: 100; display: flex; align-items: center; justify-content: center; }
-    .version-badge { position: fixed; bottom: 1rem; left: 1rem; font-size: .65rem; color: rgba(255,255,255,.5); z-index: 100; }
+    .settings-gear { position: fixed; bottom: 10px; right: 10px; background: none; color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 50%; width: 36px; height: 36px; font-size: 1rem; z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0.15; transition: opacity .3s; }
+    .settings-gear:hover, .settings-gear:active { opacity: 1; }
+    .version-badge { position: fixed; bottom: 4px; left: 8px; font-size: 10px; color: rgba(255,255,255,0.2); z-index: 100; }
     .btn-confirm-checkin { background: var(--success); color: #fff; border: none; border-radius: .8rem; padding: .8rem; font-size: 1.1rem; font-weight: 600; width: 100%; margin-top: .5rem; }
     .btn-confirm-checkin:disabled { opacity: .6; }
     .no-results { text-align: center; padding: 3rem 1rem; color: #888; }
@@ -104,7 +105,7 @@
 
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0324x</div>
+<div class="version-badge" id="deployVersion">v0324y</div>
 <!-- ===== デバッグ（ホワイトアウト調査・左下黒背景で必ず視認可能） ===== -->
 <div id="dbgInfo" style="position:fixed;bottom:2.5rem;left:.5rem;right:.5rem;font-size:10px;color:#0f0;background:rgba(0,0,0,.85);z-index:99999;font-family:monospace;padding:4px 8px;border-radius:4px;pointer-events:none;white-space:pre-wrap;"></div>
 <script>

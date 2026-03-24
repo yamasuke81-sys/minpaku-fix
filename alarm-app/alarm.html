@@ -536,7 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325i</div>
+<div id="version">v0325j</div>
 <div id="dbgCheckin" style="position:fixed;top:4px;left:4px;font-size:9px;color:#0f0;background:rgba(0,0,0,.8);z-index:99999;font-family:monospace;padding:3px 6px;border-radius:3px;pointer-events:none;white-space:pre;"></div>
 
 <script>
@@ -1681,6 +1681,11 @@ function saveSettings() {
     callGAS('saveAlarmSettings', [s]),
     callGAS('saveComplaintSettings', [cs])
   ]).then(function() {
+    // _stateも即座に更新（ページリロードなしでリダイレクトが動くように）
+    _state.checkinAppUrl = s.checkinAppUrl;
+    _state.checkinEnabled = s.checkinEnabled;
+    _state.checkinReturnTime = s.checkinReturnTime;
+    _state._checkinRedirected = false;
     alert('設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
 }

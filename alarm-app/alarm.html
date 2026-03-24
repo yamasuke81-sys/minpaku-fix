@@ -662,7 +662,8 @@ function updateClock() {
       '\nenabled=' + _state.checkinEnabled +
       ' url=' + (_state.checkinAppUrl ? _state.checkinAppUrl.substring(0, 30) + '...' : 'empty') +
       '\nredirected=' + _state._checkinRedirected +
-      ' screen=' + _state.screen;
+      ' screen=' + _state.screen +
+      '\n' + (_state._dbgRedirectLog || 'no redirect attempt yet');
   }
 
   // チェックインapp連携: 設定時刻になったらチェックインappに遷移
@@ -673,11 +674,20 @@ function updateClock() {
       var adminActive = document.getElementById('adminScreen') && document.getElementById('adminScreen').classList.contains('active');
       var alarmActive = document.getElementById('alarmScreen') && document.getElementById('alarmScreen').classList.contains('active');
       var complaintActive = document.getElementById('complaintAlarmScreen') && document.getElementById('complaintAlarmScreen').classList.contains('active');
+      _state._dbgRedirectLog = 'ATTEMPT@' + h + ':' + m + ':' + s +
+        ' admin=' + !!adminActive + ' alarm=' + !!alarmActive +
+        ' complaint=' + !!complaintActive + ' coNotify=' + _state.coNotifyActive;
       if (!adminActive && !alarmActive && !complaintActive) {
         // CO連絡画面表示中なら通知なしで終了扱いにしてからリダイレクト
         if (_state.coNotifyActive) dismissCoNotify();
         _state._checkinRedirected = true;
-        window.open(_state.checkinAppUrl, '_top');
+        _state._dbgRedirectLog += ' → REDIRECT FIRED';
+        // 方法1: top.location (GAS iframe脱出)
+        try { top.location.href = _state.checkinAppUrl; } catch(e) {
+          // 方法2: クロスオリジンでブロックされた場合
+          _state._dbgRedirectLog += ' top.location BLOCKED:' + e.message;
+          window.open(_state.checkinAppUrl, '_top');
+        }
       }
     }
     // 時刻が変わったらフラグリセット

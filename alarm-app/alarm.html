@@ -393,7 +393,36 @@ You may be asked to leave immediately.</textarea>
           <input type="text" class="form-control form-control-sm" id="coNotifyBtnTextEn" value="Check-out Notification">
         </div>
       </div>
-      <button class="btn btn-success" onclick="saveCoNotifySettings()"><i class="bi bi-save"></i> 保存</button>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-envelope-paper"></i> 通知メッセージテンプレート</h6>
+        <div class="form-text mb-2">プレースホルダー: <code>{ゲスト名}</code> <code>{人数}</code> <code>{チェックアウト日}</code> <code>{退室時刻}</code></div>
+        <div class="mb-2">
+          <label class="form-label small">件名</label>
+          <input type="text" class="form-control form-control-sm" id="coNotifySubject" value="【退室連絡】{ゲスト名} 様が退室しました">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">本文</label>
+          <textarea class="form-control form-control-sm" rows="5" id="coNotifyBody">退室連絡がありました。
+
+■ ゲスト名: {ゲスト名}
+■ 宿泊人数: {人数}名
+■ チェックアウト日: {チェックアウト日}
+■ 退室連絡時刻: {退室時刻}</textarea>
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-success" onclick="saveCoNotifySettings()"><i class="bi bi-save"></i> 保存</button>
+        <button class="btn btn-outline-warning" onclick="previewCoNotifyScreen()"><i class="bi bi-eye"></i> 画面確認</button>
+      </div>
+      <div class="mt-3 pt-2 border-top">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+          <span class="small fw-bold">テスト送信:</span>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testEmailCoNotify" checked><label class="form-check-label" for="testEmailCoNotify">メール</label></div>
+          <div class="form-check form-check-inline small mb-0"><input class="form-check-input" type="checkbox" id="testLineCoNotify"><label class="form-check-label" for="testLineCoNotify">LINE</label></div>
+          <button class="btn btn-sm btn-outline-info" onclick="sendTestCoNotify()" id="btnTestCoNotify"><i class="bi bi-send"></i> 送信</button>
+        </div>
+        <div id="testCoNotifyResult" class="small mt-1" style="display:none;"></div>
+      </div>
     </div>
 
     <!-- ⑥ 基本設定タブ -->
@@ -460,7 +489,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear"></i>
 </button>
 
-<div id="version">v0324f</div>
+<div id="version">v0324g</div>
 
 <script>
 // ===== GAS通信 =====
@@ -1912,6 +1941,18 @@ function hideCoNotifyScreen() {
 }
 
 function sendCoNotify() {
+  // プレビューモードの場合は通知を送らず管理画面に戻る
+  if (_state._coNotifyPreview) {
+    _state._coNotifyPreview = false;
+    _state.coNotifyActive = false;
+    _state.screen = 'admin';
+    document.getElementById('coNotifyScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'block';
+    document.getElementById('adminScreen').className = 'active';
+    document.getElementById('settingsBtn').style.display = '';
+    return;
+  }
+
   var data = _state.lastPollData;
   if (!data || !data.checkouts || data.checkouts.length === 0) return;
 
@@ -1970,6 +2011,11 @@ dismissAlarm = function() {
 
 // ===== 退室連絡設定の読み込み・保存 =====
 
+var _coNotifyDefaults = {
+  subject: '【退室連絡】{ゲスト名} 様が退室しました',
+  body: '退室連絡がありました。\n\n■ ゲスト名: {ゲスト名}\n■ 宿泊人数: {人数}名\n■ チェックアウト日: {チェックアウト日}\n■ 退室連絡時刻: {退室時刻}'
+};
+
 function loadCoNotifySettings() {
   callGAS('getCheckoutNotifySettings').then(function(s) {
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { s = {}; } }
@@ -1984,6 +2030,8 @@ function loadCoNotifySettings() {
     document.getElementById('coNotifyEmailAddresses').value = s.ownerEmailAddresses || '';
     document.getElementById('coNotifyBtnTextJa').value = s.btnTextJa || '退室のご連絡';
     document.getElementById('coNotifyBtnTextEn').value = s.btnTextEn || 'Check-out Notification';
+    document.getElementById('coNotifySubject').value = s.notifySubject || _coNotifyDefaults.subject;
+    document.getElementById('coNotifyBody').value = s.notifyBody || _coNotifyDefaults.body;
   }).catch(function() {});
 }
 
@@ -1998,12 +2046,77 @@ function saveCoNotifySettings() {
     ownerEmail: document.getElementById('coNotifyOwnerEmail').checked,
     ownerEmailAddresses: document.getElementById('coNotifyEmailAddresses').value.trim(),
     btnTextJa: document.getElementById('coNotifyBtnTextJa').value || '退室のご連絡',
-    btnTextEn: document.getElementById('coNotifyBtnTextEn').value || 'Check-out Notification'
+    btnTextEn: document.getElementById('coNotifyBtnTextEn').value || 'Check-out Notification',
+    notifySubject: document.getElementById('coNotifySubject').value || _coNotifyDefaults.subject,
+    notifyBody: document.getElementById('coNotifyBody').value || _coNotifyDefaults.body
   };
   callGAS('saveCheckoutNotifySettings', [s]).then(function() {
     _state.coNotifySettings = s;
     alert('退室連絡設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
+}
+
+function previewCoNotifyScreen() {
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('adminScreen').className = '';
+  _state.coNotifyActive = true;
+  _state.screen = 'coNotify';
+  _state._coNotifyPreview = true;
+  var screen = document.getElementById('coNotifyScreen');
+  screen.style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = 'none';
+
+  // ボタンテキスト反映
+  var jaEl = document.getElementById('coNotifyBtnJa');
+  var enEl = document.getElementById('coNotifyBtnEn');
+  if (jaEl) jaEl.textContent = document.getElementById('coNotifyBtnTextJa').value || '退室のご連絡';
+  if (enEl) enEl.textContent = document.getElementById('coNotifyBtnTextEn').value || 'Check-out Notification';
+
+  // 日付ラベル
+  var now = new Date();
+  var days = ['日', '月', '火', '水', '木', '金', '土'];
+  document.getElementById('coNotifyDateLabel').textContent =
+    (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
+
+  // UI初期化
+  document.getElementById('btnCoNotify').style.display = '';
+  document.getElementById('coNotifySending').style.display = 'none';
+  document.getElementById('coNotifyDone').style.display = 'none';
+}
+
+function sendTestCoNotify() {
+  var channels = {
+    email: document.getElementById('testEmailCoNotify').checked,
+    line: document.getElementById('testLineCoNotify').checked
+  };
+  if (!channels.email && !channels.line) { alert('送信先を1つ以上選択してください。'); return; }
+
+  var subjectTpl = document.getElementById('coNotifySubject').value || _coNotifyDefaults.subject;
+  var bodyTpl = document.getElementById('coNotifyBody').value || _coNotifyDefaults.body;
+  // サンプル値で置換
+  var subject = subjectTpl.replace(/\{ゲスト名\}/g, 'テスト太郎').replace(/\{人数\}/g, '2').replace(/\{チェックアウト日\}/g, '2026/03/24').replace(/\{退室時刻\}/g, '10:05');
+  var body = bodyTpl.replace(/\{ゲスト名\}/g, 'テスト太郎').replace(/\{人数\}/g, '2').replace(/\{チェックアウト日\}/g, '2026/03/24').replace(/\{退室時刻\}/g, '10:05');
+
+  var btn = document.getElementById('btnTestCoNotify');
+  var resEl = document.getElementById('testCoNotifyResult');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送信中…'; }
+  callGAS('sendTestMessage', [{ label: '退室連絡', message: '件名: ' + subject + '\n\n' + body, messageEn: '', channels: channels }])
+    .then(function(r) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      if (resEl) {
+        var msgs = [];
+        if (r.results) {
+          if (r.results.email) msgs.push('メール: ' + (r.results.email.success ? '✅ 送信成功' + (r.results.email.to ? ' (' + r.results.email.to + ')' : '') : '❌ ' + r.results.email.error));
+          if (r.results.line) msgs.push('LINE: ' + (r.results.line.success ? '✅ 送信成功' : '❌ ' + r.results.line.error));
+        }
+        resEl.innerHTML = msgs.join('<br>');
+        resEl.style.display = 'block';
+        setTimeout(function() { resEl.style.display = 'none'; }, 8000);
+      }
+    }).catch(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-send"></i> 送信'; }
+      alert('テスト送信エラー: ' + e.message);
+    });
 }
 </script>
 </body>

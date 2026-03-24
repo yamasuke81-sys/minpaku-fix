@@ -910,12 +910,20 @@ function sendCheckoutNotify(bookingInfo) {
     var guestName = bookingInfo.guestName || '(名前なし)';
     var guestCount = bookingInfo.guestCount || '?';
 
-    var subject = '【退室連絡】' + guestName + ' 様が退室しました';
-    var body = '退室連絡がありました。\n\n'
-      + '■ ゲスト名: ' + guestName + '\n'
-      + '■ 宿泊人数: ' + guestCount + '名\n'
-      + '■ チェックアウト日: ' + (bookingInfo.checkOut || '') + '\n'
-      + '■ 退室連絡時刻: ' + now + '\n';
+    // テンプレートから件名・本文を生成（プレースホルダー置換）
+    var subjectTpl = sett.notifySubject || '【退室連絡】{ゲスト名} 様が退室しました';
+    var bodyTpl = sett.notifyBody || '退室連絡がありました。\n\n■ ゲスト名: {ゲスト名}\n■ 宿泊人数: {人数}名\n■ チェックアウト日: {チェックアウト日}\n■ 退室連絡時刻: {退室時刻}';
+
+    var replacePlaceholders_ = function(text) {
+      return text
+        .replace(/\{ゲスト名\}/g, guestName)
+        .replace(/\{人数\}/g, guestCount)
+        .replace(/\{チェックアウト日\}/g, bookingInfo.checkOut || '')
+        .replace(/\{退室時刻\}/g, now);
+    };
+
+    var subject = replacePlaceholders_(subjectTpl);
+    var body = replacePlaceholders_(bodyTpl);
 
     var lineToken = props.getProperty('LINE_CHANNEL_TOKEN') || '';
 

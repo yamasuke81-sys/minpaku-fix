@@ -536,7 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325k</div>
+<div id="version">v0325l</div>
 <div id="dbgCheckin" style="position:fixed;top:4px;left:4px;font-size:9px;color:#0f0;background:rgba(0,0,0,.8);z-index:99999;font-family:monospace;padding:3px 6px;border-radius:3px;pointer-events:none;white-space:pre;"></div>
 
 <script>
@@ -682,21 +682,15 @@ function updateClock() {
         if (_state.coNotifyActive) dismissCoNotify();
         _state._checkinRedirected = true;
         _state._dbgRedirectLog += ' → REDIRECT FIRED';
-        // GAS HTMLサービスはiframe内で実行されるため、複数の方法を試行
-        var targetUrl = _state.checkinAppUrl;
-        // 方法1: window.location.href（iframe内遷移）
-        try {
-          _state._dbgRedirectLog += ' trying location.href';
-          window.location.href = targetUrl;
-        } catch(e1) {
-          _state._dbgRedirectLog += ' location.href FAIL:' + e1.message;
-        }
-        // 方法2: フォールバック（方法1が即座に効かない場合に備えて）
-        setTimeout(function() {
-          try { top.location.href = targetUrl; } catch(e2) {
-            window.open(targetUrl, '_top');
-          }
-        }, 500);
+        // GAS HTMLサービスのiframe外に遷移する定番手法:
+        // <a target="_top">を動的生成してクリック
+        var a = document.createElement('a');
+        a.href = _state.checkinAppUrl;
+        a.target = '_top';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     }
     // 時刻が変わったらフラグリセット

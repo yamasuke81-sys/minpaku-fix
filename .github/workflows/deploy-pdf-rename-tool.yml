@@ -7,6 +7,8 @@ on:
       - 'claude/enhance-pdf-renaming-tool-*'
     paths:
       - 'pdf-rename-tool/**'
+      - '.github/workflows/deploy-pdf-rename-tool.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -22,18 +24,27 @@ jobs:
         run: npm install -g @google/clasp
 
       - name: Setup clasp credentials
+        env:
+          CLASP_CREDENTIALS: ${{ secrets.CLASP_CREDENTIALS }}
         run: |
-          echo '${{ secrets.CLASP_CREDENTIALS }}' > ~/.clasprc.json
+          echo "$CLASP_CREDENTIALS" > ~/.clasprc.json
+          echo "✅ Credentials file created"
+          test -s ~/.clasprc.json && echo "File is not empty" || (echo "❌ CLASP_CREDENTIALS secret is empty!" && exit 1)
 
       - name: Push to GAS
         working-directory: pdf-rename-tool
-        run: clasp push --force
+        run: |
+          echo "Pushing to GAS..."
+          clasp push --force
+          echo "✅ Push complete"
 
       - name: Deploy as Web App
         working-directory: pdf-rename-tool
         run: |
-          # 既存のデプロイメントを更新（最新版に）
-          DEPLOY_ID=$(clasp deployments | grep -v '@HEAD' | tail -1 | awk '{print $2}')
+          echo "Deploying..."
+          DEPLOYMENTS=$(clasp deployments 2>&1)
+          echo "$DEPLOYMENTS"
+          DEPLOY_ID=$(echo "$DEPLOYMENTS" | grep -v '@HEAD' | grep '^-' | tail -1 | awk '{print $2}')
           if [ -n "$DEPLOY_ID" ] && [ "$DEPLOY_ID" != "-" ]; then
             clasp deploy --deploymentId "$DEPLOY_ID" --description "Auto-deploy $(date +%Y%m%d-%H%M%S)"
           else

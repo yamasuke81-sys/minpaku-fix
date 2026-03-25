@@ -269,6 +269,8 @@ function getTodayCheckouts() {
       var cleaningStaff = colMap.cleaningStaff >= 0 ? String(row[colMap.cleaningStaff] || '') : '';
       var bbq = colMap.bbq >= 0 ? String(row[colMap.bbq] || '') : '';
 
+      var checkinConfirmedVal = colMap.checkinConfirmed >= 0 ? String(row[colMap.checkinConfirmed] || '').trim() : '';
+
       var booking = {
         rowNumber: i + 2,
         guestName: guestName,
@@ -281,7 +283,8 @@ function getTodayCheckouts() {
         guestCountInfants: guestCountInfants,
         guestCountDisplay: guestCountDisplay,
         cleaningStaff: cleaningStaff,
-        bbq: bbq
+        bbq: bbq,
+        checkinConfirmed: checkinConfirmedVal
       };
 
       // 本日チェックアウト
@@ -359,7 +362,9 @@ function getTodayCheckouts() {
       messageVolume: Number(props.getProperty('MESSAGE_VOLUME') || '60'),
       messageSound: props.getProperty('MESSAGE_SOUND') || 'chime',
       complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),
-      complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm'
+      complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm',
+      checkinEnabled: props.getProperty('CHECKIN_ENABLED') === 'true',
+      checkinColumnExists: colMap.checkinConfirmed >= 0
     });
 
   } catch (e) {
@@ -1153,7 +1158,7 @@ function buildAlarmColumnMap_(headers) {
   var map = {
     checkIn: -1, checkOut: -1, guestName: -1, bookingSite: -1,
     guestCount: -1, guestCountInfants: -1, cleaningStaff: -1, bbq: -1, cancelledAt: -1,
-    guestNameCols: [], ageCols: []
+    checkinConfirmed: -1, guestNameCols: [], ageCols: []
   };
 
   for (var i = 0; i < headers.length; i++) {
@@ -1170,6 +1175,7 @@ function buildAlarmColumnMap_(headers) {
     if (h === '清掃担当' && map.cleaningStaff < 0) map.cleaningStaff = i;
     if (h.indexOf('バーベキュー') > -1 && map.bbq < 0) map.bbq = i;
     if (h === 'キャンセル日時' && map.cancelledAt < 0) map.cancelledAt = i;
+    if (h === 'チェックイン確認日時' && map.checkinConfirmed < 0) map.checkinConfirmed = i;
   }
 
   return map;

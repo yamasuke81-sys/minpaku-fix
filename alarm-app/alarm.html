@@ -536,7 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325o</div>
+<div id="version">v0325p</div>
 <div id="dbgCheckin" style="position:fixed;top:4px;left:4px;font-size:9px;color:#0f0;background:rgba(0,0,0,.8);z-index:99999;font-family:monospace;padding:3px 6px;border-radius:3px;pointer-events:none;white-space:pre;"></div>
 
 <script>
@@ -729,14 +729,25 @@ function updateClockInfo(data) {
 }
 
 // ===== アラーム判定 =====
+// チェックインapp連携がONかつ列が存在する場合、チェックイン済み予約のみに絞り込む
+// 連携OFFまたは列なしの場合は全予約をそのまま返す（従来通り）
+function filterByCheckin_(bookings, data) {
+  if (!data.checkinEnabled || !data.checkinColumnExists) return bookings;
+  return bookings.filter(function(b) { return !!b.checkinConfirmed; });
+}
+
 function checkAlarmTrigger(nowHHMM) {
   var data = _state.lastPollData;
   if (!data) return;
 
+  // チェックインapp連携フィルタ（連携OFF時はフィルタなし）
+  var coBookings = filterByCheckin_(data.checkouts || [], data);
+  var stayBookings = filterByCheckin_(data.currentStays || [], data);
+
   // 1) チェックアウトメッセージテンプレート（静音時間と同じ構造）
   // 複数時刻がある場合、現在時刻以前の最新のもののみ表示し、それより前は自動確認済みにする
-  if (data.checkoutMessages && data.checkouts && data.checkouts.length > 0) {
-    var hasCoChecked = hasAnyCheckedBooking(data.bookingCoFlags || {}, data.checkouts);
+  if (data.checkoutMessages && coBookings.length > 0) {
+    var hasCoChecked = hasAnyCheckedBooking(data.bookingCoFlags || {}, coBookings);
 
     // 全テンプレートの有効な時刻を集約
     var allCoAlarms = [];
@@ -789,7 +800,7 @@ function checkAlarmTrigger(nowHHMM) {
   }
 
   // 旧形式フォールバック（CHECKOUT_MESSAGESが未設定の場合）
-  if ((!data.checkoutMessages || data.checkoutMessages.length === 0) && data.checkouts && data.checkouts.length > 0 && data.alarmTimes) {
+  if ((!data.checkoutMessages || data.checkoutMessages.length === 0) && coBookings.length > 0 && data.alarmTimes) {
     for (var ti = 0; ti < data.alarmTimes.length; ti++) {
       var t = data.alarmTimes[ti];
       var coAlarmId = 'checkout_' + t;
@@ -810,7 +821,7 @@ function checkAlarmTrigger(nowHHMM) {
 
   // 2) スケジュールメッセージ（静音時間）
   if (data.scheduledMessages && data.bookingMsgFlags) {
-    var hasCheckedBookings = hasAnyCheckedBooking(data.bookingMsgFlags, data.currentStays || []);
+    var hasCheckedBookings = hasAnyCheckedBooking(data.bookingMsgFlags, stayBookings);
 
     for (var mi = 0; mi < data.scheduledMessages.length; mi++) {
       var msg = data.scheduledMessages[mi];
@@ -2135,7 +2146,8 @@ function checkCoNotifyScreen(nowHHMM) {
 
   var startTime = sett.startTime || '07:00';
   var endTime = sett.endTime || '14:00';
-  var hasCoToday = data.checkouts && data.checkouts.length > 0;
+  var coForNotify = filterByCheckin_(data.checkouts || [], data);
+  var hasCoToday = coForNotify.length > 0;
 
   // 表示条件: CO当日 & 開始時間〜終了時間の間
   var shouldShow = hasCoToday && nowHHMM >= startTime && nowHHMM < endTime;

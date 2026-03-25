@@ -604,15 +604,28 @@ function confirmCheckin(rowNumber) {
 
     // チェックイン記録をScriptPropertiesに保存
     var props = PropertiesService.getScriptProperties();
+    var confirmedAt = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
     var log = JSON.parse(props.getProperty('CHECKIN_LOG') || '[]');
     log.push({
       rowNumber: rowNumber,
       guestName: guestName,
-      confirmedAt: Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss')
+      confirmedAt: confirmedAt
     });
     // 最新100件のみ保持
     if (log.length > 100) log = log.slice(log.length - 100);
     props.setProperty('CHECKIN_LOG', JSON.stringify(log));
+
+    // スプレッドシートの「チェックイン確認日時」列にも書き込み（alarm-app連携用）
+    var ciConfirmCol = -1;
+    for (var ci = 0; ci < headers.length; ci++) {
+      if (String(headers[ci] || '').trim() === 'チェックイン確認日時') { ciConfirmCol = ci + 1; break; }
+    }
+    if (ciConfirmCol < 0) {
+      // 列がなければ末尾に作成
+      ciConfirmCol = headers.length + 1;
+      sheet.getRange(1, ciConfirmCol).setValue('チェックイン確認日時');
+    }
+    sheet.getRange(rowNumber, ciConfirmCol).setValue(confirmedAt);
 
     return JSON.stringify({ success: true });
   } catch (e) {

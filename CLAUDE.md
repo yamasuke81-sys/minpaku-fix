@@ -32,22 +32,88 @@
 - 構文エラー等、デバッグ不要なことが明白な場合
 - ユーザーがスクショ等で原因を確認済みの問題のみ
 
-## 必須ルール: 修正後のデプロイコマンド出力
-**コード修正をコミット＆プッシュした後は、必ず以下の形式でデプロイコマンドを出力すること。**
-ユーザーがWindows PCのターミナルにコピペしてすぐデプロイできるようにする。
+## 必須ルール: 修正後のリンク出力
+**コード修正をコミット＆プッシュした後は、必ず以下の3つのリンクを出力すること。**
 
+1. **GitHub Actions**: https://github.com/yamasuke81-sys/minpaku-fix/actions
+2. **メインapp**: https://script.google.com/macros/s/AKfycbzfOEVVpybSZLZe-htulSn-j4wL0pYhyLyAk-Vmz0j9N_3LtAshQiq8GRP0BSDsS8eHdw/exec
+3. **管理者リンク一覧**: https://script.google.com/macros/s/AKfycbzfOEVVpybSZLZe-htulSn-j4wL0pYhyLyAk-Vmz0j9N_3LtAshQiq8GRP0BSDsS8eHdw/exec?action=admin
+
+- pushすればGitHub Actionsで自動デプロイされるため、手動デプロイコマンドは原則不要
+- ユーザーが「デプロイして」と言わなくても、コード変更をプッシュしたら毎回上記リンクを出す
+- 手動デプロイが必要な場合のコマンド:
+  ```
+  cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <ブランチ名> && git reset --hard origin/<ブランチ名> && node deploy-all.js
+  ```
+- **ブランチ名は必ず `git branch --show-current` の出力またはプッシュ先と同じものを使うこと**
+
+## GitHub開発フロー（全プロジェクト共通）
+
+### 概要
+GitHub Actions による自動デプロイ環境を構築済み。コードをpushすると自動でデプロイされる。
+
+### 仕組み
+```
+開発者（Claude Code） → git push → GitHub → GitHub Actions → clasp push & deploy → GAS Webアプリ更新
+```
+
+### ファイル構成
+| ファイル | 役割 |
+|---------|------|
+| `.github/workflows/deploy.yml` | 自動デプロイワークフロー定義 |
+| `deploy-all.js` | デプロイスクリプト（CI/ローカル両対応） |
+| `deploy-config.json` | デプロイID保存（`.gitignore`で除外、GitHub Secretsに登録） |
+| `setup-github-secrets.bat` | GitHub Secrets 初期セットアップ用バッチ |
+
+### GitHub Secrets（リポジトリ設定に登録済み）
+| Secret名 | 内容 | 更新タイミング |
+|----------|------|--------------|
+| `CLASPRC_JSON` | clasp OAuth認証トークン（`~/.clasprc.json`の中身） | トークン失効時（数ヶ月に1回） |
+| `DEPLOY_CONFIG_JSON` | デプロイID（`deploy-config.json`の中身） | デプロイIDが変わった時 |
+
+### Secrets の更新手順（Windows PC）
+```
+cd C:\Users\yamas\minpaku-fix
+gh secret set CLASPRC_JSON --repo yamasuke81-sys/minpaku-fix < "%USERPROFILE%\.clasprc.json"
+gh secret set DEPLOY_CONFIG_JSON --repo yamasuke81-sys/minpaku-fix < "C:\Users\yamas\minpaku-fix\deploy-config.json"
+```
+
+### 自動デプロイのトリガー条件
+- **対象ブランチ**: `claude/*`, `main`
+- **対象ファイル**: `Code.gs`, `index.html`, `appsscript.json`, `deploy-all.js`, `deploy.js`, `checklist-app/**`, `checkin-app/**`, `alarm-app/**`, `.github/workflows/deploy.yml`
+- Secrets未設定時はスキップ（失敗にならない）
+
+### CI環境での動作差異
+- `process.env.CI === 'true'` で判定
+- ブラウザ自動起動をスキップ
+- バージョン数150超でエラー終了 → GitHub失敗通知メールが届く
+
+### 手動デプロイ（従来方式、引き続き使用可能）
 ```
 cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <ブランチ名> && git reset --hard origin/<ブランチ名> && node deploy-all.js
 ```
 
-- `<ブランチ名>` は現在の作業ブランチ名に置き換える
-- **ブランチ名は必ず `git branch --show-current` の出力またはプッシュ先と同じものを使うこと。別セッションのブランチ名や過去のブランチ名を推測・流用してはならない**
-- 修正の説明の最後に必ずこのコマンドブロックを出力する
-- ユーザーが「デプロイして」と言わなくても、コード変更をプッシュしたら毎回出す
-- `deploy-all.js` は以下を自動実行する:
-  1. メインアプリ: clasp push → デプロイ更新
-  2. チェックリストアプリ: deploy-checklist.js を実行
-  3. デプロイ完了後、オーナー用URLを通常ウィンドウ、スタッフ用URLをシークレットウィンドウで自動的にブラウザで開く
+### バージョン/デプロイ上限の管理
+- **バージョン上限**: 200件。150超でCI失敗通知。**自動削除不可**（GAS APIに削除エンドポイントなし）
+- **デプロイ上限**: 200件。150超で警告。`clasp undeploy` で自動削除可能
+- 手動削除: GASエディタ → 「プロジェクトの履歴」→「すべてのバージョンを表示」→ 選択して削除
+
+### 管理者リンク一覧ページ
+メインアプリURL末尾に `?action=admin` を付けるとアクセス可能。全アプリのURL・Apps Script・スプシへのリンクを一覧表示。
+
+### 新プロジェクトでGitHub自動デプロイを導入する手順
+1. GitHubリポジトリを作成
+2. `.github/workflows/deploy.yml` を作成（本プロジェクトをテンプレートにする）
+3. `deploy-all.js` を作成（CI環境判定 `isCI` を含める）
+4. `deploy-config.json` を `.gitignore` に追加
+5. Windows PCで `gh auth login` → Secrets登録（上記手順）
+6. コードをpush → 自動デプロイ開始
+
+### push後に毎回出力するリンク一覧
+コード変更をpushした後は、以下の3つのリンクを毎回出力する：
+1. **GitHub Actions**: `https://github.com/<owner>/<repo>/actions`
+2. **メインapp**: アプリのURL
+3. **管理者リンク一覧**: メインappURL + `?action=admin`
 
 ## プロジェクト概要
 Google Apps Script + スプレッドシート製の民泊予約・清掃管理Webアプリ。

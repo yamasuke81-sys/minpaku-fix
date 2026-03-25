@@ -312,11 +312,10 @@ function scanAndPrepare() {
     try {
       var blob = file.getBlob();
 
-      // PDFの内容を要約
-      var summary = analyzePdfContent_(blob, activeModel);
-
-      // リネーム予定名を生成
-      var renameTo = askGemini(blob, rules, activeModel);
+      // PDFの内容要約＋リネーム名を1回のAPI呼び出しで取得（API節約）
+      var analyzed = analyzeAndRename_(blob, rules, activeModel);
+      var summary = analyzed.summary;
+      var renameTo = analyzed.renameTo;
       if (renameTo === 'ERROR') renameTo = '（生成失敗）';
 
       // Drive内で類似PDFを検索
@@ -380,7 +379,7 @@ function scanAndPrepare() {
       compareSheet.getRange(errRow, COL.TIMESTAMP).setValue(new Date());
     }
 
-    Utilities.sleep(3000); // API負荷軽減
+    Utilities.sleep(5000); // API負荷軽減（1ファイルあたり複数回API呼び出しのため長めに待機）
   }
 
   console.log('scanAndPrepare完了: ' + processedCount + '件処理');
@@ -493,6 +492,65 @@ function analyzePdfContent_(pdfBlob, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
+  var result = callGeminiWithRetry_(url, payload, 'analyzePdf');
+  return result || '（解析失敗）';
+}
+
+// ============================================================
+// PDF解析＋リネーム名を1回のAPI呼び出しで同時取得（API節約）
+// ============================================================
+function analyzeAndRename_(pdfBlob, rules, modelName) {
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
+
+  var payload = {
+    contents: [{
+      parts: [
+        { text: '以下のPDFについて2つの作業をしてください。\n\n' +
+                '【作業1: 内容要約】\n' +
+                '以下の情報を抽出して3〜5行で要約:\n' +
+                '・書類の種類（請求書、明細、通知書など）\n' +
+                '・発行元（会社名・団体名）\n' +
+                '・対象物件や契約名\n' +
+                '・対象期間（年月）\n' +
+                '・金額\n\n' +
+                '【作業2: ファイル名生成】\n' +
+                '以下のルールに従い、新しいファイル名を1つ生成:\n' + rules + '\n\n' +
+                '【出力形式】必ず以下のJSON形式で出力（他の文字は不要）:\n' +
+                '{"summary":"要約テキスト","renameTo":"新しいファイル名"}' },
+        { inline_data: { mime_type: 'application/pdf', data: Utilities.base64Encode(pdfBlob.getBytes()) } }
+      ]
+    }],
+    generationConfig: { temperature: 0.1 }
+  };
+
+  var result = callGeminiWithRetry_(url, payload, 'analyzeAndRename');
+  if (result) {
+    try {
+      // JSON部分を抽出（前後に余計なテキストがある場合に対応）
+      var jsonMatch = result.match(/\{[\s\S]*"summary"[\s\S]*"renameTo"[\s\S]*\}/);
+      if (jsonMatch) {
+        var parsed = JSON.parse(jsonMatch[0]);
+        return {
+          summary: parsed.summary || '（解析失敗）',
+          renameTo: parsed.renameTo || 'ERROR'
+        };
+      }
+    } catch (e) {
+      console.warn('JSON解析失敗、フォールバック: ' + e.message);
+    }
+  }
+
+  // 統合APIが失敗した場合は個別に呼び出す（フォールバック）
+  console.log('統合API失敗、個別呼び出しにフォールバック');
+  var summary = analyzePdfContent_(pdfBlob, modelName);
+  var renameTo = askGemini(pdfBlob, rules, modelName);
+  return { summary: summary, renameTo: renameTo };
+}
+
+// ============================================================
+// 共通Gemini API呼び出し（指数バックオフ付きリトライ）
+// ============================================================
+function callGeminiWithRetry_(url, payload, context) {
   var options = {
     method: 'post',
     contentType: 'application/json',
@@ -500,21 +558,49 @@ function analyzePdfContent_(pdfBlob, modelName) {
     muteHttpExceptions: true
   };
 
-  for (var i = 0; i < 3; i++) {
+  var maxRetries = 5;
+  var baseDelay = 5000; // 5秒
+
+  for (var i = 0; i < maxRetries; i++) {
     try {
       var response = UrlFetchApp.fetch(url, options);
-      if (response.getResponseCode() === 200) {
+      var code = response.getResponseCode();
+
+      if (code === 200) {
         var result = JSON.parse(response.getContentText());
-        if (result.candidates && result.candidates[0].content) {
+        if (result.candidates && result.candidates[0] && result.candidates[0].content) {
           return result.candidates[0].content.parts[0].text.trim();
         }
+        // candidatesがない場合（safety filterなど）
+        var reason = '';
+        if (result.candidates && result.candidates[0] && result.candidates[0].finishReason) {
+          reason = result.candidates[0].finishReason;
+        }
+        console.warn('[' + context + '] 200だがcandidatesなし: ' + reason);
+        return null;
       }
-      Utilities.sleep(3000);
+
+      if (code === 429 || code === 503) {
+        // レート制限 or サーバー過負荷 → 指数バックオフ
+        var delay = baseDelay * Math.pow(2, i); // 5s, 10s, 20s, 40s, 80s
+        console.warn('[' + context + '] HTTP ' + code + ' → ' + (delay/1000) + '秒待機 (リトライ ' + (i+1) + '/' + maxRetries + ')');
+        Utilities.sleep(delay);
+        continue;
+      }
+
+      // その他のエラー
+      var errBody = response.getContentText().substring(0, 200);
+      console.error('[' + context + '] HTTP ' + code + ': ' + errBody);
+      return null;
+
     } catch (e) {
-      Utilities.sleep(3000);
+      console.error('[' + context + '] 例外: ' + e.message);
+      Utilities.sleep(baseDelay * Math.pow(2, i));
     }
   }
-  return '（解析失敗）';
+
+  console.error('[' + context + '] ' + maxRetries + '回リトライ後も失敗');
+  return null;
 }
 
 // ============================================================
@@ -559,25 +645,7 @@ function extractSearchKeywords_(summary, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    var response = UrlFetchApp.fetch(url, options);
-    if (response.getResponseCode() === 200) {
-      var result = JSON.parse(response.getContentText());
-      if (result.candidates && result.candidates[0].content) {
-        return result.candidates[0].content.parts[0].text.trim();
-      }
-    }
-  } catch (e) {
-    console.error('キーワード抽出エラー: ' + e.message);
-  }
-  return '';
+  return callGeminiWithRetry_(url, payload, 'extractKeywords') || '';
 }
 
 /**
@@ -672,30 +740,11 @@ function selectBestMatch_(summary, candidates, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    var response = UrlFetchApp.fetch(url, options);
-    if (response.getResponseCode() === 200) {
-      var result = JSON.parse(response.getContentText());
-      if (result.candidates && result.candidates[0].content) {
-        var answer = result.candidates[0].content.parts[0].text.trim();
-        var idx = parseInt(answer, 10);
-        if (idx > 0 && idx <= candidates.length) {
-          return candidates[idx - 1];
-        }
-      }
-    }
-  } catch (e) {
-    console.error('最適候補選定エラー: ' + e.message);
+  var answer = callGeminiWithRetry_(url, payload, 'selectBestMatch');
+  if (answer) {
+    var idx = parseInt(answer, 10);
+    if (idx > 0 && idx <= candidates.length) return candidates[idx - 1];
   }
-
-  // 判定できなかった場合は最初の候補を返す
   return candidates[0];
 }
 
@@ -822,25 +871,7 @@ function extractFolderKeywords_(summary, renameTo, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    var response = UrlFetchApp.fetch(url, options);
-    if (response.getResponseCode() === 200) {
-      var result = JSON.parse(response.getContentText());
-      if (result.candidates && result.candidates[0].content) {
-        return result.candidates[0].content.parts[0].text.trim();
-      }
-    }
-  } catch (e) {
-    console.error('フォルダキーワード抽出エラー: ' + e.message);
-  }
-  return '';
+  return callGeminiWithRetry_(url, payload, 'extractFolderKeywords') || '';
 }
 
 /**
@@ -944,30 +975,11 @@ function selectBestFolder_(summary, renameTo, candidates, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  try {
-    var response = UrlFetchApp.fetch(url, options);
-    if (response.getResponseCode() === 200) {
-      var result = JSON.parse(response.getContentText());
-      if (result.candidates && result.candidates[0].content) {
-        var answer = result.candidates[0].content.parts[0].text.trim();
-        var idx = parseInt(answer, 10);
-        if (idx > 0 && idx <= candidates.length) {
-          return candidates[idx - 1];
-        }
-      }
-    }
-  } catch (e) {
-    console.error('フォルダ選定エラー: ' + e.message);
+  var answer = callGeminiWithRetry_(url, payload, 'selectBestFolder');
+  if (answer) {
+    var idx = parseInt(answer, 10);
+    if (idx > 0 && idx <= candidates.length) return candidates[idx - 1];
   }
-
-  // 判定できなかった場合は最初の候補
   return candidates[0];
 }
 
@@ -1048,28 +1060,6 @@ function askGemini(pdfBlob, rules, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  for (var i = 0; i < 3; i++) {
-    try {
-      var response = UrlFetchApp.fetch(url, options);
-      var responseCode = response.getResponseCode();
-      if (responseCode === 200) {
-        var result = JSON.parse(response.getContentText());
-        if (result.candidates) return result.candidates[0].content.parts[0].text.trim();
-      } else if (responseCode === 503 || responseCode === 429) {
-        Utilities.sleep(5000);
-      } else {
-        return 'ERROR';
-      }
-    } catch (e) {
-      Utilities.sleep(5000);
-    }
-  }
-  return 'ERROR';
+  var result = callGeminiWithRetry_(url, payload, 'askGemini');
+  return result || 'ERROR';
 }

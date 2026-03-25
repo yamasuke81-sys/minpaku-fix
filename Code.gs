@@ -12889,96 +12889,187 @@ function getAutoAmountOverrides_(staffName, ym) {
 }
 
 /**
- * 管理者リンクページを生成
+ * 管理者リンクページを生成（データ駆動・編集可能）
  */
 function buildAdminPage_() {
+  var links = getAdminLinks();
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>管理者リンク一覧</title>'
+    + '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">'
+    + '<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">'
+    + '<style>'
+    + 'body{background:#f5f6fa;color:#2d3436;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:16px 12px;margin:0;}'
+    + '.header{text-align:center;margin-bottom:20px;}'
+    + '.header h4{font-weight:700;font-size:1.3rem;color:#2d3436;margin:0;}'
+    + '.header .edit-toggle{font-size:0.8rem;color:#636e72;cursor:pointer;margin-top:4px;}'
+    + '.cat-card{background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:14px;overflow:hidden;}'
+    + '.cat-header{padding:12px 16px;font-weight:700;font-size:0.95rem;display:flex;align-items:center;gap:8px;}'
+    + '.link-item{display:flex;align-items:center;padding:11px 16px;border-top:1px solid #f0f0f0;gap:10px;cursor:pointer;transition:background 0.15s;}'
+    + '.link-item:hover{background:#f8f9fa;}'
+    + '.link-item:active{background:#e9ecef;}'
+    + '.link-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;color:#fff;}'
+    + '.link-info{flex:1;min-width:0;}'
+    + '.link-title{font-size:0.9rem;font-weight:600;color:#2d3436;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+    + '.link-url{font-size:0.7rem;color:#b2bec3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+    + '.link-arrow{color:#b2bec3;font-size:1.1rem;flex-shrink:0;}'
+    + '.ic-app{background:#e17055;}.ic-gas{background:#0984e3;}.ic-sheet{background:#00b894;}.ic-github{background:#2d3436;}.ic-other{background:#6c5ce7;}'
+    + '.edit-panel{display:none;padding:12px 16px;border-top:1px solid #dfe6e9;background:#fafafa;}'
+    + '.edit-panel.show{display:block;}'
+    + '.edit-panel input,.edit-panel select{font-size:0.85rem;margin-bottom:6px;}'
+    + '.btn-add-link{font-size:0.8rem;padding:6px 14px;border-radius:8px;}'
+    + '.btn-add-cat{font-size:0.8rem;padding:6px 14px;border-radius:8px;margin-bottom:10px;}'
+    + '.edit-btns{display:none;gap:4px;flex-shrink:0;}'
+    + '.editing .edit-btns{display:flex;}'
+    + '.editing .link-arrow{display:none;}'
+    + '.edit-btns button{border:none;background:none;padding:2px 6px;font-size:0.9rem;cursor:pointer;border-radius:4px;}'
+    + '.edit-btns button:hover{background:#dfe6e9;}'
+    + '</style></head><body>'
+    + '<div class="container" style="max-width:480px;">'
+    + '<div class="header"><h4>管理者リンク一覧</h4>'
+    + '<div class="edit-toggle" onclick="toggleEdit()"><i class="bi bi-pencil-square"></i> 編集</div></div>'
+    + '<div id="linkContainer"></div>'
+    + '<div id="editActions" style="display:none;text-align:center;margin-top:10px;">'
+    + '<button class="btn btn-outline-primary btn-add-cat" onclick="addCategory()"><i class="bi bi-plus-lg"></i> カテゴリ追加</button>'
+    + '</div>'
+    + '</div>'
+    + '<script>'
+    + 'var _data=' + JSON.stringify(links) + ';'
+    + 'var _editing=false;'
+    + 'var IC_MAP={"app":"ic-app","gas":"ic-gas","sheet":"ic-sheet","github":"ic-github","other":"ic-other"};'
+    + 'var ICON_MAP={"app":"bi-box-arrow-up-right","gas":"bi-code-slash","sheet":"bi-table","github":"bi-github","other":"bi-link-45deg"};'
+    + 'function render(){'
+    + '  var c=document.getElementById("linkContainer");c.innerHTML="";'
+    + '  _data.forEach(function(cat,ci){'
+    + '    var d=document.createElement("div");d.className="cat-card"+(_editing?" editing":"");'
+    + '    var h=\'<div class="cat-header" style="background:\'+cat.color+\';color:#fff;">\''
+    + '      +\'<span style="flex:1">\'+esc(cat.name)+\'</span>\';'
+    + '    if(_editing) h+=\'<button onclick="editCat(\'+ci+\')" style="color:#fff;border:none;background:none;font-size:0.8rem;"><i class="bi bi-pencil"></i></button>\'+'
+    + '      \'<button onclick="delCat(\'+ci+\')" style="color:#fff;border:none;background:none;font-size:0.8rem;"><i class="bi bi-trash"></i></button>\';'
+    + '    h+="</div>";d.innerHTML=h;'
+    + '    (cat.links||[]).forEach(function(lk,li){'
+    + '      var ic=IC_MAP[lk.type]||"ic-other";'
+    + '      var icon=ICON_MAP[lk.type]||"bi-link-45deg";'
+    + '      var row=document.createElement("div");row.className="link-item";'
+    + '      row.innerHTML=\'<div class="link-icon \'+ic+\'"><i class="bi \'+icon+\'"></i></div>\'+'
+    + '        \'<div class="link-info"><div class="link-title">\'+esc(lk.title)+\'</div><div class="link-url">\'+esc(lk.url)+\'</div></div>\'+'
+    + '        \'<div class="edit-btns"><button onclick="event.stopPropagation();editLink(\'+ci+\',\'+li+\')"><i class="bi bi-pencil"></i></button>\'+'
+    + '        \'<button onclick="event.stopPropagation();delLink(\'+ci+\',\'+li+\')"><i class="bi bi-trash text-danger"></i></button></div>\'+'
+    + '        \'<div class="link-arrow"><i class="bi bi-chevron-right"></i></div>\';'
+    + '      if(!_editing) row.onclick=function(){window.open(lk.url,"_blank");};'
+    + '      d.appendChild(row);'
+    + '    });'
+    + '    if(_editing){'
+    + '      var ab=document.createElement("div");ab.style.cssText="padding:8px 16px;border-top:1px solid #f0f0f0;";'
+    + '      ab.innerHTML=\'<button class="btn btn-sm btn-outline-secondary btn-add-link" onclick="addLink(\'+ci+\')"><i class="bi bi-plus"></i> リンク追加</button>\';'
+    + '      d.appendChild(ab);'
+    + '    }'
+    + '    c.appendChild(d);'
+    + '  });'
+    + '}'
+    + 'function esc(s){var d=document.createElement("div");d.textContent=s||"";return d.innerHTML;}'
+    + 'function toggleEdit(){'
+    + '  _editing=!_editing;'
+    + '  document.getElementById("editActions").style.display=_editing?"block":"none";'
+    + '  render();'
+    + '}'
+    + 'function save(){'
+    + '  google.script.run.withSuccessHandler(function(){}).saveAdminLinks(JSON.stringify(_data));'
+    + '}'
+    + 'function addCategory(){'
+    + '  var name=prompt("カテゴリ名:");if(!name)return;'
+    + '  var color=prompt("ヘッダー色(例: #e17055):","#6c5ce7");if(!color)return;'
+    + '  _data.push({name:name,color:color,links:[]});save();render();'
+    + '}'
+    + 'function editCat(ci){'
+    + '  var cat=_data[ci];'
+    + '  var name=prompt("カテゴリ名:",cat.name);if(name===null)return;'
+    + '  var color=prompt("ヘッダー色:",cat.color);if(color===null)return;'
+    + '  cat.name=name;cat.color=color;save();render();'
+    + '}'
+    + 'function delCat(ci){if(!confirm(_data[ci].name+" を削除しますか？"))return;_data.splice(ci,1);save();render();}'
+    + 'function addLink(ci){'
+    + '  var title=prompt("タイトル:");if(!title)return;'
+    + '  var url=prompt("URL:");if(!url)return;'
+    + '  var type=prompt("種類 (app/gas/sheet/github/other):","app");if(!type)type="other";'
+    + '  _data[ci].links.push({title:title,url:url,type:type});save();render();'
+    + '}'
+    + 'function editLink(ci,li){'
+    + '  var lk=_data[ci].links[li];'
+    + '  var title=prompt("タイトル:",lk.title);if(title===null)return;'
+    + '  var url=prompt("URL:",lk.url);if(url===null)return;'
+    + '  var type=prompt("種類 (app/gas/sheet/github/other):",lk.type);if(type===null)return;'
+    + '  lk.title=title;lk.url=url;lk.type=type;save();render();'
+    + '}'
+    + 'function delLink(ci,li){if(!confirm(_data[ci].links[li].title+" を削除しますか？"))return;_data[ci].links.splice(li,1);save();render();}'
+    + 'render();'
+    + '</script></body></html>';
+  return HtmlService.createHtmlOutput(html).setTitle('管理者リンク一覧').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * 管理者リンクデータを取得（初回はデフォルトデータを自動生成）
+ */
+function getAdminLinks() {
   var sp = PropertiesService.getScriptProperties();
+  var saved = sp.getProperty('ADMIN_LINKS');
+  if (saved) {
+    try { return JSON.parse(saved); } catch(e) {}
+  }
+  // 初回: デフォルトデータを自動生成
   var dp = PropertiesService.getDocumentProperties();
-  var mainScriptId = ScriptApp.getScriptId();
-  var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
   var baseUrl = sp.getProperty('APP_BASE_URL') || '';
   var staffUrl = dp.getProperty('staffDeployUrl') || '';
   var gatewayUrl = sp.getProperty('GATEWAY_URL') || '';
   var readonlyUrl = baseUrl ? baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'readonly=1' : '';
+  var gasBase = 'https://script.google.com/home/projects/';
+  var ssBase = 'https://docs.google.com/spreadsheets/d/';
+  var mainScriptId = ScriptApp.getScriptId();
+  var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
   var checklistUrl = sp.getProperty('CHECKLIST_APP_URL') || '';
   var checkinUrl = sp.getProperty('CHECKIN_APP_URL') || '';
   var alarmUrl = sp.getProperty('ALARM_APP_URL') || '';
-  // script IDs
-  var clScriptId = '18PILN4GA1DyQY9nkf2lV1GVxAXV95LT51vh2erWB1NZ8uNX54kVqlx3w';
-  var ciScriptId = '1HL-Rm5kU7koC9_rW3ZQrblh5Jw_nQU_4fuvAD6eUPqrZCU5DTp-CWkV9';
-  var alScriptId = '1AWrymiKdg2zww4vDMiOMiRDbwETaxFohH1CTq9XIwp98XQeGWtVzfwao';
-  // チェックリスト用スプシID
-  var clSsId = '';
-  try { clSsId = sp.getProperty('CL_SPREADSHEET_ID') || ''; } catch(e) {}
+  var clSsId = sp.getProperty('CL_SPREADSHEET_ID') || '';
 
-  var gasBase = 'https://script.google.com/home/projects/';
-  var ssBase = 'https://docs.google.com/spreadsheets/d/';
-
-  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
-  html += '<title>管理者リンク一覧</title>';
-  html += '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">';
-  html += '<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">';
-  html += '<style>body{background:#1a1a2e;color:#e8e8e8;font-family:sans-serif;padding:20px;}'
-    + '.card{background:#16213e;border:1px solid #2a3a5c;border-radius:12px;margin-bottom:16px;}'
-    + '.card-header{background:#0f3460;border-bottom:1px solid #2a3a5c;border-radius:12px 12px 0 0 !important;padding:12px 16px;}'
-    + '.card-header h5{margin:0;font-size:1rem;}'
-    + '.link-row{display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid #1a2744;gap:10px;}'
-    + '.link-row:last-child{border-bottom:none;}'
-    + '.link-row:hover{background:#1a2744;}'
-    + '.link-icon{font-size:1.2rem;width:28px;text-align:center;flex-shrink:0;}'
-    + '.link-label{flex:1;font-size:0.9rem;}'
-    + '.link-btn{text-decoration:none;font-size:0.8rem;padding:4px 12px;border-radius:6px;white-space:nowrap;}'
-    + '.btn-app{background:#e94560;color:#fff;}'
-    + '.btn-gas{background:#0f3460;color:#e8e8e8;border:1px solid #2a3a5c;}'
-    + '.btn-sheet{background:#0d7377;color:#fff;}'
-    + '.btn-github{background:#24292e;color:#fff;}'
-    + '</style></head><body>';
-  html += '<div class="container" style="max-width:600px;">';
-  html += '<h4 class="text-center mb-4"><i class="bi bi-grid-3x3-gap-fill"></i> 管理者リンク一覧</h4>';
-
-  // メインアプリ
-  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-house-door-fill text-info"></i> メインアプリ</h5></div>';
-  if (baseUrl) html += linkRow_('bi-person-fill', 'オーナー用', baseUrl, 'btn-app');
-  if (staffUrl) html += linkRow_('bi-people-fill', 'スタッフ用', staffUrl, 'btn-app');
-  if (readonlyUrl) html += linkRow_('bi-eye-fill', '閲覧用', readonlyUrl, 'btn-app');
-  if (gatewayUrl) html += linkRow_('bi-link-45deg', 'ゲートウェイ（ブックマーク用）', gatewayUrl, 'btn-app');
-  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + mainScriptId + '/edit', 'btn-gas');
-  html += linkRow_('bi-table', '宿泊者名簿スプシ', ssBase + ssId, 'btn-sheet');
-  html += '</div>';
-
-  // チェックリストアプリ
-  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-check2-square text-success"></i> 清掃チェックリストアプリ</h5></div>';
-  if (checklistUrl) html += linkRow_('bi-box-arrow-up-right', 'アプリ', checklistUrl, 'btn-app');
-  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + clScriptId + '/edit', 'btn-gas');
-  if (clSsId) html += linkRow_('bi-table', 'スプシ', ssBase + clSsId, 'btn-sheet');
-  html += '</div>';
-
-  // チェックインアプリ
-  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-door-open-fill text-warning"></i> チェックインアプリ</h5></div>';
-  if (checkinUrl) html += linkRow_('bi-box-arrow-up-right', 'アプリ', checkinUrl, 'btn-app');
-  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + ciScriptId + '/edit', 'btn-gas');
-  html += '</div>';
-
-  // アラームアプリ
-  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-bell-fill text-danger"></i> アラームアプリ</h5></div>';
-  if (alarmUrl) html += linkRow_('bi-box-arrow-up-right', 'アプリ', alarmUrl, 'btn-app');
-  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + alScriptId + '/edit', 'btn-gas');
-  html += '</div>';
-
-  // GitHub
-  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-github"></i> GitHub</h5></div>';
-  html += linkRow_('bi-folder-fill', 'リポジトリ', 'https://github.com/yamasuke81-sys/minpaku-fix', 'btn-github');
-  html += linkRow_('bi-play-circle-fill', 'Actions（自動デプロイ）', 'https://github.com/yamasuke81-sys/minpaku-fix/actions', 'btn-github');
-  html += '</div>';
-
-  html += '</div></body></html>';
-  return HtmlService.createHtmlOutput(html).setTitle('管理者リンク一覧').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  var data = [
+    { name: 'メインアプリ', color: '#0984e3', links: [
+      { title: 'オーナー用', url: baseUrl, type: 'app' },
+      { title: 'スタッフ用', url: staffUrl, type: 'app' },
+      { title: '閲覧用', url: readonlyUrl, type: 'app' },
+      { title: 'ゲートウェイ（ブックマーク用）', url: gatewayUrl, type: 'app' },
+      { title: 'Apps Script', url: gasBase + mainScriptId + '/edit', type: 'gas' },
+      { title: '宿泊者名簿スプシ', url: ssBase + ssId, type: 'sheet' }
+    ]},
+    { name: '清掃チェックリストアプリ', color: '#00b894', links: [
+      { title: 'アプリ', url: checklistUrl, type: 'app' },
+      { title: 'Apps Script', url: gasBase + '18PILN4GA1DyQY9nkf2lV1GVxAXV95LT51vh2erWB1NZ8uNX54kVqlx3w/edit', type: 'gas' }
+    ]},
+    { name: 'チェックインアプリ', color: '#fdcb6e', links: [
+      { title: 'アプリ', url: checkinUrl, type: 'app' },
+      { title: 'Apps Script', url: gasBase + '1HL-Rm5kU7koC9_rW3ZQrblh5Jw_nQU_4fuvAD6eUPqrZCU5DTp-CWkV9/edit', type: 'gas' }
+    ]},
+    { name: 'アラームアプリ', color: '#e17055', links: [
+      { title: 'アプリ', url: alarmUrl, type: 'app' },
+      { title: 'Apps Script', url: gasBase + '1AWrymiKdg2zww4vDMiOMiRDbwETaxFohH1CTq9XIwp98XQeGWtVzfwao/edit', type: 'gas' }
+    ]},
+    { name: 'GitHub', color: '#2d3436', links: [
+      { title: 'リポジトリ', url: 'https://github.com/yamasuke81-sys/minpaku-fix', type: 'github' },
+      { title: 'Actions（自動デプロイ）', url: 'https://github.com/yamasuke81-sys/minpaku-fix/actions', type: 'github' }
+    ]}
+  ];
+  // 空URLの項目を除外
+  data.forEach(function(cat) {
+    cat.links = cat.links.filter(function(lk) { return lk.url; });
+  });
+  if (clSsId) data[1].links.push({ title: 'スプシ', url: ssBase + clSsId, type: 'sheet' });
+  // 保存
+  sp.setProperty('ADMIN_LINKS', JSON.stringify(data));
+  return data;
 }
 
-function linkRow_(icon, label, url, btnClass) {
-  return '<div class="link-row">'
-    + '<span class="link-icon"><i class="bi ' + icon + '"></i></span>'
-    + '<span class="link-label">' + label + '</span>'
-    + '<a href="' + url + '" target="_blank" class="link-btn ' + btnClass + '">開く</a>'
-    + '</div>';
+/**
+ * 管理者リンクデータを保存
+ */
+function saveAdminLinks(jsonStr) {
+  PropertiesService.getScriptProperties().setProperty('ADMIN_LINKS', jsonStr);
+  return JSON.stringify({ success: true });
 }

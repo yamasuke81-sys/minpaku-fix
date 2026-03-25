@@ -154,6 +154,35 @@ function updateRenameTo(rowNum, newName) {
 }
 
 /**
+ * 失敗データをクリアして再スキャン可能にする
+ * 「解析失敗」「生成失敗」のある行を削除
+ */
+function clearFailedEntries() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return '「参照元比較」シートがありません';
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '削除対象なし';
+
+  var data = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+  var deletedCount = 0;
+
+  // 下から削除（行番号がずれないように）
+  for (var i = data.length - 1; i >= 0; i--) {
+    var summary = String(data[i][COL.SUMMARY - 1]);
+    var renameTo = String(data[i][COL.RENAME_TO - 1]);
+    var status = String(data[i][COL.STATUS - 1]);
+    if (summary.indexOf('解析失敗') !== -1 || renameTo.indexOf('生成失敗') !== -1 || status.indexOf('エラー') !== -1) {
+      sheet.deleteRow(i + 2);
+      deletedCount++;
+    }
+  }
+
+  return deletedCount + '件の失敗データを削除しました。再スキャンできます。';
+}
+
+/**
  * スキャン＆参照元検索（Web版 — 処理件数を返す）
  */
 function scanAndPrepareWeb() {
@@ -301,7 +330,7 @@ function scanAndPrepare() {
 
   while (files.hasNext()) {
     // 4.5分で安全停止
-    if (Date.now() - startTime > 4.5 * 60 * 1000) break;
+    if (Date.now() - startTime > 4 * 60 * 1000) break;
 
     var file = files.next();
     var fileId = file.getId();
@@ -558,8 +587,8 @@ function callGeminiWithRetry_(url, payload, context) {
     muteHttpExceptions: true
   };
 
-  var maxRetries = 5;
-  var baseDelay = 5000; // 5秒
+  var maxRetries = 3;
+  var baseDelay = 3000; // 3秒
 
   for (var i = 0; i < maxRetries; i++) {
     try {
@@ -1000,7 +1029,7 @@ function autoRenamePDFs() {
 
     var activeModel = getLatestAvailableModel();
     while (files.hasNext()) {
-      if (Date.now() - startTime > 4.5 * 60 * 1000) break;
+      if (Date.now() - startTime > 4 * 60 * 1000) break;
       var file = files.next();
       var blob = file.getBlob();
 

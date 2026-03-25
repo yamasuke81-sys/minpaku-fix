@@ -130,6 +130,9 @@
       <span><i class="bi bi-star text-warning"></i> 新規: <strong id="newCount">-</strong></span>
     </div>
     <div>
+      <button class="btn btn-sm btn-outline-danger me-2" onclick="clearFailed()">
+        <i class="bi bi-trash"></i> 失敗データを削除＆再スキャン
+      </button>
       <button class="btn btn-sm btn-outline-secondary" onclick="openSpreadsheet()">
         <i class="bi bi-table"></i> スプレッドシートを開く
       </button>
@@ -383,6 +386,27 @@ function showSummary(idx) {
 }
 
 // ============================================================
+// 失敗データクリア＆再スキャン
+// ============================================================
+function clearFailed() {
+  if (!confirm('解析失敗・生成失敗のデータを削除し、再スキャンを実行します。よろしいですか？')) return;
+  showSpinner('失敗データを削除中...', '');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      alert(result);
+      // 続けて再スキャン
+      document.getElementById('spinnerText').textContent = 'スキャン＆参照元検索中...';
+      document.getElementById('spinnerSub').textContent = 'PDFを解析しています（4分で自動停止、残りは再度実行してください）';
+      google.script.run
+        .withSuccessHandler(function(r) { hideSpinner(); loadData(); alert('再スキャン完了'); })
+        .withFailureHandler(function(e) { hideSpinner(); loadData(); onError(e); })
+        .scanAndPrepareWeb();
+    })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .clearFailedEntries();
+}
+
+// ============================================================
 // APIキー設定
 // ============================================================
 function saveApiKey() {
@@ -418,7 +442,7 @@ function runDiagnostics() {
 // ============================================================
 function runScan() {
   if (!confirm('入力フォルダのPDFをスキャンし、参照元を検索します。\nこの処理には数分かかる場合があります。')) return;
-  showSpinner('スキャン＆参照元検索中...', 'PDFを解析し、類似ファイルを検索しています');
+  showSpinner('スキャン＆参照元検索中...', 'PDFを解析しています（4分で自動停止、残りは再度実行してください）');
   google.script.run
     .withSuccessHandler(function(result) { hideSpinner(); loadData(); alert('スキャン完了: ' + (result || '0') + '件処理しました'); })
     .withFailureHandler(function(e) { hideSpinner(); onError(e); })

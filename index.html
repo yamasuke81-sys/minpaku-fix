@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0325f</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0325g</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5715,9 +5715,10 @@
               }
               var bkSite = (cev.extendedProps.data && cev.extendedProps.data.bookingSite) ? String(cev.extendedProps.data.bookingSite).toLowerCase() : '';
               var plat = bkSite.indexOf('airbnb') >= 0 ? 'airbnb' : (bkSite.indexOf('booking') >= 0 ? 'booking' : '');
+              var bkRosterAnswered = !!cev.extendedProps.rosterAnswered;
               for (var bi = 0; bi < bkDays.length; bi++) {
                 var pos = bkDays.length === 1 ? 'only' : (bi === 0 ? 'start' : (bi === bkDays.length - 1 ? 'end' : 'mid'));
-                bookingDates[bkDays[bi]] = { pos: pos, platform: plat };
+                bookingDates[bkDays[bi]] = { pos: pos, platform: plat, rosterAnswered: bkRosterAnswered };
               }
             }
           }
@@ -5746,7 +5747,13 @@
             else if (bkInfo.pos === 'start') barPos = 'left:3px;right:-1px;border-radius:3px 0 0 3px;';
             else if (bkInfo.pos === 'mid') barPos = 'left:-1px;right:-1px;border-radius:0;';
             else if (bkInfo.pos === 'end') barPos = 'left:-1px;right:3px;border-radius:0 3px 3px 0;';
-            barHtml = '<div style="position:absolute;top:1px;height:4px;background:' + barColor + ';box-shadow:0 0 0 1px rgba(255,255,255,0.8);' + barPos + '"></div>';
+            // 名簿回答状態ドット: バー左端（start/only）に緑(入力済み)/赤(未入力)のドット
+            var rosterDotHtml = '';
+            if (bkInfo.pos === 'start' || bkInfo.pos === 'only') {
+              var rosterDotColor = bkInfo.rosterAnswered ? '#28a745' : '#dc3545';
+              rosterDotHtml = '<div style="position:absolute;left:0;top:-1px;width:4px;height:4px;border-radius:50%;background:' + rosterDotColor + ';border:1px solid #fff;z-index:2;"></div>';
+            }
+            barHtml = '<div style="position:absolute;top:1px;height:4px;background:' + barColor + ';box-shadow:0 0 0 1px rgba(255,255,255,0.8);' + barPos + '">' + rosterDotHtml + '</div>';
             thOverflow = 'position:relative;overflow:visible;';
           }
           var thClass = (hasRecruit || isBooking) ? 'text-center sr-date-header' : 'text-center';

@@ -9,9 +9,12 @@ on:
       - 'Code.gs'
       - 'index.html'
       - 'appsscript.json'
+      - 'deploy-all.js'
+      - 'deploy.js'
       - 'checklist-app/**'
       - 'checkin-app/**'
       - 'alarm-app/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:

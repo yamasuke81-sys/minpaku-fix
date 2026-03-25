@@ -28,12 +28,14 @@ const COL = {
   REF_NAME:       6,  // F: 参照元ファイル名
   REF_LINK:       7,  // G: 参照元ファイルへのリンク
   REF_FOLDER_ID:  8,  // H: 参照元フォルダID（移動先）
-  STATUS:         9,  // I: ステータス
-  SCAN_FILE_ID:  10,  // J: スキャンファイルID
-  REF_FILE_ID:   11,  // K: 参照元ファイルID
-  TIMESTAMP:     12,  // L: 処理日時
+  DEST_FOLDER:    9,  // I: 移動先フォルダ候補（名前＋パス）
+  DEST_FOLDER_ID:10,  // J: 移動先フォルダID
+  STATUS:        11,  // K: ステータス
+  SCAN_FILE_ID:  12,  // L: スキャンファイルID
+  REF_FILE_ID:   13,  // M: 参照元ファイルID
+  TIMESTAMP:     14,  // N: 処理日時
 };
-const TOTAL_COLS = 12;
+const TOTAL_COLS = 14;
 
 // ============================================================
 // メニュー
@@ -135,18 +137,31 @@ function scanAndPrepare() {
 
       if (isNewFile) {
         // 参照元なし → 新規ファイル扱い
-        // 参照元ファイル名欄にリネーム候補を表示（新規であることを明示）
         compareSheet.getRange(newRow, COL.REF_NAME).setValue('🆕 新規（参照元なし）→ ' + cleanRenameTo);
         compareSheet.getRange(newRow, COL.REF_LINK).setValue('―');
         compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue('');
+
+        // PDFの内容からDrive内の適切な保存先フォルダを提案
+        var folderSuggestion = suggestDestinationFolder_(summary, cleanRenameTo, activeModel);
+        if (folderSuggestion.folderId) {
+          compareSheet.getRange(newRow, COL.DEST_FOLDER).setValue('📁 ' + folderSuggestion.folderPath);
+          compareSheet.getRange(newRow, COL.DEST_FOLDER_ID).setValue(folderSuggestion.folderId);
+        } else {
+          compareSheet.getRange(newRow, COL.DEST_FOLDER).setValue('（候補なし → outputフォルダへ）');
+          compareSheet.getRange(newRow, COL.DEST_FOLDER_ID).setValue('');
+        }
+
         compareSheet.getRange(newRow, COL.STATUS).setValue('🆕 新規 - 確認待ち');
-        // 行の背景色を変えて新規ファイルを視覚的に区別
-        compareSheet.getRange(newRow, 1, 1, TOTAL_COLS).setBackground('#FFF9C4'); // 薄い黄色
+        compareSheet.getRange(newRow, 1, 1, TOTAL_COLS).setBackground('#FFF9C4');
       } else {
-        // 参照元あり
+        // 参照元あり → 参照元フォルダを移動先に自動セット
         compareSheet.getRange(newRow, COL.REF_NAME).setValue(refResult.fileName);
         compareSheet.getRange(newRow, COL.REF_LINK).setFormula('=HYPERLINK("' + refUrl + '","開く")');
         compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue(refResult.folderId || '');
+        // 参照元フォルダをそのまま移動先候補にコピー
+        var refFolderName = refResult.folderId ? getFolderPath_(refResult.folderId) : '';
+        compareSheet.getRange(newRow, COL.DEST_FOLDER).setValue(refFolderName ? '📁 ' + refFolderName : '');
+        compareSheet.getRange(newRow, COL.DEST_FOLDER_ID).setValue(refResult.folderId || '');
         compareSheet.getRange(newRow, COL.STATUS).setValue('確認待ち');
       }
       compareSheet.getRange(newRow, COL.SCAN_FILE_ID).setValue(fileId);
@@ -198,13 +213,17 @@ function executeApproved() {
     var status = row[COL.STATUS - 1];
 
     // チェック済み & まだ実行されていない行のみ処理
-    if (isChecked !== true || status === '完了' || status === '実行済み') continue;
+    if (isChecked !== true || String(status).indexOf('完了') !== -1) continue;
 
     var fileId = row[COL.SCAN_FILE_ID - 1];
     var renameTo = row[COL.RENAME_TO - 1];
     var refFolderId = row[COL.REF_FOLDER_ID - 1];
+    var destFolderId = row[COL.DEST_FOLDER_ID - 1];
 
     if (!fileId || !renameTo) continue;
+
+    // 移動先の優先順位: DEST_FOLDER_ID（ユーザーが確認済み）> REF_FOLDER_ID > outputフォルダ
+    var moveFolderId = destFolderId || refFolderId || '';
 
     try {
       var file = DriveApp.getFileById(fileId);
@@ -216,22 +235,26 @@ function executeApproved() {
       }
       file.setName(cleanName);
 
-      // 移動先: 参照元ファイルと同じフォルダ。なければデフォルトのoutputフォルダ
-      if (refFolderId) {
+      // 移動先フォルダへ移動
+      var movedTo = '';
+      if (moveFolderId) {
         try {
-          var destFolder = DriveApp.getFolderById(refFolderId);
+          var destFolder = DriveApp.getFolderById(moveFolderId);
           file.moveTo(destFolder);
+          movedTo = destFolder.getName();
         } catch (moveErr) {
-          console.error('参照元フォルダへの移動失敗、outputフォルダへ移動: ' + moveErr.message);
+          console.error('指定フォルダへの移動失敗、outputフォルダへ移動: ' + moveErr.message);
           file.moveTo(outputFolder);
+          movedTo = 'output（フォールバック）';
         }
       } else {
         file.moveTo(outputFolder);
+        movedTo = 'output';
       }
 
       // ステータス更新
       var sheetRow = i + 2; // ヘッダー分+1
-      var doneLabel = refFolderId ? '✅ 完了（参照元フォルダへ移動）' : '✅ 完了（新規 → outputフォルダへ移動）';
+      var doneLabel = '✅ 完了（→ ' + movedTo + '）';
       compareSheet.getRange(sheetRow, COL.STATUS).setValue(doneLabel);
       compareSheet.getRange(sheetRow, COL.TIMESTAMP).setValue(new Date());
       executedCount++;
@@ -496,8 +519,8 @@ function getOrCreateCompareSheet_(ss) {
   var headers = [
     'チェック', 'スキャンファイル名', '内容要約', 'リネーム予定名',
     'スキャンファイル', '参照元ファイル名', '参照元ファイル',
-    '参照元フォルダID', 'ステータス', 'スキャンファイルID',
-    '参照元ファイルID', '処理日時'
+    '参照元フォルダID', '移動先フォルダ候補', '移動先フォルダID',
+    'ステータス', 'スキャンファイルID', '参照元ファイルID', '処理日時'
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -509,21 +532,24 @@ function getOrCreateCompareSheet_(ss) {
   sheet.setFrozenRows(1);
 
   // 列幅の調整
-  sheet.setColumnWidth(COL.CHECK, 60);           // チェック
-  sheet.setColumnWidth(COL.SCAN_NAME, 200);       // スキャンファイル名
-  sheet.setColumnWidth(COL.SUMMARY, 350);         // 内容要約
-  sheet.setColumnWidth(COL.RENAME_TO, 250);       // リネーム予定名
-  sheet.setColumnWidth(COL.SCAN_LINK, 60);        // スキャンファイルリンク
-  sheet.setColumnWidth(COL.REF_NAME, 250);        // 参照元ファイル名
-  sheet.setColumnWidth(COL.REF_LINK, 60);         // 参照元ファイルリンク
-  sheet.setColumnWidth(COL.REF_FOLDER_ID, 100);   // 参照元フォルダID
-  sheet.setColumnWidth(COL.STATUS, 120);          // ステータス
-  sheet.setColumnWidth(COL.SCAN_FILE_ID, 100);    // スキャンファイルID（非表示推奨）
-  sheet.setColumnWidth(COL.REF_FILE_ID, 100);     // 参照元ファイルID（非表示推奨）
-  sheet.setColumnWidth(COL.TIMESTAMP, 150);       // 処理日時
+  sheet.setColumnWidth(COL.CHECK, 60);
+  sheet.setColumnWidth(COL.SCAN_NAME, 200);
+  sheet.setColumnWidth(COL.SUMMARY, 350);
+  sheet.setColumnWidth(COL.RENAME_TO, 250);
+  sheet.setColumnWidth(COL.SCAN_LINK, 60);
+  sheet.setColumnWidth(COL.REF_NAME, 250);
+  sheet.setColumnWidth(COL.REF_LINK, 60);
+  sheet.setColumnWidth(COL.REF_FOLDER_ID, 100);
+  sheet.setColumnWidth(COL.DEST_FOLDER, 300);     // 移動先フォルダ候補
+  sheet.setColumnWidth(COL.DEST_FOLDER_ID, 100);  // 移動先フォルダID
+  sheet.setColumnWidth(COL.STATUS, 180);
+  sheet.setColumnWidth(COL.SCAN_FILE_ID, 100);
+  sheet.setColumnWidth(COL.REF_FILE_ID, 100);
+  sheet.setColumnWidth(COL.TIMESTAMP, 150);
 
-  // ID列を非表示（ユーザーには不要）
+  // 内部ID列を非表示（ユーザーには不要）
   sheet.hideColumns(COL.REF_FOLDER_ID);
+  sheet.hideColumns(COL.DEST_FOLDER_ID);
   sheet.hideColumns(COL.SCAN_FILE_ID);
   sheet.hideColumns(COL.REF_FILE_ID);
 
@@ -553,6 +579,202 @@ function loadRules_(sheet) {
   if (lastRow < 1) return 'ルールがありません。';
   return sheet.getRange(1, 1, lastRow, 2).getValues()
     .map(function(row) { return row[0] + ': ' + row[1]; }).join('\n');
+}
+
+// ============================================================
+// 移動先フォルダの提案（新規ファイル用）
+// ============================================================
+
+/**
+ * PDFの内容要約とリネーム予定名から、Drive内の適切な保存先フォルダを提案
+ */
+function suggestDestinationFolder_(summary, renameTo, modelName) {
+  var emptyResult = { folderId: '', folderPath: '' };
+
+  // Geminiにフォルダ検索用キーワードを生成させる
+  var keywords = extractFolderKeywords_(summary, renameTo, modelName);
+  if (!keywords) return emptyResult;
+
+  // キーワードでDrive内のフォルダを検索
+  var candidateFolders = searchDriveForFolders_(keywords);
+  if (candidateFolders.length === 0) return emptyResult;
+
+  // 1件ならそのまま返す
+  if (candidateFolders.length === 1) {
+    return candidateFolders[0];
+  }
+
+  // 複数候補 → Geminiに最適なフォルダを選定させる
+  return selectBestFolder_(summary, renameTo, candidateFolders, modelName);
+}
+
+/**
+ * フォルダ検索用キーワードを生成
+ */
+function extractFolderKeywords_(summary, renameTo, modelName) {
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+
+  var payload = {
+    contents: [{
+      parts: [{
+        text: '以下のPDFの情報から、Googleドライブ内で保存先フォルダを探すためのキーワードを生成してください。\n' +
+              '物件名、会社名、カテゴリ（水道、電気、ガス、保険、税金など）を考慮してください。\n' +
+              'フォルダ名に含まれそうなキーワードを2〜3個、スペース区切りで出力してください。\n' +
+              'キーワードのみ出力し、説明は不要です。\n\n' +
+              '【内容要約】\n' + summary + '\n\n' +
+              '【リネーム予定名】\n' + renameTo
+      }]
+    }],
+    generationConfig: { temperature: 0.1 }
+  };
+
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    if (response.getResponseCode() === 200) {
+      var result = JSON.parse(response.getContentText());
+      if (result.candidates && result.candidates[0].content) {
+        return result.candidates[0].content.parts[0].text.trim();
+      }
+    }
+  } catch (e) {
+    console.error('フォルダキーワード抽出エラー: ' + e.message);
+  }
+  return '';
+}
+
+/**
+ * Drive内でフォルダを検索
+ */
+function searchDriveForFolders_(keywords) {
+  var results = [];
+  var keywordList = keywords.split(/[\s,　]+/).filter(function(k) { return k.length > 0; });
+
+  // 各キーワードで個別にフォルダ検索
+  var seenIds = {};
+
+  // まずAND検索
+  if (keywordList.length > 1) {
+    var andParts = keywordList.map(function(kw) {
+      return 'title contains "' + kw.replace(/"/g, '\\"') + '"';
+    });
+    var andQuery = andParts.join(' and ') + ' and mimeType = "application/vnd.google-apps.folder" and trashed = false';
+    collectFolderResults_(andQuery, seenIds, results, 5);
+  }
+
+  // 個別キーワードでフォールバック
+  for (var i = 0; i < keywordList.length && results.length < 8; i++) {
+    var query = 'title contains "' + keywordList[i].replace(/"/g, '\\"') + '" and mimeType = "application/vnd.google-apps.folder" and trashed = false';
+    collectFolderResults_(query, seenIds, results, 8);
+  }
+
+  return results;
+}
+
+/**
+ * フォルダ検索結果を収集
+ */
+function collectFolderResults_(query, seenIds, results, maxCount) {
+  try {
+    var searchResults = DriveApp.searchFolders(query);
+    while (searchResults.hasNext() && results.length < maxCount) {
+      var folder = searchResults.next();
+      var fId = folder.getId();
+      if (seenIds[fId]) continue;
+      seenIds[fId] = true;
+
+      var path = getFolderPath_(fId);
+      results.push({
+        folderId: fId,
+        folderPath: path
+      });
+    }
+  } catch (e) {
+    console.error('フォルダ検索エラー: ' + e.message);
+  }
+}
+
+/**
+ * フォルダIDからパスを構築（マイドライブからの相対パス）
+ */
+function getFolderPath_(folderId) {
+  try {
+    var folder = DriveApp.getFolderById(folderId);
+    var parts = [folder.getName()];
+    var parent = folder.getParents();
+
+    // 最大5階層まで遡る
+    var depth = 0;
+    while (parent.hasNext() && depth < 5) {
+      var p = parent.next();
+      var pName = p.getName();
+      if (pName === 'マイドライブ' || pName === 'My Drive') break;
+      parts.unshift(pName);
+      parent = p.getParents();
+      depth++;
+    }
+
+    return parts.join(' / ');
+  } catch (e) {
+    return '（パス取得失敗）';
+  }
+}
+
+/**
+ * 候補から最適なフォルダを選定（Gemini）
+ */
+function selectBestFolder_(summary, renameTo, candidates, modelName) {
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+
+  var candidateList = candidates.map(function(c, i) {
+    return (i + 1) + '. ' + c.folderPath;
+  }).join('\n');
+
+  var payload = {
+    contents: [{
+      parts: [{
+        text: '以下のPDFの保存先として最も適切なフォルダを候補から1つ選んでください。\n' +
+              '書類の種類（水道、電気、ガス、保険、税金など）と物件名・会社名が一致するフォルダを優先してください。\n' +
+              '番号のみ（例: 1）を出力してください。適切な候補がない場合は 0 と出力してください。\n\n' +
+              '【PDF内容】\n' + summary + '\n\n' +
+              '【リネーム予定名】\n' + renameTo + '\n\n' +
+              '【フォルダ候補】\n' + candidateList
+      }]
+    }],
+    generationConfig: { temperature: 0.1 }
+  };
+
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    if (response.getResponseCode() === 200) {
+      var result = JSON.parse(response.getContentText());
+      if (result.candidates && result.candidates[0].content) {
+        var answer = result.candidates[0].content.parts[0].text.trim();
+        var idx = parseInt(answer, 10);
+        if (idx > 0 && idx <= candidates.length) {
+          return candidates[idx - 1];
+        }
+      }
+    }
+  } catch (e) {
+    console.error('フォルダ選定エラー: ' + e.message);
+  }
+
+  // 判定できなかった場合は最初の候補
+  return candidates[0];
 }
 
 // ============================================================

@@ -340,11 +340,21 @@ function scanAndPrepare() {
 
     try {
       var blob = file.getBlob();
+      var fileSizeKB = Math.round(blob.getBytes().length / 1024);
 
-      // PDFの内容要約＋リネーム名を1回のAPI呼び出しで取得（API節約）
-      var analyzed = analyzeAndRename_(blob, rules, activeModel);
-      var summary = analyzed.summary;
-      var renameTo = analyzed.renameTo;
+      var summary, renameTo;
+
+      // 20MB超のPDFはGemini APIに送れない
+      if (fileSizeKB > 20000) {
+        summary = '（ファイルサイズ超過: ' + fileSizeKB + 'KB — Gemini上限20MB）';
+        renameTo = '（生成失敗: サイズ超過）';
+      } else {
+        // PDFの内容要約＋リネーム名を1回のAPI呼び出しで取得
+        var analyzed = analyzeAndRename_(blob, rules, activeModel);
+        summary = analyzed.summary;
+        renameTo = analyzed.renameTo;
+      }
+
       if (renameTo === 'ERROR') renameTo = '（生成失敗）';
 
       // Drive内で類似PDFを検索
@@ -522,6 +532,7 @@ function analyzePdfContent_(pdfBlob, modelName) {
   };
 
   var result = callGeminiWithRetry_(url, payload, 'analyzePdf');
+  if (result && result.__error) return '（解析失敗: ' + result.__error + '）';
   return result || '（解析失敗）';
 }
 
@@ -553,9 +564,14 @@ function analyzeAndRename_(pdfBlob, rules, modelName) {
   };
 
   var result = callGeminiWithRetry_(url, payload, 'analyzeAndRename');
-  if (result) {
+
+  // エラーオブジェクトが返ってきた場合
+  if (result && result.__error) {
+    return { summary: '（API失敗: ' + result.__error + '）', renameTo: 'ERROR', error: result.__error };
+  }
+
+  if (result && typeof result === 'string') {
     try {
-      // JSON部分を抽出（前後に余計なテキストがある場合に対応）
       var jsonMatch = result.match(/\{[\s\S]*"summary"[\s\S]*"renameTo"[\s\S]*\}/);
       if (jsonMatch) {
         var parsed = JSON.parse(jsonMatch[0]);
@@ -588,7 +604,8 @@ function callGeminiWithRetry_(url, payload, context) {
   };
 
   var maxRetries = 3;
-  var baseDelay = 3000; // 3秒
+  var baseDelay = 3000;
+  var lastError = '';
 
   for (var i = 0; i < maxRetries; i++) {
     try {
@@ -600,36 +617,41 @@ function callGeminiWithRetry_(url, payload, context) {
         if (result.candidates && result.candidates[0] && result.candidates[0].content) {
           return result.candidates[0].content.parts[0].text.trim();
         }
-        // candidatesがない場合（safety filterなど）
-        var reason = '';
+        var reason = 'unknown';
         if (result.candidates && result.candidates[0] && result.candidates[0].finishReason) {
           reason = result.candidates[0].finishReason;
         }
-        console.warn('[' + context + '] 200だがcandidatesなし: ' + reason);
-        return null;
+        if (result.promptFeedback && result.promptFeedback.blockReason) {
+          reason = 'BLOCKED: ' + result.promptFeedback.blockReason;
+        }
+        lastError = 'candidates無し(' + reason + ')';
+        console.warn('[' + context + '] ' + lastError);
+        // SAFETY等でブロックされた場合はリトライしても無駄
+        break;
       }
 
       if (code === 429 || code === 503) {
-        // レート制限 or サーバー過負荷 → 指数バックオフ
-        var delay = baseDelay * Math.pow(2, i); // 5s, 10s, 20s, 40s, 80s
-        console.warn('[' + context + '] HTTP ' + code + ' → ' + (delay/1000) + '秒待機 (リトライ ' + (i+1) + '/' + maxRetries + ')');
+        var delay = baseDelay * Math.pow(2, i);
+        lastError = 'HTTP' + code + '(レート制限)';
+        console.warn('[' + context + '] ' + lastError + ' → ' + (delay/1000) + '秒待機');
         Utilities.sleep(delay);
         continue;
       }
 
-      // その他のエラー
       var errBody = response.getContentText().substring(0, 200);
-      console.error('[' + context + '] HTTP ' + code + ': ' + errBody);
-      return null;
+      lastError = 'HTTP' + code;
+      console.error('[' + context + '] ' + lastError + ': ' + errBody);
+      break; // 400系エラーはリトライしても無駄
 
     } catch (e) {
-      console.error('[' + context + '] 例外: ' + e.message);
+      lastError = e.message.substring(0, 100);
+      console.error('[' + context + '] 例外: ' + lastError);
       Utilities.sleep(baseDelay * Math.pow(2, i));
     }
   }
 
-  console.error('[' + context + '] ' + maxRetries + '回リトライ後も失敗');
-  return null;
+  console.error('[' + context + '] 失敗: ' + lastError);
+  return { __error: lastError };
 }
 
 // ============================================================
@@ -674,7 +696,8 @@ function extractSearchKeywords_(summary, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  return callGeminiWithRetry_(url, payload, 'extractKeywords') || '';
+  var r = callGeminiWithRetry_(url, payload, 'extractKeywords');
+  return (r && typeof r === 'string') ? r : '';
 }
 
 /**
@@ -770,7 +793,7 @@ function selectBestMatch_(summary, candidates, modelName) {
   };
 
   var answer = callGeminiWithRetry_(url, payload, 'selectBestMatch');
-  if (answer) {
+  if (answer && typeof answer === 'string') {
     var idx = parseInt(answer, 10);
     if (idx > 0 && idx <= candidates.length) return candidates[idx - 1];
   }
@@ -900,7 +923,8 @@ function extractFolderKeywords_(summary, renameTo, modelName) {
     generationConfig: { temperature: 0.1 }
   };
 
-  return callGeminiWithRetry_(url, payload, 'extractFolderKeywords') || '';
+  var r = callGeminiWithRetry_(url, payload, 'extractFolderKeywords');
+  return (r && typeof r === 'string') ? r : '';
 }
 
 /**
@@ -1005,7 +1029,7 @@ function selectBestFolder_(summary, renameTo, candidates, modelName) {
   };
 
   var answer = callGeminiWithRetry_(url, payload, 'selectBestFolder');
-  if (answer) {
+  if (answer && typeof answer === 'string') {
     var idx = parseInt(answer, 10);
     if (idx > 0 && idx <= candidates.length) return candidates[idx - 1];
   }
@@ -1090,5 +1114,6 @@ function askGemini(pdfBlob, rules, modelName) {
   };
 
   var result = callGeminiWithRetry_(url, payload, 'askGemini');
-  return result || 'ERROR';
+  if (result && result.__error) return 'ERROR';
+  return (typeof result === 'string') ? result : 'ERROR';
 }

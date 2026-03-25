@@ -145,18 +145,21 @@ function checkDeployCount(label, cwd) {
   }
 }
 
-/** バージョン数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く */
+/** バージョン数を表示し、上限に近い場合は警告+ブラウザでGASエディタを開く。警告メッセージの配列を返す */
 function checkVersionCount(label, cwd) {
+  var warnings = [];
   var r = run(clasp + ' versions', cwd, 30000);
   if (!r.ok) {
     console.log('  ' + label + ': バージョン数の取得に失敗');
-    return;
+    return warnings;
   }
   var count = countVersions(r.out);
   var bar = count + '/' + VERSION_LIMIT + '件';
   if (count >= VERSION_WARN) {
-    console.log('  ⚠ ' + label + ': バージョン数 ' + bar + ' — バージョン履歴の削除が必要です！');
+    var msg = label + ': バージョン数が ' + bar + ' です。古いバージョンを削除してください！';
+    console.log('  ⚠ ' + msg);
     console.log('    ※ GASエディタ左サイドバー「プロジェクトの履歴」→ 右上メニュー「すべてのバージョンを表示」→ 削除したいバージョンを選択して削除');
+    warnings.push(msg);
     var scriptId = getScriptId(cwd);
     if (scriptId) {
       var editorUrl = 'https://script.google.com/home/projects/' + scriptId + '/edit';
@@ -167,6 +170,7 @@ function checkVersionCount(label, cwd) {
   } else {
     console.log('  ' + label + ': バージョン数 ' + bar);
   }
+  return warnings;
 }
 
 /** ブラウザを通常ウィンドウで開く */
@@ -583,15 +587,28 @@ function main() {
 
   // === バージョン数チェック（200件上限） ===
   console.log('[バージョン数チェック（上限200件）]');
-  checkVersionCount('メインアプリ', rootDir);
+  var versionWarnings = [];
+  versionWarnings = versionWarnings.concat(checkVersionCount('メインアプリ', rootDir));
   if (fs.existsSync(checklistDir)) {
-    checkVersionCount('チェックリスト', checklistDir);
+    versionWarnings = versionWarnings.concat(checkVersionCount('チェックリスト', checklistDir));
   }
   if (fs.existsSync(checkinDir) && ciClaspConfig.scriptId && ciClaspConfig.scriptId !== 'YOUR_CHECKIN_SCRIPT_ID_HERE') {
-    checkVersionCount('チェックイン', checkinDir);
+    versionWarnings = versionWarnings.concat(checkVersionCount('チェックイン', checkinDir));
   }
   if (fs.existsSync(alarmDir) && alClaspConfig.scriptId && alClaspConfig.scriptId !== 'YOUR_ALARM_SCRIPT_ID_HERE') {
-    checkVersionCount('アラーム', alarmDir);
+    versionWarnings = versionWarnings.concat(checkVersionCount('アラーム', alarmDir));
+  }
+
+  // CI環境でバージョン数警告がある場合、エラー終了（GitHub Actionsに通知メールが届く）
+  if (isCI && versionWarnings.length > 0) {
+    console.log('');
+    versionWarnings.forEach(function(w) {
+      console.log('::error::' + w);
+    });
+    console.log('::error::GASエディタで古いバージョンを手動削除してください → https://script.google.com/home/projects/' + getScriptId(rootDir) + '/edit');
+    console.log('::error::手順: 左サイドバー「プロジェクトの履歴」→ 右上「すべてのバージョンを表示」→ 古いバージョンを選択して削除');
+    // デプロイ自体は成功しているので警告メッセージを出しつつ exit 1
+    process.exit(1);
   }
 
   console.log('');

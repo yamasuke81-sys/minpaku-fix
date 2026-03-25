@@ -127,16 +127,28 @@ function scanAndPrepare() {
       compareSheet.getRange(newRow, COL.CHECK).insertCheckboxes();
       compareSheet.getRange(newRow, COL.SCAN_NAME).setValue(file.getName());
       compareSheet.getRange(newRow, COL.SUMMARY).setValue(summary);
-      compareSheet.getRange(newRow, COL.RENAME_TO).setValue(renameTo.replace(/[\\/:*?"<>|]/g, '').trim());
+      var cleanRenameTo = renameTo.replace(/[\\/:*?"<>|]/g, '').trim();
+      compareSheet.getRange(newRow, COL.RENAME_TO).setValue(cleanRenameTo);
       compareSheet.getRange(newRow, COL.SCAN_LINK).setFormula('=HYPERLINK("' + driveFileUrl + '","開く")');
-      compareSheet.getRange(newRow, COL.REF_NAME).setValue(refResult.fileName || '（見つからず）');
-      if (refUrl) {
-        compareSheet.getRange(newRow, COL.REF_LINK).setFormula('=HYPERLINK("' + refUrl + '","開く")');
-      } else {
+
+      var isNewFile = !refResult.fileId;
+
+      if (isNewFile) {
+        // 参照元なし → 新規ファイル扱い
+        // 参照元ファイル名欄にリネーム候補を表示（新規であることを明示）
+        compareSheet.getRange(newRow, COL.REF_NAME).setValue('🆕 新規（参照元なし）→ ' + cleanRenameTo);
         compareSheet.getRange(newRow, COL.REF_LINK).setValue('―');
+        compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue('');
+        compareSheet.getRange(newRow, COL.STATUS).setValue('🆕 新規 - 確認待ち');
+        // 行の背景色を変えて新規ファイルを視覚的に区別
+        compareSheet.getRange(newRow, 1, 1, TOTAL_COLS).setBackground('#FFF9C4'); // 薄い黄色
+      } else {
+        // 参照元あり
+        compareSheet.getRange(newRow, COL.REF_NAME).setValue(refResult.fileName);
+        compareSheet.getRange(newRow, COL.REF_LINK).setFormula('=HYPERLINK("' + refUrl + '","開く")');
+        compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue(refResult.folderId || '');
+        compareSheet.getRange(newRow, COL.STATUS).setValue('確認待ち');
       }
-      compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue(refResult.folderId || '');
-      compareSheet.getRange(newRow, COL.STATUS).setValue('確認待ち');
       compareSheet.getRange(newRow, COL.SCAN_FILE_ID).setValue(fileId);
       compareSheet.getRange(newRow, COL.REF_FILE_ID).setValue(refResult.fileId || '');
       compareSheet.getRange(newRow, COL.TIMESTAMP).setValue(new Date());
@@ -219,7 +231,8 @@ function executeApproved() {
 
       // ステータス更新
       var sheetRow = i + 2; // ヘッダー分+1
-      compareSheet.getRange(sheetRow, COL.STATUS).setValue('完了');
+      var doneLabel = refFolderId ? '✅ 完了（参照元フォルダへ移動）' : '✅ 完了（新規 → outputフォルダへ移動）';
+      compareSheet.getRange(sheetRow, COL.STATUS).setValue(doneLabel);
       compareSheet.getRange(sheetRow, COL.TIMESTAMP).setValue(new Date());
       executedCount++;
 

@@ -536,7 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325n</div>
+<div id="version">v0325o</div>
 <div id="dbgCheckin" style="position:fixed;top:4px;left:4px;font-size:9px;color:#0f0;background:rgba(0,0,0,.8);z-index:99999;font-family:monospace;padding:3px 6px;border-radius:3px;pointer-events:none;white-space:pre;"></div>
 
 <script>
@@ -734,30 +734,56 @@ function checkAlarmTrigger(nowHHMM) {
   if (!data) return;
 
   // 1) チェックアウトメッセージテンプレート（静音時間と同じ構造）
+  // 複数時刻がある場合、現在時刻以前の最新のもののみ表示し、それより前は自動確認済みにする
   if (data.checkoutMessages && data.checkouts && data.checkouts.length > 0) {
     var hasCoChecked = hasAnyCheckedBooking(data.bookingCoFlags || {}, data.checkouts);
 
+    // 全テンプレートの有効な時刻を集約
+    var allCoAlarms = [];
     for (var ci = 0; ci < data.checkoutMessages.length; ci++) {
       var coMsg = data.checkoutMessages[ci];
-      if (!coMsg.enabled) continue;
-      if (!coMsg.times || !coMsg.times.length) continue;
-      if (!hasCoChecked) continue;
-
+      if (!coMsg.enabled || !coMsg.times || !coMsg.times.length || !hasCoChecked) continue;
       for (var cti = 0; cti < coMsg.times.length; cti++) {
-        var ct = coMsg.times[cti];
-        var coAlarmId = coMsg.id + '_' + ct;
-        if (nowHHMM === ct && !_state.dismissed[coAlarmId]) {
-          triggerAlarm({
-            id: coAlarmId,
-            type: 'checkout',
-            title: coMsg.label || 'Check-out Time',
-            body: coMsg.message || 'チェックアウトの時間です。',
-            bodyEn: coMsg.messageEn || 'It is checkout time.',
-            volume: data.checkoutVolume || 80,
-            sound: data.checkoutSound || 'chime'
-          });
-          return;
+        allCoAlarms.push({
+          time: coMsg.times[cti],
+          id: coMsg.id + '_' + coMsg.times[cti],
+          msg: coMsg
+        });
+      }
+    }
+
+    if (allCoAlarms.length > 0) {
+      // 時刻で降順ソート（最新が先頭）
+      allCoAlarms.sort(function(a, b) { return b.time.localeCompare(a.time); });
+
+      // nowHHMM以前で未確認の最新時刻を探し、それより前は自動確認済みにする
+      var latestToTrigger = null;
+      for (var ai = 0; ai < allCoAlarms.length; ai++) {
+        var ca = allCoAlarms[ai];
+        if (ca.time > nowHHMM) continue; // 未来の時刻はスキップ
+        if (_state.dismissed[ca.id]) continue; // 既に確認済み
+        if (!latestToTrigger) {
+          latestToTrigger = ca; // 降順の最初 = 最新の到達済み時刻
+        } else {
+          // latestToTriggerより前の時刻 → 自動確認済み
+          _state.dismissed[ca.id] = true;
+          callGAS('recordAlarmDismiss', [ca.id]).catch(function() {});
         }
+      }
+
+      // 最新のアラームを発火（既に表示中でなければ）
+      if (latestToTrigger) {
+        if (_state.currentAlarm && _state.currentAlarm.id === latestToTrigger.id) return;
+        triggerAlarm({
+          id: latestToTrigger.id,
+          type: 'checkout',
+          title: latestToTrigger.msg.label || 'Check-out Time',
+          body: latestToTrigger.msg.message || 'チェックアウトの時間です。',
+          bodyEn: latestToTrigger.msg.messageEn || 'It is checkout time.',
+          volume: data.checkoutVolume || 80,
+          sound: data.checkoutSound || 'chime'
+        });
+        return;
       }
     }
   }

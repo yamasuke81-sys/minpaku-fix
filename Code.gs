@@ -292,6 +292,10 @@ function doGet(e) {
   if (params.type === 'json') {
     return handleJsonApi_(params);
   }
+  // 管理者リンクページ
+  if (action === 'admin') {
+    return buildAdminPage_();
+  }
   // オーナーURL取得アクション（deploy-all.jsがデプロイ時にユーザー保存URLを確認するため）
   if (action === 'getOwnerBaseUrl') {
     var ownerUrl = '';
@@ -12882,4 +12886,99 @@ function getAutoAmountOverrides_(staffName, ym) {
     var key = 'autoAmtOverride_' + staffName + '_' + ym;
     return JSON.parse(PropertiesService.getDocumentProperties().getProperty(key) || '{}');
   } catch (e) { return {}; }
+}
+
+/**
+ * 管理者リンクページを生成
+ */
+function buildAdminPage_() {
+  var sp = PropertiesService.getScriptProperties();
+  var dp = PropertiesService.getDocumentProperties();
+  var mainScriptId = ScriptApp.getScriptId();
+  var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  var baseUrl = sp.getProperty('APP_BASE_URL') || '';
+  var staffUrl = dp.getProperty('staffDeployUrl') || '';
+  var gatewayUrl = sp.getProperty('GATEWAY_URL') || '';
+  var readonlyUrl = baseUrl ? baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'readonly=1' : '';
+  var checklistUrl = sp.getProperty('CHECKLIST_APP_URL') || '';
+  var checkinUrl = sp.getProperty('CHECKIN_APP_URL') || '';
+  var alarmUrl = sp.getProperty('ALARM_APP_URL') || '';
+  // script IDs
+  var clScriptId = '18PILN4GA1DyQY9nkf2lV1GVxAXV95LT51vh2erWB1NZ8uNX54kVqlx3w';
+  var ciScriptId = '1HL-Rm5kU7koC9_rW3ZQrblh5Jw_nQU_4fuvAD6eUPqrZCU5DTp-CWkV9';
+  var alScriptId = '1AWrymiKdg2zww4vDMiOMiRDbwETaxFohH1CTq9XIwp98XQeGWtVzfwao';
+  // チェックリスト用スプシID
+  var clSsId = '';
+  try { clSsId = sp.getProperty('CL_SPREADSHEET_ID') || ''; } catch(e) {}
+
+  var gasBase = 'https://script.google.com/home/projects/';
+  var ssBase = 'https://docs.google.com/spreadsheets/d/';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<title>管理者リンク一覧</title>';
+  html += '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">';
+  html += '<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">';
+  html += '<style>body{background:#1a1a2e;color:#e8e8e8;font-family:sans-serif;padding:20px;}'
+    + '.card{background:#16213e;border:1px solid #2a3a5c;border-radius:12px;margin-bottom:16px;}'
+    + '.card-header{background:#0f3460;border-bottom:1px solid #2a3a5c;border-radius:12px 12px 0 0 !important;padding:12px 16px;}'
+    + '.card-header h5{margin:0;font-size:1rem;}'
+    + '.link-row{display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid #1a2744;gap:10px;}'
+    + '.link-row:last-child{border-bottom:none;}'
+    + '.link-row:hover{background:#1a2744;}'
+    + '.link-icon{font-size:1.2rem;width:28px;text-align:center;flex-shrink:0;}'
+    + '.link-label{flex:1;font-size:0.9rem;}'
+    + '.link-btn{text-decoration:none;font-size:0.8rem;padding:4px 12px;border-radius:6px;white-space:nowrap;}'
+    + '.btn-app{background:#e94560;color:#fff;}'
+    + '.btn-gas{background:#0f3460;color:#e8e8e8;border:1px solid #2a3a5c;}'
+    + '.btn-sheet{background:#0d7377;color:#fff;}'
+    + '.btn-github{background:#24292e;color:#fff;}'
+    + '</style></head><body>';
+  html += '<div class="container" style="max-width:600px;">';
+  html += '<h4 class="text-center mb-4"><i class="bi bi-grid-3x3-gap-fill"></i> 管理者リンク一覧</h4>';
+
+  // メインアプリ
+  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-house-door-fill text-info"></i> メインアプリ</h5></div>';
+  if (baseUrl) html += linkRow_('bi-person-fill', 'オーナー用', baseUrl, 'btn-app');
+  if (staffUrl) html += linkRow_('bi-people-fill', 'スタッフ用', staffUrl, 'btn-app');
+  if (readonlyUrl) html += linkRow_('bi-eye-fill', '閲覧用', readonlyUrl, 'btn-app');
+  if (gatewayUrl) html += linkRow_('bi-link-45deg', 'ゲートウェイ（ブックマーク用）', gatewayUrl, 'btn-app');
+  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + mainScriptId + '/edit', 'btn-gas');
+  html += linkRow_('bi-table', '宿泊者名簿スプシ', ssBase + ssId, 'btn-sheet');
+  html += '</div>';
+
+  // チェックリストアプリ
+  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-check2-square text-success"></i> 清掃チェックリストアプリ</h5></div>';
+  if (checklistUrl) html += linkRow_('bi-box-arrow-up-right', 'アプリ', checklistUrl, 'btn-app');
+  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + clScriptId + '/edit', 'btn-gas');
+  if (clSsId) html += linkRow_('bi-table', 'スプシ', ssBase + clSsId, 'btn-sheet');
+  html += '</div>';
+
+  // チェックインアプリ
+  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-door-open-fill text-warning"></i> チェックインアプリ</h5></div>';
+  if (checkinUrl) html += linkRow_('bi-box-arrow-up-right', 'アプリ', checkinUrl, 'btn-app');
+  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + ciScriptId + '/edit', 'btn-gas');
+  html += '</div>';
+
+  // アラームアプリ
+  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-bell-fill text-danger"></i> アラームアプリ</h5></div>';
+  if (alarmUrl) html += linkRow_('bi-box-arrow-up-right', 'アプリ', alarmUrl, 'btn-app');
+  html += linkRow_('bi-code-slash', 'Apps Script', gasBase + alScriptId + '/edit', 'btn-gas');
+  html += '</div>';
+
+  // GitHub
+  html += '<div class="card"><div class="card-header"><h5><i class="bi bi-github"></i> GitHub</h5></div>';
+  html += linkRow_('bi-folder-fill', 'リポジトリ', 'https://github.com/yamasuke81-sys/minpaku-fix', 'btn-github');
+  html += linkRow_('bi-play-circle-fill', 'Actions（自動デプロイ）', 'https://github.com/yamasuke81-sys/minpaku-fix/actions', 'btn-github');
+  html += '</div>';
+
+  html += '</div></body></html>';
+  return HtmlService.createHtmlOutput(html).setTitle('管理者リンク一覧').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function linkRow_(icon, label, url, btnClass) {
+  return '<div class="link-row">'
+    + '<span class="link-icon"><i class="bi ' + icon + '"></i></span>'
+    + '<span class="link-label">' + label + '</span>'
+    + '<a href="' + url + '" target="_blank" class="link-btn ' + btnClass + '">開く</a>'
+    + '</div>';
 }

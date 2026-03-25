@@ -19,24 +19,49 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Check secrets configured
+        id: check
+        run: |
+          if [ -z "$CLASPRC" ]; then
+            echo "::warning::CLASPRC_JSON secret is not configured. Run setup-github-secrets.bat first."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          CLASPRC: ${{ secrets.CLASPRC_JSON }}
+
       - name: Checkout code
+        if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install dependencies
+        if: steps.check.outputs.skip != 'true'
         run: npm ci
 
       - name: Setup clasp credentials
+        if: steps.check.outputs.skip != 'true'
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
       - name: Setup deploy config
-        run: echo '${{ secrets.DEPLOY_CONFIG_JSON }}' > deploy-config.json
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          if [ -n "$DEPLOY_CFG" ]; then
+            echo '${{ secrets.DEPLOY_CONFIG_JSON }}' > deploy-config.json
+          else
+            echo "DEPLOY_CONFIG_JSON not set — new deploy IDs will be created"
+          fi
+        env:
+          DEPLOY_CFG: ${{ secrets.DEPLOY_CONFIG_JSON }}
 
       - name: Deploy all apps
+        if: steps.check.outputs.skip != 'true'
         run: node deploy-all.js
         env:
           CI: 'true'
@@ -45,6 +70,8 @@ jobs:
         if: always()
         run: |
           echo "## Deploy Result" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.skip }}" = "true" ]; then
+            echo "- **Status**: Skipped (secrets not configured)" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

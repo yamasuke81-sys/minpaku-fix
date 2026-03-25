@@ -536,8 +536,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325p</div>
-<div id="dbgCheckin" style="position:fixed;top:4px;left:4px;font-size:9px;color:#0f0;background:rgba(0,0,0,.8);z-index:99999;font-family:monospace;padding:3px 6px;border-radius:3px;pointer-events:none;white-space:pre;"></div>
+<div id="version">v0325q</div>
 
 <script>
 // ===== GAS通信 =====
@@ -654,18 +653,6 @@ function updateClock() {
   var ds = (now.getMonth() + 1) + '月' + now.getDate() + '日 (' + days[now.getDay()] + ')';
   document.getElementById('clockDate').textContent = ds;
 
-  // [DEBUG] チェックインapp連携の状態を表示
-  var _dbgEl = document.getElementById('dbgCheckin');
-  if (_dbgEl) {
-    _dbgEl.textContent = 'now=' + h + ':' + m + ':' + s +
-      ' target=' + (_state.checkinReturnTime || 'N/A') +
-      '\nenabled=' + _state.checkinEnabled +
-      ' url=' + (_state.checkinAppUrl ? _state.checkinAppUrl.substring(0, 30) + '...' : 'empty') +
-      '\nredirected=' + _state._checkinRedirected +
-      ' screen=' + _state.screen +
-      '\n' + (_state._dbgRedirectLog || 'no redirect attempt yet');
-  }
-
   // チェックインapp連携: 設定時刻になったらチェックインappに遷移
   if (_state.checkinEnabled && _state.checkinAppUrl && _state.checkinReturnTime) {
     var nowHM = h + ':' + m;
@@ -674,14 +661,10 @@ function updateClock() {
       var adminActive = document.getElementById('adminScreen') && document.getElementById('adminScreen').classList.contains('active');
       var alarmActive = document.getElementById('alarmScreen') && document.getElementById('alarmScreen').classList.contains('active');
       var complaintActive = document.getElementById('complaintAlarmScreen') && document.getElementById('complaintAlarmScreen').classList.contains('active');
-      _state._dbgRedirectLog = 'ATTEMPT@' + h + ':' + m + ':' + s +
-        ' admin=' + !!adminActive + ' alarm=' + !!alarmActive +
-        ' complaint=' + !!complaintActive + ' coNotify=' + _state.coNotifyActive;
       if (!adminActive && !alarmActive && !complaintActive) {
         // CO連絡画面表示中なら通知なしで終了扱いにしてからリダイレクト
         if (_state.coNotifyActive) dismissCoNotify();
         _state._checkinRedirected = true;
-        _state._dbgRedirectLog += ' → REDIRECT FIRED';
         var targetUrl = _state.checkinAppUrl;
         // GAS HTMLサービスはiframe内で実行されるため、
         // window.location.hrefでiframe内を遷移させる（ブラウザ非依存）

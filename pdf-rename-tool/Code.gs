@@ -50,29 +50,108 @@ function onOpen() {
 }
 
 // ============================================================
-// doGet — URLアクセス時
+// doGet — WebアプリUI表示
 // ============================================================
 function doGet(e) {
-  var mode = e && e.parameter && e.parameter.mode ? e.parameter.mode : 'scan';
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('PDF自動リネームツール')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
 
-  if (mode === 'execute') {
-    executeApproved();
-    return HtmlService.createHtmlOutput(
-      '<html><body style="font-family:sans-serif;text-align:center;margin-top:50px;background:#f0f4f8;">' +
-      '<h2 style="color:#34a853;">✅ チェック済みファイルのリネーム＆移動が完了しました</h2>' +
-      '<p>このタブは閉じて大丈夫です。</p></body></html>'
-    );
+// ============================================================
+// WebアプリAPI関数（google.script.run から呼ばれる）
+// ============================================================
+
+/**
+ * 比較シートのデータを取得してWebアプリに返す
+ */
+function getCompareData() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return [];
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  var data = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+  var result = [];
+
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    result.push({
+      rowNum: i + 2, // シート上の行番号
+      checked: row[COL.CHECK - 1] === true,
+      scanName: row[COL.SCAN_NAME - 1] || '',
+      summary: row[COL.SUMMARY - 1] || '',
+      renameTo: row[COL.RENAME_TO - 1] || '',
+      refName: row[COL.REF_NAME - 1] || '',
+      refFolderId: row[COL.REF_FOLDER_ID - 1] || '',
+      destFolder: row[COL.DEST_FOLDER - 1] || '',
+      destFolderId: row[COL.DEST_FOLDER_ID - 1] || '',
+      status: row[COL.STATUS - 1] || '',
+      scanFileId: row[COL.SCAN_FILE_ID - 1] || '',
+      refFileId: row[COL.REF_FILE_ID - 1] || '',
+      timestamp: row[COL.TIMESTAMP - 1] ? Utilities.formatDate(new Date(row[COL.TIMESTAMP - 1]), 'Asia/Tokyo', 'MM/dd HH:mm') : ''
+    });
   }
+  return result;
+}
 
-  // デフォルト: スキャン＆比較準備
+/**
+ * チェック状態を更新
+ */
+function updateCheckStatus(rowNum, checked) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return;
+  sheet.getRange(rowNum, COL.CHECK).setValue(checked);
+}
+
+/**
+ * チェック状態を一括更新
+ */
+function updateCheckStatusBatch(updates) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return;
+  for (var i = 0; i < updates.length; i++) {
+    sheet.getRange(updates[i].rowNum, COL.CHECK).setValue(updates[i].checked);
+  }
+}
+
+/**
+ * リネーム予定名を更新
+ */
+function updateRenameTo(rowNum, newName) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return;
+  sheet.getRange(rowNum, COL.RENAME_TO).setValue(newName);
+}
+
+/**
+ * スキャン＆参照元検索（Web版 — 処理件数を返す）
+ */
+function scanAndPrepareWeb() {
   scanAndPrepare();
-  return HtmlService.createHtmlOutput(
-    '<html><body style="font-family:sans-serif;text-align:center;margin-top:50px;background:#f0f4f8;">' +
-    '<h2 style="color:#1a73e8;">📋 スキャン＆参照元検索が完了しました</h2>' +
-    '<p>スプレッドシートの「参照元比較」シートを確認してください。</p>' +
-    '<p><a href="' + SS_URL + '" target="_blank">スプレッドシートを開く</a></p>' +
-    '</body></html>'
-  );
+  // 処理件数を返す（最後のログから取得は難しいので、比較シートの行数を返す）
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  return sheet ? Math.max(0, sheet.getLastRow() - 1) : 0;
+}
+
+/**
+ * 実行（Web版 — 結果メッセージを返す）
+ */
+function executeApprovedWeb() {
+  return executeApproved();
+}
+
+/**
+ * スプレッドシートURLを返す
+ */
+function getSpreadsheetUrl() {
+  return SS_URL;
 }
 
 // ============================================================
@@ -89,7 +168,7 @@ function scanAndPrepare() {
   var files = inputFolder.getFilesByType(MimeType.PDF);
 
   if (!files.hasNext()) {
-    SpreadsheetApp.getUi().alert('入力フォルダにPDFファイルがありません。');
+    console.log('入力フォルダにPDFファイルがありません。');
     return;
   }
 
@@ -192,14 +271,12 @@ function executeApproved() {
   var ss = SpreadsheetApp.openByUrl(SS_URL);
   var compareSheet = ss.getSheetByName(COMPARE_SHEET_NAME);
   if (!compareSheet) {
-    SpreadsheetApp.getUi().alert('「参照元比較」シートが見つかりません。先に「スキャン＆参照元検索」を実行してください。');
-    return;
+    return '「参照元比較」シートが見つかりません。先に「スキャン＆参照元検索」を実行してください。';
   }
 
   var lastRow = compareSheet.getLastRow();
   if (lastRow < 2) {
-    SpreadsheetApp.getUi().alert('処理対象のデータがありません。');
-    return;
+    return '処理対象のデータがありません。';
   }
 
   var data = compareSheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
@@ -269,12 +346,7 @@ function executeApproved() {
   var msg = '実行完了: ' + executedCount + '件リネーム＆移動';
   if (errorCount > 0) msg += '（エラー: ' + errorCount + '件）';
   console.log(msg);
-
-  try {
-    SpreadsheetApp.getUi().alert(msg);
-  } catch (e) {
-    // doGetから呼ばれた場合UIがないので無視
-  }
+  return msg;
 }
 
 // ============================================================

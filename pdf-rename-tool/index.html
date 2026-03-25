@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f4f8; font-family: 'Segoe UI', sans-serif; }
+    .header { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: #fff; padding: 20px 0; }
+    .header h1 { font-size: 1.5rem; margin: 0; }
+    .card-action { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; border: none; }
+    .card-action:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+    .status-bar { background: #fff; border-radius: 12px; padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .table-container { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow-x: auto; }
+    .table th { background: #1a73e8; color: #fff; font-size: 0.8rem; white-space: nowrap; position: sticky; top: 0; }
+    .table td { font-size: 0.85rem; vertical-align: middle; }
+    .badge-new { background: #FFF9C4; color: #F57F17; border: 1px solid #FDD835; }
+    .badge-waiting { background: #E3F2FD; color: #1565C0; }
+    .badge-done { background: #E8F5E9; color: #2E7D32; }
+    .badge-error { background: #FFEBEE; color: #C62828; }
+    .summary-cell { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .summary-cell:hover { white-space: normal; overflow: visible; }
+    .rename-input { border: 1px solid #ddd; border-radius: 4px; padding: 2px 6px; width: 100%; font-size: 0.85rem; }
+    .rename-input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+    .spinner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .spinner-box { background: #fff; border-radius: 16px; padding: 40px; text-align: center; }
+    .folder-cell { max-width: 200px; font-size: 0.8rem; color: #555; }
+    .check-all-header { cursor: pointer; }
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.2rem; }
+      .action-cards .col { margin-bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <h1><i class="bi bi-file-earmark-pdf"></i> PDF自動リネームツール</h1>
+        <small class="opacity-75">スキャン → 比較確認 → リネーム＆移動</small>
+      </div>
+      <button class="btn btn-outline-light btn-sm" onclick="loadData()">
+        <i class="bi bi-arrow-clockwise"></i> 更新
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- メインコンテンツ -->
+<div class="container py-4">
+
+  <!-- アクションカード -->
+  <div class="row action-cards g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card card-action h-100" onclick="runScan()">
+        <div class="card-body text-center p-4">
+          <i class="bi bi-search text-primary" style="font-size: 2rem;"></i>
+          <h6 class="mt-2 mb-1">スキャン＆参照元検索</h6>
+          <small class="text-muted">入力フォルダのPDFを解析し、類似ファイルを検索</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card card-action h-100" onclick="runExecute()">
+        <div class="card-body text-center p-4">
+          <i class="bi bi-check2-circle text-success" style="font-size: 2rem;"></i>
+          <h6 class="mt-2 mb-1">チェック済みを実行</h6>
+          <small class="text-muted">承認済みファイルをリネーム＆移動</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card card-action h-100" onclick="runLegacy()">
+        <div class="card-body text-center p-4">
+          <i class="bi bi-lightning text-warning" style="font-size: 2rem;"></i>
+          <h6 class="mt-2 mb-1">従来のリネーム（即時）</h6>
+          <small class="text-muted">確認なしで一括リネーム＆移動</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ステータスバー -->
+  <div class="status-bar mb-4 d-flex align-items-center justify-content-between flex-wrap gap-2" id="statusBar">
+    <div>
+      <span class="me-3"><i class="bi bi-files"></i> 全体: <strong id="totalCount">-</strong></span>
+      <span class="me-3"><i class="bi bi-hourglass-split text-primary"></i> 確認待ち: <strong id="waitingCount">-</strong></span>
+      <span class="me-3"><i class="bi bi-check-circle text-success"></i> 完了: <strong id="doneCount">-</strong></span>
+      <span><i class="bi bi-star text-warning"></i> 新規: <strong id="newCount">-</strong></span>
+    </div>
+    <div>
+      <button class="btn btn-sm btn-outline-secondary" onclick="openSpreadsheet()">
+        <i class="bi bi-table"></i> スプレッドシートを開く
+      </button>
+    </div>
+  </div>
+
+  <!-- データテーブル -->
+  <div class="table-container p-3">
+    <div id="loadingMsg" class="text-center py-5 text-muted">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      データを読み込み中...
+    </div>
+    <div id="emptyMsg" class="text-center py-5 text-muted d-none">
+      <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+      <p class="mt-2">データがありません。「スキャン＆参照元検索」を実行してください。</p>
+    </div>
+    <div id="tableWrapper" class="d-none">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="check-all-header" onclick="toggleAll()" title="全選択/全解除">
+              <input type="checkbox" id="checkAll" class="form-check-input">
+            </th>
+            <th>スキャンファイル</th>
+            <th>内容要約</th>
+            <th>リネーム予定名</th>
+            <th>参照元</th>
+            <th>移動先フォルダ</th>
+            <th>ステータス</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="dataBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ローディングオーバーレイ -->
+<div id="spinnerOverlay" class="spinner-overlay d-none">
+  <div class="spinner-box">
+    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+    <p class="mb-0 fw-bold" id="spinnerText">処理中...</p>
+    <small class="text-muted" id="spinnerSub">しばらくお待ちください</small>
+  </div>
+</div>
+
+<!-- 要約モーダル -->
+<div class="modal fade" id="summaryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-file-text"></i> 内容要約</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="summaryModalBody" style="white-space: pre-wrap;"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ============================================================
+// データ管理
+// ============================================================
+var currentData = [];
+
+window.onload = function() {
+  loadData();
+};
+
+function loadData() {
+  document.getElementById('loadingMsg').classList.remove('d-none');
+  document.getElementById('tableWrapper').classList.add('d-none');
+  document.getElementById('emptyMsg').classList.add('d-none');
+
+  google.script.run
+    .withSuccessHandler(onDataLoaded)
+    .withFailureHandler(onError)
+    .getCompareData();
+}
+
+function onDataLoaded(data) {
+  currentData = data || [];
+  document.getElementById('loadingMsg').classList.add('d-none');
+
+  if (currentData.length === 0) {
+    document.getElementById('emptyMsg').classList.remove('d-none');
+    document.getElementById('tableWrapper').classList.add('d-none');
+  } else {
+    document.getElementById('emptyMsg').classList.add('d-none');
+    document.getElementById('tableWrapper').classList.remove('d-none');
+    renderTable();
+  }
+  updateCounts();
+}
+
+function updateCounts() {
+  var total = currentData.length;
+  var waiting = 0, done = 0, newCount = 0;
+  currentData.forEach(function(r) {
+    var s = r.status || '';
+    if (s.indexOf('完了') !== -1) done++;
+    else if (s.indexOf('新規') !== -1) { waiting++; newCount++; }
+    else if (s.indexOf('確認待ち') !== -1) waiting++;
+  });
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('waitingCount').textContent = waiting;
+  document.getElementById('doneCount').textContent = done;
+  document.getElementById('newCount').textContent = newCount;
+}
+
+// ============================================================
+// テーブル描画
+// ============================================================
+function renderTable() {
+  var tbody = document.getElementById('dataBody');
+  tbody.innerHTML = '';
+
+  currentData.forEach(function(row, idx) {
+    var tr = document.createElement('tr');
+    var isDone = (row.status || '').indexOf('完了') !== -1;
+    var isNew = (row.status || '').indexOf('新規') !== -1;
+    var isError = (row.status || '').indexOf('エラー') !== -1;
+
+    if (isNew) tr.style.background = '#FFFDE7';
+    if (isDone) tr.style.opacity = '0.6';
+
+    // チェックボックス
+    var tdCheck = document.createElement('td');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'form-check-input row-check';
+    cb.checked = row.checked || false;
+    cb.disabled = isDone;
+    cb.dataset.idx = idx;
+    cb.onchange = function() { onCheckChanged(idx, this.checked); };
+    tdCheck.appendChild(cb);
+    tr.appendChild(tdCheck);
+
+    // スキャンファイル名
+    var tdScan = document.createElement('td');
+    tdScan.innerHTML = '<small>' + esc(row.scanName) + '</small>' +
+      (row.scanFileId ? ' <a href="https://drive.google.com/file/d/' + row.scanFileId + '/view" target="_blank" class="text-primary"><i class="bi bi-box-arrow-up-right"></i></a>' : '');
+    tr.appendChild(tdScan);
+
+    // 内容要約
+    var tdSum = document.createElement('td');
+    tdSum.className = 'summary-cell';
+    tdSum.innerHTML = '<span onclick="showSummary(' + idx + ')" style="cursor:pointer;" title="クリックで詳細">' + esc(row.summary || '') + '</span>';
+    tr.appendChild(tdSum);
+
+    // リネーム予定名（編集可能）
+    var tdRename = document.createElement('td');
+    if (isDone) {
+      tdRename.innerHTML = '<small>' + esc(row.renameTo) + '</small>';
+    } else {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'rename-input';
+      input.value = row.renameTo || '';
+      input.dataset.idx = idx;
+      input.onblur = function() { onRenameChanged(idx, this.value); };
+      tdRename.appendChild(input);
+    }
+    tr.appendChild(tdRename);
+
+    // 参照元
+    var tdRef = document.createElement('td');
+    var refHtml = '<small>' + esc(row.refName || '') + '</small>';
+    if (row.refFileId) {
+      refHtml += ' <a href="https://drive.google.com/file/d/' + row.refFileId + '/view" target="_blank" class="text-primary"><i class="bi bi-box-arrow-up-right"></i></a>';
+    }
+    tdRef.innerHTML = refHtml;
+    tr.appendChild(tdRef);
+
+    // 移動先フォルダ
+    var tdFolder = document.createElement('td');
+    tdFolder.className = 'folder-cell';
+    tdFolder.innerHTML = esc(row.destFolder || '');
+    tr.appendChild(tdFolder);
+
+    // ステータス
+    var tdStatus = document.createElement('td');
+    var badgeClass = 'badge ';
+    if (isDone) badgeClass += 'badge-done';
+    else if (isNew) badgeClass += 'badge-new';
+    else if (isError) badgeClass += 'badge-error';
+    else badgeClass += 'badge-waiting';
+    tdStatus.innerHTML = '<span class="' + badgeClass + '">' + esc(row.status) + '</span>';
+    tr.appendChild(tdStatus);
+
+    // 操作
+    var tdOps = document.createElement('td');
+    if (!isDone && row.scanFileId && row.refFileId) {
+      tdOps.innerHTML = '<a href="https://drive.google.com/file/d/' + row.scanFileId + '/view" target="_blank" class="btn btn-outline-primary btn-sm me-1" title="スキャンPDF"><i class="bi bi-file-pdf"></i></a>' +
+        '<a href="https://drive.google.com/file/d/' + row.refFileId + '/view" target="_blank" class="btn btn-outline-secondary btn-sm" title="参照元PDF"><i class="bi bi-file-pdf-fill"></i></a>';
+    } else if (!isDone && row.scanFileId) {
+      tdOps.innerHTML = '<a href="https://drive.google.com/file/d/' + row.scanFileId + '/view" target="_blank" class="btn btn-outline-primary btn-sm" title="スキャンPDF"><i class="bi bi-file-pdf"></i></a>';
+    }
+    tr.appendChild(tdOps);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function esc(str) {
+  var d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+// ============================================================
+// ユーザー操作
+// ============================================================
+function onCheckChanged(idx, checked) {
+  currentData[idx].checked = checked;
+  var rowNum = currentData[idx].rowNum;
+  google.script.run.updateCheckStatus(rowNum, checked);
+}
+
+function onRenameChanged(idx, newName) {
+  if (newName === currentData[idx].renameTo) return;
+  currentData[idx].renameTo = newName;
+  var rowNum = currentData[idx].rowNum;
+  google.script.run.updateRenameTo(rowNum, newName);
+}
+
+function toggleAll() {
+  var checkAll = document.getElementById('checkAll');
+  var newState = checkAll.checked;
+  var checks = document.querySelectorAll('.row-check');
+  var updates = [];
+  checks.forEach(function(cb) {
+    if (!cb.disabled) {
+      cb.checked = newState;
+      var idx = parseInt(cb.dataset.idx);
+      currentData[idx].checked = newState;
+      updates.push({ rowNum: currentData[idx].rowNum, checked: newState });
+    }
+  });
+  google.script.run.updateCheckStatusBatch(updates);
+}
+
+function showSummary(idx) {
+  document.getElementById('summaryModalBody').textContent = currentData[idx].summary || '（要約なし）';
+  new bootstrap.Modal(document.getElementById('summaryModal')).show();
+}
+
+// ============================================================
+// アクション実行
+// ============================================================
+function runScan() {
+  if (!confirm('入力フォルダのPDFをスキャンし、参照元を検索します。\nこの処理には数分かかる場合があります。')) return;
+  showSpinner('スキャン＆参照元検索中...', 'PDFを解析し、類似ファイルを検索しています');
+  google.script.run
+    .withSuccessHandler(function(result) { hideSpinner(); loadData(); alert('スキャン完了: ' + (result || '0') + '件処理しました'); })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .scanAndPrepareWeb();
+}
+
+function runExecute() {
+  var checkedCount = currentData.filter(function(r) { return r.checked && (r.status || '').indexOf('完了') === -1; }).length;
+  if (checkedCount === 0) { alert('チェックされたファイルがありません。'); return; }
+  if (!confirm(checkedCount + '件のファイルをリネーム＆移動します。よろしいですか？')) return;
+  showSpinner('リネーム＆移動実行中...', checkedCount + '件を処理しています');
+  google.script.run
+    .withSuccessHandler(function(result) { hideSpinner(); loadData(); alert(result); })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .executeApprovedWeb();
+}
+
+function runLegacy() {
+  if (!confirm('従来の即時リネーム処理を実行します。\n確認なしで一括リネーム＆移動されます。よろしいですか？')) return;
+  showSpinner('従来リネーム実行中...', 'PDFを読み取ってリネーム＆移動しています');
+  google.script.run
+    .withSuccessHandler(function() { hideSpinner(); alert('完了しました'); })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .autoRenamePDFs();
+}
+
+function openSpreadsheet() {
+  google.script.run
+    .withSuccessHandler(function(url) { window.open(url, '_blank'); })
+    .getSpreadsheetUrl();
+}
+
+// ============================================================
+// UI ヘルパー
+// ============================================================
+function showSpinner(text, sub) {
+  document.getElementById('spinnerText').textContent = text;
+  document.getElementById('spinnerSub').textContent = sub || '';
+  document.getElementById('spinnerOverlay').classList.remove('d-none');
+}
+
+function hideSpinner() {
+  document.getElementById('spinnerOverlay').classList.add('d-none');
+}
+
+function onError(e) {
+  alert('エラーが発生しました: ' + (e.message || e));
+  console.error(e);
+}
+</script>
+</body>
+</html>

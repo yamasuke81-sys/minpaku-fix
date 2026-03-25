@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0325g</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0325s</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5318,9 +5318,11 @@
               if (dotColor) {
                 var dot = document.createElement('span');
                 dot.className = 'fc-event-status-dot';
-                dot.style.cssText = 'display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;';
+                dot.style.cssText = 'display:inline-block;width:18px;height:18px;border-radius:50%;background:' + dotColor + ';border:1px solid #fff;box-shadow:0 0 0 1px rgba(255,255,255,0.8);margin-right:4px;flex-shrink:0;vertical-align:middle;';
                 var titleEl = arg.el.querySelector('.fc-event-title') || arg.el.querySelector('.fc-event-main');
                 if (titleEl) {
+                  titleEl.style.display = 'flex';
+                  titleEl.style.alignItems = 'center';
                   if (titleEl.firstChild) titleEl.insertBefore(dot, titleEl.firstChild);
                   else titleEl.appendChild(dot);
                 }

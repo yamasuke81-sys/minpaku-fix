@@ -10,10 +10,34 @@
 // ============================================================
 // 設定エリア
 // ============================================================
-const API_KEY = 'AIzaSyBFUXa18JSJEOkG6ePpSwjgbKO5Fag9s9M';
+// APIキーはスクリプトプロパティから取得（コードに直書きしない）
+// 初回セットアップ: GASエディタで setupApiKey() を実行
+function getApiKey_() {
+  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) throw new Error('APIキーが未設定です。GASエディタで setupApiKey() を実行してください。');
+  return key;
+}
+
 const SS_URL = 'https://docs.google.com/spreadsheets/d/17oV_2vPj33aZf7fl8A-NDgS0l4aYvsRrSJBw2JliAy0/edit?usp=drive_link';
 const INPUT_FOLDER_URL = 'https://drive.google.com/drive/folders/1qHOwdBCPydL4wnZhPOfhIJAsjnyZOtRX?usp=drive_link';
 const OUTPUT_FOLDER_URL = 'https://drive.google.com/drive/folders/1N0SMy_uAV2sIX1roMbJqoy2kQz79Vco3?usp=drive_link';
+
+/**
+ * 初回セットアップ: GASエディタでこの関数を1回だけ実行してAPIキーを保存
+ */
+function setupApiKey() {
+  PropertiesService.getScriptProperties().setProperty('GEMINI_API_KEY', 'YOUR_API_KEY_HERE');
+  console.log('APIキーを保存しました。');
+}
+
+/**
+ * WebアプリからAPIキーを設定
+ */
+function setApiKey(key) {
+  if (!key || key.length < 10) return 'APIキーが無効です';
+  PropertiesService.getScriptProperties().setProperty('GEMINI_API_KEY', key);
+  return '✅ APIキーを保存しました';
+}
 
 // 比較シート名
 const COMPARE_SHEET_NAME = '参照元比較';
@@ -161,7 +185,13 @@ function runDiagnostics() {
   var results = [];
 
   // 1. APIキー確認
-  results.push('【APIキー】 ' + API_KEY.substring(0, 10) + '...');
+  try {
+    var apiKey = getApiKey_();
+    results.push('【APIキー】 ✅ ' + apiKey.substring(0, 10) + '...');
+  } catch (e) {
+    results.push('【APIキー】 ❌ ' + e.message);
+    return results.join('\n');
+  }
 
   // 2. モデル取得テスト
   try {
@@ -174,7 +204,7 @@ function runDiagnostics() {
   // 3. Gemini APIテスト（テキストのみ）
   try {
     var model = getLatestAvailableModel();
-    var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + API_KEY;
+    var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + getApiKey_();
     var payload = { contents: [{ parts: [{ text: 'こんにちは。「テスト成功」とだけ返してください。' }] }] };
     var resp = UrlFetchApp.fetch(url, {
       method: 'post', contentType: 'application/json',
@@ -219,7 +249,7 @@ function runDiagnostics() {
       results.push('【PDFテスト】 ファイル: ' + testFile.getName() + ' (' + Math.round(bytes.length / 1024) + 'KB)');
 
       var model = getLatestAvailableModel();
-      var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + API_KEY;
+      var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + getApiKey_();
       var payload = {
         contents: [{ parts: [
           { text: 'このPDFの内容を一言で教えてください。' },
@@ -445,7 +475,7 @@ function executeApproved() {
 // PDF内容解析（Gemini）
 // ============================================================
 function analyzePdfContent_(pdfBlob, modelName) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var payload = {
     contents: [{
@@ -515,7 +545,7 @@ function findSimilarFile_(summary, modelName) {
  * 要約から検索用キーワードを抽出（Gemini）
  */
 function extractSearchKeywords_(summary, modelName) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var payload = {
     contents: [{
@@ -623,7 +653,7 @@ function searchDriveForPdf_(keywords, excludeFolderId) {
  * 候補から最適な参照元を選定（Gemini）
  */
 function selectBestMatch_(summary, candidates, modelName) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var candidateList = candidates.map(function(c, i) {
     return (i + 1) + '. ' + c.fileName;
@@ -776,7 +806,7 @@ function suggestDestinationFolder_(summary, renameTo, modelName) {
  * フォルダ検索用キーワードを生成
  */
 function extractFolderKeywords_(summary, renameTo, modelName) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var payload = {
     contents: [{
@@ -894,7 +924,7 @@ function getFolderPath_(folderId) {
  * 候補から最適なフォルダを選定（Gemini）
  */
 function selectBestFolder_(summary, renameTo, candidates, modelName) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var candidateList = candidates.map(function(c, i) {
     return (i + 1) + '. ' + c.folderPath;
@@ -986,7 +1016,7 @@ function extractIdFromUrl(url) {
 }
 
 function getLatestAvailableModel() {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + getApiKey_();
   try {
     var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     if (response.getResponseCode() === 200) {
@@ -1006,7 +1036,7 @@ function getLatestAvailableModel() {
 }
 
 function askGemini(pdfBlob, rules, modelName) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + API_KEY;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var payload = {
     contents: [{

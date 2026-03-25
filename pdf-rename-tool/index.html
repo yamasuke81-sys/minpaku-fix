@@ -45,8 +45,11 @@
         <small class="opacity-75">スキャン → 比較確認 → リネーム＆移動</small>
       </div>
       <div>
+        <button class="btn btn-outline-light btn-sm me-2" onclick="document.getElementById('apiKeyArea').classList.toggle('d-none')">
+          <i class="bi bi-key"></i> APIキー
+        </button>
         <button class="btn btn-outline-light btn-sm me-2" onclick="runDiagnostics()">
-          <i class="bi bi-wrench"></i> API診断
+          <i class="bi bi-wrench"></i> 診断
         </button>
         <button class="btn btn-outline-light btn-sm" onclick="loadData()">
           <i class="bi bi-arrow-clockwise"></i> 更新
@@ -86,6 +89,23 @@
           <h6 class="mt-2 mb-1">従来のリネーム（即時）</h6>
           <small class="text-muted">確認なしで一括リネーム＆移動</small>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APIキー設定 -->
+  <div id="apiKeyArea" class="d-none mb-4">
+    <div class="card border-warning">
+      <div class="card-header bg-warning text-dark">
+        <i class="bi bi-key"></i> Gemini APIキー設定
+      </div>
+      <div class="card-body">
+        <div class="input-group">
+          <input type="password" class="form-control" id="apiKeyInput" placeholder="APIキーを入力...">
+          <button class="btn btn-primary" onclick="saveApiKey()">保存</button>
+          <button class="btn btn-outline-secondary" onclick="document.getElementById('apiKeyArea').classList.add('d-none')">閉じる</button>
+        </div>
+        <small class="text-muted mt-1 d-block">Google AI Studio で取得したAPIキーを入力してください</small>
       </div>
     </div>
   </div>
@@ -360,6 +380,22 @@ function toggleAll() {
 function showSummary(idx) {
   document.getElementById('summaryModalBody').textContent = currentData[idx].summary || '（要約なし）';
   new bootstrap.Modal(document.getElementById('summaryModal')).show();
+}
+
+// ============================================================
+// APIキー設定
+// ============================================================
+function saveApiKey() {
+  var key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) { alert('APIキーを入力してください'); return; }
+  google.script.run
+    .withSuccessHandler(function(result) {
+      alert(result);
+      document.getElementById('apiKeyArea').classList.add('d-none');
+      document.getElementById('apiKeyInput').value = '';
+    })
+    .withFailureHandler(onError)
+    .setApiKey(key);
 }
 
 // ============================================================

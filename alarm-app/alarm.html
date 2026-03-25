@@ -114,6 +114,7 @@
 
 <!-- ===== アラーム画面 ===== -->
 <div id="alarmScreen" style="position:relative; overflow:hidden;">
+  <button onclick="silentDismissAlarm()" style="position:absolute;top:1.5vh;right:1.5vw;background:none;border:none;font-size:5vw;color:rgba(90,78,70,0.3);padding:1vh 1.5vw;line-height:1;z-index:10;" title="閉じる">&times;</button>
   <div class="alarm-icon" id="alarmIcon">&#x1F305;</div>
   <div class="alarm-title" id="alarmTitle"></div>
   <div class="alarm-body" id="alarmBody"></div>
@@ -536,7 +537,7 @@ You may be asked to leave immediately.</textarea>
   <i class="bi bi-gear-fill"></i>
 </button>
 
-<div id="version">v0325q</div>
+<div id="version">v0325r</div>
 
 <script>
 // ===== GAS通信 =====
@@ -937,6 +938,22 @@ function dismissAlarm() {
     document.getElementById('clockScreen').style.display = 'flex';
     document.getElementById('settingsBtn').style.display = '';
   }
+}
+
+// 閉じるボタン: 通知を飛ばさずにアラームを消す（チェックアウト完了扱い）
+function silentDismissAlarm() {
+  if (!_state.currentAlarm) return;
+  stopAlarmSound();
+  // サーバーに確認記録（再表示防止）
+  _state.dismissed[_state.currentAlarm.id] = true;
+  callGAS('recordAlarmDismiss', [_state.currentAlarm.id]).catch(function() {});
+  _state.alarmActive = false;
+  _state.currentAlarm = null;
+  document.getElementById('alarmScreen').style.display = 'none';
+  document.getElementById('alarmScreen').className = '';
+  _state.screen = 'clock';
+  document.getElementById('clockScreen').style.display = 'flex';
+  document.getElementById('settingsBtn').style.display = '';
 }
 
 // ===== アラーム音（Web Audio API） =====

@@ -154,6 +154,98 @@ function getSpreadsheetUrl() {
   return SS_URL;
 }
 
+/**
+ * Gemini API接続診断（Webアプリから呼べる）
+ */
+function runDiagnostics() {
+  var results = [];
+
+  // 1. APIキー確認
+  results.push('【APIキー】 ' + API_KEY.substring(0, 10) + '...');
+
+  // 2. モデル取得テスト
+  try {
+    var model = getLatestAvailableModel();
+    results.push('【モデル】 ✅ ' + model);
+  } catch (e) {
+    results.push('【モデル】 ❌ ' + e.message);
+  }
+
+  // 3. Gemini APIテスト（テキストのみ）
+  try {
+    var model = getLatestAvailableModel();
+    var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + API_KEY;
+    var payload = { contents: [{ parts: [{ text: 'こんにちは。「テスト成功」とだけ返してください。' }] }] };
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'post', contentType: 'application/json',
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+    results.push('【テキストAPI】 HTTP ' + resp.getResponseCode());
+    if (resp.getResponseCode() !== 200) {
+      results.push('  → レスポンス: ' + resp.getContentText().substring(0, 300));
+    } else {
+      var r = JSON.parse(resp.getContentText());
+      results.push('  → 応答: ' + (r.candidates ? r.candidates[0].content.parts[0].text : '(candidates なし)'));
+    }
+  } catch (e) {
+    results.push('【テキストAPI】 ❌ ' + e.message);
+  }
+
+  // 4. 入力フォルダ確認
+  try {
+    var folder = DriveApp.getFolderById(extractIdFromUrl(INPUT_FOLDER_URL));
+    var files = folder.getFilesByType(MimeType.PDF);
+    var count = 0;
+    var sampleSize = 0;
+    while (files.hasNext()) {
+      var f = files.next();
+      if (count === 0) sampleSize = f.getSize();
+      count++;
+    }
+    results.push('【入力フォルダ】 ✅ PDF ' + count + '件');
+    if (sampleSize > 0) results.push('  → 1件目のサイズ: ' + Math.round(sampleSize / 1024) + 'KB');
+  } catch (e) {
+    results.push('【入力フォルダ】 ❌ ' + e.message);
+  }
+
+  // 5. PDF付きAPIテスト（1件目のPDFで試行）
+  try {
+    var folder = DriveApp.getFolderById(extractIdFromUrl(INPUT_FOLDER_URL));
+    var files = folder.getFilesByType(MimeType.PDF);
+    if (files.hasNext()) {
+      var testFile = files.next();
+      var blob = testFile.getBlob();
+      var bytes = blob.getBytes();
+      results.push('【PDFテスト】 ファイル: ' + testFile.getName() + ' (' + Math.round(bytes.length / 1024) + 'KB)');
+
+      var model = getLatestAvailableModel();
+      var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + API_KEY;
+      var payload = {
+        contents: [{ parts: [
+          { text: 'このPDFの内容を一言で教えてください。' },
+          { inline_data: { mime_type: 'application/pdf', data: Utilities.base64Encode(bytes) } }
+        ] }],
+        generationConfig: { temperature: 0.1 }
+      };
+      var resp = UrlFetchApp.fetch(url, {
+        method: 'post', contentType: 'application/json',
+        payload: JSON.stringify(payload), muteHttpExceptions: true
+      });
+      results.push('  → HTTP ' + resp.getResponseCode());
+      if (resp.getResponseCode() !== 200) {
+        results.push('  → エラー: ' + resp.getContentText().substring(0, 500));
+      } else {
+        var r = JSON.parse(resp.getContentText());
+        results.push('  → ✅ 応答: ' + (r.candidates ? r.candidates[0].content.parts[0].text.substring(0, 100) : '(candidates なし)'));
+      }
+    }
+  } catch (e) {
+    results.push('【PDFテスト】 ❌ ' + e.message);
+  }
+
+  return results.join('\n');
+}
+
 // ============================================================
 // 1. スキャン＆参照元検索
 // ============================================================

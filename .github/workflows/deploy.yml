@@ -1,0 +1,50 @@
+name: Auto Deploy to GAS
+
+on:
+  push:
+    branches:
+      - 'claude/*'
+      - 'main'
+    paths:
+      - 'Code.gs'
+      - 'index.html'
+      - 'appsscript.json'
+      - 'checklist-app/**'
+      - 'checkin-app/**'
+      - 'alarm-app/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup clasp credentials
+        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+
+      - name: Setup deploy config
+        run: echo '${{ secrets.DEPLOY_CONFIG_JSON }}' > deploy-config.json
+
+      - name: Deploy all apps
+        run: node deploy-all.js
+        env:
+          CI: 'true'
+
+      - name: Post deploy summary
+        if: always()
+        run: |
+          echo "## Deploy Result" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

@@ -17,6 +17,9 @@ const checklistDir = path.join(rootDir, 'checklist-app');
 const checkinDir = path.join(rootDir, 'checkin-app');
 const alarmDir = path.join(rootDir, 'alarm-app');
 
+// CI環境判定（GitHub Actions等）— ブラウザ起動をスキップ
+const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+
 // clasp コマンドのパスを解決
 const binDir = path.join(rootDir, 'node_modules', '.bin');
 const claspCmd = process.platform === 'win32'
@@ -168,6 +171,7 @@ function checkVersionCount(label, cwd) {
 
 /** ブラウザを通常ウィンドウで開く */
 function openBrowser(url) {
+  if (isCI) { console.log('  [CI] ブラウザ起動スキップ: ' + url); return; }
   try {
     if (process.platform === 'win32') {
       execSync('start "" "' + url + '"', { shell: true });
@@ -183,6 +187,7 @@ function openBrowser(url) {
 
 /** ブラウザをシークレットウィンドウで開く（Windows: Brave→Edge→Chrome→通常 の順で試行） */
 function openBrowserIncognito(url) {
+  if (isCI) { console.log('  [CI] ブラウザ起動スキップ: ' + url); return; }
   if (process.platform !== 'win32') { openBrowser(url); return; }
   // startコマンドは非同期で起動するため、存在しないコマンドでもエラーをスローしない
   // そのため、ブラウザの実行ファイルが実際に存在するかチェックしてから起動する

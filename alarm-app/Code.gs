@@ -64,7 +64,8 @@ function getAlarmSettings() {
     complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm',
     checkinAppUrl: props.getProperty('CHECKIN_APP_URL') || '',
     checkinEnabled: props.getProperty('CHECKIN_ENABLED') === 'true',
-    checkinReturnTime: props.getProperty('CHECKIN_RETURN_TIME') || '14:01'
+    checkinReturnTime: props.getProperty('CHECKIN_RETURN_TIME') || '14:01',
+    testModeNoBooking: props.getProperty('TEST_MODE_NO_BOOKING') === 'true'
   });
 }
 
@@ -89,6 +90,7 @@ function saveAlarmSettings(settings) {
   if (settings.checkinAppUrl !== undefined) props.setProperty('CHECKIN_APP_URL', settings.checkinAppUrl);
   if (settings.checkinEnabled !== undefined) props.setProperty('CHECKIN_ENABLED', settings.checkinEnabled ? 'true' : 'false');
   if (settings.checkinReturnTime !== undefined) props.setProperty('CHECKIN_RETURN_TIME', settings.checkinReturnTime);
+  if (settings.testModeNoBooking !== undefined) props.setProperty('TEST_MODE_NO_BOOKING', settings.testModeNoBooking ? 'true' : 'false');
   return JSON.stringify({ success: true });
 }
 
@@ -364,7 +366,8 @@ function getTodayCheckouts() {
       complaintVolume: Number(props.getProperty('COMPLAINT_VOLUME') || '100'),
       complaintSound: props.getProperty('COMPLAINT_SOUND') || 'alarm',
       checkinEnabled: props.getProperty('CHECKIN_ENABLED') === 'true',
-      checkinColumnExists: colMap.checkinConfirmed >= 0
+      checkinColumnExists: colMap.checkinConfirmed >= 0,
+      testModeNoBooking: props.getProperty('TEST_MODE_NO_BOOKING') === 'true'
     });
 
   } catch (e) {

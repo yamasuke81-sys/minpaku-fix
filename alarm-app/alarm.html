@@ -502,6 +502,14 @@ You may be asked to leave immediately.</textarea>
         </div>
       </div>
       <div class="card p-3 mb-3">
+        <h6><i class="bi bi-bug"></i> テストモード</h6>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="settTestModeNoBooking">
+          <label class="form-check-label" for="settTestModeNoBooking">予約がなくてもアラームを有効にする</label>
+        </div>
+        <div class="form-text">ONにすると、予約がない日でもCOリマインド・静音時間・CO連絡が動作します（テスト用）</div>
+      </div>
+      <div class="card p-3 mb-3">
         <h6><i class="bi bi-lock"></i> PIN（管理画面のロック）</h6>
         <input type="text" id="settPin" class="form-control form-control-sm" style="width:120px;" value="1234">
       </div>
@@ -724,20 +732,23 @@ function checkAlarmTrigger(nowHHMM) {
   var data = _state.lastPollData;
   if (!data) return;
 
+  // テストモード: 予約がなくてもアラームを発火
+  var testMode = !!data.testModeNoBooking;
+
   // チェックインapp連携フィルタ（連携OFF時はフィルタなし）
   var coBookings = filterByCheckin_(data.checkouts || [], data);
   var stayBookings = filterByCheckin_(data.currentStays || [], data);
 
   // 1) チェックアウトメッセージテンプレート（静音時間と同じ構造）
   // 複数時刻がある場合、現在時刻以前の最新のもののみ表示し、それより前は自動確認済みにする
-  if (data.checkoutMessages && coBookings.length > 0) {
+  if (data.checkoutMessages && (coBookings.length > 0 || testMode)) {
     var hasCoChecked = hasAnyCheckedBooking(data.bookingCoFlags || {}, coBookings);
 
     // 全テンプレートの有効な時刻を集約
     var allCoAlarms = [];
     for (var ci = 0; ci < data.checkoutMessages.length; ci++) {
       var coMsg = data.checkoutMessages[ci];
-      if (!coMsg.enabled || !coMsg.times || !coMsg.times.length || !hasCoChecked) continue;
+      if (!coMsg.enabled || !coMsg.times || !coMsg.times.length || (!hasCoChecked && !testMode)) continue;
       for (var cti = 0; cti < coMsg.times.length; cti++) {
         allCoAlarms.push({
           time: coMsg.times[cti],
@@ -784,7 +795,7 @@ function checkAlarmTrigger(nowHHMM) {
   }
 
   // 旧形式フォールバック（CHECKOUT_MESSAGESが未設定の場合）
-  if ((!data.checkoutMessages || data.checkoutMessages.length === 0) && coBookings.length > 0 && data.alarmTimes) {
+  if ((!data.checkoutMessages || data.checkoutMessages.length === 0) && (coBookings.length > 0 || testMode) && data.alarmTimes) {
     for (var ti = 0; ti < data.alarmTimes.length; ti++) {
       var t = data.alarmTimes[ti];
       var coAlarmId = 'checkout_' + t;
@@ -811,7 +822,7 @@ function checkAlarmTrigger(nowHHMM) {
       var msg = data.scheduledMessages[mi];
       if (!msg.enabled) continue;
       if (!msg.times || !msg.times.length) continue;
-      if (!hasCheckedBookings) continue;
+      if (!hasCheckedBookings && !testMode) continue;
 
       for (var ti = 0; ti < msg.times.length; ti++) {
         var t = msg.times[ti];
@@ -1190,6 +1201,7 @@ function loadAdminData() {
     document.getElementById('settCheckinAppUrl').value = s.checkinAppUrl || '';
     document.getElementById('settCheckinEnabled').checked = !!s.checkinEnabled;
     document.getElementById('settCheckinReturnTime').value = s.checkinReturnTime || '14:01';
+    document.getElementById('settTestModeNoBooking').checked = !!s.testModeNoBooking;
     _state.checkinAppUrl = s.checkinAppUrl || '';
     _state.checkinEnabled = !!s.checkinEnabled;
     _state.checkinReturnTime = s.checkinReturnTime || '14:01';
@@ -1701,7 +1713,8 @@ function saveSettings() {
     complaintSound: document.getElementById('settComplaintSound').value,
     checkinAppUrl: document.getElementById('settCheckinAppUrl').value.trim(),
     checkinEnabled: document.getElementById('settCheckinEnabled').checked,
-    checkinReturnTime: document.getElementById('settCheckinReturnTime').value || '14:01'
+    checkinReturnTime: document.getElementById('settCheckinReturnTime').value || '14:01',
+    testModeNoBooking: document.getElementById('settTestModeNoBooking').checked
   };
   // 基本設定タブのLINE連携・メールも一緒に保存
   var cs = {
@@ -2148,9 +2161,10 @@ function checkCoNotifyScreen(nowHHMM) {
   var endTime = sett.endTime || '14:00';
   var coForNotify = filterByCheckin_(data.checkouts || [], data);
   var hasCoToday = coForNotify.length > 0;
+  var testMode = !!data.testModeNoBooking;
 
-  // 表示条件: CO当日 & 開始時間〜終了時間の間
-  var shouldShow = hasCoToday && nowHHMM >= startTime && nowHHMM < endTime;
+  // 表示条件: CO当日 & 開始時間〜終了時間の間（テストモード時は予約なしでも表示）
+  var shouldShow = (hasCoToday || testMode) && nowHHMM >= startTime && nowHHMM < endTime;
 
   if (shouldShow && !_state.coNotifyActive && _state.screen === 'clock') {
     showCoNotifyScreen();

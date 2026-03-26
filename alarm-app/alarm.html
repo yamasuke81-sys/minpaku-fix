@@ -2242,13 +2242,14 @@ function sendCoNotify() {
   document.getElementById('coNotifyConfirm').style.display = 'none';
 
   var data = _state.lastPollData;
-  if (!data || !data.checkouts || data.checkouts.length === 0) return;
+  var testMode = data && !!data.testModeNoBooking;
+  if (!data || (!testMode && (!data.checkouts || data.checkouts.length === 0))) return;
 
   // ボタン押下直後にフラグ設定（再表示防止）
   _state.coNotifyDismissed = true;
 
-  // 最初のCO予約の情報を送信
-  var co = data.checkouts[0];
+  // 最初のCO予約の情報を送信（テストモード時はダミーデータ）
+  var co = (data.checkouts && data.checkouts.length > 0) ? data.checkouts[0] : { guestName: 'テスト', checkOut: new Date().toISOString().slice(0, 10) };
   document.getElementById('btnCoNotify').style.display = 'none';
   document.getElementById('coNotifySending').style.display = '';
 

@@ -2261,19 +2261,17 @@ function sendCoNotify() {
   }]).then(function(r) {
     document.getElementById('coNotifySending').style.display = 'none';
     document.getElementById('coNotifyDone').style.display = '';
-    // 3秒後に時計画面に戻る
-    setTimeout(function() {
-      hideCoNotifyScreen();
-    }, 3000);
+    setTimeout(function() { hideCoNotifyScreen(); }, 3000);
   }).catch(function(e) {
     document.getElementById('coNotifySending').style.display = 'none';
     document.getElementById('coNotifyDone').style.display = '';
-    // エラーでも完了画面を表示して時計に戻る
-    setTimeout(function() {
-      hideCoNotifyScreen();
-    }, 3000);
+    setTimeout(function() { hideCoNotifyScreen(); }, 3000);
     console.error('CO notify error:', e);
   });
+  // フォールバック: 15秒後に確実に時計画面に戻る（Promise未解決時の保険）
+  setTimeout(function() {
+    if (_state.coNotifyActive) hideCoNotifyScreen();
+  }, 15000);
 }
 
 // アラーム発火時にCO連絡画面を一時中断

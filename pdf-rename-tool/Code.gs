@@ -41,6 +41,7 @@ function setApiKey(key) {
 
 // 比較シート名
 const COMPARE_SHEET_NAME = '参照元比較';
+const FEEDBACK_SHEET_NAME = 'フィードバック履歴';
 
 // 比較シートのカラム定義（1始まり）
 const COL = {
@@ -57,9 +58,10 @@ const COL = {
   STATUS:        11,  // K: ステータス
   SCAN_FILE_ID:  12,  // L: スキャンファイルID
   REF_FILE_ID:   13,  // M: 参照元ファイルID
-  TIMESTAMP:     14,  // N: 処理日時
+  FEEDBACK:      15,  // O: 補足メモ（ユーザーフィードバック）
+  TIMESTAMP:     16,  // P: 処理日時
 };
-const TOTAL_COLS = 14;
+const TOTAL_COLS = 16;
 
 // ============================================================
 // メニュー
@@ -115,6 +117,7 @@ function getCompareData() {
       status: row[COL.STATUS - 1] || '',
       scanFileId: row[COL.SCAN_FILE_ID - 1] || '',
       refFileId: row[COL.REF_FILE_ID - 1] || '',
+      feedback: row[COL.FEEDBACK - 1] || '',
       timestamp: row[COL.TIMESTAMP - 1] ? Utilities.formatDate(new Date(row[COL.TIMESTAMP - 1]), 'Asia/Tokyo', 'MM/dd HH:mm') : ''
     });
   }
@@ -151,6 +154,90 @@ function updateRenameTo(rowNum, newName) {
   var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
   if (!sheet) return;
   sheet.getRange(rowNum, COL.RENAME_TO).setValue(newName);
+}
+
+/**
+ * 補足メモを保存（参照元が違う場合のフィードバック）
+ */
+function saveFeedback(rowNum, feedbackText) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return 'シートなし';
+
+  // 比較シートの補足メモ列に保存
+  sheet.getRange(rowNum, COL.FEEDBACK).setValue(feedbackText);
+
+  // フィードバック履歴シートにも蓄積（学習用）
+  var row = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
+  var scanName = row[COL.SCAN_NAME - 1];
+  var summary = row[COL.SUMMARY - 1];
+  var renameTo = row[COL.RENAME_TO - 1];
+  var refName = row[COL.REF_NAME - 1];
+  var refFileId = row[COL.REF_FILE_ID - 1];
+
+  saveFeedbackHistory_(ss, {
+    scanName: scanName,
+    summary: summary,
+    renameTo: renameTo,
+    wrongRefName: refName,
+    wrongRefFileId: refFileId,
+    feedback: feedbackText,
+    timestamp: new Date()
+  });
+
+  return '✅ 補足メモを保存しました';
+}
+
+/**
+ * フィードバック履歴シートに蓄積
+ */
+function saveFeedbackHistory_(ss, data) {
+  var sheet = ss.getSheetByName(FEEDBACK_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(FEEDBACK_SHEET_NAME);
+    var headers = [
+      'スキャンファイル名', '内容要約', 'リネーム予定名',
+      '誤った参照元ファイル名', '誤った参照元ID',
+      '補足メモ（正しい情報）', '登録日時'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setBackground('#e65100');
+    headerRange.setFontColor('#ffffff');
+    headerRange.setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 200);
+    sheet.setColumnWidth(2, 300);
+    sheet.setColumnWidth(3, 200);
+    sheet.setColumnWidth(4, 200);
+    sheet.setColumnWidth(5, 100);
+    sheet.setColumnWidth(6, 400);
+    sheet.setColumnWidth(7, 150);
+  }
+
+  var newRow = sheet.getLastRow() + 1;
+  sheet.getRange(newRow, 1, 1, 7).setValues([[
+    data.scanName, data.summary, data.renameTo,
+    data.wrongRefName, data.wrongRefFileId,
+    data.feedback, data.timestamp
+  ]]);
+}
+
+/**
+ * フィードバック履歴を取得（類似検索で活用するため）
+ */
+function getFeedbackHistory_() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(FEEDBACK_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return '';
+
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+  var feedbackLines = data.map(function(row) {
+    return '・「' + row[0] + '」(内容: ' + String(row[1]).substring(0, 50) + ') → 誤参照:「' + row[3] + '」→ 補足:「' + row[5] + '」';
+  });
+
+  // 最新20件のみ返す（プロンプトが長くなりすぎないように）
+  return feedbackLines.slice(-20).join('\n');
 }
 
 /**
@@ -660,6 +747,9 @@ function callGeminiWithRetry_(url, payload, context) {
 function findSimilarFile_(summary, modelName) {
   var emptyResult = { fileId: '', fileName: '', folderId: '' };
 
+  // 過去のフィードバック履歴を取得（学習データ）
+  var feedbackHistory = getFeedbackHistory_();
+
   // Geminiに検索キーワードを生成させる
   var keywords = extractSearchKeywords_(summary, modelName);
   if (!keywords) return emptyResult;
@@ -670,12 +760,12 @@ function findSimilarFile_(summary, modelName) {
 
   if (candidates.length === 0) return emptyResult;
 
-  // 最も類似度が高いファイルを選定（Geminiに判定させる）
   if (candidates.length === 1) {
     return candidates[0];
   }
 
-  return selectBestMatch_(summary, candidates, modelName);
+  // フィードバック履歴を含めて最適候補を選定
+  return selectBestMatch_(summary, candidates, modelName, feedbackHistory);
 }
 
 /**
@@ -772,22 +862,27 @@ function searchDriveForPdf_(keywords, excludeFolderId) {
 /**
  * 候補から最適な参照元を選定（Gemini）
  */
-function selectBestMatch_(summary, candidates, modelName) {
+function selectBestMatch_(summary, candidates, modelName, feedbackHistory) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var candidateList = candidates.map(function(c, i) {
     return (i + 1) + '. ' + c.fileName;
   }).join('\n');
 
+  var promptText = '以下のPDFの内容要約に最も類似したファイルを、候補リストから1つ選んでください。\n' +
+    '同じ会社・同じ書類種別・同じ物件のファイルを優先してください（対象月が違うのは問題ありません）。\n' +
+    '番号のみ（例: 1）を出力してください。適切な候補がない場合は 0 と出力してください。\n\n' +
+    '【PDF内容要約】\n' + summary + '\n\n' +
+    '【候補リスト】\n' + candidateList;
+
+  // フィードバック履歴がある場合、過去の誤りを伝えて精度を上げる
+  if (feedbackHistory) {
+    promptText += '\n\n【過去の誤り（参考にして同じ間違いを避けてください）】\n' + feedbackHistory;
+  }
+
   var payload = {
     contents: [{
-      parts: [{
-        text: '以下のPDFの内容要約に最も類似したファイルを、候補リストから1つ選んでください。\n' +
-              '同じ会社・同じ書類種別・同じ物件のファイルを優先してください（対象月が違うのは問題ありません）。\n' +
-              '番号のみ（例: 1）を出力してください。適切な候補がない場合は 0 と出力してください。\n\n' +
-              '【PDF内容要約】\n' + summary + '\n\n' +
-              '【候補リスト】\n' + candidateList
-      }]
+      parts: [{ text: promptText }]
     }],
     generationConfig: { temperature: 0.1 }
   };
@@ -815,7 +910,8 @@ function getOrCreateCompareSheet_(ss) {
     'チェック', 'スキャンファイル名', '内容要約', 'リネーム予定名',
     'スキャンファイル', '参照元ファイル名', '参照元ファイル',
     '参照元フォルダID', '移動先フォルダ候補', '移動先フォルダID',
-    'ステータス', 'スキャンファイルID', '参照元ファイルID', '処理日時'
+    'ステータス', 'スキャンファイルID', '参照元ファイルID',
+    '補足メモ', '処理日時'
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -835,11 +931,12 @@ function getOrCreateCompareSheet_(ss) {
   sheet.setColumnWidth(COL.REF_NAME, 250);
   sheet.setColumnWidth(COL.REF_LINK, 60);
   sheet.setColumnWidth(COL.REF_FOLDER_ID, 100);
-  sheet.setColumnWidth(COL.DEST_FOLDER, 300);     // 移動先フォルダ候補
-  sheet.setColumnWidth(COL.DEST_FOLDER_ID, 100);  // 移動先フォルダID
+  sheet.setColumnWidth(COL.DEST_FOLDER, 300);
+  sheet.setColumnWidth(COL.DEST_FOLDER_ID, 100);
   sheet.setColumnWidth(COL.STATUS, 180);
   sheet.setColumnWidth(COL.SCAN_FILE_ID, 100);
   sheet.setColumnWidth(COL.REF_FILE_ID, 100);
+  sheet.setColumnWidth(COL.FEEDBACK, 300);         // 補足メモ
   sheet.setColumnWidth(COL.TIMESTAMP, 150);
 
   // 内部ID列を非表示（ユーザーには不要）

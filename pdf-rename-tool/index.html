@@ -162,6 +162,7 @@
             <th>参照元</th>
             <th>移動先フォルダ</th>
             <th>ステータス</th>
+            <th>補足メモ</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -328,6 +329,34 @@ function renderTable() {
     tdStatus.innerHTML = '<span class="' + badgeClass + '">' + esc(row.status) + '</span>';
     tr.appendChild(tdStatus);
 
+    // 補足メモ
+    var tdFeedback = document.createElement('td');
+    tdFeedback.style.minWidth = '180px';
+    if (isDone) {
+      tdFeedback.innerHTML = '<small class="text-muted">' + esc(row.feedback || '') + '</small>';
+    } else {
+      var fbDiv = document.createElement('div');
+      fbDiv.className = 'd-flex gap-1';
+      var fbInput = document.createElement('input');
+      fbInput.type = 'text';
+      fbInput.className = 'rename-input';
+      fbInput.placeholder = '参照元が違う場合はここに補足...';
+      fbInput.value = row.feedback || '';
+      fbInput.style.fontSize = '0.75rem';
+      fbInput.dataset.idx = idx;
+      var fbBtn = document.createElement('button');
+      fbBtn.className = 'btn btn-outline-warning btn-sm';
+      fbBtn.title = '補足を保存';
+      fbBtn.innerHTML = '<i class="bi bi-chat-dots"></i>';
+      fbBtn.onclick = (function(i, input) {
+        return function() { onFeedbackSave(i, input.value); };
+      })(idx, fbInput);
+      fbDiv.appendChild(fbInput);
+      fbDiv.appendChild(fbBtn);
+      tdFeedback.appendChild(fbDiv);
+    }
+    tr.appendChild(tdFeedback);
+
     // 操作
     var tdOps = document.createElement('td');
     if (!isDone && row.scanFileId && row.refFileId) {
@@ -378,6 +407,18 @@ function toggleAll() {
     }
   });
   google.script.run.updateCheckStatusBatch(updates);
+}
+
+function onFeedbackSave(idx, text) {
+  if (!text.trim()) { alert('補足メモを入力してください'); return; }
+  var rowNum = currentData[idx].rowNum;
+  currentData[idx].feedback = text;
+  google.script.run
+    .withSuccessHandler(function(result) {
+      alert(result);
+    })
+    .withFailureHandler(onError)
+    .saveFeedback(rowNum, text);
 }
 
 function showSummary(idx) {

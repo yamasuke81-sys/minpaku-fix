@@ -712,6 +712,10 @@ function showConfirmScreen() {
       var lineCallUrl = settings.lineCallUrl || ('https://line.me/R/ti/p/@' + settings.lineOaId.replace(/^@/, ''));
       html += '<a href="' + escapeHtml(lineCallUrl) + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;">' +
         '<i class="bi bi-telephone-fill"></i> スタッフに連絡<br><small style="font-size:.75em;">Contact Staff via LINE</small></a>';
+      html += '<div style="margin-top:.6rem;padding:.5rem .8rem;background:#f0f7f0;border-radius:.6rem;font-size:.78rem;color:#555;line-height:1.5;text-align:left;">' +
+        '<i class="bi bi-camera-video-fill" style="color:#06C755;font-size:1rem;vertical-align:middle;"></i> ' +
+        '通話開始後、画面下の <i class="bi bi-camera-video-fill" style="font-size:.85rem;"></i> ボタンでビデオ通話に切替できます<br>' +
+        '<span style="color:#888;">After the call starts, tap <i class="bi bi-camera-video-fill" style="font-size:.85rem;"></i> at the bottom to switch to video call</span></div>';
     }
     if (showMeet && settings.meetUrl) {
       html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +

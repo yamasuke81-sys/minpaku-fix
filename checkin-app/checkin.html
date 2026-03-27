@@ -171,10 +171,7 @@
     <h2>確認完了<br><small style="font-size:.8rem;color:#666;">Information Confirmed</small></h2>
     <div id="callButtons"></div>
     <div id="confirmNextArea" class="mt-3">
-      <button class="btn btn-success btn-lg w-100" id="btnContactDone" onclick="onContactDone()" style="border-radius:.8rem;padding:.8rem;font-size:1.1rem;display:none;">
-        <i class="bi bi-arrow-right-circle-fill"></i> 連絡完了 / Contact Done
-      </button>
-      <button class="btn btn-outline-secondary mt-2" onclick="resetToSearch()" style="border-radius:.8rem;">
+      <button class="btn btn-outline-secondary mt-2" id="btnBackToStart" onclick="handleBackToStart()" style="border-radius:.8rem;">
         <i class="bi bi-arrow-counterclockwise"></i> 最初に戻る / Back to Start
       </button>
     </div>
@@ -743,21 +740,41 @@ function renderCallButtons_(notifyHtml, contactHtml) {
   var cb = document.getElementById('callButtons');
   if (!cb) return;
   cb.innerHTML = notifyHtml + contactHtml;
-  // 「連絡完了」ボタンを表示（連絡先ボタンが表示された後に）
-  var doneBtn = document.getElementById('btnContactDone');
-  if (doneBtn) doneBtn.style.display = '';
 }
 
-// 連絡完了ボタン: アラーム連携ONならアラームappへ遷移、OFFなら検索画面に戻る
-function onContactDone() {
-  if (window._alarmEnabled && window._alarmAppUrl) {
-    var url = window._alarmAppUrl;
-    if (url.indexOf('?') >= 0) url += '&from=checkin';
-    else url += '?from=checkin';
-    window.location.href = url;
-  } else {
-    resetToSearch();
+var _backToStartConfirmed = false;
+function handleBackToStart() {
+  if (_backToStartConfirmed) {
+    _backToStartConfirmed = false;
+    // アラーム連携ONならアラームappへ遷移
+    if (window._alarmEnabled && window._alarmAppUrl) {
+      var url = window._alarmAppUrl;
+      if (url.indexOf('?') >= 0) url += '&from=checkin';
+      else url += '?from=checkin';
+      window.location.href = url;
+    } else {
+      resetToSearch();
+    }
+    return;
   }
+  _backToStartConfirmed = true;
+  var btn = document.getElementById('btnBackToStart');
+  if (btn) {
+    btn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> スタッフへの連絡は必須です。戻ってもよろしいですか？<br><small>Contacting staff is required. Are you sure you want to go back?</small><br><strong>もう一度タップで戻る / Tap again to go back</strong>';
+    btn.classList.replace('btn-outline-secondary', 'btn-warning');
+    btn.style.fontSize = '.85rem';
+    btn.style.lineHeight = '1.4';
+  }
+  // 5秒後にリセット
+  setTimeout(function() {
+    _backToStartConfirmed = false;
+    if (btn) {
+      btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> 最初に戻る / Back to Start';
+      btn.classList.replace('btn-warning', 'btn-outline-secondary');
+      btn.style.fontSize = '';
+      btn.style.lineHeight = '';
+    }
+  }, 5000);
 }
 
 function resetToSearch() {

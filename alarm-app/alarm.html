@@ -132,6 +132,8 @@
 <!-- ===== 騒音クレームアラーム画面 ===== -->
 <div id="complaintScreen">
   <div class="complaint-title">&#x26A0;&#xFE0F; 騒音クレーム &#x26A0;&#xFE0F;<br>&#x26A0;&#xFE0F; NOISE COMPLAINT &#x26A0;&#xFE0F;</div>
+  <div class="complaint-body" id="complaintBodyJaTop"></div>
+  <div class="complaint-body-en" id="complaintBodyEnTop"></div>
   <div id="complaintDismissArea">
     <button class="btn btn-warning btn-lg" id="btnComplaintHold"
       ontouchstart="startHold(event)" ontouchend="endHold(event)" ontouchcancel="endHold(event)"
@@ -144,8 +146,8 @@
       &#x2705; アラームを停止する / Stop Alarm
     </button>
   </div>
-  <div class="complaint-body" id="complaintBodyJa"></div>
-  <div class="complaint-body-en" id="complaintBodyEn"></div>
+  <div class="complaint-body" id="complaintBodyJaBottom"></div>
+  <div class="complaint-body-en" id="complaintBodyEnBottom"></div>
 </div>
 
 <!-- ===== 退室連絡画面 ===== -->
@@ -221,23 +223,28 @@
         </div>
       </div>
       <div class="card p-3 mb-3">
-        <h6><i class="bi bi-megaphone"></i> タブレット警告メッセージ</h6>
+        <h6><i class="bi bi-megaphone"></i> タブレット警告メッセージ（ボタンの上）</h6>
         <div class="mb-2">
           <label class="form-label small">日本語</label>
-          <textarea id="compWarningJa" class="form-control form-control-sm" rows="4">近隣の方から騒音のクレームが入りました。
-
-ただちに静かにしてください。
-
-静かにしない場合、警察に連絡します。
+          <textarea id="compWarningJaTop" class="form-control form-control-sm" rows="3">近隣の方から騒音のクレームが入りました。
+ただちに静かにしてください。</textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">英語</label>
+          <textarea id="compWarningEnTop" class="form-control form-control-sm" rows="3">A noise complaint has been received from a neighbor.
+Please be quiet immediately.</textarea>
+        </div>
+      </div>
+      <div class="card p-3 mb-3">
+        <h6><i class="bi bi-megaphone"></i> タブレット警告メッセージ（ボタンの下）</h6>
+        <div class="mb-2">
+          <label class="form-label small">日本語</label>
+          <textarea id="compWarningJaBottom" class="form-control form-control-sm" rows="3">静かにしない場合、警察に連絡します。
 即時退室していただく場合もあります。</textarea>
         </div>
         <div class="mb-2">
           <label class="form-label small">英語</label>
-          <textarea id="compWarningEn" class="form-control form-control-sm" rows="4">A noise complaint has been received from a neighbor.
-
-Please be quiet immediately.
-
-If you do not comply, the police will be called.
+          <textarea id="compWarningEnBottom" class="form-control form-control-sm" rows="3">If you do not comply, the police will be called.
 You may be asked to leave immediately.</textarea>
         </div>
       </div>
@@ -611,8 +618,10 @@ window.addEventListener('load', function() {
   // 騒音クレーム警告メッセージをキャッシュ
   callGAS('getComplaintSettings').then(function(s) {
     if (typeof s === 'string') { try { s = JSON.parse(s); } catch(e) { return; } }
-    _complaintWarningJa = s.warningMessageJa || '';
-    _complaintWarningEn = s.warningMessageEn || '';
+    _complaintWarningJaTop = s.warningMessageJaTop || s.warningMessageJa || '';
+    _complaintWarningEnTop = s.warningMessageEnTop || s.warningMessageEn || '';
+    _complaintWarningJaBottom = s.warningMessageJaBottom || '';
+    _complaintWarningEnBottom = s.warningMessageEnBottom || '';
   }).catch(function() {});
   // 退室連絡設定をキャッシュ
   callGAS('getCheckoutNotifySettings').then(function(s) {
@@ -1790,8 +1799,10 @@ var _holdTimer = null;
 var _holdStart = 0;
 var _holdDuration = 5000; // 5秒
 var _holdProgressTimer = null;
-var _complaintWarningJa = '';
-var _complaintWarningEn = '';
+var _complaintWarningJaTop = '';
+var _complaintWarningEnTop = '';
+var _complaintWarningJaBottom = '';
+var _complaintWarningEnBottom = '';
 
 function checkComplaintAlarm() {
   if (_state.complaintActive) return; // 既にアラーム表示中
@@ -1819,11 +1830,15 @@ function showComplaintAlarm() {
   _state.screen = 'complaint';
 
   // 警告メッセージを設定から取得（キャッシュがなければデフォルト）
-  var jaMsg = _complaintWarningJa || '近隣の方から騒音のクレームが入りました。\n\nただちに静かにしてください。\n\n静かにしない場合、警察に連絡します。\n即時退室していただく場合もあります。';
-  var enMsg = _complaintWarningEn || 'A noise complaint has been received from a neighbor.\n\nPlease be quiet immediately.\n\nIf you do not comply, the police will be called.\nYou may be asked to leave immediately.';
+  var jaTop = _complaintWarningJaTop || '近隣の方から騒音のクレームが入りました。\nただちに静かにしてください。';
+  var enTop = _complaintWarningEnTop || 'A noise complaint has been received from a neighbor.\nPlease be quiet immediately.';
+  var jaBottom = _complaintWarningJaBottom || '静かにしない場合、警察に連絡します。\n即時退室していただく場合もあります。';
+  var enBottom = _complaintWarningEnBottom || 'If you do not comply, the police will be called.\nYou may be asked to leave immediately.';
 
-  document.getElementById('complaintBodyJa').textContent = jaMsg;
-  document.getElementById('complaintBodyEn').textContent = enMsg;
+  document.getElementById('complaintBodyJaTop').textContent = jaTop;
+  document.getElementById('complaintBodyEnTop').textContent = enTop;
+  document.getElementById('complaintBodyJaBottom').textContent = jaBottom;
+  document.getElementById('complaintBodyEnBottom').textContent = enBottom;
 
   // 画面切替
   document.getElementById('clockScreen').style.display = 'none';
@@ -1934,13 +1949,17 @@ function loadComplaintSettings() {
     document.getElementById('compNeighborGroupId').value = s.neighborLineGroupId || '';
     document.getElementById('compOwnerEmail').value = s.ownerEmail || '';
     document.getElementById('compKeywords').value = s.complaintKeywords || '';
-    document.getElementById('compWarningJa').value = s.warningMessageJa || '';
-    document.getElementById('compWarningEn').value = s.warningMessageEn || '';
+    document.getElementById('compWarningJaTop').value = s.warningMessageJaTop || s.warningMessageJa || '';
+    document.getElementById('compWarningEnTop').value = s.warningMessageEnTop || s.warningMessageEn || '';
+    document.getElementById('compWarningJaBottom').value = s.warningMessageJaBottom || '';
+    document.getElementById('compWarningEnBottom').value = s.warningMessageEnBottom || '';
     document.getElementById('compReplyMsg').value = s.complaintReplyMessage || '';
     document.getElementById('compDismissedMsg').value = s.complaintDismissedMessage || '';
     // フロントエンド用にキャッシュ
-    _complaintWarningJa = s.warningMessageJa || '';
-    _complaintWarningEn = s.warningMessageEn || '';
+    _complaintWarningJaTop = s.warningMessageJaTop || s.warningMessageJa || '';
+    _complaintWarningEnTop = s.warningMessageEnTop || s.warningMessageEn || '';
+    _complaintWarningJaBottom = s.warningMessageJaBottom || '';
+    _complaintWarningEnBottom = s.warningMessageEnBottom || '';
   });
 }
 
@@ -1953,14 +1972,25 @@ function saveComplaintSettings() {
     neighborLineGroupId: document.getElementById('compNeighborGroupId').value.trim(),
     ownerEmail: document.getElementById('compOwnerEmail').value.trim(),
     complaintKeywords: document.getElementById('compKeywords').value.trim(),
-    warningMessageJa: document.getElementById('compWarningJa').value,
-    warningMessageEn: document.getElementById('compWarningEn').value,
+    warningMessageJaTop: document.getElementById('compWarningJaTop').value,
+    warningMessageEnTop: document.getElementById('compWarningEnTop').value,
+    warningMessageJaBottom: document.getElementById('compWarningJaBottom').value,
+    warningMessageEnBottom: document.getElementById('compWarningEnBottom').value,
     complaintReplyMessage: document.getElementById('compReplyMsg').value,
     complaintDismissedMessage: document.getElementById('compDismissedMsg').value
   };
-  callGAS('saveComplaintSettings', [s]).then(function() {
-    _complaintWarningJa = s.warningMessageJa;
-    _complaintWarningEn = s.warningMessageEn;
+  var soundSettings = {
+    complaintVolume: Number(document.getElementById('settComplaintVolume').value),
+    complaintSound: document.getElementById('settComplaintSound').value
+  };
+  Promise.all([
+    callGAS('saveComplaintSettings', [s]),
+    callGAS('saveAlarmSettings', [soundSettings])
+  ]).then(function() {
+    _complaintWarningJaTop = s.warningMessageJaTop;
+    _complaintWarningEnTop = s.warningMessageEnTop;
+    _complaintWarningJaBottom = s.warningMessageJaBottom;
+    _complaintWarningEnBottom = s.warningMessageEnBottom;
     alert('騒音クレーム設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
 }
@@ -2034,8 +2064,8 @@ function sendTestComplaint() {
   if (!channels.email && !channels.line) { alert('送信先を1つ以上選択してください。'); return; }
   var btn = document.getElementById('btnTestComplaint');
   var resEl = document.getElementById('testComplaintResult');
-  var msgJa = document.getElementById('compWarningJa').value || '';
-  var msgEn = document.getElementById('compWarningEn').value || '';
+  var msgJa = (document.getElementById('compWarningJaTop').value || '') + '\n' + (document.getElementById('compWarningJaBottom').value || '');
+  var msgEn = (document.getElementById('compWarningEnTop').value || '') + '\n' + (document.getElementById('compWarningEnBottom').value || '');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 送信中…'; }
   callGAS('sendTestMessage', [{ label: '騒音クレーム警告', message: msgJa, messageEn: msgEn, channels: channels }])
     .then(function(r) {
@@ -2109,8 +2139,10 @@ function previewMessageByIdx(idx) {
 }
 
 function previewComplaintScreen() {
-  var msgJa = (document.getElementById('compWarningJa') || {}).value || '近隣の方から騒音のクレームが入りました。';
-  var msgEn = (document.getElementById('compWarningEn') || {}).value || 'A noise complaint has been received.';
+  var jaTop = (document.getElementById('compWarningJaTop') || {}).value || '近隣の方から騒音のクレームが入りました。';
+  var enTop = (document.getElementById('compWarningEnTop') || {}).value || 'A noise complaint has been received.';
+  var jaBottom = (document.getElementById('compWarningJaBottom') || {}).value || '';
+  var enBottom = (document.getElementById('compWarningEnBottom') || {}).value || '';
   var vol = parseInt((document.getElementById('settComplaintVolume') || {}).value || '100') / 100;
   var snd = (document.getElementById('settComplaintSound') || {}).value || 'alarm';
   document.getElementById('adminScreen').style.display = 'none';
@@ -2118,10 +2150,10 @@ function previewComplaintScreen() {
   _state.screen = 'preview';
   // 騒音クレームは専用画面
   _state.complaintActive = true;
-  _state._complaintWarningJa = msgJa;
-  _state._complaintWarningEn = msgEn;
-  document.getElementById('complaintBodyJa').textContent = msgJa;
-  document.getElementById('complaintBodyEn').textContent = msgEn;
+  document.getElementById('complaintBodyJaTop').textContent = jaTop;
+  document.getElementById('complaintBodyEnTop').textContent = enTop;
+  document.getElementById('complaintBodyJaBottom').textContent = jaBottom;
+  document.getElementById('complaintBodyEnBottom').textContent = enBottom;
   document.getElementById('clockScreen').style.display = 'none';
   var cs = document.getElementById('complaintScreen');
   cs.className = 'active';

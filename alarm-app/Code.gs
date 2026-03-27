@@ -841,8 +841,12 @@ function getComplaintSettings() {
     complaintKeywords: props.getProperty('COMPLAINT_KEYWORDS') || '騒音,うるさい,noise,noisy,loud',
     complaintReplyMessage: props.getProperty('COMPLAINT_REPLY_MESSAGE') || '【自動送信です】\nご連絡ありがとうございます。\nご迷惑をおかけし大変申し訳ありません。\n宿泊者に注意喚起いたしました。\n（室内でアラーム発報、注意メッセージ表示）\n引き続きご迷惑をおかけする場合は、再度ご連絡ください。',
     complaintDismissedMessage: props.getProperty('COMPLAINT_DISMISSED_MESSAGE') || '【自動送信です】\n宿泊者が騒音についての注意を確認しました。\n引き続きご迷惑な場合は、お手数ですが再度ご連絡ください。\nご迷惑おかけして大変申し訳ありませんでした。',
-    warningMessageJa: props.getProperty('COMPLAINT_WARNING_JA') || '近隣の方から騒音のクレームが入りました。\n\nただちに静かにしてください。\n\n静かにしない場合、警察に連絡します。\n即時退室していただく場合もあります。',
-    warningMessageEn: props.getProperty('COMPLAINT_WARNING_EN') || 'A noise complaint has been received from a neighbor.\n\nPlease be quiet immediately.\n\nIf you do not comply, the police will be called.\nYou may be asked to leave immediately.'
+    warningMessageJa: props.getProperty('COMPLAINT_WARNING_JA') || '',
+    warningMessageEn: props.getProperty('COMPLAINT_WARNING_EN') || '',
+    warningMessageJaTop: props.getProperty('COMPLAINT_WARNING_JA_TOP') || '',
+    warningMessageEnTop: props.getProperty('COMPLAINT_WARNING_EN_TOP') || '',
+    warningMessageJaBottom: props.getProperty('COMPLAINT_WARNING_JA_BOTTOM') || '',
+    warningMessageEnBottom: props.getProperty('COMPLAINT_WARNING_EN_BOTTOM') || ''
   });
 }
 
@@ -860,6 +864,10 @@ function saveComplaintSettings(settings) {
   if (settings.complaintDismissedMessage !== undefined) props.setProperty('COMPLAINT_DISMISSED_MESSAGE', settings.complaintDismissedMessage);
   if (settings.warningMessageJa !== undefined) props.setProperty('COMPLAINT_WARNING_JA', settings.warningMessageJa);
   if (settings.warningMessageEn !== undefined) props.setProperty('COMPLAINT_WARNING_EN', settings.warningMessageEn);
+  if (settings.warningMessageJaTop !== undefined) props.setProperty('COMPLAINT_WARNING_JA_TOP', settings.warningMessageJaTop);
+  if (settings.warningMessageEnTop !== undefined) props.setProperty('COMPLAINT_WARNING_EN_TOP', settings.warningMessageEnTop);
+  if (settings.warningMessageJaBottom !== undefined) props.setProperty('COMPLAINT_WARNING_JA_BOTTOM', settings.warningMessageJaBottom);
+  if (settings.warningMessageEnBottom !== undefined) props.setProperty('COMPLAINT_WARNING_EN_BOTTOM', settings.warningMessageEnBottom);
   return JSON.stringify({ success: true });
 }
 

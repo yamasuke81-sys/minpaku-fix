@@ -41,11 +41,10 @@
     #complaintScreen.active { display: flex; }
     @keyframes flash { 0%,100% { background: #d50000; } 50% { background: #ff1744; } }
     #complaintScreen.active { animation: flash 1s infinite; }
-    #complaintScreen .complaint-icon { font-size: 20vw; animation: shake 0.3s infinite; }
-    #complaintScreen .complaint-title { font-size: 5vw; font-weight: bold; margin: 1vh 0; text-align: center; line-height: 1.4; }
-    #complaintScreen .complaint-body { font-size: 4vw; font-weight: bold; text-align: center; max-width: 90vw; line-height: 1.6; white-space: pre-line; margin: 2vh 0; }
+    #complaintScreen .complaint-title { font-size: 5vw; font-weight: bold; margin-bottom: 3vh; text-align: center; line-height: 1.4; }
+    #complaintDismissArea { margin-bottom: 3vh; text-align: center; }
+    #complaintScreen .complaint-body { font-size: 4vw; font-weight: bold; text-align: center; max-width: 90vw; line-height: 1.6; white-space: pre-line; margin: 1vh 0; }
     #complaintScreen .complaint-body-en { font-size: 3vw; color: rgba(255,255,255,0.85); text-align: center; max-width: 90vw; line-height: 1.5; white-space: pre-line; }
-    #complaintDismissArea { margin-top: 3vh; text-align: center; }
     #btnComplaintHold { font-size: 3.5vw; padding: 2vh 6vw; border-radius: 2vw; user-select: none; -webkit-user-select: none; }
     #btnComplaintHold.holding { background: #ff9800 !important; border-color: #ff9800 !important; }
     #holdProgress { width: 60vw; height: 1.5vh; background: rgba(255,255,255,0.3); border-radius: 1vh; margin: 1vh auto 0; overflow: hidden; }
@@ -132,15 +131,12 @@
 
 <!-- ===== 騒音クレームアラーム画面 ===== -->
 <div id="complaintScreen">
-  <div class="complaint-icon">&#x1F6A8;</div>
   <div class="complaint-title">&#x26A0;&#xFE0F; 騒音クレーム &#x26A0;&#xFE0F;<br>&#x26A0;&#xFE0F; NOISE COMPLAINT &#x26A0;&#xFE0F;</div>
-  <div class="complaint-body" id="complaintBodyJa"></div>
-  <div class="complaint-body-en" id="complaintBodyEn"></div>
   <div id="complaintDismissArea">
     <button class="btn btn-warning btn-lg" id="btnComplaintHold"
       ontouchstart="startHold(event)" ontouchend="endHold(event)" ontouchcancel="endHold(event)"
       onmousedown="startHold(event)" onmouseup="endHold(event)" onmouseleave="endHold(event)">
-      &#x1F4A4; 長押しして確認 / Press &amp; Hold
+      &#x1F4A4; 長押しして解除 / Press &amp; Hold to Dismiss
     </button>
     <div id="holdProgress"><div id="holdProgressBar"></div></div>
     <div id="holdInstruction">5秒間長押ししてください / Hold for 5 seconds</div>
@@ -148,6 +144,8 @@
       &#x2705; アラームを停止する / Stop Alarm
     </button>
   </div>
+  <div class="complaint-body" id="complaintBodyJa"></div>
+  <div class="complaint-body-en" id="complaintBodyEn"></div>
 </div>
 
 <!-- ===== 退室連絡画面 ===== -->

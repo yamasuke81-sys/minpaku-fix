@@ -710,7 +710,7 @@ function showConfirmScreen() {
 
     if (showLine && (settings.lineCallUrl || settings.lineOaId)) {
       var lineCallUrl = settings.lineCallUrl || ('https://line.me/R/ti/p/@' + settings.lineOaId.replace(/^@/, ''));
-      html += '<a href="' + escapeHtml(lineCallUrl) + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;">' +
+      html += '<a href="' + escapeHtml(lineCallUrl) + '" target="_blank" class="btn btn-call" style="background:#06C755;color:#fff;" onclick="startAlarmRedirectTimer()">' +
         '<i class="bi bi-telephone-fill"></i> スタッフに連絡<br><small style="font-size:.75em;">Contact Staff via LINE</small></a>';
       html += '<div style="margin-top:.6rem;padding:.5rem .8rem;background:#f0f7f0;border-radius:.6rem;font-size:.78rem;color:#555;line-height:1.5;text-align:left;">' +
         '<i class="bi bi-camera-video-fill" style="color:#06C755;font-size:1rem;vertical-align:middle;"></i> ' +
@@ -718,12 +718,12 @@ function showConfirmScreen() {
         '<span style="color:#888;">After the call starts, tap <i class="bi bi-camera-video-fill" style="font-size:.85rem;"></i> at the bottom to switch to video call</span></div>';
     }
     if (showMeet && settings.meetUrl) {
-      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet">' +
+      html += '<a href="' + escapeHtml(settings.meetUrl) + '" target="_blank" class="btn btn-call btn-call-meet" onclick="startAlarmRedirectTimer()">' +
         '<i class="bi bi-camera-video-fill"></i> スタッフに連絡<br><small style="font-size:.75em;">Contact Staff via Meet</small></a>';
     }
     if (showPhone && settings.phoneNumber) {
       var tel = settings.phoneNumber.replace(/[^\d+]/g, '');
-      html += '<a href="tel:' + tel + '" class="btn btn-call btn-call-phone">' +
+      html += '<a href="tel:' + tel + '" class="btn btn-call btn-call-phone" onclick="startAlarmRedirectTimer()">' +
         '<i class="bi bi-telephone-fill"></i> スタッフに連絡<br><small style="font-size:.75em;">Contact Staff by Phone</small></a>';
     }
 
@@ -789,6 +789,19 @@ function resetToSearch() {
   if (sn) sn.value = '';
   if (sp) sp.value = '';
   showScreen('searchScreen');
+}
+
+// ===== スタッフ連絡後のアラームapp自動遷移（10分後） =====
+var _alarmRedirectTimer = null;
+function startAlarmRedirectTimer() {
+  if (_alarmRedirectTimer) return; // 重複防止
+  if (!window._alarmEnabled || !window._alarmAppUrl) return;
+  _alarmRedirectTimer = setTimeout(function() {
+    var url = window._alarmAppUrl;
+    if (url.indexOf('?') >= 0) url += '&from=checkin';
+    else url += '?from=checkin';
+    window.location.href = url;
+  }, 10 * 60 * 1000); // 10分
 }
 
 // ===== パスポート拡大 =====

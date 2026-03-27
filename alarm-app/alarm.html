@@ -321,6 +321,7 @@ You may be asked to leave immediately.</textarea>
             <select class="form-select form-select-sm" id="settMessageSound">
               <option value="chime">チャイム（和音）</option>
               <option value="bell">ベル（三角波）</option>
+              <option value="hotaru">蛍の光（メロディ）</option>
               <option value="beep">ビープ（短音繰り返し）</option>
               <option value="siren">サイレン（高低交互）</option>
               <option value="alarm">アラーム（ノコギリ波）</option>
@@ -1466,7 +1467,14 @@ function removeTime(msgIdx, timeIdx) {
 }
 
 function saveMessages() {
-  callGAS('saveScheduledMessages', [_state.messages]).then(function() {
+  var soundSettings = {
+    messageVolume: Number(document.getElementById('settMessageVolume').value),
+    messageSound: document.getElementById('settMessageSound').value
+  };
+  Promise.all([
+    callGAS('saveScheduledMessages', [_state.messages]),
+    callGAS('saveAlarmSettings', [soundSettings])
+  ]).then(function() {
     alert('メッセージ設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
 }
@@ -1573,7 +1581,14 @@ function removeCoTime(msgIdx, timeIdx) {
 }
 
 function saveCoMessages() {
-  callGAS('saveCheckoutMessages', [_state.coMessages]).then(function() {
+  var soundSettings = {
+    checkoutVolume: Number(document.getElementById('settCheckoutVolume').value),
+    checkoutSound: document.getElementById('settCheckoutSound').value
+  };
+  Promise.all([
+    callGAS('saveCheckoutMessages', [_state.coMessages]),
+    callGAS('saveAlarmSettings', [soundSettings])
+  ]).then(function() {
     alert('チェックアウトメッセージ設定を保存しました');
   }).catch(function(e) { alert('保存エラー: ' + e.message); });
 }

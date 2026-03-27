@@ -442,6 +442,9 @@ function scanAndPrepare() {
   var activeModel = getLatestAvailableModel();
   var processedCount = 0;
 
+  // 過去のフィードバック履歴を取得（全ステップで活用）
+  var feedbackHistory = getFeedbackHistory_();
+
   while (files.hasNext()) {
     // 4.5分で安全停止
     if (Date.now() - startTime > 4 * 60 * 1000) break;
@@ -463,8 +466,8 @@ function scanAndPrepare() {
         summary = '（ファイルサイズ超過: ' + fileSizeKB + 'KB — Gemini上限20MB）';
         renameTo = '（生成失敗: サイズ超過）';
       } else {
-        // PDFの内容要約＋リネーム名を1回のAPI呼び出しで取得
-        var analyzed = analyzeAndRename_(blob, rules, activeModel);
+        // PDFの内容要約＋リネーム名を1回のAPI呼び出しで取得（学習データ込み）
+        var analyzed = analyzeAndRename_(blob, rules, activeModel, feedbackHistory);
         summary = analyzed.summary;
         renameTo = analyzed.renameTo;
       }
@@ -472,7 +475,7 @@ function scanAndPrepare() {
       if (renameTo === 'ERROR') renameTo = '（生成失敗）';
 
       // Drive内で類似PDFを検索
-      var refResult = findSimilarFile_(summary, activeModel);
+      var refResult = findSimilarFile_(summary, activeModel, feedbackHistory);
 
       // 比較シートに行を追加
       var newRow = compareSheet.getLastRow() + 1;
@@ -495,7 +498,7 @@ function scanAndPrepare() {
         compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue('');
 
         // PDFの内容からDrive内の適切な保存先フォルダを提案
-        var folderSuggestion = suggestDestinationFolder_(summary, cleanRenameTo, activeModel);
+        var folderSuggestion = suggestDestinationFolder_(summary, cleanRenameTo, activeModel, feedbackHistory);
         if (folderSuggestion.folderId) {
           compareSheet.getRange(newRow, COL.DEST_FOLDER).setValue('📁 ' + folderSuggestion.folderPath);
           compareSheet.getRange(newRow, COL.DEST_FOLDER_ID).setValue(folderSuggestion.folderId);
@@ -653,24 +656,31 @@ function analyzePdfContent_(pdfBlob, modelName) {
 // ============================================================
 // PDF解析＋リネーム名を1回のAPI呼び出しで同時取得（API節約）
 // ============================================================
-function analyzeAndRename_(pdfBlob, rules, modelName) {
+function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
+
+  var promptText = '以下のPDFについて2つの作業をしてください。\n\n' +
+    '【作業1: 内容要約】\n' +
+    '以下の情報を抽出して3〜5行で要約:\n' +
+    '・書類の種類（請求書、明細、通知書など）\n' +
+    '・発行元（会社名・団体名）\n' +
+    '・対象物件や契約名\n' +
+    '・対象期間（年月）\n' +
+    '・金額\n\n' +
+    '【作業2: ファイル名生成】\n' +
+    '以下のルールに従い、新しいファイル名を1つ生成:\n' + rules + '\n\n';
+
+  if (feedbackHistory) {
+    promptText += '【過去の補足情報（命名や分類の参考にしてください）】\n' + feedbackHistory + '\n\n';
+  }
+
+  promptText += '【出力形式】必ず以下のJSON形式で出力（他の文字は不要）:\n' +
+    '{"summary":"要約テキスト","renameTo":"新しいファイル名"}';
 
   var payload = {
     contents: [{
       parts: [
-        { text: '以下のPDFについて2つの作業をしてください。\n\n' +
-                '【作業1: 内容要約】\n' +
-                '以下の情報を抽出して3〜5行で要約:\n' +
-                '・書類の種類（請求書、明細、通知書など）\n' +
-                '・発行元（会社名・団体名）\n' +
-                '・対象物件や契約名\n' +
-                '・対象期間（年月）\n' +
-                '・金額\n\n' +
-                '【作業2: ファイル名生成】\n' +
-                '以下のルールに従い、新しいファイル名を1つ生成:\n' + rules + '\n\n' +
-                '【出力形式】必ず以下のJSON形式で出力（他の文字は不要）:\n' +
-                '{"summary":"要約テキスト","renameTo":"新しいファイル名"}' },
+        { text: promptText },
         { inline_data: { mime_type: 'application/pdf', data: Utilities.base64Encode(pdfBlob.getBytes()) } }
       ]
     }],
@@ -771,14 +781,11 @@ function callGeminiWithRetry_(url, payload, context) {
 // ============================================================
 // Drive内で類似ファイルを検索
 // ============================================================
-function findSimilarFile_(summary, modelName) {
+function findSimilarFile_(summary, modelName, feedbackHistory) {
   var emptyResult = { fileId: '', fileName: '', folderId: '' };
 
-  // 過去のフィードバック履歴を取得（学習データ）
-  var feedbackHistory = getFeedbackHistory_();
-
-  // Geminiに検索キーワードを生成させる
-  var keywords = extractSearchKeywords_(summary, modelName);
+  // Geminiに検索キーワードを生成させる（学習データ込み）
+  var keywords = extractSearchKeywords_(summary, modelName, feedbackHistory);
   if (!keywords) return emptyResult;
 
   // キーワードでDriveを検索（PDFのみ、inputフォルダ以外）
@@ -798,17 +805,21 @@ function findSimilarFile_(summary, modelName) {
 /**
  * 要約から検索用キーワードを抽出（Gemini）
  */
-function extractSearchKeywords_(summary, modelName) {
+function extractSearchKeywords_(summary, modelName, feedbackHistory) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
+
+  var promptText = '以下のPDF内容の要約から、Googleドライブで類似ファイルを検索するためのキーワードを生成してください。\n' +
+    '会社名・物件名・書類種別など、ファイル名に含まれそうな重要キーワードを2〜4個、スペース区切りで出力してください。\n' +
+    'キーワードのみ出力し、説明は不要です。\n\n' +
+    '【要約】\n' + summary;
+
+  if (feedbackHistory) {
+    promptText += '\n\n【過去の補足情報（正しい分類の参考にしてください）】\n' + feedbackHistory;
+  }
 
   var payload = {
     contents: [{
-      parts: [{
-        text: '以下のPDF内容の要約から、Googleドライブで類似ファイルを検索するためのキーワードを生成してください。\n' +
-              '会社名・物件名・書類種別など、ファイル名に含まれそうな重要キーワードを2〜4個、スペース区切りで出力してください。\n' +
-              'キーワードのみ出力し、説明は不要です。\n\n' +
-              '【要約】\n' + summary
-      }]
+      parts: [{ text: promptText }]
     }],
     generationConfig: { temperature: 0.1 }
   };
@@ -1007,42 +1018,45 @@ function loadRules_(sheet) {
 /**
  * PDFの内容要約とリネーム予定名から、Drive内の適切な保存先フォルダを提案
  */
-function suggestDestinationFolder_(summary, renameTo, modelName) {
+function suggestDestinationFolder_(summary, renameTo, modelName, feedbackHistory) {
   var emptyResult = { folderId: '', folderPath: '' };
 
-  // Geminiにフォルダ検索用キーワードを生成させる
-  var keywords = extractFolderKeywords_(summary, renameTo, modelName);
+  // Geminiにフォルダ検索用キーワードを生成させる（学習データ込み）
+  var keywords = extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory);
   if (!keywords) return emptyResult;
 
   // キーワードでDrive内のフォルダを検索
   var candidateFolders = searchDriveForFolders_(keywords);
   if (candidateFolders.length === 0) return emptyResult;
 
-  // 1件ならそのまま返す
   if (candidateFolders.length === 1) {
     return candidateFolders[0];
   }
 
-  // 複数候補 → Geminiに最適なフォルダを選定させる
-  return selectBestFolder_(summary, renameTo, candidateFolders, modelName);
+  // 複数候補 → 学習データ込みで最適なフォルダを選定
+  return selectBestFolder_(summary, renameTo, candidateFolders, modelName, feedbackHistory);
 }
 
 /**
  * フォルダ検索用キーワードを生成
  */
-function extractFolderKeywords_(summary, renameTo, modelName) {
+function extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
+
+  var promptText = '以下のPDFの情報から、Googleドライブ内で保存先フォルダを探すためのキーワードを生成してください。\n' +
+    '物件名、会社名、カテゴリ（水道、電気、ガス、保険、税金など）を考慮してください。\n' +
+    'フォルダ名に含まれそうなキーワードを2〜3個、スペース区切りで出力してください。\n' +
+    'キーワードのみ出力し、説明は不要です。\n\n' +
+    '【内容要約】\n' + summary + '\n\n' +
+    '【リネーム予定名】\n' + renameTo;
+
+  if (feedbackHistory) {
+    promptText += '\n\n【過去の補足情報（正しいフォルダ分類の参考にしてください）】\n' + feedbackHistory;
+  }
 
   var payload = {
     contents: [{
-      parts: [{
-        text: '以下のPDFの情報から、Googleドライブ内で保存先フォルダを探すためのキーワードを生成してください。\n' +
-              '物件名、会社名、カテゴリ（水道、電気、ガス、保険、税金など）を考慮してください。\n' +
-              'フォルダ名に含まれそうなキーワードを2〜3個、スペース区切りで出力してください。\n' +
-              'キーワードのみ出力し、説明は不要です。\n\n' +
-              '【内容要約】\n' + summary + '\n\n' +
-              '【リネーム予定名】\n' + renameTo
-      }]
+      parts: [{ text: promptText }]
     }],
     generationConfig: { temperature: 0.1 }
   };
@@ -1131,23 +1145,27 @@ function getFolderPath_(folderId) {
 /**
  * 候補から最適なフォルダを選定（Gemini）
  */
-function selectBestFolder_(summary, renameTo, candidates, modelName) {
+function selectBestFolder_(summary, renameTo, candidates, modelName, feedbackHistory) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var candidateList = candidates.map(function(c, i) {
     return (i + 1) + '. ' + c.folderPath;
   }).join('\n');
 
+  var promptText = '以下のPDFの保存先として最も適切なフォルダを候補から1つ選んでください。\n' +
+    '書類の種類（水道、電気、ガス、保険、税金など）と物件名・会社名が一致するフォルダを優先してください。\n' +
+    '番号のみ（例: 1）を出力してください。適切な候補がない場合は 0 と出力してください。\n\n' +
+    '【PDF内容】\n' + summary + '\n\n' +
+    '【リネーム予定名】\n' + renameTo + '\n\n' +
+    '【フォルダ候補】\n' + candidateList;
+
+  if (feedbackHistory) {
+    promptText += '\n\n【過去の補足情報（フォルダ選択の参考にしてください）】\n' + feedbackHistory;
+  }
+
   var payload = {
     contents: [{
-      parts: [{
-        text: '以下のPDFの保存先として最も適切なフォルダを候補から1つ選んでください。\n' +
-              '書類の種類（水道、電気、ガス、保険、税金など）と物件名・会社名が一致するフォルダを優先してください。\n' +
-              '番号のみ（例: 1）を出力してください。適切な候補がない場合は 0 と出力してください。\n\n' +
-              '【PDF内容】\n' + summary + '\n\n' +
-              '【リネーム予定名】\n' + renameTo + '\n\n' +
-              '【フォルダ候補】\n' + candidateList
-      }]
+      parts: [{ text: promptText }]
     }],
     generationConfig: { temperature: 0.1 }
   };

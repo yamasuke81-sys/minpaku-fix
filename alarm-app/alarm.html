@@ -105,7 +105,7 @@
 <body>
 
 <!-- [DEBUG] 全画面共通デバッグ表示（clockScreenの外に配置） -->
-<div id="debugState" style="position:fixed;top:4px;left:8px;font-size:9px;color:rgba(0,0,0,0.5);z-index:9999;max-width:90vw;word-break:break-all;background:rgba(255,255,255,0.7);padding:2px 6px;border-radius:3px;"></div>
+<div id="debugState" style="position:fixed;bottom:4px;left:8px;font-size:7px;color:rgba(255,255,255,0.15);z-index:9999;max-width:60vw;word-break:break-all;pointer-events:none;"></div>
 
 <!-- ===== 待機画面（時計） ===== -->
 <div id="clockScreen">
@@ -1189,8 +1189,10 @@ function showAdmin() {
   document.getElementById('clockScreen').style.display = 'none';
   document.getElementById('coNotifyScreen').style.display = 'none';
   _state.coNotifyActive = false;
-  _state._coNotifySuspended = true; // 管理画面を閉じた後に復帰させるフラグ
-  document.getElementById('adminScreen').classList.add('active');
+  _state._coNotifySuspended = true;
+  var adminEl = document.getElementById('adminScreen');
+  adminEl.style.display = '';  // インラインstyleをクリア（CSSクラスを有効にする）
+  adminEl.classList.add('active');
   document.getElementById('settingsBtn').style.display = 'none';
   loadAdminData();
 }

@@ -270,6 +270,33 @@ function clearFailedEntries() {
 }
 
 /**
+ * チェック済みの行を比較シートから削除して再スキャン対象にする
+ */
+function requeueCheckedEntries() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return '「参照元比較」シートがありません';
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '対象なし';
+
+  var data = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+  var deletedCount = 0;
+
+  for (var i = data.length - 1; i >= 0; i--) {
+    var isChecked = data[i][COL.CHECK - 1];
+    var status = String(data[i][COL.STATUS - 1]);
+    // チェック済み ＆ まだ完了していない行のみ削除
+    if (isChecked === true && status.indexOf('完了') === -1) {
+      sheet.deleteRow(i + 2);
+      deletedCount++;
+    }
+  }
+
+  return deletedCount + '件を削除しました。再スキャンで再処理されます。';
+}
+
+/**
  * スキャン＆参照元検索（Web版 — 処理件数を返す）
  */
 function scanAndPrepareWeb() {

@@ -131,7 +131,10 @@
     </div>
     <div>
       <button class="btn btn-sm btn-outline-danger me-2" onclick="clearFailed()">
-        <i class="bi bi-trash"></i> 失敗データを削除＆再スキャン
+        <i class="bi bi-trash"></i> 失敗を再スキャン
+      </button>
+      <button class="btn btn-sm btn-outline-warning me-2" onclick="requeueChecked()">
+        <i class="bi bi-arrow-repeat"></i> チェック済みを再スキャン
       </button>
       <button class="btn btn-sm btn-outline-secondary" onclick="openSpreadsheet()">
         <i class="bi bi-table"></i> スプレッドシートを開く
@@ -407,6 +410,25 @@ function toggleAll() {
     }
   });
   google.script.run.updateCheckStatusBatch(updates);
+}
+
+function requeueChecked() {
+  var checkedCount = currentData.filter(function(r) { return r.checked && (r.status || '').indexOf('完了') === -1; }).length;
+  if (checkedCount === 0) { alert('チェックされたファイルがありません。再スキャンしたい行にチェックを入れてください。'); return; }
+  if (!confirm(checkedCount + '件をシートから削除し、再スキャンします。よろしいですか？')) return;
+  showSpinner('再スキャン準備中...', 'チェック済みデータを削除しています');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      alert(result);
+      document.getElementById('spinnerText').textContent = 'スキャン＆参照元検索中...';
+      document.getElementById('spinnerSub').textContent = '再スキャンしています';
+      google.script.run
+        .withSuccessHandler(function(r) { hideSpinner(); loadData(); alert('再スキャン完了'); })
+        .withFailureHandler(function(e) { hideSpinner(); loadData(); onError(e); })
+        .scanAndPrepareWeb();
+    })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .requeueCheckedEntries();
 }
 
 function onFeedbackSave(idx, text) {

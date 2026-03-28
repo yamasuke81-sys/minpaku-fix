@@ -993,14 +993,41 @@ function executeApprovedWeb() {
 function scheduledScanAndRetry() {
   console.log('定期実行開始: ' + new Date());
 
-  // 1. 失敗データをクリア
+  // まずAPIが使えるかテスト（1回だけ軽いリクエスト）
+  if (!isGeminiApiAvailable_()) {
+    console.log('定期実行スキップ: Gemini APIがレート制限中');
+    return;
+  }
+
+  // 失敗データをクリア（APIが使える時だけ）
   clearFailedEntries();
   Utilities.sleep(1000);
 
-  // 2. スキャン＆参照元検索
+  // スキャン＆参照元検索
   scanAndPrepare();
 
   console.log('定期実行完了: ' + new Date());
+}
+
+/**
+ * Gemini APIが使えるかテスト（軽量リクエスト）
+ */
+function isGeminiApiAvailable_() {
+  try {
+    var apiKey = getApiKey_();
+    var model = getLatestAvailableModel();
+    var url = 'https://generativelanguage.googleapis.com/v1beta/' + model + ':generateContent?key=' + apiKey;
+    var payload = { contents: [{ parts: [{ text: 'test' }] }] };
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    return resp.getResponseCode() === 200;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**

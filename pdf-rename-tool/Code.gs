@@ -870,10 +870,75 @@ function executeApprovedWeb() {
  * スプレッドシートURLを返す
  */
 // ============================================================
-// 実行履歴＆元に戻す（直近3回まで）
+// 定期実行（スキャン＆失敗再スキャン）
+// ============================================================
+
+/**
+ * 定期実行用: スキャン→失敗クリア→再スキャンを1関数で実行
+ * GASトリガーから呼ばれる
+ */
+function scheduledScanAndRetry() {
+  console.log('定期実行開始: ' + new Date());
+
+  // 1. 失敗データをクリア
+  clearFailedEntries();
+  Utilities.sleep(1000);
+
+  // 2. スキャン＆参照元検索
+  scanAndPrepare();
+
+  console.log('定期実行完了: ' + new Date());
+}
+
+/**
+ * 定期実行トリガーを設定
+ * @param {number} intervalMinutes - 実行間隔（分）
+ */
+function setupScheduledTrigger(intervalMinutes) {
+  // 既存のトリガーを削除
+  removeScheduledTrigger();
+
+  // 新しいトリガーを作成
+  ScriptApp.newTrigger('scheduledScanAndRetry')
+    .timeBased()
+    .everyMinutes(intervalMinutes)
+    .create();
+
+  return '✅ 定期実行を設定しました（' + intervalMinutes + '分間隔）';
+}
+
+/**
+ * 定期実行トリガーを削除
+ */
+function removeScheduledTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'scheduledScanAndRetry') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  return '✅ 定期実行を停止しました';
+}
+
+/**
+ * 現在のトリガー状態を取得
+ */
+function getScheduleStatus() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'scheduledScanAndRetry') {
+      // everyMinutesの間隔を取得
+      return { active: true, interval: '設定済み' };
+    }
+  }
+  return { active: false, interval: '' };
+}
+
+// ============================================================
+// 実行履歴＆元に戻す（直近5回まで）
 // ============================================================
 var HISTORY_SHEET_NAME = '実行履歴';
-var MAX_UNDO_BATCHES = 3;
+var MAX_UNDO_BATCHES = 5;
 
 /**
  * 実行履歴を保存

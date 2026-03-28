@@ -869,6 +869,140 @@ function executeApprovedWeb() {
 /**
  * スプレッドシートURLを返す
  */
+// ============================================================
+// 実行履歴＆元に戻す（直近3回まで）
+// ============================================================
+var HISTORY_SHEET_NAME = '実行履歴';
+var MAX_UNDO_BATCHES = 3;
+
+/**
+ * 実行履歴を保存
+ */
+function saveExecutionHistory_(ss, data) {
+  var sheet = ss.getSheetByName(HISTORY_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(HISTORY_SHEET_NAME);
+    sheet.getRange(1, 1, 1, 9).setValues([[
+      'バッチID', 'ファイルID', '元のファイル名', '元のフォルダID',
+      '新しいファイル名', '新しいフォルダID', '税理士コピー先', 'シート行', '実行日時'
+    ]]);
+    var h = sheet.getRange(1, 1, 1, 9);
+    h.setBackground('#37474F'); h.setFontColor('#fff'); h.setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+
+  // バッチID = 同じ「チェック済みを実行」で処理されたグループ
+  var batchId = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd_HHmmss');
+  // 既に同じ秒に書かれた行があればそのバッチIDを使う
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    var lastBatch = sheet.getRange(lastRow, 1).getValue();
+    var lastTime = sheet.getRange(lastRow, 9).getValue();
+    if (lastTime && (new Date().getTime() - new Date(lastTime).getTime()) < 300000) {
+      // 5分以内なら同じバッチ
+      batchId = lastBatch;
+    }
+  }
+
+  sheet.getRange(lastRow + 1, 1, 1, 9).setValues([[
+    batchId, data.fileId, data.originalName, data.originalFolderId,
+    data.newName, data.newFolderId,
+    JSON.stringify(data.taxCopies || []),
+    data.sheetRow, data.timestamp
+  ]]);
+}
+
+/**
+ * 元に戻せるバッチ一覧を取得（直近3回）
+ */
+function getUndoBatches() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(HISTORY_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getValues();
+
+  // バッチIDごとにグループ化
+  var batches = {};
+  var batchOrder = [];
+  for (var i = 0; i < data.length; i++) {
+    var bid = data[i][0];
+    if (!batches[bid]) {
+      batches[bid] = { batchId: bid, files: [], timestamp: '' };
+      batchOrder.push(bid);
+    }
+    batches[bid].files.push({
+      fileId: data[i][1],
+      originalName: data[i][2],
+      newName: data[i][4]
+    });
+    batches[bid].timestamp = data[i][8] ? Utilities.formatDate(new Date(data[i][8]), 'Asia/Tokyo', 'MM/dd HH:mm') : '';
+  }
+
+  // 直近3バッチを返す
+  var result = [];
+  for (var j = batchOrder.length - 1; j >= 0 && result.length < MAX_UNDO_BATCHES; j--) {
+    result.push(batches[batchOrder[j]]);
+  }
+  return result;
+}
+
+/**
+ * 指定バッチの実行を元に戻す
+ */
+function undoBatch(batchId) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var histSheet = ss.getSheetByName(HISTORY_SHEET_NAME);
+  if (!histSheet) return '❌ 実行履歴がありません';
+
+  var compareSheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  var data = histSheet.getRange(2, 1, histSheet.getLastRow() - 1, 9).getValues();
+
+  var undoneCount = 0;
+  var errors = [];
+
+  // 対象バッチの行を逆順に処理
+  for (var i = data.length - 1; i >= 0; i--) {
+    if (data[i][0] !== batchId) continue;
+
+    var fileId = data[i][1];
+    var originalName = data[i][2];
+    var originalFolderId = data[i][3];
+    var sheetRow = data[i][7];
+
+    try {
+      var file = DriveApp.getFileById(fileId);
+
+      // ファイル名を元に戻す
+      file.setName(originalName);
+
+      // 元のフォルダに移動
+      if (originalFolderId) {
+        var origFolder = DriveApp.getFolderById(originalFolderId);
+        file.moveTo(origFolder);
+      }
+
+      // 比較シートのステータスを戻す
+      if (compareSheet && sheetRow) {
+        compareSheet.getRange(sheetRow, COL.STATUS).setValue('↩ 元に戻し済み');
+        compareSheet.getRange(sheetRow, COL.CHECK).setValue(false);
+      }
+
+      // 履歴から削除
+      histSheet.deleteRow(i + 2);
+
+      undoneCount++;
+    } catch (e) {
+      errors.push(originalName + ': ' + e.message);
+    }
+  }
+
+  var msg = '↩ ' + undoneCount + '件を元に戻しました';
+  if (errors.length > 0) msg += '\n⚠ エラー: ' + errors.join(', ');
+  msg += '\n\n※ 税理士共有フォルダにコピーされたファイルは手動で削除してください';
+  return msg;
+}
+
 function getSpreadsheetUrl() {
   return SS_URL;
 }
@@ -1152,6 +1286,11 @@ function executeApproved() {
     try {
       var file = DriveApp.getFileById(fileId);
 
+      // 元に戻す用: 実行前の情報を保存
+      var originalName = file.getName();
+      var originalParents = file.getParents();
+      var originalFolderId = originalParents.hasNext() ? originalParents.next().getId() : '';
+
       var cleanName = renameTo.replace(/[\\/:*?"<>|]/g, '').trim();
       if (!cleanName.toLowerCase().endsWith('.pdf')) {
         cleanName += '.pdf';
@@ -1183,6 +1322,19 @@ function executeApproved() {
       }
 
       var sheetRow = i + 2;
+
+      // 実行履歴に保存（元に戻す用）
+      saveExecutionHistory_(ss, {
+        fileId: fileId,
+        originalName: originalName,
+        originalFolderId: originalFolderId,
+        newName: cleanName,
+        newFolderId: moveFolderId || extractIdFromUrl(OUTPUT_FOLDER_URL),
+        taxCopies: taxShareFolders,
+        sheetRow: sheetRow,
+        timestamp: new Date()
+      });
+
       var doneLabel = '✅ 完了（→ ' + movedTo + taxMsg + '）';
       compareSheet.getRange(sheetRow, COL.STATUS).setValue(doneLabel);
       compareSheet.getRange(sheetRow, COL.TIMESTAMP).setValue(new Date());

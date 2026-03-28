@@ -85,7 +85,7 @@
   <!-- アクションカード -->
   <div class="row action-cards g-2 mb-2">
     <div class="col-md-6">
-      <div class="card card-action h-100" onclick="runScan()">
+      <div class="card card-action h-100" onclick="runScan()" style="border-left: 3px solid #1a73e8;">
         <div class="card-body text-center">
           <i class="bi bi-search text-primary"></i>
           <h6>スキャン＆参照元検索</h6>
@@ -93,12 +93,21 @@
         </div>
       </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
       <div class="card card-action h-100" onclick="runExecute()">
         <div class="card-body text-center">
           <i class="bi bi-check2-circle text-success"></i>
           <h6>チェック済みを実行</h6>
-          <small class="text-muted">承認済みファイルをリネーム＆移動＆税理士共有</small>
+          <small class="text-muted">リネーム＆移動＆税理士共有</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card card-action h-100" onclick="openUndoModal()" style="border-left: 3px solid #ff9800;">
+        <div class="card-body text-center">
+          <i class="bi bi-arrow-counterclockwise text-warning"></i>
+          <h6>元に戻す</h6>
+          <small class="text-muted">直近3回</small>
         </div>
       </div>
     </div>
@@ -201,6 +210,26 @@
   </div>
 </div>
 <!-- /スクロールエリア -->
+
+<!-- Undoモーダル -->
+<div class="modal fade" id="undoModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h6 class="modal-title"><i class="bi bi-arrow-counterclockwise"></i> 実行を元に戻す（直近3回）</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="undoBatchList">
+          <p class="text-center text-muted">読み込み中...</p>
+        </div>
+        <div class="mt-2">
+          <small class="text-muted">※ ファイル名とフォルダを実行前の状態に戻します。税理士共有フォルダにコピーされたファイルは手動で削除してください。</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ローディングオーバーレイ -->
 <div id="spinnerOverlay" class="spinner-overlay d-none">
@@ -809,6 +838,57 @@ function onTaxShareToggle(idx, folderName, checked) {
 
   // AI推薦と異なる場合、フィードバックを蓄積
   google.script.run.saveTaxShareFeedback(rowNum, aiSuggested, selected);
+}
+
+// ============================================================
+// ============================================================
+// 元に戻す（Undo）
+// ============================================================
+function openUndoModal() {
+  document.getElementById('undoBatchList').innerHTML = '<p class="text-center text-muted">読み込み中...</p>';
+  new bootstrap.Modal(document.getElementById('undoModal')).show();
+  google.script.run
+    .withSuccessHandler(renderUndoBatches)
+    .withFailureHandler(onError)
+    .getUndoBatches();
+}
+
+function renderUndoBatches(batches) {
+  var container = document.getElementById('undoBatchList');
+  if (!batches || batches.length === 0) {
+    container.innerHTML = '<p class="text-muted text-center">元に戻せる実行履歴がありません</p>';
+    return;
+  }
+  var html = '';
+  batches.forEach(function(b, i) {
+    var fileList = b.files.map(function(f) {
+      return '<small class="d-block text-muted">' + esc(f.originalName) + ' → ' + esc(f.newName) + '</small>';
+    }).join('');
+    html += '<div class="card mb-2">' +
+      '<div class="card-body p-2">' +
+      '<div class="d-flex justify-content-between align-items-start">' +
+      '<div>' +
+      '<strong>' + (i + 1) + '. ' + b.timestamp + '</strong> <span class="badge bg-secondary">' + b.files.length + '件</span>' +
+      fileList +
+      '</div>' +
+      '<button class="btn btn-warning btn-sm" onclick="executeUndo(\'' + b.batchId + '\')"><i class="bi bi-arrow-counterclockwise"></i> 戻す</button>' +
+      '</div></div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function executeUndo(batchId) {
+  if (!confirm('この実行を元に戻しますか？\nファイル名とフォルダが実行前の状態に戻ります。')) return;
+  bootstrap.Modal.getInstance(document.getElementById('undoModal')).hide();
+  showSpinner('元に戻しています...', '');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideSpinner();
+      alert(result);
+      loadData();
+    })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .undoBatch(batchId);
 }
 
 // ============================================================

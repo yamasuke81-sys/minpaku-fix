@@ -267,10 +267,18 @@
       <div class="modal-body">
         <input type="hidden" id="browseRowIdx">
         <input type="hidden" id="browseMode"> <!-- "ref" or "dest" -->
-        <div class="d-flex align-items-center mb-2" id="browsePath">
-          <small class="text-muted" id="browseCurrentPath">読み込み中...</small>
+        <!-- ナビゲーション -->
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div>
+            <button class="btn btn-outline-secondary btn-sm me-1" onclick="loadBrowseFolder('')"><i class="bi bi-house"></i> マイドライブ</button>
+            <button class="btn btn-outline-info btn-sm me-1" onclick="loadBrowseFolder('shared')"><i class="bi bi-people"></i> 共有アイテム</button>
+            <small class="text-muted ms-2" id="browseCurrentPath"></small>
+          </div>
         </div>
+        <!-- フォルダURL直接入力 -->
         <div class="input-group mb-2">
+          <input type="text" class="form-control form-control-sm" id="browseFolderUrl" placeholder="フォルダURL/IDを直接入力して移動..." onkeydown="if(event.key==='Enter')goToFolderUrl()">
+          <button class="btn btn-outline-secondary btn-sm" onclick="goToFolderUrl()"><i class="bi bi-box-arrow-in-right"></i></button>
           <input type="text" class="form-control form-control-sm" id="browseSearchQuery" placeholder="ファイル名で検索..." onkeydown="if(event.key==='Enter')doBrowseSearch()">
           <button class="btn btn-outline-primary btn-sm" onclick="doBrowseSearch()"><i class="bi bi-search"></i></button>
         </div>
@@ -835,7 +843,10 @@ function renderBrowseContent(data) {
 
   var html = '<div class="list-group">';
   // 上へ戻るボタン
-  if (data.parentId) {
+  if (data.parentId === '__root__') {
+    html += '<button class="list-group-item list-group-item-action py-1" onclick="loadBrowseFolder(\'\')">' +
+      '<i class="bi bi-arrow-up me-2"></i>.. マイドライブへ戻る</button>';
+  } else if (data.parentId) {
     html += '<button class="list-group-item list-group-item-action py-1" onclick="loadBrowseFolder(\'' + data.parentId + '\')">' +
       '<i class="bi bi-arrow-up me-2"></i>.. 上のフォルダへ</button>';
   }
@@ -911,6 +922,23 @@ function selectBrowseFolder(folderId) {
     .withSuccessHandler(function(result) { hideSpinner(); alert(result); loadData(); })
     .withFailureHandler(function(e) { hideSpinner(); onError(e); })
     .updateDestFolder(rowNum, folderId);
+}
+
+function goToFolderUrl() {
+  var url = document.getElementById('browseFolderUrl').value.trim();
+  if (!url) return;
+  document.getElementById('browseContent').innerHTML = '<p class="text-center"><span class="spinner-border spinner-border-sm"></span> 移動中...</p>';
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.error) {
+        document.getElementById('browseContent').innerHTML = '<p class="text-danger">' + esc(result.error) + '</p>';
+      } else {
+        document.getElementById('browseFolderUrl').value = '';
+        loadBrowseFolder(result.folderId);
+      }
+    })
+    .withFailureHandler(onError)
+    .resolveFolderFromUrl(url);
 }
 
 // ============================================================

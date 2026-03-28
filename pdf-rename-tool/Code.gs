@@ -186,6 +186,11 @@ function getTaxShareLearning_() {
  */
 function browseDriveFolder(folderId) {
   try {
+    // 特殊ID: "shared" → 共有アイテムのフォルダ一覧
+    if (folderId === 'shared') {
+      return browseSharedFolders_();
+    }
+
     var folder;
     if (folderId) {
       folder = DriveApp.getFolderById(folderId);
@@ -197,6 +202,7 @@ function browseDriveFolder(folderId) {
       folderId: folder.getId(),
       folderName: folder.getName(),
       parentId: '',
+      isRoot: !folderId,
       folders: [],
       files: []
     };
@@ -227,6 +233,48 @@ function browseDriveFolder(folderId) {
     return result;
   } catch (e) {
     return { error: e.message };
+  }
+}
+
+/**
+ * 共有されたフォルダの一覧を取得
+ */
+function browseSharedFolders_() {
+  var result = {
+    folderId: 'shared',
+    folderName: '共有アイテム',
+    parentId: '__root__',
+    isRoot: false,
+    folders: [],
+    files: []
+  };
+
+  try {
+    // 「自分に共有されたフォルダ」を検索
+    var folders = DriveApp.searchFolders('sharedWithMe = true and trashed = false');
+    var count = 0;
+    while (folders.hasNext() && count < 50) {
+      var f = folders.next();
+      result.folders.push({ id: f.getId(), name: f.getName() });
+      count++;
+    }
+    result.folders.sort(function(a, b) { return a.name.localeCompare(b.name); });
+  } catch (e) {
+    result.error = e.message;
+  }
+  return result;
+}
+
+/**
+ * フォルダURLまたはIDから直接フォルダを開く
+ */
+function resolveFolderFromUrl(url) {
+  try {
+    var folderId = extractIdFromUrl(url);
+    var folder = DriveApp.getFolderById(folderId);
+    return { folderId: folder.getId(), folderName: folder.getName() };
+  } catch (e) {
+    return { error: 'フォルダにアクセスできません: ' + e.message };
   }
 }
 

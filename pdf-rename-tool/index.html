@@ -235,7 +235,36 @@
 // 列幅リサイズ
 // ============================================================
 (function() {
+  var STORAGE_KEY = 'pdfRenameColWidths';
   var resizing = null;
+
+  // 保存済み列幅を復元
+  function restoreWidths() {
+    try {
+      var saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      var widths = JSON.parse(saved);
+      var cols = document.getElementById('mainTable').querySelectorAll('colgroup col');
+      for (var i = 0; i < cols.length && i < widths.length; i++) {
+        if (widths[i]) cols[i].style.width = widths[i] + 'px';
+      }
+    } catch (e) {}
+  }
+
+  // 現在の列幅を保存
+  function saveWidths() {
+    try {
+      var cols = document.getElementById('mainTable').querySelectorAll('colgroup col');
+      var widths = [];
+      for (var i = 0; i < cols.length; i++) {
+        widths.push(parseInt(cols[i].style.width) || 0);
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(widths));
+    } catch (e) {}
+  }
+
+  // ページ読み込み時に復元
+  restoreWidths();
 
   document.addEventListener('mousedown', function(e) {
     if (!e.target.classList.contains('col-resizer')) return;
@@ -261,7 +290,10 @@
   }
 
   function onMouseUp() {
-    if (resizing) resizing.handle.classList.remove('active');
+    if (resizing) {
+      resizing.handle.classList.remove('active');
+      saveWidths(); // ドラッグ終了時に保存
+    }
     resizing = null;
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);

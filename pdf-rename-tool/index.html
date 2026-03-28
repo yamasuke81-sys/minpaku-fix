@@ -520,15 +520,21 @@ function renderTable() {
     }
     tr.appendChild(tdOps);
 
-    // 税理士共有
+    // 税理士共有チェックボックス
     var tdTax = document.createElement('td');
-    if (row.scanFileId) {
-      var taxBtn = document.createElement('button');
-      taxBtn.className = 'btn btn-outline-secondary btn-sm py-0 px-1';
-      taxBtn.title = '税理士共有フォルダにコピー';
-      taxBtn.innerHTML = '<i class="bi bi-share"></i>';
-      taxBtn.onclick = (function(i) { return function() { shareWithTax(i); }; })(idx);
-      tdTax.appendChild(taxBtn);
+    tdTax.style.textAlign = 'center';
+    if (!isDone) {
+      var taxCb = document.createElement('input');
+      taxCb.type = 'checkbox';
+      taxCb.className = 'form-check-input';
+      taxCb.checked = row.taxShare || false;
+      taxCb.title = '税理士共有フォルダにもコピー';
+      taxCb.onchange = (function(i) {
+        return function() { onTaxShareChanged(i, this.checked); };
+      })(idx);
+      tdTax.appendChild(taxCb);
+    } else if (row.taxShare) {
+      tdTax.innerHTML = '<i class="bi bi-check-circle text-success" title="税理士共有済"></i>';
     }
     tr.appendChild(tdTax);
 
@@ -731,15 +737,12 @@ function saveTaxFolder() {
 }
 
 // ============================================================
-// 税理士共有
+// 税理士共有チェック
 // ============================================================
-function shareWithTax(idx) {
-  var row = currentData[idx];
-  if (!confirm('「' + (row.renameTo || row.scanName) + '」を税理士共有フォルダにコピーしますか？')) return;
-  google.script.run
-    .withSuccessHandler(function(result) { alert(result); })
-    .withFailureHandler(onError)
-    .shareWithTaxAccountant(row.scanFileId, row.renameTo);
+function onTaxShareChanged(idx, checked) {
+  currentData[idx].taxShare = checked;
+  var rowNum = currentData[idx].rowNum;
+  google.script.run.updateTaxShare(rowNum, checked);
 }
 
 // ============================================================

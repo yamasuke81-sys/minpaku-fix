@@ -228,9 +228,10 @@ const COL = {
   SCAN_FILE_ID:  12,  // L: スキャンファイルID
   REF_FILE_ID:   13,  // M: 参照元ファイルID
   FEEDBACK:      15,  // O: 補足メモ（ユーザーフィードバック）
-  TIMESTAMP:     16,  // P: 処理日時
+  TAX_SHARE:     16,  // P: 税理士共有チェック
+  TIMESTAMP:     17,  // Q: 処理日時
 };
-const TOTAL_COLS = 16;
+const TOTAL_COLS = 17;
 
 // ============================================================
 // メニュー
@@ -287,6 +288,7 @@ function getCompareData() {
       scanFileId: row[COL.SCAN_FILE_ID - 1] || '',
       refFileId: row[COL.REF_FILE_ID - 1] || '',
       feedback: row[COL.FEEDBACK - 1] || '',
+      taxShare: row[COL.TAX_SHARE - 1] === true,
       timestamp: row[COL.TIMESTAMP - 1] ? Utilities.formatDate(new Date(row[COL.TIMESTAMP - 1]), 'Asia/Tokyo', 'MM/dd HH:mm') : ''
     });
   }
@@ -313,6 +315,16 @@ function updateCheckStatusBatch(updates) {
   for (var i = 0; i < updates.length; i++) {
     sheet.getRange(updates[i].rowNum, COL.CHECK).setValue(updates[i].checked);
   }
+}
+
+/**
+ * 税理士共有チェック状態を更新
+ */
+function updateTaxShare(rowNum, checked) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return;
+  sheet.getRange(rowNum, COL.TAX_SHARE).setValue(checked);
 }
 
 /**
@@ -810,10 +822,11 @@ function executeApproved() {
     var renameTo = row[COL.RENAME_TO - 1];
     var refFolderId = row[COL.REF_FOLDER_ID - 1];
     var destFolderId = row[COL.DEST_FOLDER_ID - 1];
+    var taxShare = row[COL.TAX_SHARE - 1] === true;
 
     if (!fileId || !renameTo) continue;
 
-    // 移動先の優先順位: DEST_FOLDER_ID（ユーザーが確認済み）> REF_FOLDER_ID > outputフォルダ
+    // 移動先の優先順位: DEST_FOLDER_ID > REF_FOLDER_ID > outputフォルダ
     var moveFolderId = destFolderId || refFolderId || '';
 
     try {
@@ -843,9 +856,28 @@ function executeApproved() {
         movedTo = 'output';
       }
 
+      // 税理士共有チェックがONの場合、税理士フォルダにもコピー
+      var taxMsg = '';
+      if (taxShare) {
+        var taxFolderId = PropertiesService.getScriptProperties().getProperty('TAX_ACCOUNTANT_FOLDER_ID');
+        if (taxFolderId) {
+          try {
+            var taxFolder = DriveApp.getFolderById(taxFolderId);
+            file.makeCopy(cleanName, taxFolder);
+            taxMsg = ' + 税理士共有済';
+            saveShareLearning_(fileId, cleanName, taxFolderId);
+          } catch (taxErr) {
+            taxMsg = ' + 税理士共有失敗';
+            console.error('税理士共有失敗: ' + taxErr.message);
+          }
+        } else {
+          taxMsg = ' + 税理士フォルダ未設定';
+        }
+      }
+
       // ステータス更新
-      var sheetRow = i + 2; // ヘッダー分+1
-      var doneLabel = '✅ 完了（→ ' + movedTo + '）';
+      var sheetRow = i + 2;
+      var doneLabel = '✅ 完了（→ ' + movedTo + taxMsg + '）';
       compareSheet.getRange(sheetRow, COL.STATUS).setValue(doneLabel);
       compareSheet.getRange(sheetRow, COL.TIMESTAMP).setValue(new Date());
       executedCount++;
@@ -1199,7 +1231,7 @@ function getOrCreateCompareSheet_(ss) {
     'スキャンファイル', '参照元ファイル名', '参照元ファイル',
     '参照元フォルダID', '移動先フォルダ候補', '移動先フォルダID',
     'ステータス', 'スキャンファイルID', '参照元ファイルID',
-    '補足メモ', '処理日時'
+    '補足メモ', '税理士共有', '処理日時'
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -1225,6 +1257,7 @@ function getOrCreateCompareSheet_(ss) {
   sheet.setColumnWidth(COL.SCAN_FILE_ID, 100);
   sheet.setColumnWidth(COL.REF_FILE_ID, 100);
   sheet.setColumnWidth(COL.FEEDBACK, 300);         // 補足メモ
+  sheet.setColumnWidth(COL.TAX_SHARE, 60);         // 税理士共有
   sheet.setColumnWidth(COL.TIMESTAMP, 150);
 
   // 内部ID列を非表示（ユーザーには不要）

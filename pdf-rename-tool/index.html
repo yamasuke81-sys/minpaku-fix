@@ -18,8 +18,8 @@
     .card-action h6 { font-size: 0.85rem; margin-top: 4px !important; margin-bottom: 2px !important; }
     .card-action small { font-size: 0.7rem; }
     .status-bar { background: #fff; border-radius: 8px; padding: 8px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); font-size: 0.85rem; }
-    .scroll-area { flex: 1; overflow-y: auto; min-height: 0; }
-    .table-container { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow-x: auto; }
+    .scroll-area { flex: 1; overflow: auto; min-height: 0; }
+    .table-container { background: #fff; }
     .table th { background: #1a73e8; color: #fff; font-size: 0.8rem; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
     .table td { font-size: 0.85rem; vertical-align: middle; }
     .badge-new { background: #FFF9C4; color: #F57F17; border: 1px solid #FDD835; }
@@ -157,8 +157,7 @@
 
 <!-- スクロールエリア（テーブル） -->
 <div class="scroll-area">
-<div class="container py-2">
-  <div class="table-container p-3">
+  <div class="table-container">
     <div id="loadingMsg" class="text-center py-5 text-muted">
       <div class="spinner-border spinner-border-sm me-2" role="status"></div>
       データを読み込み中...
@@ -188,8 +187,6 @@
       </table>
     </div>
   </div>
-
-</div>
 </div>
 <!-- /スクロールエリア -->
 

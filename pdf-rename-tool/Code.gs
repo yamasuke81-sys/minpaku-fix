@@ -1220,20 +1220,32 @@ function selectBestMatch_(summary, candidates, modelName, feedbackHistory, rules
 // ============================================================
 function getOrCreateCompareSheet_(ss) {
   var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
-  if (sheet) return sheet;
 
-  // 新規作成
-  sheet = ss.insertSheet(COMPARE_SHEET_NAME);
-
-  // ヘッダー設定
-  var headers = [
+  var expectedHeaders = [
     'チェック', 'スキャンファイル名', '内容要約', 'リネーム予定名',
     'スキャンファイル', '参照元ファイル名', '参照元ファイル',
     '参照元フォルダID', '移動先フォルダ候補', '移動先フォルダID',
     'ステータス', 'スキャンファイルID', '参照元ファイルID',
     '補足メモ', '税理士共有', '処理日時'
   ];
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+  if (sheet) {
+    // 既存シートの列数が足りない場合、不足列を自動追加（データを消さない）
+    var currentCols = sheet.getLastColumn();
+    if (currentCols < expectedHeaders.length) {
+      for (var c = currentCols + 1; c <= expectedHeaders.length; c++) {
+        sheet.getRange(1, c).setValue(expectedHeaders[c - 1]);
+        sheet.getRange(1, c).setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold');
+      }
+      console.log('参照元比較シート: 列を ' + currentCols + ' → ' + expectedHeaders.length + ' に拡張しました');
+    }
+    return sheet;
+  }
+
+  // 新規作成
+  sheet = ss.insertSheet(COMPARE_SHEET_NAME);
+
+  sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
 
   // ヘッダーの書式設定
   var headerRange = sheet.getRange(1, 1, 1, headers.length);

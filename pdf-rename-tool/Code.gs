@@ -543,7 +543,7 @@ function scanAndPrepare() {
       if (renameTo === 'ERROR') renameTo = '（生成失敗）';
 
       // Drive内で類似PDFを検索
-      var refResult = findSimilarFile_(summary, activeModel, feedbackHistory);
+      var refResult = findSimilarFile_(summary, activeModel, feedbackHistory, rules);
 
       // 比較シートに行を追加
       var newRow = compareSheet.getLastRow() + 1;
@@ -566,7 +566,7 @@ function scanAndPrepare() {
         compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue('');
 
         // PDFの内容からDrive内の適切な保存先フォルダを提案
-        var folderSuggestion = suggestDestinationFolder_(summary, cleanRenameTo, activeModel, feedbackHistory);
+        var folderSuggestion = suggestDestinationFolder_(summary, cleanRenameTo, activeModel, feedbackHistory, rules);
         if (folderSuggestion.folderId) {
           compareSheet.getRange(newRow, COL.DEST_FOLDER).setValue('📁 ' + folderSuggestion.folderPath);
           compareSheet.getRange(newRow, COL.DEST_FOLDER_ID).setValue(folderSuggestion.folderId);
@@ -855,11 +855,11 @@ function callGeminiWithRetry_(url, payload, context) {
 // ============================================================
 // Drive内で類似ファイルを検索
 // ============================================================
-function findSimilarFile_(summary, modelName, feedbackHistory) {
+function findSimilarFile_(summary, modelName, feedbackHistory, rules) {
   var emptyResult = { fileId: '', fileName: '', folderId: '' };
 
-  // Geminiに検索キーワードを生成させる（学習データ込み）
-  var keywords = extractSearchKeywords_(summary, modelName, feedbackHistory);
+  // Geminiに検索キーワードを生成させる（学習データ＋ルール込み）
+  var keywords = extractSearchKeywords_(summary, modelName, feedbackHistory, rules);
   if (!keywords) return emptyResult;
 
   // キーワードでDriveを検索（PDFのみ、inputフォルダ以外）
@@ -872,20 +872,24 @@ function findSimilarFile_(summary, modelName, feedbackHistory) {
     return candidates[0];
   }
 
-  // フィードバック履歴を含めて最適候補を選定
-  return selectBestMatch_(summary, candidates, modelName, feedbackHistory);
+  // フィードバック履歴＋ルールを含めて最適候補を選定
+  return selectBestMatch_(summary, candidates, modelName, feedbackHistory, rules);
 }
 
 /**
  * 要約から検索用キーワードを抽出（Gemini）
  */
-function extractSearchKeywords_(summary, modelName, feedbackHistory) {
+function extractSearchKeywords_(summary, modelName, feedbackHistory, rules) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var promptText = '以下のPDF内容の要約から、Googleドライブで類似ファイルを検索するためのキーワードを生成してください。\n' +
     '会社名・物件名・書類種別など、ファイル名に含まれそうな重要キーワードを2〜4個、スペース区切りで出力してください。\n' +
     'キーワードのみ出力し、説明は不要です。\n\n' +
     '【要約】\n' + summary;
+
+  if (rules) {
+    promptText += '\n\n【変名ルール（ファイル命名の前提条件）】\n' + rules;
+  }
 
   if (feedbackHistory) {
     promptText += '\n\n【過去の補足情報（正しい分類の参考にしてください）】\n' + feedbackHistory;
@@ -974,7 +978,7 @@ function searchDriveForPdf_(keywords, excludeFolderId) {
 /**
  * 候補から最適な参照元を選定（Gemini）
  */
-function selectBestMatch_(summary, candidates, modelName, feedbackHistory) {
+function selectBestMatch_(summary, candidates, modelName, feedbackHistory, rules) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var candidateList = candidates.map(function(c, i) {
@@ -987,7 +991,10 @@ function selectBestMatch_(summary, candidates, modelName, feedbackHistory) {
     '【PDF内容要約】\n' + summary + '\n\n' +
     '【候補リスト】\n' + candidateList;
 
-  // フィードバック履歴がある場合、過去の誤りを伝えて精度を上げる
+  if (rules) {
+    promptText += '\n\n【変名ルール（ファイル命名の前提条件）】\n' + rules;
+  }
+
   if (feedbackHistory) {
     promptText += '\n\n【過去の誤り（参考にして同じ間違いを避けてください）】\n' + feedbackHistory;
   }
@@ -1092,11 +1099,11 @@ function loadRules_(sheet) {
 /**
  * PDFの内容要約とリネーム予定名から、Drive内の適切な保存先フォルダを提案
  */
-function suggestDestinationFolder_(summary, renameTo, modelName, feedbackHistory) {
+function suggestDestinationFolder_(summary, renameTo, modelName, feedbackHistory, rules) {
   var emptyResult = { folderId: '', folderPath: '' };
 
-  // Geminiにフォルダ検索用キーワードを生成させる（学習データ込み）
-  var keywords = extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory);
+  // Geminiにフォルダ検索用キーワードを生成させる（学習データ＋ルール込み）
+  var keywords = extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory, rules);
   if (!keywords) return emptyResult;
 
   // キーワードでDrive内のフォルダを検索
@@ -1107,14 +1114,14 @@ function suggestDestinationFolder_(summary, renameTo, modelName, feedbackHistory
     return candidateFolders[0];
   }
 
-  // 複数候補 → 学習データ込みで最適なフォルダを選定
-  return selectBestFolder_(summary, renameTo, candidateFolders, modelName, feedbackHistory);
+  // 複数候補 → 学習データ＋ルール込みで最適なフォルダを選定
+  return selectBestFolder_(summary, renameTo, candidateFolders, modelName, feedbackHistory, rules);
 }
 
 /**
  * フォルダ検索用キーワードを生成
  */
-function extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory) {
+function extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory, rules) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var promptText = '以下のPDFの情報から、Googleドライブ内で保存先フォルダを探すためのキーワードを生成してください。\n' +
@@ -1123,6 +1130,10 @@ function extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory) {
     'キーワードのみ出力し、説明は不要です。\n\n' +
     '【内容要約】\n' + summary + '\n\n' +
     '【リネーム予定名】\n' + renameTo;
+
+  if (rules) {
+    promptText += '\n\n【変名ルール（前提条件）】\n' + rules;
+  }
 
   if (feedbackHistory) {
     promptText += '\n\n【過去の補足情報（正しいフォルダ分類の参考にしてください）】\n' + feedbackHistory;
@@ -1219,7 +1230,7 @@ function getFolderPath_(folderId) {
 /**
  * 候補から最適なフォルダを選定（Gemini）
  */
-function selectBestFolder_(summary, renameTo, candidates, modelName, feedbackHistory) {
+function selectBestFolder_(summary, renameTo, candidates, modelName, feedbackHistory, rules) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var candidateList = candidates.map(function(c, i) {
@@ -1232,6 +1243,10 @@ function selectBestFolder_(summary, renameTo, candidates, modelName, feedbackHis
     '【PDF内容】\n' + summary + '\n\n' +
     '【リネーム予定名】\n' + renameTo + '\n\n' +
     '【フォルダ候補】\n' + candidateList;
+
+  if (rules) {
+    promptText += '\n\n【変名ルール（前提条件）】\n' + rules;
+  }
 
   if (feedbackHistory) {
     promptText += '\n\n【過去の補足情報（フォルダ選択の参考にしてください）】\n' + feedbackHistory;

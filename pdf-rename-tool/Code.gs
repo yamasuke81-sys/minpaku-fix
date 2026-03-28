@@ -287,13 +287,13 @@ const COL = {
   STATUS:        11,  // K: ステータス
   SCAN_FILE_ID:  12,  // L: スキャンファイルID
   REF_FILE_ID:   13,  // M: 参照元ファイルID
-  FEEDBACK:      15,  // O: 補足メモ（ユーザーフィードバック）
-  TAX_SHARE:     16,  // P: 税理士共有（JSON: ["法人用"] 等）
-  DOC_DATE:      17,  // Q: 書類日付（YYYY-MM形式）
-  ENTITY_TYPE:   18,  // R: 法人/個人判定
-  TIMESTAMP:     19,  // S: 処理日時
+  FEEDBACK:      14,  // N: 補足メモ（ユーザーフィードバック）
+  TAX_SHARE:     15,  // O: 税理士共有（JSON: ["法人用"] 等）
+  DOC_DATE:      16,  // P: 書類日付（YYYY-MM形式）
+  ENTITY_TYPE:   17,  // Q: 法人/個人判定
+  TIMESTAMP:     18,  // R: 処理日時
 };
-const TOTAL_COLS = 19;
+const TOTAL_COLS = 18;
 
 // ============================================================
 // メニュー
@@ -324,39 +324,49 @@ function doGet(e) {
  * 比較シートのデータを取得してWebアプリに返す
  */
 function getCompareData() {
-  var ss = SpreadsheetApp.openByUrl(SS_URL);
-  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
-  if (!sheet) return [];
+  try {
+    var ss = SpreadsheetApp.openByUrl(SS_URL);
+    var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+    if (!sheet) return [];
 
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
 
-  var data = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
-  var result = [];
+    var data = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+    var result = [];
 
-  for (var i = 0; i < data.length; i++) {
-    var row = data[i];
-    result.push({
-      rowNum: i + 2, // シート上の行番号
-      checked: row[COL.CHECK - 1] === true,
-      scanName: row[COL.SCAN_NAME - 1] || '',
-      summary: row[COL.SUMMARY - 1] || '',
-      renameTo: row[COL.RENAME_TO - 1] || '',
-      refName: row[COL.REF_NAME - 1] || '',
-      refFolderId: row[COL.REF_FOLDER_ID - 1] || '',
-      destFolder: row[COL.DEST_FOLDER - 1] || '',
-      destFolderId: row[COL.DEST_FOLDER_ID - 1] || '',
-      status: row[COL.STATUS - 1] || '',
-      scanFileId: row[COL.SCAN_FILE_ID - 1] || '',
-      refFileId: row[COL.REF_FILE_ID - 1] || '',
-      feedback: row[COL.FEEDBACK - 1] || '',
-      taxShare: parseTaxShare_(row[COL.TAX_SHARE - 1]),
-      docDate: row[COL.DOC_DATE - 1] || '',
-      entityType: row[COL.ENTITY_TYPE - 1] || '',
-      timestamp: row[COL.TIMESTAMP - 1] ? Utilities.formatDate(new Date(row[COL.TIMESTAMP - 1]), 'Asia/Tokyo', 'MM/dd HH:mm') : ''
-    });
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var ts = '';
+      try {
+        if (row[COL.TIMESTAMP - 1]) ts = Utilities.formatDate(new Date(row[COL.TIMESTAMP - 1]), 'Asia/Tokyo', 'MM/dd HH:mm');
+      } catch (e) { ts = ''; }
+
+      result.push({
+        rowNum: i + 2,
+        checked: row[COL.CHECK - 1] === true,
+        scanName: String(row[COL.SCAN_NAME - 1] || ''),
+        summary: String(row[COL.SUMMARY - 1] || ''),
+        renameTo: String(row[COL.RENAME_TO - 1] || ''),
+        refName: String(row[COL.REF_NAME - 1] || ''),
+        refFolderId: String(row[COL.REF_FOLDER_ID - 1] || ''),
+        destFolder: String(row[COL.DEST_FOLDER - 1] || ''),
+        destFolderId: String(row[COL.DEST_FOLDER_ID - 1] || ''),
+        status: String(row[COL.STATUS - 1] || ''),
+        scanFileId: String(row[COL.SCAN_FILE_ID - 1] || ''),
+        refFileId: String(row[COL.REF_FILE_ID - 1] || ''),
+        feedback: String(row[COL.FEEDBACK - 1] || ''),
+        taxShare: parseTaxShare_(row[COL.TAX_SHARE - 1]),
+        docDate: String(row[COL.DOC_DATE - 1] || ''),
+        entityType: String(row[COL.ENTITY_TYPE - 1] || ''),
+        timestamp: ts
+      });
+    }
+    return result;
+  } catch (e) {
+    console.error('getCompareData エラー: ' + e.message);
+    throw new Error('データ読み込みエラー: ' + e.message);
   }
-  return result;
 }
 
 /**

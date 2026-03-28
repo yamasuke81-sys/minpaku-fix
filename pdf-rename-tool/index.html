@@ -929,6 +929,7 @@ function openBrowse(idx, mode) {
   document.getElementById('browseModalTitle').innerHTML = mode === 'ref'
     ? '<i class="bi bi-folder2-open"></i> 参照元ファイルを選択'
     : '<i class="bi bi-folder2-open"></i> 移動先フォルダを選択';
+  document.getElementById('browseSearchQuery').placeholder = mode === 'ref' ? 'ファイル名で検索...' : 'フォルダ名で検索...';
   document.getElementById('browseContent').innerHTML = '<p class="text-center text-muted">読み込み中...</p>';
   new bootstrap.Modal(document.getElementById('browseModal')).show();
   loadBrowseFolder('shared'); // デフォルトは共有アイテム
@@ -991,24 +992,46 @@ function doBrowseSearch() {
   var mode = document.getElementById('browseMode').value;
   document.getElementById('browseContent').innerHTML = '<p class="text-center"><span class="spinner-border spinner-border-sm"></span> 検索中...</p>';
 
-  google.script.run
-    .withSuccessHandler(function(results) {
-      if (!results || results.length === 0) {
-        document.getElementById('browseContent').innerHTML = '<p class="text-muted text-center">見つかりません</p>';
-        return;
-      }
-      var html = '<div class="list-group">';
-      results.forEach(function(f) {
-        html += '<button class="list-group-item list-group-item-action py-1" onclick="selectBrowseFile(\'' + f.fileId + '\')">' +
-          '<i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.fileName) +
-          '<br><small class="text-muted">📁 ' + esc(f.folderName || '') + '</small>' +
-          ' <span class="badge bg-primary float-end">選択</span></button>';
-      });
-      html += '</div>';
-      document.getElementById('browseContent').innerHTML = html;
-    })
-    .withFailureHandler(onError)
-    .searchFilesInDrive(query);
+  if (mode === 'dest') {
+    // 移動先モード: フォルダ検索
+    google.script.run
+      .withSuccessHandler(function(results) {
+        if (!results || results.length === 0) {
+          document.getElementById('browseContent').innerHTML = '<p class="text-muted text-center">フォルダが見つかりません</p>';
+          return;
+        }
+        var html = '<div class="list-group">';
+        results.forEach(function(f) {
+          html += '<button class="list-group-item list-group-item-action py-1" onclick="selectBrowseFolder(\'' + f.folderId + '\')">' +
+            '<i class="bi bi-folder-fill text-warning me-2"></i>' + esc(f.folderPath) +
+            ' <span class="badge bg-success float-end">選択</span></button>';
+        });
+        html += '</div>';
+        document.getElementById('browseContent').innerHTML = html;
+      })
+      .withFailureHandler(onError)
+      .searchFolders(query);
+  } else {
+    // 参照元モード: ファイル検索
+    google.script.run
+      .withSuccessHandler(function(results) {
+        if (!results || results.length === 0) {
+          document.getElementById('browseContent').innerHTML = '<p class="text-muted text-center">ファイルが見つかりません</p>';
+          return;
+        }
+        var html = '<div class="list-group">';
+        results.forEach(function(f) {
+          html += '<button class="list-group-item list-group-item-action py-1" onclick="selectBrowseFile(\'' + f.fileId + '\')">' +
+            '<i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.fileName) +
+            '<br><small class="text-muted">📁 ' + esc(f.folderName || '') + '</small>' +
+            ' <span class="badge bg-primary float-end">選択</span></button>';
+        });
+        html += '</div>';
+        document.getElementById('browseContent').innerHTML = html;
+      })
+      .withFailureHandler(onError)
+      .searchFilesInDrive(query);
+  }
 }
 
 function selectBrowseFile(fileId) {

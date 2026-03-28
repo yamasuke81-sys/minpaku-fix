@@ -630,10 +630,25 @@ function saveTaxShareFeedback(rowNum, aiSuggested, userSelected) {
     h.setBackground('#00695C'); h.setFontColor('#fff'); h.setFontWeight('bold');
     lSheet.setFrozenRows(1);
   }
-  lSheet.getRange(lSheet.getLastRow() + 1, 1, 1, 5).setValues([[
-    String(summary).substring(0, 100), entityType,
-    JSON.stringify(aiSuggested), JSON.stringify(userSelected), new Date()
-  ]]);
+  var scanName = row[COL.SCAN_NAME - 1];
+  var summaryKey = String(summary).substring(0, 100);
+
+  // 同じファイルの既存エントリがあれば上書き
+  var lastRow = lSheet.getLastRow();
+  var existingRow = -1;
+  if (lastRow >= 2) {
+    var existingData = lSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = existingData.length - 1; i >= 0; i--) {
+      if (existingData[i][0] === summaryKey) { existingRow = i + 2; break; }
+    }
+  }
+
+  var rowValues = [[summaryKey, entityType, JSON.stringify(aiSuggested), JSON.stringify(userSelected), new Date()]];
+  if (existingRow > 0) {
+    lSheet.getRange(existingRow, 1, 1, 5).setValues(rowValues);
+  } else {
+    lSheet.getRange(lastRow + 1, 1, 1, 5).setValues(rowValues);
+  }
 }
 
 /**
@@ -690,11 +705,29 @@ function saveRenameLearning_(ss, data) {
     sheet.setColumnWidth(5, 150);
   }
 
-  var newRow = sheet.getLastRow() + 1;
-  sheet.getRange(newRow, 1, 1, 5).setValues([[
+  // 同じスキャンファイル名の既存エントリがあれば上書き（最新のみ保持）
+  var lastRow = sheet.getLastRow();
+  var existingRow = -1;
+  if (lastRow >= 2) {
+    var existingData = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = existingData.length - 1; i >= 0; i--) {
+      if (existingData[i][0] === data.scanName) {
+        existingRow = i + 2;
+        break;
+      }
+    }
+  }
+
+  var rowValues = [[
     data.scanName, data.summary, data.aiGeneratedName,
     data.userCorrectedName, data.timestamp
-  ]]);
+  ]];
+
+  if (existingRow > 0) {
+    sheet.getRange(existingRow, 1, 1, 5).setValues(rowValues);
+  } else {
+    sheet.getRange(lastRow + 1, 1, 1, 5).setValues(rowValues);
+  }
 }
 
 /**
@@ -756,12 +789,33 @@ function saveFeedbackHistory_(ss, data) {
     sheet.setColumnWidth(7, 150);
   }
 
-  var newRow = sheet.getLastRow() + 1;
-  sheet.getRange(newRow, 1, 1, 7).setValues([[
+  // 同じスキャンファイル名＋同じ種類の変更があれば上書き（最新のみ保持）
+  var lastRow = sheet.getLastRow();
+  var existingRow = -1;
+  if (lastRow >= 2) {
+    var existingData = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    for (var i = existingData.length - 1; i >= 0; i--) {
+      if (existingData[i][0] === data.scanName && existingData[i][5] &&
+          data.feedback && existingData[i][5].toString().split('「')[0] === data.feedback.toString().split('「')[0]) {
+        existingRow = i + 2;
+        break;
+      }
+    }
+  }
+
+  var rowValues = [[
     data.scanName, data.summary, data.renameTo,
     data.wrongRefName, data.wrongRefFileId,
     data.feedback, data.timestamp
-  ]]);
+  ]];
+
+  if (existingRow > 0) {
+    // 同じファイルの同種の変更 → 上書き
+    sheet.getRange(existingRow, 1, 1, 7).setValues(rowValues);
+  } else {
+    // 新規追加
+    sheet.getRange(lastRow + 1, 1, 1, 7).setValues(rowValues);
+  }
 }
 
 /**
@@ -1926,6 +1980,13 @@ function extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory, r
 /**
  * Drive内でフォルダを検索
  */
+/**
+ * フォルダ検索（Web APIから呼べる公開版）
+ */
+function searchFolders(query) {
+  return searchDriveForFolders_(query);
+}
+
 function searchDriveForFolders_(keywords) {
   var results = [];
   var keywordList = keywords.split(/[\s,　]+/).filter(function(k) { return k.length > 0; });

@@ -5310,6 +5310,11 @@
       });
     }
 
+    function updateProxyDebug_() {
+      var el = document.getElementById('proxyDebugBanner');
+      if (el) el.textContent = 'proxy=' + (_useImageProxy ? 'ON' : 'OFF') + ' ok=' + _proxyStats.success + ' fail=' + _proxyStats.fail + '/' + _proxyStats.total;
+    }
+
     // MutationObserverでDOM更新を監視し、iOS Safariプロキシ画像を自動差替
     var _proxyObserverTimer = null;
     if (typeof MutationObserver !== 'undefined') {
@@ -5336,6 +5341,16 @@
     var _isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
     var _useImageProxy = _isIOSSafari; // trueでプロキシ有効、falseで従来方式
     var _imgProxyCache = {}; // fileId+width → data URL キャッシュ
+    var _proxyStats = { total: 0, success: 0, fail: 0 }; // デバッグ用カウンタ
+
+    // [DEBUG-PROXY] デバッグバナー表示
+    (function() {
+      var dbg = document.createElement('div');
+      dbg.id = 'proxyDebugBanner';
+      dbg.style.cssText = 'position:fixed;bottom:30px;left:8px;font-size:9px;color:#fff;background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:4px;z-index:99999;pointer-events:none;';
+      dbg.textContent = 'proxy=' + (_isIOSSafari ? 'ON' : 'OFF') + ' ua=' + navigator.userAgent.slice(0, 60);
+      document.body.appendChild(dbg);
+    })();
 
     /**
      * サムネイルURLを返す。iOS Safariの場合はプロキシ経由のBase64を返す。
@@ -5366,15 +5381,19 @@
         }
         // プレースホルダー表示
         img.alt = '読込中...';
+        _proxyStats.total++;
         callGAS('getImageProxy', [fileId, width]).then(function(r) {
           if (r.success) {
             _imgProxyCache[cacheKey] = r.data;
             img.src = r.data;
             img.alt = '';
+            _proxyStats.success++;
           } else {
-            img.alt = '読込失敗';
+            img.alt = '読込失敗:' + (r.error || '?');
+            _proxyStats.fail++;
           }
-        }).catch(function() { img.alt = '読込失敗'; });
+          updateProxyDebug_();
+        }).catch(function(e) { img.alt = '読込失敗:' + (e.message || e); _proxyStats.fail++; updateProxyDebug_(); });
       });
       // background-image も処理
       var bgs = document.querySelectorAll('[data-proxy-bg]:not([data-proxy-done])');
@@ -5388,12 +5407,15 @@
           el.style.backgroundImage = 'url(' + _imgProxyCache[cacheKey] + ')';
           return;
         }
+        _proxyStats.total++;
         callGAS('getImageProxy', [fileId, width]).then(function(r) {
           if (r.success) {
             _imgProxyCache[cacheKey] = r.data;
             el.style.backgroundImage = 'url(' + r.data + ')';
-          }
-        }).catch(function() {});
+            _proxyStats.success++;
+          } else { _proxyStats.fail++; }
+          updateProxyDebug_();
+        }).catch(function() { _proxyStats.fail++; updateProxyDebug_(); });
       });
     }
     }

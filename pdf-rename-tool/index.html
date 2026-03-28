@@ -21,9 +21,10 @@
     .scroll-area { flex: 1; overflow: auto; min-height: 0; }
     .table-container { background: #fff; }
     .table { table-layout: fixed; }
-    .table th { background: #1a73e8; color: #fff; font-size: 0.8rem; white-space: nowrap; position: sticky; top: 0; z-index: 10; overflow: hidden; text-overflow: ellipsis; position: relative; }
+    .table th { background: #1a73e8; color: #fff; font-size: 0.8rem; white-space: nowrap; position: sticky; top: 0; z-index: 10; overflow: hidden; text-overflow: ellipsis; }
     .table td { overflow: hidden; text-overflow: ellipsis; }
-    .col-resizer { position: absolute; right: 0; top: 0; width: 5px; height: 100%; cursor: col-resize; background: transparent; }
+    .col-resizer { position: absolute; right: 0; top: 0; width: 5px; height: 100%; cursor: col-resize; background: transparent; z-index: 11; }
+    .th-wrap { position: relative; display: inline-block; width: 100%; }
     .col-resizer:hover, .col-resizer.active { background: rgba(255,255,255,0.4); }
     .table td { font-size: 0.85rem; vertical-align: middle; }
     .badge-new { background: #FFF9C4; color: #F57F17; border: 1px solid #FDD835; }
@@ -183,15 +184,15 @@
             <th class="check-all-header" onclick="toggleAll()" title="全選択/全解除">
               <input type="checkbox" id="checkAll" class="form-check-input">
             </th>
-            <th>スキャンファイル<div class="col-resizer" data-col="1"></div></th>
-            <th>内容要約<div class="col-resizer" data-col="2"></div></th>
-            <th>リネーム予定名<div class="col-resizer" data-col="3"></div></th>
-            <th>参照元<div class="col-resizer" data-col="4"></div></th>
-            <th>移動先フォルダ<div class="col-resizer" data-col="5"></div></th>
-            <th>ステータス<div class="col-resizer" data-col="6"></div></th>
-            <th>補足メモ<div class="col-resizer" data-col="7"></div></th>
+            <th><div class="th-wrap">スキャンファイル<div class="col-resizer" data-col="1"></div></div></th>
+            <th><div class="th-wrap">内容要約<div class="col-resizer" data-col="2"></div></div></th>
+            <th><div class="th-wrap">リネーム予定名<div class="col-resizer" data-col="3"></div></div></th>
+            <th><div class="th-wrap">参照元<div class="col-resizer" data-col="4"></div></div></th>
+            <th><div class="th-wrap">移動先フォルダ<div class="col-resizer" data-col="5"></div></div></th>
+            <th><div class="th-wrap">ステータス<div class="col-resizer" data-col="6"></div></div></th>
+            <th><div class="th-wrap">補足メモ<div class="col-resizer" data-col="7"></div></div></th>
             <th>操作</th>
-            <th>税理士</th>
+            <th><div class="th-wrap">税理士<div class="col-resizer" data-col="9"></div></div></th>
           </tr>
         </thead>
         <tbody id="dataBody"></tbody>
@@ -255,22 +256,26 @@
   </div>
 </div>
 
-<!-- 参照元検索モーダル -->
-<div class="modal fade" id="refSearchModal" tabindex="-1">
+<!-- Driveブラウズモーダル（参照元選択 / 移動先フォルダ選択 兼用） -->
+<div class="modal fade" id="browseModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
-        <h6 class="modal-title"><i class="bi bi-search"></i> 参照元ファイルを検索</h6>
+        <h6 class="modal-title" id="browseModalTitle"><i class="bi bi-folder2-open"></i> Googleドライブ</h6>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <input type="hidden" id="refSearchRowIdx">
-        <div class="input-group mb-3">
-          <input type="text" class="form-control" id="refSearchQuery" placeholder="ファイル名で検索..." onkeydown="if(event.key==='Enter')doRefSearch()">
-          <button class="btn btn-primary" onclick="doRefSearch()"><i class="bi bi-search"></i> 検索</button>
+        <input type="hidden" id="browseRowIdx">
+        <input type="hidden" id="browseMode"> <!-- "ref" or "dest" -->
+        <div class="d-flex align-items-center mb-2" id="browsePath">
+          <small class="text-muted" id="browseCurrentPath">読み込み中...</small>
         </div>
-        <div id="refSearchResults">
-          <p class="text-muted text-center">ファイル名を入力して検索してください</p>
+        <div class="input-group mb-2">
+          <input type="text" class="form-control form-control-sm" id="browseSearchQuery" placeholder="ファイル名で検索..." onkeydown="if(event.key==='Enter')doBrowseSearch()">
+          <button class="btn btn-outline-primary btn-sm" onclick="doBrowseSearch()"><i class="bi bi-search"></i></button>
+        </div>
+        <div id="browseContent" style="max-height: 400px; overflow-y: auto;">
+          <p class="text-center text-muted">読み込み中...</p>
         </div>
       </div>
     </div>
@@ -469,7 +474,7 @@ function renderTable() {
       refHtml += ' <a href="https://drive.google.com/file/d/' + row.refFileId + '/view" target="_blank" class="text-primary"><i class="bi bi-box-arrow-up-right"></i></a>';
     }
     if (!isDone) {
-      refHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="参照元を変更" onclick="openRefSearch(' + idx + ')"><i class="bi bi-arrow-repeat"></i></button>';
+      refHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="参照元を変更（Driveを参照）" onclick="openBrowse(' + idx + ',\'ref\')"><i class="bi bi-folder2-open"></i></button>';
     }
     tdRef.innerHTML = refHtml;
     tr.appendChild(tdRef);
@@ -477,7 +482,11 @@ function renderTable() {
     // 移動先フォルダ
     var tdFolder = document.createElement('td');
     tdFolder.className = 'folder-cell';
-    tdFolder.innerHTML = esc(row.destFolder || '');
+    var folderHtml = '<small>' + esc(row.destFolder || '') + '</small>';
+    if (!isDone) {
+      folderHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="移動先を変更（Driveを参照）" onclick="openBrowse(' + idx + ',\'dest\')"><i class="bi bi-folder2-open"></i></button>';
+    }
+    tdFolder.innerHTML = folderHtml;
     tr.appendChild(tdFolder);
 
     // ステータス
@@ -501,7 +510,7 @@ function renderTable() {
       var fbInput = document.createElement('input');
       fbInput.type = 'text';
       fbInput.className = 'rename-input';
-      fbInput.placeholder = '参照元が違う場合はここに補足...';
+      fbInput.placeholder = '';
       fbInput.value = row.feedback || '';
       fbInput.style.fontSize = '0.75rem';
       fbInput.dataset.idx = idx;
@@ -794,57 +803,114 @@ function onTaxShareToggle(idx, folderName, checked) {
 }
 
 // ============================================================
-// 参照元ファイル検索＆変更
+// Driveブラウズ（参照元変更 / 移動先フォルダ変更 兼用）
 // ============================================================
-function openRefSearch(idx) {
-  document.getElementById('refSearchRowIdx').value = idx;
-  document.getElementById('refSearchQuery').value = '';
-  document.getElementById('refSearchResults').innerHTML = '<p class="text-muted text-center">ファイル名を入力して検索してください</p>';
-  new bootstrap.Modal(document.getElementById('refSearchModal')).show();
-  setTimeout(function() { document.getElementById('refSearchQuery').focus(); }, 300);
+function openBrowse(idx, mode) {
+  document.getElementById('browseRowIdx').value = idx;
+  document.getElementById('browseMode').value = mode;
+  document.getElementById('browseSearchQuery').value = '';
+  document.getElementById('browseModalTitle').innerHTML = mode === 'ref'
+    ? '<i class="bi bi-folder2-open"></i> 参照元ファイルを選択'
+    : '<i class="bi bi-folder2-open"></i> 移動先フォルダを選択';
+  document.getElementById('browseContent').innerHTML = '<p class="text-center text-muted">読み込み中...</p>';
+  new bootstrap.Modal(document.getElementById('browseModal')).show();
+  loadBrowseFolder(''); // ルートから開始
 }
 
-function doRefSearch() {
-  var query = document.getElementById('refSearchQuery').value.trim();
+function loadBrowseFolder(folderId) {
+  document.getElementById('browseContent').innerHTML = '<p class="text-center"><span class="spinner-border spinner-border-sm"></span> 読み込み中...</p>';
+  google.script.run
+    .withSuccessHandler(renderBrowseContent)
+    .withFailureHandler(onError)
+    .browseDriveFolder(folderId);
+}
+
+function renderBrowseContent(data) {
+  if (data.error) {
+    document.getElementById('browseContent').innerHTML = '<p class="text-danger">エラー: ' + esc(data.error) + '</p>';
+    return;
+  }
+  var mode = document.getElementById('browseMode').value;
+  document.getElementById('browseCurrentPath').textContent = '📁 ' + data.folderName;
+
+  var html = '<div class="list-group">';
+  // 上へ戻るボタン
+  if (data.parentId) {
+    html += '<button class="list-group-item list-group-item-action py-1" onclick="loadBrowseFolder(\'' + data.parentId + '\')">' +
+      '<i class="bi bi-arrow-up me-2"></i>.. 上のフォルダへ</button>';
+  }
+  // このフォルダを選択（移動先モード時）
+  if (mode === 'dest') {
+    html += '<button class="list-group-item list-group-item-action py-1 list-group-item-success" onclick="selectBrowseFolder(\'' + data.folderId + '\')">' +
+      '<i class="bi bi-check-circle me-2"></i><strong>このフォルダを移動先に選択</strong></button>';
+  }
+  // サブフォルダ
+  data.folders.forEach(function(f) {
+    html += '<button class="list-group-item list-group-item-action py-1" onclick="loadBrowseFolder(\'' + f.id + '\')">' +
+      '<i class="bi bi-folder-fill text-warning me-2"></i>' + esc(f.name) + '</button>';
+  });
+  // PDFファイル（参照元モード時のみクリック可能）
+  if (data.files.length > 0) {
+    data.files.forEach(function(f) {
+      if (mode === 'ref') {
+        html += '<button class="list-group-item list-group-item-action py-1" onclick="selectBrowseFile(\'' + f.id + '\')">' +
+          '<i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.name) + ' <span class="badge bg-primary float-end">選択</span></button>';
+      } else {
+        html += '<div class="list-group-item py-1 text-muted">' +
+          '<i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.name) + '</div>';
+      }
+    });
+  }
+  html += '</div>';
+  document.getElementById('browseContent').innerHTML = html;
+}
+
+function doBrowseSearch() {
+  var query = document.getElementById('browseSearchQuery').value.trim();
   if (!query) return;
-  document.getElementById('refSearchResults').innerHTML = '<p class="text-center"><div class="spinner-border spinner-border-sm"></div> 検索中...</p>';
+  var mode = document.getElementById('browseMode').value;
+  document.getElementById('browseContent').innerHTML = '<p class="text-center"><span class="spinner-border spinner-border-sm"></span> 検索中...</p>';
 
   google.script.run
     .withSuccessHandler(function(results) {
-      var container = document.getElementById('refSearchResults');
       if (!results || results.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center">該当するファイルが見つかりません</p>';
+        document.getElementById('browseContent').innerHTML = '<p class="text-muted text-center">見つかりません</p>';
         return;
       }
       var html = '<div class="list-group">';
       results.forEach(function(f) {
-        html += '<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="selectRefFile(\'' + f.fileId + '\')">' +
-          '<div><i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.fileName) +
-          '<br><small class="text-muted">📁 ' + esc(f.folderName || '') + '</small></div>' +
-          '<span class="badge bg-primary">選択</span></button>';
+        html += '<button class="list-group-item list-group-item-action py-1" onclick="selectBrowseFile(\'' + f.fileId + '\')">' +
+          '<i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.fileName) +
+          '<br><small class="text-muted">📁 ' + esc(f.folderName || '') + '</small>' +
+          ' <span class="badge bg-primary float-end">選択</span></button>';
       });
       html += '</div>';
-      container.innerHTML = html;
+      document.getElementById('browseContent').innerHTML = html;
     })
     .withFailureHandler(onError)
     .searchFilesInDrive(query);
 }
 
-function selectRefFile(fileId) {
-  var idx = parseInt(document.getElementById('refSearchRowIdx').value);
+function selectBrowseFile(fileId) {
+  var idx = parseInt(document.getElementById('browseRowIdx').value);
   var rowNum = currentData[idx].rowNum;
-
-  bootstrap.Modal.getInstance(document.getElementById('refSearchModal')).hide();
+  bootstrap.Modal.getInstance(document.getElementById('browseModal')).hide();
   showSpinner('参照元を変更中...', '');
-
   google.script.run
-    .withSuccessHandler(function(result) {
-      hideSpinner();
-      alert(result);
-      loadData(); // テーブルを更新
-    })
+    .withSuccessHandler(function(result) { hideSpinner(); alert(result); loadData(); })
     .withFailureHandler(function(e) { hideSpinner(); onError(e); })
     .updateReferenceFile(rowNum, fileId);
+}
+
+function selectBrowseFolder(folderId) {
+  var idx = parseInt(document.getElementById('browseRowIdx').value);
+  var rowNum = currentData[idx].rowNum;
+  bootstrap.Modal.getInstance(document.getElementById('browseModal')).hide();
+  showSpinner('移動先を変更中...', '');
+  google.script.run
+    .withSuccessHandler(function(result) { hideSpinner(); alert(result); loadData(); })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .updateDestFolder(rowNum, folderId);
 }
 
 // ============================================================

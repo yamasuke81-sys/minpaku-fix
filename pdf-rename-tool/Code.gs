@@ -180,6 +180,97 @@ function getTaxShareLearning_() {
 // 参照元ファイルの変更（ファイル検索＋選択）
 // ============================================================
 /**
+ * Driveフォルダの中身を取得（ブラウズ用）
+ * @param {string} folderId - フォルダID（空ならマイドライブのルート）
+ * @return {Object} { folderName, parentId, folders: [...], files: [...] }
+ */
+function browseDriveFolder(folderId) {
+  try {
+    var folder;
+    if (folderId) {
+      folder = DriveApp.getFolderById(folderId);
+    } else {
+      folder = DriveApp.getRootFolder();
+    }
+
+    var result = {
+      folderId: folder.getId(),
+      folderName: folder.getName(),
+      parentId: '',
+      folders: [],
+      files: []
+    };
+
+    // 親フォルダ
+    var parents = folder.getParents();
+    if (parents.hasNext()) {
+      result.parentId = parents.next().getId();
+    }
+
+    // サブフォルダ
+    var subFolders = folder.getFolders();
+    while (subFolders.hasNext()) {
+      var sf = subFolders.next();
+      result.folders.push({ id: sf.getId(), name: sf.getName() });
+    }
+    result.folders.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+    // PDF ファイル（最大20件）
+    var pdfFiles = folder.getFilesByType(MimeType.PDF);
+    var count = 0;
+    while (pdfFiles.hasNext() && count < 20) {
+      var f = pdfFiles.next();
+      result.files.push({ id: f.getId(), name: f.getName() });
+      count++;
+    }
+
+    return result;
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+/**
+ * 移動先フォルダを手動変更＋学習データ蓄積
+ */
+function updateDestFolder(rowNum, newFolderId) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return '❌ シートなし';
+
+  try {
+    var folder = DriveApp.getFolderById(newFolderId);
+    var folderPath = getFolderPath_(newFolderId);
+
+    // 変更前の情報（学習用）
+    var row = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
+    var oldDestFolder = row[COL.DEST_FOLDER - 1];
+    var summary = row[COL.SUMMARY - 1];
+
+    // シート更新
+    sheet.getRange(rowNum, COL.DEST_FOLDER).setValue('📁 ' + folderPath);
+    sheet.getRange(rowNum, COL.DEST_FOLDER_ID).setValue(newFolderId);
+
+    // 学習データ蓄積（フィードバック履歴に保存）
+    if (oldDestFolder) {
+      saveFeedbackHistory_(ss, {
+        scanName: row[COL.SCAN_NAME - 1],
+        summary: summary,
+        renameTo: row[COL.RENAME_TO - 1],
+        wrongRefName: '移動先変更: ' + oldDestFolder,
+        wrongRefFileId: '',
+        feedback: '移動先を「' + folderPath + '」に変更',
+        timestamp: new Date()
+      });
+    }
+
+    return '✅ 移動先を「' + folderPath + '」に変更しました';
+  } catch (e) {
+    return '❌ フォルダアクセス失敗: ' + e.message;
+  }
+}
+
+/**
  * ファイル名でDrive内を検索
  */
 function searchFilesInDrive(query) {
@@ -865,7 +956,7 @@ function scanAndPrepare() {
 
       if (isNewFile) {
         // 参照元なし → 新規ファイル扱い
-        compareSheet.getRange(newRow, COL.REF_NAME).setValue('🆕 新規（参照元なし）→ ' + cleanRenameTo);
+        compareSheet.getRange(newRow, COL.REF_NAME).setValue('🆕 新規（参照元なし）');
         compareSheet.getRange(newRow, COL.REF_LINK).setValue('―');
         compareSheet.getRange(newRow, COL.REF_FOLDER_ID).setValue('');
 

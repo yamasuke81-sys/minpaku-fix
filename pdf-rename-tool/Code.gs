@@ -186,54 +186,106 @@ function getTaxShareLearning_() {
  */
 function browseDriveFolder(folderId) {
   try {
-    // 特殊ID: "shared" → 共有アイテムのフォルダ一覧
-    if (folderId === 'shared') {
-      return browseSharedFolders_();
-    }
-
-    var folder;
-    if (folderId) {
-      folder = DriveApp.getFolderById(folderId);
-    } else {
-      folder = DriveApp.getRootFolder();
-    }
+    // 特殊ID
+    if (folderId === 'shared') return browseSharedFolders_();
+    if (folderId === 'sharedDrives') return listSharedDrives_();
 
     var result = {
-      folderId: folder.getId(),
-      folderName: folder.getName(),
+      folderId: folderId || 'root',
+      folderName: '',
       parentId: '',
       isRoot: !folderId,
       folders: [],
       files: []
     };
 
-    // 親フォルダ
-    var parents = folder.getParents();
-    if (parents.hasNext()) {
-      result.parentId = parents.next().getId();
+    // Drive API v3でフォルダ情報取得（共有ドライブ対応）
+    if (folderId) {
+      try {
+        var meta = Drive.Files.get(folderId, { fields: 'id,name,parents', supportsAllDrives: true });
+        result.folderName = meta.name;
+        result.parentId = (meta.parents && meta.parents.length > 0) ? meta.parents[0] : '';
+      } catch (e) {
+        // DriveApp にフォールバック
+        var f = DriveApp.getFolderById(folderId);
+        result.folderName = f.getName();
+        var p = f.getParents();
+        result.parentId = p.hasNext() ? p.next().getId() : '';
+      }
+    } else {
+      result.folderName = 'マイドライブ';
     }
 
-    // サブフォルダ
-    var subFolders = folder.getFolders();
-    while (subFolders.hasNext()) {
-      var sf = subFolders.next();
-      result.folders.push({ id: sf.getId(), name: sf.getName() });
+    // サブフォルダ一覧（Drive API v3 — 共有ドライブ含む）
+    var folderQuery = "'" + (folderId || 'root') + "' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+    try {
+      var folderRes = Drive.Files.list({
+        q: folderQuery,
+        fields: 'files(id,name)',
+        pageSize: 100,
+        orderBy: 'name',
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true
+      });
+      (folderRes.files || []).forEach(function(sf) {
+        result.folders.push({ id: sf.id, name: sf.name });
+      });
+    } catch (e) {
+      // DriveApp フォールバック
+      var folder = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
+      var subs = folder.getFolders();
+      while (subs.hasNext()) { var s = subs.next(); result.folders.push({ id: s.getId(), name: s.getName() }); }
+      result.folders.sort(function(a, b) { return a.name.localeCompare(b.name); });
     }
-    result.folders.sort(function(a, b) { return a.name.localeCompare(b.name); });
 
-    // PDF ファイル（最大20件）
-    var pdfFiles = folder.getFilesByType(MimeType.PDF);
-    var count = 0;
-    while (pdfFiles.hasNext() && count < 20) {
-      var f = pdfFiles.next();
-      result.files.push({ id: f.getId(), name: f.getName() });
-      count++;
+    // PDFファイル一覧（Drive API v3 — 共有ドライブ含む）
+    var fileQuery = "'" + (folderId || 'root') + "' in parents and mimeType = 'application/pdf' and trashed = false";
+    try {
+      var fileRes = Drive.Files.list({
+        q: fileQuery,
+        fields: 'files(id,name)',
+        pageSize: 20,
+        orderBy: 'name',
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true
+      });
+      (fileRes.files || []).forEach(function(ff) {
+        result.files.push({ id: ff.id, name: ff.name });
+      });
+    } catch (e) {
+      var folder2 = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
+      var pdfs = folder2.getFilesByType(MimeType.PDF);
+      var cnt = 0;
+      while (pdfs.hasNext() && cnt < 20) { var p = pdfs.next(); result.files.push({ id: p.getId(), name: p.getName() }); cnt++; }
     }
 
     return result;
   } catch (e) {
     return { error: e.message };
   }
+}
+
+/**
+ * 共有ドライブ（チームドライブ）一覧を取得
+ */
+function listSharedDrives_() {
+  var result = {
+    folderId: 'sharedDrives',
+    folderName: '共有ドライブ',
+    parentId: '__root__',
+    isRoot: false,
+    folders: [],
+    files: []
+  };
+  try {
+    var res = Drive.Drives.list({ pageSize: 50 });
+    (res.drives || []).forEach(function(d) {
+      result.folders.push({ id: d.id, name: d.name });
+    });
+  } catch (e) {
+    result.error = '共有ドライブの取得に失敗: ' + e.message;
+  }
+  return result;
 }
 
 /**
@@ -1391,62 +1443,68 @@ function searchDriveForPdf_(keywords, excludeFolderId) {
   var results = [];
   var keywordList = keywords.split(/[\s,　]+/).filter(function(k) { return k.length > 0; });
 
-  // 各キーワードでAND検索クエリを構築
-  // Drive検索: タイトルにキーワードを含むPDF
+  // Drive API v3 クエリ構築（マイドライブ＋共有ドライブ両方を検索）
   var queryParts = keywordList.map(function(kw) {
-    return 'title contains "' + kw.replace(/"/g, '\\"') + '"';
+    return 'name contains "' + kw.replace(/"/g, '\\"') + '"';
   });
 
-  // まずAND検索、結果がなければ個別キーワードで検索
   var queries = [];
   if (queryParts.length > 1) {
     queries.push(queryParts.join(' and ') + ' and mimeType = "application/pdf" and trashed = false');
   }
-  // 個別キーワードでも検索（フォールバック用）
   keywordList.forEach(function(kw) {
-    queries.push('title contains "' + kw.replace(/"/g, '\\"') + '" and mimeType = "application/pdf" and trashed = false');
+    queries.push('name contains "' + kw.replace(/"/g, '\\"') + '" and mimeType = "application/pdf" and trashed = false');
   });
 
   var seenIds = {};
   for (var q = 0; q < queries.length; q++) {
-    if (results.length >= 10) break; // 最大10件
+    if (results.length >= 10) break;
 
     try {
-      var searchResults = DriveApp.searchFiles(queries[q]);
-      while (searchResults.hasNext() && results.length < 10) {
-        var f = searchResults.next();
-        var fId = f.getId();
+      // Drive API v3で検索（共有ドライブ含む）
+      var res = Drive.Files.list({
+        q: queries[q],
+        fields: 'files(id,name,parents)',
+        pageSize: 20,
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true,
+        corpora: 'allDrives'
+      });
 
-        // 入力フォルダ内のファイルは除外、重複も除外
-        if (seenIds[fId]) continue;
-        seenIds[fId] = true;
+      var files = res.files || [];
+      for (var i = 0; i < files.length && results.length < 10; i++) {
+        var f = files[i];
+        if (seenIds[f.id]) continue;
+        seenIds[f.id] = true;
 
-        // 入力フォルダ内かチェック
-        var parents = f.getParents();
-        var isInInputFolder = false;
-        while (parents.hasNext()) {
-          if (parents.next().getId() === excludeFolderId) {
-            isInInputFolder = true;
-            break;
-          }
-        }
-        if (isInInputFolder) continue;
-
-        // 親フォルダIDを取得
-        var folderId = '';
-        var parentFolders = f.getParents();
-        if (parentFolders.hasNext()) {
-          folderId = parentFolders.next().getId();
-        }
+        // 入力フォルダ内は除外
+        var parentIds = f.parents || [];
+        if (parentIds.indexOf(excludeFolderId) !== -1) continue;
 
         results.push({
-          fileId: fId,
-          fileName: f.getName(),
-          folderId: folderId
+          fileId: f.id,
+          fileName: f.name,
+          folderId: parentIds.length > 0 ? parentIds[0] : ''
         });
       }
     } catch (e) {
-      console.error('Drive検索エラー: ' + e.message);
+      console.error('Drive API検索エラー: ' + e.message);
+      // フォールバック: DriveApp（共有ドライブは含まれないが動作する）
+      try {
+        var fallbackQuery = queries[q].replace(/name contains/g, 'title contains');
+        var searchResults = DriveApp.searchFiles(fallbackQuery);
+        while (searchResults.hasNext() && results.length < 10) {
+          var ff = searchResults.next();
+          if (seenIds[ff.getId()]) continue;
+          seenIds[ff.getId()] = true;
+          var parents = ff.getParents();
+          var pid = parents.hasNext() ? parents.next().getId() : '';
+          if (pid === excludeFolderId) continue;
+          results.push({ fileId: ff.getId(), fileName: ff.getName(), folderId: pid });
+        }
+      } catch (e2) {
+        console.error('DriveApp検索フォールバックエラー: ' + e2.message);
+      }
     }
   }
 
@@ -1649,23 +1707,42 @@ function extractFolderKeywords_(summary, renameTo, modelName, feedbackHistory, r
 function searchDriveForFolders_(keywords) {
   var results = [];
   var keywordList = keywords.split(/[\s,　]+/).filter(function(k) { return k.length > 0; });
-
-  // 各キーワードで個別にフォルダ検索
   var seenIds = {};
 
-  // まずAND検索
+  // Drive API v3でフォルダ検索（共有ドライブ含む）
+  var queries = [];
   if (keywordList.length > 1) {
     var andParts = keywordList.map(function(kw) {
-      return 'title contains "' + kw.replace(/"/g, '\\"') + '"';
+      return 'name contains "' + kw.replace(/"/g, '\\"') + '"';
     });
-    var andQuery = andParts.join(' and ') + ' and mimeType = "application/vnd.google-apps.folder" and trashed = false';
-    collectFolderResults_(andQuery, seenIds, results, 5);
+    queries.push(andParts.join(' and ') + ' and mimeType = "application/vnd.google-apps.folder" and trashed = false');
   }
+  keywordList.forEach(function(kw) {
+    queries.push('name contains "' + kw.replace(/"/g, '\\"') + '" and mimeType = "application/vnd.google-apps.folder" and trashed = false');
+  });
 
-  // 個別キーワードでフォールバック
-  for (var i = 0; i < keywordList.length && results.length < 8; i++) {
-    var query = 'title contains "' + keywordList[i].replace(/"/g, '\\"') + '" and mimeType = "application/vnd.google-apps.folder" and trashed = false';
-    collectFolderResults_(query, seenIds, results, 8);
+  for (var q = 0; q < queries.length && results.length < 8; q++) {
+    try {
+      var res = Drive.Files.list({
+        q: queries[q],
+        fields: 'files(id,name)',
+        pageSize: 10,
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true,
+        corpora: 'allDrives'
+      });
+      var files = res.files || [];
+      for (var i = 0; i < files.length && results.length < 8; i++) {
+        if (seenIds[files[i].id]) continue;
+        seenIds[files[i].id] = true;
+        var path = getFolderPath_(files[i].id);
+        results.push({ folderId: files[i].id, folderPath: path });
+      }
+    } catch (e) {
+      // フォールバック: DriveApp
+      var fallbackQuery = queries[q].replace(/name contains/g, 'title contains');
+      collectFolderResults_(fallbackQuery, seenIds, results, 8);
+    }
   }
 
   return results;

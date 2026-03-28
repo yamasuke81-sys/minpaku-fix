@@ -54,6 +54,9 @@
         <h1><i class="bi bi-file-earmark-pdf"></i> PDF自動リネームツール</h1>
       </div>
       <div>
+        <button class="btn btn-outline-light btn-sm me-2" onclick="openSettingsModal()">
+          <i class="bi bi-gear"></i> 設定
+        </button>
         <button class="btn btn-outline-light btn-sm me-2" onclick="openSpreadsheet()">
           <i class="bi bi-table"></i> スプシ
         </button>
@@ -182,6 +185,7 @@
           <col style="width:140px">
           <col style="width:200px">
           <col style="width:70px">
+          <col style="width:50px">
         </colgroup>
         <thead>
           <tr>
@@ -196,6 +200,7 @@
             <th>ステータス<div class="col-resizer" data-col="6"></div></th>
             <th>補足メモ<div class="col-resizer" data-col="7"></div></th>
             <th>操作</th>
+            <th>税理士</th>
           </tr>
         </thead>
         <tbody id="dataBody"></tbody>
@@ -224,6 +229,50 @@
       </div>
       <div class="modal-body">
         <p id="summaryModalBody" style="white-space: pre-wrap;"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h6 class="modal-title"><i class="bi bi-gear"></i> 設定</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="bi bi-folder"></i> 税理士共有フォルダ</label>
+          <p class="mb-1"><small class="text-muted">現在: <span id="settingsTaxFolder">読み込み中...</span></small></p>
+          <div class="input-group">
+            <input type="text" class="form-control form-control-sm" id="taxFolderUrl" placeholder="GoogleドライブフォルダのURLを貼り付け">
+            <button class="btn btn-primary btn-sm" onclick="saveTaxFolder()">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 参照元検索モーダル -->
+<div class="modal fade" id="refSearchModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h6 class="modal-title"><i class="bi bi-search"></i> 参照元ファイルを検索</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="refSearchRowIdx">
+        <div class="input-group mb-3">
+          <input type="text" class="form-control" id="refSearchQuery" placeholder="ファイル名で検索..." onkeydown="if(event.key==='Enter')doRefSearch()">
+          <button class="btn btn-primary" onclick="doRefSearch()"><i class="bi bi-search"></i> 検索</button>
+        </div>
+        <div id="refSearchResults">
+          <p class="text-muted text-center">ファイル名を入力して検索してください</p>
+        </div>
       </div>
     </div>
   </div>
@@ -411,6 +460,9 @@ function renderTable() {
     if (row.refFileId) {
       refHtml += ' <a href="https://drive.google.com/file/d/' + row.refFileId + '/view" target="_blank" class="text-primary"><i class="bi bi-box-arrow-up-right"></i></a>';
     }
+    if (!isDone) {
+      refHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="参照元を変更" onclick="openRefSearch(' + idx + ')"><i class="bi bi-arrow-repeat"></i></button>';
+    }
     tdRef.innerHTML = refHtml;
     tr.appendChild(tdRef);
 
@@ -467,6 +519,18 @@ function renderTable() {
       tdOps.innerHTML = '<a href="https://drive.google.com/file/d/' + row.scanFileId + '/view" target="_blank" class="btn btn-outline-primary btn-sm" title="スキャンPDF"><i class="bi bi-file-pdf"></i></a>';
     }
     tr.appendChild(tdOps);
+
+    // 税理士共有
+    var tdTax = document.createElement('td');
+    if (row.scanFileId) {
+      var taxBtn = document.createElement('button');
+      taxBtn.className = 'btn btn-outline-secondary btn-sm py-0 px-1';
+      taxBtn.title = '税理士共有フォルダにコピー';
+      taxBtn.innerHTML = '<i class="bi bi-share"></i>';
+      taxBtn.onclick = (function(i) { return function() { shareWithTax(i); }; })(idx);
+      tdTax.appendChild(taxBtn);
+    }
+    tr.appendChild(tdTax);
 
     tbody.appendChild(tr);
   });
@@ -634,6 +698,102 @@ function openSpreadsheet() {
   google.script.run
     .withSuccessHandler(function(url) { window.open(url, '_blank'); })
     .getSpreadsheetUrl();
+}
+
+// ============================================================
+// 設定
+// ============================================================
+function openSettingsModal() {
+  document.getElementById('settingsTaxFolder').textContent = '読み込み中...';
+  google.script.run
+    .withSuccessHandler(function(s) {
+      document.getElementById('settingsTaxFolder').textContent = s.taxAccountantFolderName;
+    })
+    .withFailureHandler(onError)
+    .getSettings();
+  new bootstrap.Modal(document.getElementById('settingsModal')).show();
+}
+
+function saveTaxFolder() {
+  var url = document.getElementById('taxFolderUrl').value.trim();
+  if (!url) { alert('URLを入力してください'); return; }
+  google.script.run
+    .withSuccessHandler(function(result) {
+      alert(result);
+      document.getElementById('taxFolderUrl').value = '';
+      // 表示を更新
+      google.script.run.withSuccessHandler(function(s) {
+        document.getElementById('settingsTaxFolder').textContent = s.taxAccountantFolderName;
+      }).getSettings();
+    })
+    .withFailureHandler(onError)
+    .saveSettings({ taxAccountantFolderUrl: url });
+}
+
+// ============================================================
+// 税理士共有
+// ============================================================
+function shareWithTax(idx) {
+  var row = currentData[idx];
+  if (!confirm('「' + (row.renameTo || row.scanName) + '」を税理士共有フォルダにコピーしますか？')) return;
+  google.script.run
+    .withSuccessHandler(function(result) { alert(result); })
+    .withFailureHandler(onError)
+    .shareWithTaxAccountant(row.scanFileId, row.renameTo);
+}
+
+// ============================================================
+// 参照元ファイル検索＆変更
+// ============================================================
+function openRefSearch(idx) {
+  document.getElementById('refSearchRowIdx').value = idx;
+  document.getElementById('refSearchQuery').value = '';
+  document.getElementById('refSearchResults').innerHTML = '<p class="text-muted text-center">ファイル名を入力して検索してください</p>';
+  new bootstrap.Modal(document.getElementById('refSearchModal')).show();
+  setTimeout(function() { document.getElementById('refSearchQuery').focus(); }, 300);
+}
+
+function doRefSearch() {
+  var query = document.getElementById('refSearchQuery').value.trim();
+  if (!query) return;
+  document.getElementById('refSearchResults').innerHTML = '<p class="text-center"><div class="spinner-border spinner-border-sm"></div> 検索中...</p>';
+
+  google.script.run
+    .withSuccessHandler(function(results) {
+      var container = document.getElementById('refSearchResults');
+      if (!results || results.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">該当するファイルが見つかりません</p>';
+        return;
+      }
+      var html = '<div class="list-group">';
+      results.forEach(function(f) {
+        html += '<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="selectRefFile(\'' + f.fileId + '\')">' +
+          '<div><i class="bi bi-file-pdf text-danger me-2"></i>' + esc(f.fileName) +
+          '<br><small class="text-muted">📁 ' + esc(f.folderName || '') + '</small></div>' +
+          '<span class="badge bg-primary">選択</span></button>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    })
+    .withFailureHandler(onError)
+    .searchFilesInDrive(query);
+}
+
+function selectRefFile(fileId) {
+  var idx = parseInt(document.getElementById('refSearchRowIdx').value);
+  var rowNum = currentData[idx].rowNum;
+
+  bootstrap.Modal.getInstance(document.getElementById('refSearchModal')).hide();
+  showSpinner('参照元を変更中...', '');
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideSpinner();
+      alert(result);
+      loadData(); // テーブルを更新
+    })
+    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
+    .updateReferenceFile(rowNum, fileId);
 }
 
 // ============================================================

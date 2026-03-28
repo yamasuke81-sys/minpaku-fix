@@ -39,6 +39,175 @@ function setApiKey(key) {
   return '✅ APIキーを保存しました';
 }
 
+// ============================================================
+// 設定管理
+// ============================================================
+/**
+ * 設定を取得
+ */
+function getSettings() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    taxAccountantFolderId: props.getProperty('TAX_ACCOUNTANT_FOLDER_ID') || '',
+    taxAccountantFolderName: props.getProperty('TAX_ACCOUNTANT_FOLDER_NAME') || '（未設定）'
+  };
+}
+
+/**
+ * 設定を保存
+ */
+function saveSettings(settings) {
+  var props = PropertiesService.getScriptProperties();
+
+  if (settings.taxAccountantFolderUrl) {
+    var folderId = extractIdFromUrl(settings.taxAccountantFolderUrl);
+    try {
+      var folder = DriveApp.getFolderById(folderId);
+      props.setProperty('TAX_ACCOUNTANT_FOLDER_ID', folderId);
+      props.setProperty('TAX_ACCOUNTANT_FOLDER_NAME', folder.getName());
+      return '✅ 税理士共有フォルダを設定: ' + folder.getName();
+    } catch (e) {
+      return '❌ フォルダにアクセスできません: ' + e.message;
+    }
+  }
+  return '設定なし';
+}
+
+// ============================================================
+// 税理士共有
+// ============================================================
+/**
+ * ファイルを税理士共有フォルダにコピー
+ */
+function shareWithTaxAccountant(scanFileId, renameTo) {
+  var folderId = PropertiesService.getScriptProperties().getProperty('TAX_ACCOUNTANT_FOLDER_ID');
+  if (!folderId) return '❌ 税理士共有フォルダが未設定です。設定画面で指定してください。';
+
+  try {
+    var file = DriveApp.getFileById(scanFileId);
+    var folder = DriveApp.getFolderById(folderId);
+    var fileName = renameTo || file.getName();
+    if (!fileName.toLowerCase().endsWith('.pdf')) fileName += '.pdf';
+    var copy = file.makeCopy(fileName, folder);
+
+    // 学習データに蓄積
+    saveShareLearning_(scanFileId, fileName, folderId);
+
+    return '✅ 「' + fileName + '」を税理士共有フォルダにコピーしました';
+  } catch (e) {
+    return '❌ コピー失敗: ' + e.message;
+  }
+}
+
+/**
+ * 税理士共有の学習データを蓄積
+ */
+function saveShareLearning_(fileId, fileName, folderId) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheetName = '税理士共有履歴';
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.getRange(1, 1, 1, 4).setValues([['ファイル名', 'ファイルID', 'フォルダID', '共有日時']]);
+    var h = sheet.getRange(1, 1, 1, 4);
+    h.setBackground('#6A1B9A'); h.setFontColor('#fff'); h.setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 4).setValues([[fileName, fileId, folderId, new Date()]]);
+}
+
+// ============================================================
+// 参照元ファイルの変更（ファイル検索＋選択）
+// ============================================================
+/**
+ * ファイル名でDrive内を検索
+ */
+function searchFilesInDrive(query) {
+  if (!query || query.length < 2) return [];
+
+  var results = [];
+  try {
+    var searchQuery = 'title contains "' + query.replace(/"/g, '\\"') + '" and mimeType = "application/pdf" and trashed = false';
+    var files = DriveApp.searchFiles(searchQuery);
+    var count = 0;
+    while (files.hasNext() && count < 15) {
+      var f = files.next();
+      var folderId = '';
+      var folderName = '';
+      var parents = f.getParents();
+      if (parents.hasNext()) {
+        var p = parents.next();
+        folderId = p.getId();
+        folderName = p.getName();
+      }
+      results.push({
+        fileId: f.getId(),
+        fileName: f.getName(),
+        folderId: folderId,
+        folderName: folderName
+      });
+      count++;
+    }
+  } catch (e) {
+    console.error('ファイル検索エラー: ' + e.message);
+  }
+  return results;
+}
+
+/**
+ * 参照元ファイルを変更（行を更新＋学習データ蓄積）
+ */
+function updateReferenceFile(rowNum, newRefFileId) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return '❌ シートなし';
+
+  try {
+    var file = DriveApp.getFileById(newRefFileId);
+    var folderId = '';
+    var folderPath = '';
+    var parents = file.getParents();
+    if (parents.hasNext()) {
+      var p = parents.next();
+      folderId = p.getId();
+      folderPath = getFolderPath_(folderId);
+    }
+
+    // 変更前の情報を取得（学習用）
+    var oldRow = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
+    var oldRefName = oldRow[COL.REF_NAME - 1];
+    var oldRefFileId = oldRow[COL.REF_FILE_ID - 1];
+    var summary = oldRow[COL.SUMMARY - 1];
+    var scanName = oldRow[COL.SCAN_NAME - 1];
+
+    // シートを更新
+    var refUrl = 'https://drive.google.com/file/d/' + newRefFileId + '/view';
+    sheet.getRange(rowNum, COL.REF_NAME).setValue(file.getName());
+    sheet.getRange(rowNum, COL.REF_LINK).setFormula('=HYPERLINK("' + refUrl + '","開く")');
+    sheet.getRange(rowNum, COL.REF_FILE_ID).setValue(newRefFileId);
+    sheet.getRange(rowNum, COL.REF_FOLDER_ID).setValue(folderId);
+    sheet.getRange(rowNum, COL.DEST_FOLDER).setValue(folderPath ? '📁 ' + folderPath : '');
+    sheet.getRange(rowNum, COL.DEST_FOLDER_ID).setValue(folderId);
+
+    // 学習データに蓄積（フィードバック履歴に保存）
+    if (oldRefFileId !== newRefFileId) {
+      saveFeedbackHistory_(ss, {
+        scanName: scanName,
+        summary: summary,
+        renameTo: oldRow[COL.RENAME_TO - 1],
+        wrongRefName: oldRefName,
+        wrongRefFileId: oldRefFileId,
+        feedback: '参照元を「' + file.getName() + '」(フォルダ: ' + folderPath + ')に変更',
+        timestamp: new Date()
+      });
+    }
+
+    return '✅ 参照元を「' + file.getName() + '」に変更しました';
+  } catch (e) {
+    return '❌ 変更失敗: ' + e.message;
+  }
+}
+
 // 比較シート名
 const COMPARE_SHEET_NAME = '参照元比較';
 const FEEDBACK_SHEET_NAME = 'フィードバック履歴';

@@ -147,13 +147,64 @@ function updateCheckStatusBatch(updates) {
 }
 
 /**
- * リネーム予定名を更新
+ * リネーム予定名を更新＋手動変更を学習データに蓄積
  */
 function updateRenameTo(rowNum, newName) {
   var ss = SpreadsheetApp.openByUrl(SS_URL);
   var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
   if (!sheet) return;
+
+  // 変更前の名前（AI生成名）を取得
+  var oldName = sheet.getRange(rowNum, COL.RENAME_TO).getValue();
+
+  // 新しい名前を保存
   sheet.getRange(rowNum, COL.RENAME_TO).setValue(newName);
+
+  // AI生成名と異なる場合、リネーム学習データに蓄積
+  if (oldName && newName && oldName !== newName) {
+    var row = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
+    var summary = row[COL.SUMMARY - 1] || '';
+    var scanName = row[COL.SCAN_NAME - 1] || '';
+
+    saveRenameLearning_(ss, {
+      scanName: scanName,
+      summary: summary,
+      aiGeneratedName: oldName,
+      userCorrectedName: newName,
+      timestamp: new Date()
+    });
+  }
+}
+
+/**
+ * リネーム学習データをシートに蓄積
+ */
+function saveRenameLearning_(ss, data) {
+  var sheetName = 'リネーム学習';
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    var headers = [
+      'スキャンファイル名', '内容要約', 'AI生成名', 'ユーザー修正名', '登録日時'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setBackground('#1565C0');
+    headerRange.setFontColor('#ffffff');
+    headerRange.setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 200);
+    sheet.setColumnWidth(2, 300);
+    sheet.setColumnWidth(3, 250);
+    sheet.setColumnWidth(4, 250);
+    sheet.setColumnWidth(5, 150);
+  }
+
+  var newRow = sheet.getLastRow() + 1;
+  sheet.getRange(newRow, 1, 1, 5).setValues([[
+    data.scanName, data.summary, data.aiGeneratedName,
+    data.userCorrectedName, data.timestamp
+  ]]);
 }
 
 /**
@@ -238,6 +289,22 @@ function getFeedbackHistory_() {
 
   // 最新20件のみ返す（プロンプトが長くなりすぎないように）
   return feedbackLines.slice(-20).join('\n');
+}
+
+/**
+ * リネーム学習データを取得（ファイル名生成で活用するため）
+ */
+function getRenameLearningHistory_() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName('リネーム学習');
+  if (!sheet || sheet.getLastRow() < 2) return '';
+
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  var lines = data.map(function(row) {
+    return '・内容:「' + String(row[1]).substring(0, 50) + '」→ AI提案:「' + row[2] + '」→ 正しい名前:「' + row[3] + '」';
+  });
+
+  return lines.slice(-20).join('\n');
 }
 
 /**
@@ -444,6 +511,7 @@ function scanAndPrepare() {
 
   // 過去のフィードバック履歴を取得（全ステップで活用）
   var feedbackHistory = getFeedbackHistory_();
+  var renameLearning = getRenameLearningHistory_();
 
   while (files.hasNext()) {
     // 4.5分で安全停止
@@ -467,7 +535,7 @@ function scanAndPrepare() {
         renameTo = '（生成失敗: サイズ超過）';
       } else {
         // PDFの内容要約＋リネーム名を1回のAPI呼び出しで取得（学習データ込み）
-        var analyzed = analyzeAndRename_(blob, rules, activeModel, feedbackHistory);
+        var analyzed = analyzeAndRename_(blob, rules, activeModel, feedbackHistory, renameLearning);
         summary = analyzed.summary;
         renameTo = analyzed.renameTo;
       }
@@ -656,7 +724,7 @@ function analyzePdfContent_(pdfBlob, modelName) {
 // ============================================================
 // PDF解析＋リネーム名を1回のAPI呼び出しで同時取得（API節約）
 // ============================================================
-function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory) {
+function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory, renameLearning) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
   var promptText = '以下のPDFについて2つの作業をしてください。\n\n' +
@@ -670,8 +738,14 @@ function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory) {
     '【作業2: ファイル名生成】\n' +
     '以下のルールに従い、新しいファイル名を1つ生成:\n' + rules + '\n\n';
 
+  if (renameLearning) {
+    promptText += '【過去のリネーム修正履歴（ユーザーが望む命名パターンを学習してください）】\n' +
+      'AIが提案した名前をユーザーがどう修正したかの履歴です。この傾向に合わせてファイル名を生成してください:\n' +
+      renameLearning + '\n\n';
+  }
+
   if (feedbackHistory) {
-    promptText += '【過去の補足情報（命名や分類の参考にしてください）】\n' + feedbackHistory + '\n\n';
+    promptText += '【過去の補足情報（分類の参考にしてください）】\n' + feedbackHistory + '\n\n';
   }
 
   promptText += '【出力形式】必ず以下のJSON形式で出力（他の文字は不要）:\n' +

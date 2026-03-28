@@ -563,15 +563,10 @@ function renderTable() {
       fbInput.value = row.feedback || '';
       fbInput.style.fontSize = '0.75rem';
       fbInput.dataset.idx = idx;
-      var fbBtn = document.createElement('button');
-      fbBtn.className = 'btn btn-outline-warning btn-sm';
-      fbBtn.title = '補足を保存';
-      fbBtn.innerHTML = '<i class="bi bi-chat-dots"></i>';
-      fbBtn.onclick = (function(i, input) {
-        return function() { onFeedbackSave(i, input.value); };
-      })(idx, fbInput);
+      fbInput.onblur = (function(i) {
+        return function() { onFeedbackAutoSave(i, this.value); };
+      })(idx);
       fbDiv.appendChild(fbInput);
-      fbDiv.appendChild(fbBtn);
       tdFeedback.appendChild(fbDiv);
     }
     tr.appendChild(tdFeedback);
@@ -673,16 +668,12 @@ function requeueChecked() {
     .requeueCheckedEntries();
 }
 
-function onFeedbackSave(idx, text) {
-  if (!text.trim()) { alert('補足メモを入力してください'); return; }
-  var rowNum = currentData[idx].rowNum;
+function onFeedbackAutoSave(idx, text) {
+  // 変更がなければ何もしない
+  if (text === (currentData[idx].feedback || '')) return;
   currentData[idx].feedback = text;
-  google.script.run
-    .withSuccessHandler(function(result) {
-      alert(result);
-    })
-    .withFailureHandler(onError)
-    .saveFeedback(rowNum, text);
+  var rowNum = currentData[idx].rowNum;
+  google.script.run.saveFeedback(rowNum, text);
 }
 
 function showSummary(idx) {
@@ -940,7 +931,7 @@ function openBrowse(idx, mode) {
     : '<i class="bi bi-folder2-open"></i> 移動先フォルダを選択';
   document.getElementById('browseContent').innerHTML = '<p class="text-center text-muted">読み込み中...</p>';
   new bootstrap.Modal(document.getElementById('browseModal')).show();
-  loadBrowseFolder(''); // ルートから開始
+  loadBrowseFolder('shared'); // デフォルトは共有アイテム
 }
 
 function loadBrowseFolder(folderId) {

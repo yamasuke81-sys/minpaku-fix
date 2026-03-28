@@ -333,41 +333,58 @@ function resolveFolderFromUrl(url) {
 /**
  * 移動先フォルダを手動変更＋学習データ蓄積
  */
-function updateDestFolder(rowNum, newFolderId) {
+/**
+ * @param {number} slot - 1 or 2（移動先1 / 移動先2）
+ */
+function updateDestFolder(rowNum, newFolderId, slot) {
   var ss = SpreadsheetApp.openByUrl(SS_URL);
   var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
   if (!sheet) return '❌ シートなし';
+
+  slot = slot || 1;
+  var colFolder = slot === 2 ? COL.DEST_FOLDER2 : COL.DEST_FOLDER;
+  var colFolderId = slot === 2 ? COL.DEST_FOLDER2_ID : COL.DEST_FOLDER_ID;
+  var label = '移動先' + slot;
 
   try {
     var folder = DriveApp.getFolderById(newFolderId);
     var folderPath = getFolderPath_(newFolderId);
 
-    // 変更前の情報（学習用）
     var row = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
-    var oldDestFolder = row[COL.DEST_FOLDER - 1];
+    var oldDestFolder = row[colFolder - 1];
     var summary = row[COL.SUMMARY - 1];
 
-    // シート更新
-    sheet.getRange(rowNum, COL.DEST_FOLDER).setValue('📁 ' + folderPath);
-    sheet.getRange(rowNum, COL.DEST_FOLDER_ID).setValue(newFolderId);
+    sheet.getRange(rowNum, colFolder).setValue('📁 ' + folderPath);
+    sheet.getRange(rowNum, colFolderId).setValue(newFolderId);
 
-    // 学習データ蓄積（フィードバック履歴に保存）
     if (oldDestFolder) {
       saveFeedbackHistory_(ss, {
         scanName: row[COL.SCAN_NAME - 1],
         summary: summary,
         renameTo: row[COL.RENAME_TO - 1],
-        wrongRefName: '移動先変更: ' + oldDestFolder,
+        wrongRefName: label + '変更: ' + oldDestFolder,
         wrongRefFileId: '',
-        feedback: '移動先を「' + folderPath + '」に変更',
+        feedback: label + 'を「' + folderPath + '」に変更',
         timestamp: new Date()
       });
     }
 
-    return '✅ 移動先を「' + folderPath + '」に変更しました';
+    return '✅ ' + label + 'を「' + folderPath + '」に変更しました';
   } catch (e) {
     return '❌ フォルダアクセス失敗: ' + e.message;
   }
+}
+
+/**
+ * 移動先フォルダ2をクリア
+ */
+function clearDestFolder2(rowNum) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return '❌ シートなし';
+  sheet.getRange(rowNum, COL.DEST_FOLDER2).setValue('');
+  sheet.getRange(rowNum, COL.DEST_FOLDER2_ID).setValue('');
+  return '✅ 移動先2をクリアしました';
 }
 
 /**
@@ -511,18 +528,20 @@ const COL = {
   REF_NAME:       6,  // F: 参照元ファイル名
   REF_LINK:       7,  // G: 参照元ファイルへのリンク
   REF_FOLDER_ID:  8,  // H: 参照元フォルダID（移動先）
-  DEST_FOLDER:    9,  // I: 移動先フォルダ候補（名前＋パス）
-  DEST_FOLDER_ID:10,  // J: 移動先フォルダID
-  STATUS:        11,  // K: ステータス
-  SCAN_FILE_ID:  12,  // L: スキャンファイルID
-  REF_FILE_ID:   13,  // M: 参照元ファイルID
-  FEEDBACK:      14,  // N: 補足メモ（ユーザーフィードバック）
-  TAX_SHARE:     15,  // O: 税理士共有（JSON: ["法人用"] 等）
-  DOC_DATE:      16,  // P: 書類日付（YYYY-MM形式）
-  ENTITY_TYPE:   17,  // Q: 法人/個人判定
-  TIMESTAMP:     18,  // R: 処理日時
+  DEST_FOLDER:    9,  // I: 移動先フォルダ1（名前＋パス）
+  DEST_FOLDER_ID:10,  // J: 移動先フォルダ1 ID
+  DEST_FOLDER2:  11,  // K: 移動先フォルダ2（名前＋パス）
+  DEST_FOLDER2_ID:12, // L: 移動先フォルダ2 ID
+  STATUS:        13,  // M: ステータス
+  SCAN_FILE_ID:  14,  // N: スキャンファイルID
+  REF_FILE_ID:   15,  // O: 参照元ファイルID
+  FEEDBACK:      16,  // P: 補足メモ（ユーザーフィードバック）
+  TAX_SHARE:     17,  // Q: 税理士共有（JSON: ["法人用"] 等）
+  DOC_DATE:      18,  // R: 書類日付（YYYY-MM形式）
+  ENTITY_TYPE:   19,  // S: 法人/個人判定
+  TIMESTAMP:     20,  // T: 処理日時
 };
-const TOTAL_COLS = 18;
+const TOTAL_COLS = 20;
 
 // ============================================================
 // メニュー
@@ -581,6 +600,8 @@ function getCompareData() {
         refFolderId: String(row[COL.REF_FOLDER_ID - 1] || ''),
         destFolder: String(row[COL.DEST_FOLDER - 1] || ''),
         destFolderId: String(row[COL.DEST_FOLDER_ID - 1] || ''),
+        destFolder2: String(row[COL.DEST_FOLDER2 - 1] || ''),
+        destFolderId2: String(row[COL.DEST_FOLDER2_ID - 1] || ''),
         status: String(row[COL.STATUS - 1] || ''),
         scanFileId: String(row[COL.SCAN_FILE_ID - 1] || ''),
         refFileId: String(row[COL.REF_FILE_ID - 1] || ''),
@@ -1433,6 +1454,7 @@ function executeApproved() {
     var renameTo = row[COL.RENAME_TO - 1];
     var refFolderId = row[COL.REF_FOLDER_ID - 1];
     var destFolderId = row[COL.DEST_FOLDER_ID - 1];
+    var destFolderId2 = row[COL.DEST_FOLDER2_ID - 1];
     var taxShareFolders = parseTaxShare_(row[COL.TAX_SHARE - 1]);
     var docDate = row[COL.DOC_DATE - 1] || '';
 
@@ -1454,7 +1476,7 @@ function executeApproved() {
       }
       file.setName(cleanName);
 
-      // 移動先フォルダへ移動
+      // 移動先フォルダ1へ移動
       var movedTo = '';
       if (moveFolderId) {
         try {
@@ -1469,6 +1491,19 @@ function executeApproved() {
       } else {
         file.moveTo(outputFolder);
         movedTo = 'output';
+      }
+
+      // 移動先フォルダ2がある場合、そこにもコピー
+      var dest2Msg = '';
+      if (destFolderId2) {
+        try {
+          var dest2Folder = DriveApp.getFolderById(destFolderId2);
+          file.makeCopy(cleanName, dest2Folder);
+          dest2Msg = ' + ' + dest2Folder.getName();
+        } catch (dest2Err) {
+          dest2Msg = ' + 移動先2失敗';
+          console.error('移動先2コピー失敗: ' + dest2Err.message);
+        }
       }
 
       // 税理士共有（複数フォルダ＋年月サブフォルダ）
@@ -1492,7 +1527,7 @@ function executeApproved() {
         timestamp: new Date()
       });
 
-      var doneLabel = '✅ 完了（→ ' + movedTo + taxMsg + '）';
+      var doneLabel = '✅ 完了（→ ' + movedTo + dest2Msg + taxMsg + '）';
       compareSheet.getRange(sheetRow, COL.STATUS).setValue(doneLabel);
       compareSheet.getRange(sheetRow, COL.TIMESTAMP).setValue(new Date());
       executedCount++;
@@ -1868,7 +1903,7 @@ function getOrCreateCompareSheet_(ss) {
   var expectedHeaders = [
     'チェック', 'スキャンファイル名', '内容要約', 'リネーム予定名',
     'スキャンファイル', '参照元ファイル名', '参照元ファイル',
-    '参照元フォルダID', '移動先フォルダ候補', '移動先フォルダID',
+    '参照元フォルダID', '移動先フォルダ1', '移動先フォルダ1 ID', '移動先フォルダ2', '移動先フォルダ2 ID',
     'ステータス', 'スキャンファイルID', '参照元ファイルID',
     '補足メモ', '税理士共有', '書類日付', '法人/個人', '処理日時'
   ];
@@ -1909,6 +1944,8 @@ function getOrCreateCompareSheet_(ss) {
   sheet.setColumnWidth(COL.REF_FOLDER_ID, 100);
   sheet.setColumnWidth(COL.DEST_FOLDER, 300);
   sheet.setColumnWidth(COL.DEST_FOLDER_ID, 100);
+  sheet.setColumnWidth(COL.DEST_FOLDER2, 300);
+  sheet.setColumnWidth(COL.DEST_FOLDER2_ID, 100);
   sheet.setColumnWidth(COL.STATUS, 180);
   sheet.setColumnWidth(COL.SCAN_FILE_ID, 100);
   sheet.setColumnWidth(COL.REF_FILE_ID, 100);
@@ -1921,6 +1958,7 @@ function getOrCreateCompareSheet_(ss) {
   // 内部ID列を非表示（ユーザーには不要）
   sheet.hideColumns(COL.REF_FOLDER_ID);
   sheet.hideColumns(COL.DEST_FOLDER_ID);
+  sheet.hideColumns(COL.DEST_FOLDER2_ID);
   sheet.hideColumns(COL.SCAN_FILE_ID);
   sheet.hideColumns(COL.REF_FILE_ID);
 

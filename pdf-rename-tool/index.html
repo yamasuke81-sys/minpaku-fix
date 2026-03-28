@@ -183,6 +183,7 @@
           <col style="width:180px">
           <col style="width:200px">
           <col style="width:160px">
+          <col style="width:160px">
           <col style="width:140px">
           <col style="width:200px">
           <col style="width:70px">
@@ -197,7 +198,8 @@
             <th><div class="th-wrap">内容要約<div class="col-resizer" data-col="2"></div></div></th>
             <th><div class="th-wrap">リネーム予定名<div class="col-resizer" data-col="3"></div></div></th>
             <th><div class="th-wrap">参照元<div class="col-resizer" data-col="4"></div></div></th>
-            <th><div class="th-wrap">移動先フォルダ<div class="col-resizer" data-col="5"></div></div></th>
+            <th><div class="th-wrap">移動先1<div class="col-resizer" data-col="5"></div></div></th>
+            <th><div class="th-wrap">移動先2<div class="col-resizer" data-col="10"></div></div></th>
             <th><div class="th-wrap">ステータス<div class="col-resizer" data-col="6"></div></div></th>
             <th><div class="th-wrap">補足メモ<div class="col-resizer" data-col="7"></div></div></th>
             <th>操作</th>
@@ -534,10 +536,23 @@ function renderTable() {
     tdFolder.className = 'folder-cell';
     var folderHtml = '<small>' + esc(row.destFolder || '') + '</small>';
     if (!isDone) {
-      folderHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="移動先を変更（Driveを参照）" onclick="openBrowse(' + idx + ',\'dest\')"><i class="bi bi-folder2-open"></i></button>';
+      folderHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="移動先1を変更" onclick="openBrowse(' + idx + ',\'dest\')"><i class="bi bi-folder2-open"></i></button>';
     }
     tdFolder.innerHTML = folderHtml;
     tr.appendChild(tdFolder);
+
+    // 移動先フォルダ2
+    var tdFolder2 = document.createElement('td');
+    tdFolder2.className = 'folder-cell';
+    var folder2Html = '<small>' + esc(row.destFolder2 || '') + '</small>';
+    if (!isDone) {
+      folder2Html += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="移動先2を設定" onclick="openBrowse(' + idx + ',\'dest2\')"><i class="bi bi-folder2-open"></i></button>';
+      if (row.destFolderId2) {
+        folder2Html += ' <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="移動先2をクリア" onclick="clearDest2(' + idx + ')"><i class="bi bi-x-circle"></i></button>';
+      }
+    }
+    tdFolder2.innerHTML = folder2Html;
+    tr.appendChild(tdFolder2);
 
     // ステータス
     var tdStatus = document.createElement('td');
@@ -936,9 +951,8 @@ function openBrowse(idx, mode) {
   document.getElementById('browseRowIdx').value = idx;
   document.getElementById('browseMode').value = mode;
   document.getElementById('browseSearchQuery').value = '';
-  document.getElementById('browseModalTitle').innerHTML = mode === 'ref'
-    ? '<i class="bi bi-folder2-open"></i> 参照元ファイルを選択'
-    : '<i class="bi bi-folder2-open"></i> 移動先フォルダを選択';
+  var titles = { ref: '参照元ファイルを選択', dest: '移動先フォルダ1を選択', dest2: '移動先フォルダ2を選択' };
+  document.getElementById('browseModalTitle').innerHTML = '<i class="bi bi-folder2-open"></i> ' + (titles[mode] || '選択');
   document.getElementById('browseSearchQuery').placeholder = mode === 'ref' ? 'ファイル名で検索...' : 'フォルダ名で検索...';
   document.getElementById('browseContent').innerHTML = '<p class="text-center text-muted">読み込み中...</p>';
   new bootstrap.Modal(document.getElementById('browseModal')).show();
@@ -971,7 +985,7 @@ function renderBrowseContent(data) {
       '<i class="bi bi-arrow-up me-2"></i>.. 上のフォルダへ</button>';
   }
   // このフォルダを選択（移動先モード時）
-  if (mode === 'dest') {
+  if (mode === 'dest' || mode === 'dest2') {
     html += '<button class="list-group-item list-group-item-action py-1 list-group-item-success" onclick="selectBrowseFolder(\'' + data.folderId + '\')">' +
       '<i class="bi bi-check-circle me-2"></i><strong>このフォルダを移動先に選択</strong></button>';
   }
@@ -1002,7 +1016,7 @@ function doBrowseSearch() {
   var mode = document.getElementById('browseMode').value;
   document.getElementById('browseContent').innerHTML = '<p class="text-center"><span class="spinner-border spinner-border-sm"></span> 検索中...</p>';
 
-  if (mode === 'dest') {
+  if (mode === 'dest' || mode === 'dest2') {
     // 移動先モード: フォルダ検索
     google.script.run
       .withSuccessHandler(function(results) {
@@ -1058,12 +1072,22 @@ function selectBrowseFile(fileId) {
 function selectBrowseFolder(folderId) {
   var idx = parseInt(document.getElementById('browseRowIdx').value);
   var rowNum = currentData[idx].rowNum;
+  var mode = document.getElementById('browseMode').value;
+  var slot = (mode === 'dest2') ? 2 : 1;
   bootstrap.Modal.getInstance(document.getElementById('browseModal')).hide();
   showSpinner('移動先を変更中...', '');
   google.script.run
     .withSuccessHandler(function(result) { hideSpinner(); alert(result); loadData(); })
     .withFailureHandler(function(e) { hideSpinner(); onError(e); })
-    .updateDestFolder(rowNum, folderId);
+    .updateDestFolder(rowNum, folderId, slot);
+}
+
+function clearDest2(idx) {
+  var rowNum = currentData[idx].rowNum;
+  google.script.run
+    .withSuccessHandler(function(result) { alert(result); loadData(); })
+    .withFailureHandler(onError)
+    .clearDestFolder2(rowNum);
 }
 
 function goToFolderUrl() {

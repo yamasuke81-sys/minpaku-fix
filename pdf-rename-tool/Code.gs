@@ -672,6 +672,10 @@ function getSpreadsheetUrl() {
   return SS_URL;
 }
 
+function getScanFolderUrl() {
+  return INPUT_FOLDER_URL;
+}
+
 /**
  * Gemini API接続診断（Webアプリから呼べる）
  */

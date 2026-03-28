@@ -60,6 +60,9 @@
         <button class="btn btn-outline-light btn-sm me-2" onclick="openSpreadsheet()">
           <i class="bi bi-table"></i> スプシ
         </button>
+        <button class="btn btn-outline-light btn-sm me-2" onclick="openScanFolder()">
+          <i class="bi bi-folder2-open"></i> SCANフォルダ
+        </button>
         <button class="btn btn-outline-light btn-sm me-2" onclick="document.getElementById('apiKeyArea').classList.toggle('d-none')">
           <i class="bi bi-key"></i> APIキー
         </button>
@@ -80,7 +83,7 @@
 
   <!-- アクションカード -->
   <div class="row action-cards g-2 mb-2">
-    <div class="col-md-4">
+    <div class="col-md-6">
       <div class="card card-action h-100" onclick="runScan()">
         <div class="card-body text-center">
           <i class="bi bi-search text-primary"></i>
@@ -89,21 +92,12 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-6">
       <div class="card card-action h-100" onclick="runExecute()">
         <div class="card-body text-center">
           <i class="bi bi-check2-circle text-success"></i>
           <h6>チェック済みを実行</h6>
-          <small class="text-muted">承認済みファイルをリネーム＆移動</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4">
-      <div class="card card-action h-100" onclick="runLegacy()">
-        <div class="card-body text-center">
-          <i class="bi bi-lightning text-warning"></i>
-          <h6>従来のリネーム（即時）</h6>
-          <small class="text-muted">確認なしで一括リネーム＆移動</small>
+          <small class="text-muted">承認済みファイルをリネーム＆移動＆税理士共有</small>
         </div>
       </div>
     </div>
@@ -149,11 +143,8 @@
       <button class="btn btn-sm btn-outline-danger me-2" onclick="clearFailed()">
         <i class="bi bi-trash"></i> 失敗を再スキャン
       </button>
-      <button class="btn btn-sm btn-outline-warning me-2" onclick="requeueChecked()">
+      <button class="btn btn-sm btn-outline-warning" onclick="requeueChecked()">
         <i class="bi bi-arrow-repeat"></i> チェック済みを再スキャン
-      </button>
-      <button class="btn btn-sm btn-outline-secondary" onclick="openSpreadsheet()">
-        <i class="bi bi-table"></i> スプレッドシートを開く
       </button>
     </div>
   </div>
@@ -716,19 +707,16 @@ function runExecute() {
     .executeApprovedWeb();
 }
 
-function runLegacy() {
-  if (!confirm('従来の即時リネーム処理を実行します。\n確認なしで一括リネーム＆移動されます。よろしいですか？')) return;
-  showSpinner('従来リネーム実行中...', 'PDFを読み取ってリネーム＆移動しています');
-  google.script.run
-    .withSuccessHandler(function() { hideSpinner(); alert('完了しました'); })
-    .withFailureHandler(function(e) { hideSpinner(); onError(e); })
-    .autoRenamePDFs();
-}
-
 function openSpreadsheet() {
   google.script.run
     .withSuccessHandler(function(url) { window.open(url, '_blank'); })
     .getSpreadsheetUrl();
+}
+
+function openScanFolder() {
+  google.script.run
+    .withSuccessHandler(function(url) { window.open(url, '_blank'); })
+    .getScanFolderUrl();
 }
 
 // ============================================================

@@ -408,6 +408,39 @@ function searchFilesInDrive(query) {
 /**
  * 参照元ファイルを変更（行を更新＋学習データ蓄積）
  */
+/**
+ * 参照元を「新規（参照元なし）」にクリア
+ */
+function clearReferenceFile(rowNum) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return '❌ シートなし';
+
+  var oldRow = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
+  var oldRefName = oldRow[COL.REF_NAME - 1];
+  var oldRefFileId = oldRow[COL.REF_FILE_ID - 1];
+
+  sheet.getRange(rowNum, COL.REF_NAME).setValue('🆕 新規（参照元なし）');
+  sheet.getRange(rowNum, COL.REF_LINK).setValue('―');
+  sheet.getRange(rowNum, COL.REF_FILE_ID).setValue('');
+  sheet.getRange(rowNum, COL.REF_FOLDER_ID).setValue('');
+
+  // 学習データに蓄積
+  if (oldRefFileId) {
+    saveFeedbackHistory_(ss, {
+      scanName: oldRow[COL.SCAN_NAME - 1],
+      summary: oldRow[COL.SUMMARY - 1],
+      renameTo: oldRow[COL.RENAME_TO - 1],
+      wrongRefName: oldRefName,
+      wrongRefFileId: oldRefFileId,
+      feedback: '参照元を「新規（参照元なし）」に変更（誤った参照元を解除）',
+      timestamp: new Date()
+    });
+  }
+
+  return '✅ 参照元を「新規（参照元なし）」に変更しました';
+}
+
 function updateReferenceFile(rowNum, newRefFileId) {
   var ss = SpreadsheetApp.openByUrl(SS_URL);
   var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);

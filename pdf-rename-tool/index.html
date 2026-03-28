@@ -524,6 +524,7 @@ function renderTable() {
     }
     if (!isDone) {
       refHtml += ' <button class="btn btn-outline-info btn-sm py-0 px-1" title="参照元を変更（Driveを参照）" onclick="openBrowse(' + idx + ',\'ref\')"><i class="bi bi-folder2-open"></i></button>';
+      refHtml += ' <button class="btn btn-outline-secondary btn-sm py-0 px-1" title="新規（参照元なし）に変更" onclick="clearReference(' + idx + ')"><i class="bi bi-x-circle"></i></button>';
     }
     tdRef.innerHTML = refHtml;
     tr.appendChild(tdRef);
@@ -666,6 +667,15 @@ function requeueChecked() {
     })
     .withFailureHandler(function(e) { hideSpinner(); onError(e); })
     .requeueCheckedEntries();
+}
+
+function clearReference(idx) {
+  if (!confirm('参照元を「新規（参照元なし）」に変更しますか？')) return;
+  var rowNum = currentData[idx].rowNum;
+  google.script.run
+    .withSuccessHandler(function(result) { alert(result); loadData(); })
+    .withFailureHandler(onError)
+    .clearReferenceFile(rowNum);
 }
 
 function onFeedbackAutoSave(idx, text) {

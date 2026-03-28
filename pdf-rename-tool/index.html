@@ -185,7 +185,7 @@
           <col style="width:140px">
           <col style="width:200px">
           <col style="width:70px">
-          <col style="width:50px">
+          <col style="width:120px">
         </colgroup>
         <thead>
           <tr>
@@ -243,12 +243,20 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label fw-bold"><i class="bi bi-folder"></i> 税理士共有フォルダ</label>
-          <p class="mb-1"><small class="text-muted">現在: <span id="settingsTaxFolder">読み込み中...</span></small></p>
-          <div class="input-group">
-            <input type="text" class="form-control form-control-sm" id="taxFolderUrl" placeholder="GoogleドライブフォルダのURLを貼り付け">
-            <button class="btn btn-primary btn-sm" onclick="saveTaxFolder()">保存</button>
+        <label class="form-label fw-bold"><i class="bi bi-folder"></i> 税理士共有フォルダ（複数登録可）</label>
+        <div id="taxFolderList" class="mb-3"></div>
+        <div class="card p-2 bg-light">
+          <small class="fw-bold mb-1">新規追加</small>
+          <div class="row g-2">
+            <div class="col-4">
+              <input type="text" class="form-control form-control-sm" id="newTaxName" placeholder="名前（例: 法人用）">
+            </div>
+            <div class="col-6">
+              <input type="text" class="form-control form-control-sm" id="newTaxUrl" placeholder="GoogleドライブフォルダURL">
+            </div>
+            <div class="col-2">
+              <button class="btn btn-primary btn-sm w-100" onclick="addTaxFolderSetting()">追加</button>
+            </div>
           </div>
         </div>
       </div>
@@ -354,8 +362,17 @@
 // ============================================================
 var currentData = [];
 
+window._taxFolders = [];
+
 window.onload = function() {
-  loadData();
+  // 税理士フォルダ一覧を先に取得してからデータ読み込み
+  google.script.run
+    .withSuccessHandler(function(s) {
+      window._taxFolders = s.taxFolders || [];
+      loadData();
+    })
+    .withFailureHandler(function() { loadData(); })
+    .getSettings();
 };
 
 function loadData() {
@@ -520,21 +537,29 @@ function renderTable() {
     }
     tr.appendChild(tdOps);
 
-    // 税理士共有チェックボックス
+    // 税理士共有（複数チェックボックス）
     var tdTax = document.createElement('td');
-    tdTax.style.textAlign = 'center';
-    if (!isDone) {
-      var taxCb = document.createElement('input');
-      taxCb.type = 'checkbox';
-      taxCb.className = 'form-check-input';
-      taxCb.checked = row.taxShare || false;
-      taxCb.title = '税理士共有フォルダにもコピー';
-      taxCb.onchange = (function(i) {
-        return function() { onTaxShareChanged(i, this.checked); };
-      })(idx);
-      tdTax.appendChild(taxCb);
-    } else if (row.taxShare) {
-      tdTax.innerHTML = '<i class="bi bi-check-circle text-success" title="税理士共有済"></i>';
+    tdTax.style.fontSize = '0.75rem';
+    var selectedTax = row.taxShare || []; // 配列
+    if (!isDone && window._taxFolders && window._taxFolders.length > 0) {
+      window._taxFolders.forEach(function(tf) {
+        var label = document.createElement('label');
+        label.className = 'd-block';
+        label.style.cursor = 'pointer';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'form-check-input me-1';
+        cb.style.transform = 'scale(0.8)';
+        cb.checked = selectedTax.indexOf(tf.name) !== -1;
+        cb.onchange = (function(i, folderName) {
+          return function() { onTaxShareToggle(i, folderName, this.checked); };
+        })(idx, tf.name);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(tf.name));
+        tdTax.appendChild(label);
+      });
+    } else if (isDone && selectedTax.length > 0) {
+      tdTax.innerHTML = '<small class="text-success">' + selectedTax.join(', ') + ' ✓</small>';
     }
     tr.appendChild(tdTax);
 
@@ -710,39 +735,74 @@ function openSpreadsheet() {
 // 設定
 // ============================================================
 function openSettingsModal() {
-  document.getElementById('settingsTaxFolder').textContent = '読み込み中...';
-  google.script.run
-    .withSuccessHandler(function(s) {
-      document.getElementById('settingsTaxFolder').textContent = s.taxAccountantFolderName;
-    })
-    .withFailureHandler(onError)
-    .getSettings();
+  refreshTaxFolderList();
   new bootstrap.Modal(document.getElementById('settingsModal')).show();
 }
 
-function saveTaxFolder() {
-  var url = document.getElementById('taxFolderUrl').value.trim();
-  if (!url) { alert('URLを入力してください'); return; }
+function refreshTaxFolderList() {
+  google.script.run
+    .withSuccessHandler(function(s) {
+      window._taxFolders = s.taxFolders || [];
+      var container = document.getElementById('taxFolderList');
+      if (s.taxFolders.length === 0) {
+        container.innerHTML = '<p class="text-muted small">登録なし</p>';
+        return;
+      }
+      var html = '<div class="list-group">';
+      s.taxFolders.forEach(function(f) {
+        html += '<div class="list-group-item d-flex justify-content-between align-items-center py-1">' +
+          '<span><i class="bi bi-folder me-1"></i><strong>' + esc(f.name) + '</strong> <small class="text-muted">(' + esc(f.folderName || '') + ')</small></span>' +
+          '<button class="btn btn-outline-danger btn-sm py-0" onclick="removeTaxFolderSetting(\'' + esc(f.name) + '\')"><i class="bi bi-trash"></i></button>' +
+          '</div>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    })
+    .withFailureHandler(onError)
+    .getSettings();
+}
+
+function addTaxFolderSetting() {
+  var name = document.getElementById('newTaxName').value.trim();
+  var url = document.getElementById('newTaxUrl').value.trim();
+  if (!name || !url) { alert('名前とURLを入力してください'); return; }
   google.script.run
     .withSuccessHandler(function(result) {
       alert(result);
-      document.getElementById('taxFolderUrl').value = '';
-      // 表示を更新
-      google.script.run.withSuccessHandler(function(s) {
-        document.getElementById('settingsTaxFolder').textContent = s.taxAccountantFolderName;
-      }).getSettings();
+      document.getElementById('newTaxName').value = '';
+      document.getElementById('newTaxUrl').value = '';
+      refreshTaxFolderList();
     })
     .withFailureHandler(onError)
-    .saveSettings({ taxAccountantFolderUrl: url });
+    .addTaxFolder(name, url);
+}
+
+function removeTaxFolderSetting(name) {
+  if (!confirm('「' + name + '」を削除しますか？')) return;
+  google.script.run
+    .withSuccessHandler(function(result) { alert(result); refreshTaxFolderList(); })
+    .withFailureHandler(onError)
+    .removeTaxFolder(name);
 }
 
 // ============================================================
-// 税理士共有チェック
+// 税理士共有チェック（複数フォルダ対応）
 // ============================================================
-function onTaxShareChanged(idx, checked) {
-  currentData[idx].taxShare = checked;
+function onTaxShareToggle(idx, folderName, checked) {
+  var selected = currentData[idx].taxShare || [];
+  var aiSuggested = selected.slice(); // 変更前のコピー
+
+  if (checked && selected.indexOf(folderName) === -1) {
+    selected.push(folderName);
+  } else if (!checked) {
+    selected = selected.filter(function(n) { return n !== folderName; });
+  }
+  currentData[idx].taxShare = selected;
   var rowNum = currentData[idx].rowNum;
-  google.script.run.updateTaxShare(rowNum, checked);
+  google.script.run.updateTaxShare(rowNum, selected);
+
+  // AI推薦と異なる場合、フィードバックを蓄積
+  google.script.run.saveTaxShareFeedback(rowNum, aiSuggested, selected);
 }
 
 // ============================================================

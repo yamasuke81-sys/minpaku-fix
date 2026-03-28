@@ -40,80 +40,140 @@ function setApiKey(key) {
 }
 
 // ============================================================
-// 設定管理
+// 設定管理（税理士フォルダ複数対応）
 // ============================================================
 /**
- * 設定を取得
+ * 税理士フォルダ一覧を取得
+ * 保存形式: ScriptProperty 'TAX_FOLDERS' = JSON配列
+ *   [{ "name": "法人用", "folderId": "xxx" }, { "name": "個人用", "folderId": "yyy" }]
  */
+function getTaxFolders() {
+  var json = PropertiesService.getScriptProperties().getProperty('TAX_FOLDERS');
+  if (!json) return [];
+  try { return JSON.parse(json); } catch (e) { return []; }
+}
+
 function getSettings() {
-  var props = PropertiesService.getScriptProperties();
-  return {
-    taxAccountantFolderId: props.getProperty('TAX_ACCOUNTANT_FOLDER_ID') || '',
-    taxAccountantFolderName: props.getProperty('TAX_ACCOUNTANT_FOLDER_NAME') || '（未設定）'
-  };
+  return { taxFolders: getTaxFolders() };
 }
 
 /**
- * 設定を保存
+ * 税理士フォルダを追加
  */
-function saveSettings(settings) {
-  var props = PropertiesService.getScriptProperties();
+function addTaxFolder(name, folderUrl) {
+  if (!name || !folderUrl) return '❌ 名前とフォルダURLを入力してください';
+  var folderId = extractIdFromUrl(folderUrl);
+  try {
+    var folder = DriveApp.getFolderById(folderId);
+    var folders = getTaxFolders();
+    // 同名チェック
+    for (var i = 0; i < folders.length; i++) {
+      if (folders[i].name === name) return '❌ 「' + name + '」は既に登録されています';
+    }
+    folders.push({ name: name, folderId: folderId, folderName: folder.getName() });
+    PropertiesService.getScriptProperties().setProperty('TAX_FOLDERS', JSON.stringify(folders));
+    return '✅ 「' + name + '」を追加しました（' + folder.getName() + '）';
+  } catch (e) {
+    return '❌ フォルダにアクセスできません: ' + e.message;
+  }
+}
 
-  if (settings.taxAccountantFolderUrl) {
-    var folderId = extractIdFromUrl(settings.taxAccountantFolderUrl);
+/**
+ * 税理士フォルダを削除
+ */
+function removeTaxFolder(name) {
+  var folders = getTaxFolders();
+  folders = folders.filter(function(f) { return f.name !== name; });
+  PropertiesService.getScriptProperties().setProperty('TAX_FOLDERS', JSON.stringify(folders));
+  return '✅ 「' + name + '」を削除しました';
+}
+
+// ============================================================
+// 税理士共有（複数フォルダ＋年月サブフォルダ対応）
+// ============================================================
+/**
+ * ファイルを指定の税理士フォルダにコピー（年月サブフォルダ自動作成）
+ * @param {File} file - DriveApp.getFileById()で取得したファイル
+ * @param {string} fileName - コピー後のファイル名
+ * @param {string[]} taxFolderNames - 共有先フォルダ名のリスト（例: ["法人用","個人用"]）
+ * @param {string} docDate - 書類日付（YYYY-MM形式）
+ * @return {string} 結果メッセージ
+ */
+function copyToTaxFolders_(file, fileName, taxFolderNames, docDate) {
+  if (!taxFolderNames || taxFolderNames.length === 0) return '';
+
+  var allFolders = getTaxFolders();
+  var results = [];
+
+  for (var i = 0; i < taxFolderNames.length; i++) {
+    var targetName = taxFolderNames[i];
+    var folderConfig = null;
+    for (var j = 0; j < allFolders.length; j++) {
+      if (allFolders[j].name === targetName) { folderConfig = allFolders[j]; break; }
+    }
+    if (!folderConfig) { results.push(targetName + ':未登録'); continue; }
+
     try {
-      var folder = DriveApp.getFolderById(folderId);
-      props.setProperty('TAX_ACCOUNTANT_FOLDER_ID', folderId);
-      props.setProperty('TAX_ACCOUNTANT_FOLDER_NAME', folder.getName());
-      return '✅ 税理士共有フォルダを設定: ' + folder.getName();
+      var parentFolder = DriveApp.getFolderById(folderConfig.folderId);
+
+      // 年月サブフォルダを取得 or 作成
+      var subFolderName = docDate || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy.MM');
+      // YYYY-MM → YYYY.MM に変換
+      subFolderName = subFolderName.replace(/-/g, '.');
+      var subFolder = getOrCreateSubFolder_(parentFolder, subFolderName);
+
+      file.makeCopy(fileName, subFolder);
+      results.push(targetName + ':OK');
+
+      // 学習データに蓄積
+      saveShareLearning_(file.getId(), fileName, folderConfig.folderId, targetName, subFolderName);
     } catch (e) {
-      return '❌ フォルダにアクセスできません: ' + e.message;
+      results.push(targetName + ':失敗(' + e.message.substring(0, 30) + ')');
     }
   }
-  return '設定なし';
+
+  return results.join(', ');
 }
 
-// ============================================================
-// 税理士共有
-// ============================================================
 /**
- * ファイルを税理士共有フォルダにコピー
+ * サブフォルダを取得（なければ作成）
  */
-function shareWithTaxAccountant(scanFileId, renameTo) {
-  var folderId = PropertiesService.getScriptProperties().getProperty('TAX_ACCOUNTANT_FOLDER_ID');
-  if (!folderId) return '❌ 税理士共有フォルダが未設定です。設定画面で指定してください。';
-
-  try {
-    var file = DriveApp.getFileById(scanFileId);
-    var folder = DriveApp.getFolderById(folderId);
-    var fileName = renameTo || file.getName();
-    if (!fileName.toLowerCase().endsWith('.pdf')) fileName += '.pdf';
-    var copy = file.makeCopy(fileName, folder);
-
-    // 学習データに蓄積
-    saveShareLearning_(scanFileId, fileName, folderId);
-
-    return '✅ 「' + fileName + '」を税理士共有フォルダにコピーしました';
-  } catch (e) {
-    return '❌ コピー失敗: ' + e.message;
-  }
+function getOrCreateSubFolder_(parentFolder, subFolderName) {
+  var folders = parentFolder.getFoldersByName(subFolderName);
+  if (folders.hasNext()) return folders.next();
+  return parentFolder.createFolder(subFolderName);
 }
 
 /**
  * 税理士共有の学習データを蓄積
  */
-function saveShareLearning_(fileId, fileName, folderId) {
+function saveShareLearning_(fileId, fileName, folderId, folderName, subFolder) {
   var ss = SpreadsheetApp.openByUrl(SS_URL);
   var sheetName = '税理士共有履歴';
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
-    sheet.getRange(1, 1, 1, 4).setValues([['ファイル名', 'ファイルID', 'フォルダID', '共有日時']]);
-    var h = sheet.getRange(1, 1, 1, 4);
+    sheet.getRange(1, 1, 1, 6).setValues([['ファイル名', 'ファイルID', 'フォルダ名', 'フォルダID', 'サブフォルダ', '共有日時']]);
+    var h = sheet.getRange(1, 1, 1, 6);
     h.setBackground('#6A1B9A'); h.setFontColor('#fff'); h.setFontWeight('bold');
     sheet.setFrozenRows(1);
   }
-  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 4).setValues([[fileName, fileId, folderId, new Date()]]);
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 6).setValues([[fileName, fileId, folderName, folderId, subFolder, new Date()]]);
+}
+
+/**
+ * 税理士共有の学習履歴を取得
+ */
+function getTaxShareLearning_() {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName('税理士共有履歴');
+  if (!sheet || sheet.getLastRow() < 2) return '';
+
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+  var lines = data.map(function(row) {
+    return '・「' + row[0] + '」→ ' + row[2] + '/' + row[4];
+  });
+  return lines.slice(-20).join('\n');
 }
 
 // ============================================================
@@ -228,10 +288,12 @@ const COL = {
   SCAN_FILE_ID:  12,  // L: スキャンファイルID
   REF_FILE_ID:   13,  // M: 参照元ファイルID
   FEEDBACK:      15,  // O: 補足メモ（ユーザーフィードバック）
-  TAX_SHARE:     16,  // P: 税理士共有チェック
-  TIMESTAMP:     17,  // Q: 処理日時
+  TAX_SHARE:     16,  // P: 税理士共有（JSON: ["法人用"] 等）
+  DOC_DATE:      17,  // Q: 書類日付（YYYY-MM形式）
+  ENTITY_TYPE:   18,  // R: 法人/個人判定
+  TIMESTAMP:     19,  // S: 処理日時
 };
-const TOTAL_COLS = 17;
+const TOTAL_COLS = 19;
 
 // ============================================================
 // メニュー
@@ -288,7 +350,9 @@ function getCompareData() {
       scanFileId: row[COL.SCAN_FILE_ID - 1] || '',
       refFileId: row[COL.REF_FILE_ID - 1] || '',
       feedback: row[COL.FEEDBACK - 1] || '',
-      taxShare: row[COL.TAX_SHARE - 1] === true,
+      taxShare: parseTaxShare_(row[COL.TAX_SHARE - 1]),
+      docDate: row[COL.DOC_DATE - 1] || '',
+      entityType: row[COL.ENTITY_TYPE - 1] || '',
       timestamp: row[COL.TIMESTAMP - 1] ? Utilities.formatDate(new Date(row[COL.TIMESTAMP - 1]), 'Asia/Tokyo', 'MM/dd HH:mm') : ''
     });
   }
@@ -318,13 +382,52 @@ function updateCheckStatusBatch(updates) {
 }
 
 /**
- * 税理士共有チェック状態を更新
+ * 税理士共有のJSON文字列をパース
  */
-function updateTaxShare(rowNum, checked) {
+function parseTaxShare_(val) {
+  if (!val) return [];
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch (e) { return []; }
+  }
+  if (val === true) return []; // 旧形式のtrue対応
+  return [];
+}
+
+/**
+ * 税理士共有選択を更新（JSON配列）
+ */
+function updateTaxShare(rowNum, selectedFolders) {
   var ss = SpreadsheetApp.openByUrl(SS_URL);
   var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
   if (!sheet) return;
-  sheet.getRange(rowNum, COL.TAX_SHARE).setValue(checked);
+  sheet.getRange(rowNum, COL.TAX_SHARE).setValue(JSON.stringify(selectedFolders));
+}
+
+/**
+ * 税理士共有フィードバック（AI判定の修正を学習データに蓄積）
+ */
+function saveTaxShareFeedback(rowNum, aiSuggested, userSelected) {
+  var ss = SpreadsheetApp.openByUrl(SS_URL);
+  var sheet = ss.getSheetByName(COMPARE_SHEET_NAME);
+  if (!sheet) return;
+
+  var row = sheet.getRange(rowNum, 1, 1, TOTAL_COLS).getValues()[0];
+  var summary = row[COL.SUMMARY - 1];
+  var entityType = row[COL.ENTITY_TYPE - 1];
+
+  var sheetName = '税理士振分学習';
+  var lSheet = ss.getSheetByName(sheetName);
+  if (!lSheet) {
+    lSheet = ss.insertSheet(sheetName);
+    lSheet.getRange(1, 1, 1, 5).setValues([['内容要約', '法人/個人', 'AI推薦', 'ユーザー選択', '登録日時']]);
+    var h = lSheet.getRange(1, 1, 1, 5);
+    h.setBackground('#00695C'); h.setFontColor('#fff'); h.setFontWeight('bold');
+    lSheet.setFrozenRows(1);
+  }
+  lSheet.getRange(lSheet.getLastRow() + 1, 1, 1, 5).setValues([[
+    String(summary).substring(0, 100), entityType,
+    JSON.stringify(aiSuggested), JSON.stringify(userSelected), new Date()
+  ]]);
 }
 
 /**
@@ -719,9 +822,15 @@ function scanAndPrepare() {
         var analyzed = analyzeAndRename_(blob, rules, activeModel, feedbackHistory, renameLearning);
         summary = analyzed.summary;
         renameTo = analyzed.renameTo;
+        var docDate = analyzed.docDate || '';
+        var entityType = analyzed.entityType || '不明';
+        var suggestedTaxFolders = analyzed.taxFolders || [];
       }
 
       if (renameTo === 'ERROR') renameTo = '（生成失敗）';
+      if (typeof docDate === 'undefined') var docDate = '';
+      if (typeof entityType === 'undefined') var entityType = '';
+      if (typeof suggestedTaxFolders === 'undefined') var suggestedTaxFolders = [];
 
       // Drive内で類似PDFを検索
       var refResult = findSimilarFile_(summary, activeModel, feedbackHistory, rules);
@@ -771,6 +880,12 @@ function scanAndPrepare() {
       }
       compareSheet.getRange(newRow, COL.SCAN_FILE_ID).setValue(fileId);
       compareSheet.getRange(newRow, COL.REF_FILE_ID).setValue(refResult.fileId || '');
+      // 税理士共有: AIが推薦したフォルダをJSON文字列で保存
+      if (suggestedTaxFolders.length > 0) {
+        compareSheet.getRange(newRow, COL.TAX_SHARE).setValue(JSON.stringify(suggestedTaxFolders));
+      }
+      compareSheet.getRange(newRow, COL.DOC_DATE).setValue(docDate);
+      compareSheet.getRange(newRow, COL.ENTITY_TYPE).setValue(entityType);
       compareSheet.getRange(newRow, COL.TIMESTAMP).setValue(new Date());
 
       processedCount++;
@@ -822,17 +937,16 @@ function executeApproved() {
     var renameTo = row[COL.RENAME_TO - 1];
     var refFolderId = row[COL.REF_FOLDER_ID - 1];
     var destFolderId = row[COL.DEST_FOLDER_ID - 1];
-    var taxShare = row[COL.TAX_SHARE - 1] === true;
+    var taxShareFolders = parseTaxShare_(row[COL.TAX_SHARE - 1]);
+    var docDate = row[COL.DOC_DATE - 1] || '';
 
     if (!fileId || !renameTo) continue;
 
-    // 移動先の優先順位: DEST_FOLDER_ID > REF_FOLDER_ID > outputフォルダ
     var moveFolderId = destFolderId || refFolderId || '';
 
     try {
       var file = DriveApp.getFileById(fileId);
 
-      // リネーム（.pdf拡張子を確保）
       var cleanName = renameTo.replace(/[\\/:*?"<>|]/g, '').trim();
       if (!cleanName.toLowerCase().endsWith('.pdf')) {
         cleanName += '.pdf';
@@ -856,26 +970,13 @@ function executeApproved() {
         movedTo = 'output';
       }
 
-      // 税理士共有チェックがONの場合、税理士フォルダにもコピー
+      // 税理士共有（複数フォルダ＋年月サブフォルダ）
       var taxMsg = '';
-      if (taxShare) {
-        var taxFolderId = PropertiesService.getScriptProperties().getProperty('TAX_ACCOUNTANT_FOLDER_ID');
-        if (taxFolderId) {
-          try {
-            var taxFolder = DriveApp.getFolderById(taxFolderId);
-            file.makeCopy(cleanName, taxFolder);
-            taxMsg = ' + 税理士共有済';
-            saveShareLearning_(fileId, cleanName, taxFolderId);
-          } catch (taxErr) {
-            taxMsg = ' + 税理士共有失敗';
-            console.error('税理士共有失敗: ' + taxErr.message);
-          }
-        } else {
-          taxMsg = ' + 税理士フォルダ未設定';
-        }
+      if (taxShareFolders.length > 0) {
+        var taxResult = copyToTaxFolders_(file, cleanName, taxShareFolders, docDate);
+        taxMsg = ' + 税理士(' + taxResult + ')';
       }
 
-      // ステータス更新
       var sheetRow = i + 2;
       var doneLabel = '✅ 完了（→ ' + movedTo + taxMsg + '）';
       compareSheet.getRange(sheetRow, COL.STATUS).setValue(doneLabel);
@@ -928,29 +1029,51 @@ function analyzePdfContent_(pdfBlob, modelName) {
 function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory, renameLearning) {
   var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + getApiKey_();
 
-  var promptText = '以下のPDFについて2つの作業をしてください。\n\n' +
+  // 登録済み税理士フォルダ名のリスト
+  var taxFolders = getTaxFolders();
+  var taxFolderNames = taxFolders.map(function(f) { return f.name; });
+  var taxShareLearning = getTaxShareLearning_();
+
+  var promptText = '以下のPDFについて作業をしてください。\n\n' +
     '【作業1: 内容要約】\n' +
     '以下の情報を抽出して3〜5行で要約:\n' +
     '・書類の種類（請求書、明細、通知書など）\n' +
     '・発行元（会社名・団体名）\n' +
+    '・宛名（個人名、法人名など）\n' +
     '・対象物件や契約名\n' +
     '・対象期間（年月）\n' +
     '・金額\n\n' +
     '【作業2: ファイル名生成】\n' +
-    '以下のルールに従い、新しいファイル名を1つ生成:\n' + rules + '\n\n';
+    '以下のルールに従い、新しいファイル名を1つ生成:\n' + rules + '\n\n' +
+    '【作業3: 書類日付の抽出】\n' +
+    'この書類の対象年月をYYYY-MM形式で抽出してください。（例: 2026-03）\n' +
+    '請求期間、対象月、発行日などから判断してください。\n\n' +
+    '【作業4: 法人/個人の判定】\n' +
+    '書類の宛名や内容から、この書類が法人宛か個人宛かを判定してください。\n' +
+    '法人名（株式会社、合同会社、LLC等）が宛名にあれば「法人」、個人名なら「個人」。\n' +
+    '判断できない場合は「不明」としてください。\n\n';
+
+  if (taxFolderNames.length > 0) {
+    promptText += '【作業5: 税理士共有先の推薦】\n' +
+      '以下の税理士共有フォルダのうち、この書類を共有すべき先を選んでください（複数可）:\n' +
+      taxFolderNames.map(function(n, i) { return (i+1) + '. ' + n; }).join('\n') + '\n' +
+      '法人宛の書類は「法人」を含むフォルダ、個人宛は「個人」を含むフォルダを選ぶのが基本です。\n\n';
+
+    if (taxShareLearning) {
+      promptText += '【過去の税理士共有パターン（参考にしてください）】\n' + taxShareLearning + '\n\n';
+    }
+  }
 
   if (renameLearning) {
-    promptText += '【過去のリネーム修正履歴（ユーザーが望む命名パターンを学習してください）】\n' +
-      'AIが提案した名前をユーザーがどう修正したかの履歴です。この傾向に合わせてファイル名を生成してください:\n' +
-      renameLearning + '\n\n';
+    promptText += '【過去のリネーム修正履歴】\n' + renameLearning + '\n\n';
   }
 
   if (feedbackHistory) {
-    promptText += '【過去の補足情報（分類の参考にしてください）】\n' + feedbackHistory + '\n\n';
+    promptText += '【過去の補足情報】\n' + feedbackHistory + '\n\n';
   }
 
   promptText += '【出力形式】必ず以下のJSON形式で出力（他の文字は不要）:\n' +
-    '{"summary":"要約テキスト","renameTo":"新しいファイル名"}';
+    '{"summary":"要約テキスト","renameTo":"新しいファイル名","docDate":"YYYY-MM","entityType":"法人 or 個人 or 不明","taxFolders":["フォルダ名1"]}';
 
   var payload = {
     contents: [{
@@ -964,9 +1087,8 @@ function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory, renameLea
 
   var result = callGeminiWithRetry_(url, payload, 'analyzeAndRename');
 
-  // エラーオブジェクトが返ってきた場合
   if (result && result.__error) {
-    return { summary: '（API失敗: ' + result.__error + '）', renameTo: 'ERROR', error: result.__error };
+    return { summary: '（API失敗: ' + result.__error + '）', renameTo: 'ERROR', docDate: '', entityType: '', taxFolders: [], error: result.__error };
   }
 
   if (result && typeof result === 'string') {
@@ -976,7 +1098,10 @@ function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory, renameLea
         var parsed = JSON.parse(jsonMatch[0]);
         return {
           summary: parsed.summary || '（解析失敗）',
-          renameTo: parsed.renameTo || 'ERROR'
+          renameTo: parsed.renameTo || 'ERROR',
+          docDate: parsed.docDate || '',
+          entityType: parsed.entityType || '不明',
+          taxFolders: parsed.taxFolders || []
         };
       }
     } catch (e) {
@@ -984,11 +1109,10 @@ function analyzeAndRename_(pdfBlob, rules, modelName, feedbackHistory, renameLea
     }
   }
 
-  // 統合APIが失敗した場合は個別に呼び出す（フォールバック）
   console.log('統合API失敗、個別呼び出しにフォールバック');
   var summary = analyzePdfContent_(pdfBlob, modelName);
   var renameTo = askGemini(pdfBlob, rules, modelName);
-  return { summary: summary, renameTo: renameTo };
+  return { summary: summary, renameTo: renameTo, docDate: '', entityType: '不明', taxFolders: [] };
 }
 
 // ============================================================
@@ -1226,7 +1350,7 @@ function getOrCreateCompareSheet_(ss) {
     'スキャンファイル', '参照元ファイル名', '参照元ファイル',
     '参照元フォルダID', '移動先フォルダ候補', '移動先フォルダID',
     'ステータス', 'スキャンファイルID', '参照元ファイルID',
-    '補足メモ', '税理士共有', '処理日時'
+    '補足メモ', '税理士共有', '書類日付', '法人/個人', '処理日時'
   ];
 
   if (sheet) {
@@ -1269,7 +1393,9 @@ function getOrCreateCompareSheet_(ss) {
   sheet.setColumnWidth(COL.SCAN_FILE_ID, 100);
   sheet.setColumnWidth(COL.REF_FILE_ID, 100);
   sheet.setColumnWidth(COL.FEEDBACK, 300);         // 補足メモ
-  sheet.setColumnWidth(COL.TAX_SHARE, 60);         // 税理士共有
+  sheet.setColumnWidth(COL.TAX_SHARE, 150);         // 税理士共有
+  sheet.setColumnWidth(COL.DOC_DATE, 80);           // 書類日付
+  sheet.setColumnWidth(COL.ENTITY_TYPE, 60);        // 法人/個人
   sheet.setColumnWidth(COL.TIMESTAMP, 150);
 
   // 内部ID列を非表示（ユーザーには不要）

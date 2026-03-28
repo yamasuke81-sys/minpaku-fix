@@ -1443,7 +1443,7 @@ function scanAndPrepare() {
       compareSheet.getRange(errRow, COL.TIMESTAMP).setValue(new Date());
     }
 
-    Utilities.sleep(5000); // API負荷軽減（1ファイルあたり複数回API呼び出しのため長めに待機）
+    Utilities.sleep(15000); // API負荷軽減（15秒間隔 → 1分あたり最大4件でレート制限回避）
   }
 
   console.log('scanAndPrepare完了: ' + processedCount + '件処理');
@@ -1737,10 +1737,16 @@ function callGeminiWithRetry_(url, payload, context) {
         continue;
       }
 
-      var errBody = response.getContentText().substring(0, 200);
-      lastError = 'HTTP' + code;
+      var errBody = response.getContentText().substring(0, 500);
+      // 400エラーの詳細をパース
+      var errDetail = '';
+      try {
+        var errJson = JSON.parse(response.getContentText());
+        if (errJson.error && errJson.error.message) errDetail = errJson.error.message;
+      } catch (pe) {}
+      lastError = 'HTTP' + code + (errDetail ? '(' + errDetail.substring(0, 80) + ')' : '');
       console.error('[' + context + '] ' + lastError + ': ' + errBody);
-      break; // 400系エラーはリトライしても無駄
+      break;
 
     } catch (e) {
       lastError = e.message.substring(0, 100);

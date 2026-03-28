@@ -437,8 +437,13 @@ function updateReferenceFile(rowNum, newRefFileId) {
     sheet.getRange(rowNum, COL.REF_LINK).setFormula('=HYPERLINK("' + refUrl + '","開く")');
     sheet.getRange(rowNum, COL.REF_FILE_ID).setValue(newRefFileId);
     sheet.getRange(rowNum, COL.REF_FOLDER_ID).setValue(folderId);
-    sheet.getRange(rowNum, COL.DEST_FOLDER).setValue(folderPath ? '📁 ' + folderPath : '');
-    sheet.getRange(rowNum, COL.DEST_FOLDER_ID).setValue(folderId);
+
+    // 移動先フォルダは、ユーザーが既に手動設定していたら上書きしない
+    var existingDestFolderId = oldRow[COL.DEST_FOLDER_ID - 1];
+    if (!existingDestFolderId) {
+      sheet.getRange(rowNum, COL.DEST_FOLDER).setValue(folderPath ? '📁 ' + folderPath : '');
+      sheet.getRange(rowNum, COL.DEST_FOLDER_ID).setValue(folderId);
+    }
 
     // 学習データに蓄積（フィードバック履歴に保存）
     if (oldRefFileId !== newRefFileId) {

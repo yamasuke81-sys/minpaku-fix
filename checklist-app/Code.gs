@@ -4071,3 +4071,32 @@ function installCleanupTrigger() {
 
   Logger.log('クリーンアップトリガーを設定しました（毎日午前3時）');
 }
+
+/**
+ * Google Drive画像のプロキシ（iOS Safari ITP対策）
+ * 画像をBase64で返し、script.google.comドメインから配信する
+ * @param {string} fileId Google DriveのファイルID
+ * @param {number} width サムネイル幅（デフォルト200）
+ * @return {string} JSON { success, data: "data:image/jpeg;base64,..." }
+ */
+function getImageProxy(fileId, width) {
+  try {
+    if (!fileId) return JSON.stringify({ success: false, error: 'fileId未指定' });
+    var w = width || 200;
+    if (w > 800) w = 800; // 最大800pxに制限
+    var url = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + w;
+    var response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() }
+    });
+    if (response.getResponseCode() !== 200) {
+      return JSON.stringify({ success: false, error: 'HTTP ' + response.getResponseCode() });
+    }
+    var blob = response.getBlob();
+    var base64 = Utilities.base64Encode(blob.getBytes());
+    var mimeType = blob.getContentType() || 'image/jpeg';
+    return JSON.stringify({ success: true, data: 'data:' + mimeType + ';base64,' + base64 });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}

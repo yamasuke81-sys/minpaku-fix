@@ -31,9 +31,10 @@
     .badge-waiting { background: #E3F2FD; color: #1565C0; }
     .badge-done { background: #E8F5E9; color: #2E7D32; }
     .badge-error { background: #FFEBEE; color: #C62828; }
-    .summary-cell { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; position: relative; }
+    .summary-cell { max-width: 250px; position: relative; }
+    .summary-cell .summary-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .summary-cell .summary-tooltip { display: none; position: absolute; left: 0; top: 100%; z-index: 100; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; white-space: pre-wrap; width: 400px; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none; }
     .summary-cell:hover .summary-tooltip { display: block; }
-    .summary-tooltip { display: none; position: absolute; left: 0; top: 100%; z-index: 20; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; white-space: pre-wrap; max-width: 400px; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none; }
     .rename-input { border: 1px solid #ddd; border-radius: 4px; padding: 2px 6px; width: 100%; font-size: 0.85rem; }
     .rename-input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
     .spinner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
@@ -501,7 +502,7 @@ function renderTable() {
     // 内容要約
     var tdSum = document.createElement('td');
     tdSum.className = 'summary-cell';
-    tdSum.innerHTML = esc(row.summary || '') + '<div class="summary-tooltip">' + esc(row.summary || '') + '</div>';
+    tdSum.innerHTML = '<span class="summary-text">' + esc(row.summary || '') + '</span><div class="summary-tooltip">' + esc(row.summary || '') + '</div>';
     tr.appendChild(tdSum);
 
     // リネーム予定名（編集可能）

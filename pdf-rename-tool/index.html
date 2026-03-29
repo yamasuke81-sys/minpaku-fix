@@ -22,20 +22,17 @@
     .table-container { background: #fff; }
     .table { table-layout: fixed; }
     .table th { background: #1a73e8; color: #fff; font-size: 0.8rem; white-space: nowrap; position: sticky; top: 0; z-index: 10; overflow: hidden; text-overflow: ellipsis; }
-    .table td { text-overflow: ellipsis; }
-    .table td:not(.summary-cell) { overflow: hidden; }
+    .table td { font-size: 0.85rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+    .table td.summary-cell { overflow: hidden; }
     .col-resizer { position: absolute; right: 0; top: 0; width: 5px; height: 100%; cursor: col-resize; background: transparent; z-index: 11; }
     .th-wrap { position: relative; display: inline-block; width: 100%; }
     .col-resizer:hover, .col-resizer.active { background: rgba(255,255,255,0.4); }
-    .table td { font-size: 0.85rem; vertical-align: middle; }
     .badge-new { background: #FFF9C4; color: #F57F17; border: 1px solid #FDD835; }
     .badge-waiting { background: #E3F2FD; color: #1565C0; }
     .badge-done { background: #E8F5E9; color: #2E7D32; }
     .badge-error { background: #FFEBEE; color: #C62828; }
-    .summary-cell { max-width: 250px; position: relative; }
-    .summary-cell .summary-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .summary-cell .summary-tooltip { display: none; position: absolute; left: 0; top: 100%; z-index: 100; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; white-space: pre-wrap; width: 400px; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none; }
-    .summary-cell:hover .summary-tooltip { display: block; }
+    .summary-cell { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    #floatingTooltip { display: none; position: fixed; z-index: 99999; background: #333; color: #fff; padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; max-width: 400px; font-size: 0.8rem; box-shadow: 0 4px 16px rgba(0,0,0,0.4); pointer-events: none; line-height: 1.5; }
     .rename-input { border: 1px solid #ddd; border-radius: 4px; padding: 2px 6px; width: 100%; font-size: 0.85rem; }
     .rename-input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
     .spinner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
@@ -336,9 +333,29 @@
   </div>
 </div>
 
+<div id="floatingTooltip"></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ============================================================
+// フローティングツールチップ（body直下のfixed要素 — 親のoverflowに影響されない）
+(function() {
+  var tip = document.getElementById('floatingTooltip');
+  document.addEventListener('mouseover', function(e) {
+    var cell = e.target.closest('.summary-cell');
+    if (cell && cell.dataset.tooltip) {
+      tip.textContent = cell.dataset.tooltip;
+      tip.style.display = 'block';
+      var rect = cell.getBoundingClientRect();
+      tip.style.left = rect.left + 'px';
+      tip.style.top = (rect.bottom + 4) + 'px';
+    }
+  });
+  document.addEventListener('mouseout', function(e) {
+    var cell = e.target.closest('.summary-cell');
+    if (cell) tip.style.display = 'none';
+  });
+})();
+
 // 列幅リサイズ
 // ============================================================
 (function() {
@@ -503,7 +520,8 @@ function renderTable() {
     // 内容要約
     var tdSum = document.createElement('td');
     tdSum.className = 'summary-cell';
-    tdSum.innerHTML = '<span class="summary-text">' + esc(row.summary || '') + '</span><div class="summary-tooltip">' + esc(row.summary || '') + '</div>';
+    tdSum.textContent = row.summary || '';
+    tdSum.dataset.tooltip = row.summary || '';
     tr.appendChild(tdSum);
 
     // リネーム予定名（編集可能）

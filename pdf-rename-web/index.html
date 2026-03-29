@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF リネームツール</title>
+  <!-- Bootstrap 5.3.2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    /* === 全体レイアウト === */
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    #app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* === ヘッダー === */
+    #header-area {
+      flex-shrink: 0;
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      padding: 8px 16px;
+    }
+
+    #header-area h1 {
+      font-size: 1.3rem;
+      margin: 0;
+    }
+
+    /* === アクションカード === */
+    .action-cards {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 8px 16px;
+      background: #fff;
+      border-bottom: 1px solid #dee2e6;
+      flex-shrink: 0;
+    }
+
+    .action-card {
+      flex: 1;
+      min-width: 180px;
+      max-width: 280px;
+    }
+
+    .action-card .card-body {
+      padding: 10px 14px;
+    }
+
+    .action-card .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .action-card .card-text {
+      font-size: 0.75rem;
+      color: #6c757d;
+      margin-bottom: 8px;
+    }
+
+    /* === ステータスバー === */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 16px;
+      background: #e9ecef;
+      border-bottom: 1px solid #dee2e6;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+
+    #status-bar .badge {
+      font-size: 0.75rem;
+    }
+
+    #status-message {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* === テーブルエリア === */
+    #table-area {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+
+    #data-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    #data-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #343a40;
+      color: #fff;
+    }
+
+    #data-table thead th {
+      padding: 6px 8px;
+      white-space: nowrap;
+      border-right: 1px solid #495057;
+      position: relative;
+      user-select: none;
+    }
+
+    #data-table tbody td {
+      padding: 4px 8px;
+      border: 1px solid #dee2e6;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+      vertical-align: middle;
+    }
+
+    #data-table tbody tr:hover {
+      background: #e3f2fd;
+    }
+
+    #data-table tbody tr.row-done {
+      background: #d4edda;
+    }
+
+    #data-table tbody tr.row-error {
+      background: #f8d7da;
+    }
+
+    #data-table tbody tr.row-undone {
+      background: #fff3cd;
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    /* === カラムリサイズハンドル === */
+    .resize-handle {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      cursor: col-resize;
+      background: transparent;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.active {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* === フローティングツールチップ === */
+    #floating-tooltip {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      background: #333;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      max-width: 400px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      pointer-events: none;
+    }
+
+    /* === ログインオーバーレイ === */
+    #login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255,255,255,0.95);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    #login-overlay h2 {
+      font-size: 1.5rem;
+      color: #333;
+    }
+
+    #login-overlay p {
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    /* === プログレスバー === */
+    #progress-container {
+      display: none;
+      padding: 0 16px 8px;
+      background: #fff;
+      flex-shrink: 0;
+    }
+
+    .progress {
+      height: 6px;
+    }
+
+    /* === 設定モーダル === */
+    .settings-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* === リンクセル === */
+    .cell-link {
+      color: #0d6efd;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .cell-link:hover {
+      text-decoration: underline;
+    }
+
+    /* === チェックボックス === */
+    .row-check {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* === フィードバックボタン === */
+    .fb-btn {
+      padding: 1px 6px;
+      font-size: 0.7rem;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+
+    .fb-btn.active-good { background: #28a745; color: #fff; border-color: #28a745; }
+    .fb-btn.active-ok { background: #17a2b8; color: #fff; border-color: #17a2b8; }
+    .fb-btn.active-bad { background: #dc3545; color: #fff; border-color: #dc3545; }
+    .fb-btn.active-corrected { background: #ffc107; color: #000; border-color: #ffc107; }
+
+    /* === フォルダブラウザモーダル === */
+    .folder-item {
+      cursor: pointer;
+      padding: 6px 12px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .folder-item:hover {
+      background: #f0f0f0;
+    }
+
+    .folder-item i {
+      margin-right: 6px;
+      color: #ffc107;
+    }
+
+    /* === ローディングスピナー === */
+    .spinner-inline {
+      width: 14px;
+      height: 14px;
+      border-width: 2px;
+    }
+
+    /* === 選択全解除ボタン === */
+    #select-all-check {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- ログインオーバーレイ -->
+  <div id="login-overlay">
+    <h2><i class="bi bi-file-earmark-pdf"></i> PDF リネームツール</h2>
+    <p>Google アカウントでログインしてください</p>
+    <div id="google-signin-btn"></div>
+  </div>
+
+  <!-- メインアプリコンテナ -->
+  <div id="app-container" style="display:none;">
+    <!-- ヘッダー -->
+    <div id="header-area">
+      <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+          <h1><i class="bi bi-file-earmark-pdf text-danger"></i> PDF リネームツール</h1>
+          <span class="badge bg-secondary" id="version-badge">v1.0</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span id="user-email" class="text-muted small"></span>
+          <button class="btn btn-outline-secondary btn-sm" onclick="App.openSettings()" title="設定">
+            <i class="bi bi-gear"></i>
+          </button>
+          <button class="btn btn-outline-danger btn-sm" onclick="App.signOut()" title="ログアウト">
+            <i class="bi bi-box-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- アクションカード -->
+    <div class="action-cards">
+      <!-- スキャン -->
+      <div class="action-card card border-primary">
+        <div class="card-body">
+          <h6 class="card-title text-primary"><i class="bi bi-search"></i> スキャン＆準備</h6>
+          <p class="card-text">入力フォルダのPDFをAIで解析し、リネーム候補を生成します</p>
+          <button class="btn btn-primary btn-sm w-100" id="btn-scan" onclick="App.scanAndPrepare()">
+            <i class="bi bi-play-fill"></i> スキャン開始
+          </button>
+        </div>
+      </div>
+      <!-- 実行 -->
+      <div class="action-card card border-success">
+        <div class="card-body">
+          <h6 class="card-title text-success"><i class="bi bi-check2-all"></i> 承認済み実行</h6>
+          <p class="card-text">チェック済みファイルのリネーム・移動を実行します</p>
+          <button class="btn btn-success btn-sm w-100" id="btn-execute" onclick="App.executeApproved()">
+            <i class="bi bi-lightning-fill"></i> 実行
+          </button>
+        </div>
+      </div>
+      <!-- 取消 -->
+      <div class="action-card card border-warning">
+        <div class="card-body">
+          <h6 class="card-title text-warning"><i class="bi bi-arrow-counterclockwise"></i> 取消（Undo）</h6>
+          <p class="card-text">実行済みの操作を元に戻します（選択行のみ）</p>
+          <button class="btn btn-warning btn-sm w-100" id="btn-undo" onclick="App.undoSelected()">
+            <i class="bi bi-arrow-counterclockwise"></i> 取消
+          </button>
+        </div>
+      </div>
+      <!-- データ更新 -->
+      <div class="action-card card border-info">
+        <div class="card-body">
+          <h6 class="card-title text-info"><i class="bi bi-arrow-repeat"></i> データ更新</h6>
+          <p class="card-text">スプレッドシートから最新データを再取得します</p>
+          <button class="btn btn-info btn-sm w-100" id="btn-refresh" onclick="App.refreshData()">
+            <i class="bi bi-arrow-clockwise"></i> 更新
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- プログレスバー -->
+    <div id="progress-container">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <small id="progress-text" class="text-muted">処理中...</small>
+        <small id="progress-count" class="text-muted ms-auto">0/0</small>
+      </div>
+      <div class="progress">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" id="progress-bar" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- ステータスバー -->
+    <div id="status-bar">
+      <span id="status-message">準備完了</span>
+      <span class="badge bg-primary" id="count-total" title="合計">0</span>
+      <span class="badge bg-warning text-dark" id="count-pending" title="承認待ち">0</span>
+      <span class="badge bg-success" id="count-done" title="実行済み">0</span>
+      <span class="badge bg-danger" id="count-error" title="エラー">0</span>
+      <span class="badge bg-info" id="count-checked" title="選択中">0</span>
+    </div>
+
+    <!-- テーブルエリア -->
+    <div id="table-area">
+      <table id="data-table">
+        <thead>
+          <tr id="table-header">
+            <th style="width:40px">
+              <input type="checkbox" id="select-all-check" title="全選択/全解除" onchange="App.toggleSelectAll(this.checked)">
+            </th>
+            <th data-col="scanName" style="width:200px">
+              スキャンファイル名
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="summary" style="width:250px">
+              AI要約
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="renameTo" style="width:220px">
+              リネーム先
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="refName" style="width:180px">
+              参照ファイル
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="destFolder" style="width:150px">
+              移動先1
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="destFolder2" style="width:150px">
+              移動先2
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="status" style="width:80px">
+              ステータス
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="feedback" style="width:60px">
+              FB
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="taxShare" style="width:60px">
+              税理士
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="docDate" style="width:90px">
+              日付
+              <div class="resize-handle"></div>
+            </th>
+            <th data-col="entityType" style="width:80px">
+              種別
+              <div class="resize-handle"></div>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- フローティングツールチップ -->
+  <div id="floating-tooltip"></div>
+
+  <!-- 設定モーダル -->
+  <div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gear"></i> 設定</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="settings-label">Gemini API キー</label>
+            <input type="password" class="form-control form-control-sm" id="setting-gemini-key"
+              placeholder="AIza...">
+            <small class="text-muted">ブラウザのlocalStorageに保存されます</small>
+          </div>
+          <div class="mb-3">
+            <label class="settings-label">入力フォルダID</label>
+            <input type="text" class="form-control form-control-sm" id="setting-input-folder"
+              placeholder="Google Drive フォルダID">
+          </div>
+          <div class="mb-3">
+            <label class="settings-label">出力フォルダID</label>
+            <input type="text" class="form-control form-control-sm" id="setting-output-folder"
+              placeholder="Google Drive フォルダID">
+          </div>
+          <div class="mb-3">
+            <label class="settings-label">税理士共有フォルダID</label>
+            <input type="text" class="form-control form-control-sm" id="setting-tax-folder"
+              placeholder="Google Drive フォルダID">
+          </div>
+          <hr>
+          <div class="mb-3">
+            <label class="settings-label">スプレッドシートID</label>
+            <input type="text" class="form-control form-control-sm" id="setting-spreadsheet-id"
+              value="" readonly>
+            <small class="text-muted">config.js で設定済み</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">閉じる</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="App.saveSettings()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- フォルダブラウザモーダル -->
+  <div class="modal fade" id="folderBrowserModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-folder"></i> フォルダ選択</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="folder-breadcrumb" class="mb-2 small"></div>
+          <div id="folder-list" style="max-height: 400px; overflow-y: auto;">
+            <div class="text-center text-muted py-4">読み込み中...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-select-folder" onclick="App.selectCurrentFolder()">
+            このフォルダを選択
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- リネーム編集モーダル -->
+  <div class="modal fade" id="renameModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> リネーム先を編集</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="settings-label">現在のファイル名</label>
+            <div id="rename-current" class="text-muted small"></div>
+          </div>
+          <div class="mb-3">
+            <label class="settings-label">リネーム先</label>
+            <input type="text" class="form-control form-control-sm" id="rename-input">
+          </div>
+          <div class="mb-3">
+            <label class="settings-label">移動先フォルダ1</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" id="rename-dest1" readonly>
+              <button class="btn btn-outline-secondary" onclick="App.browseDestFolder(1)">
+                <i class="bi bi-folder"></i>
+              </button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="settings-label">移動先フォルダ2（税理士共有用）</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" id="rename-dest2" readonly>
+              <button class="btn btn-outline-secondary" onclick="App.browseDestFolder(2)">
+                <i class="bi bi-folder"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="App.saveRename()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認モーダル -->
+  <div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="confirm-title">確認</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p id="confirm-message"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary btn-sm" id="confirm-ok-btn">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Google Identity Services ライブラリ -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Bootstrap 5.3.2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- アプリケーションコード -->
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

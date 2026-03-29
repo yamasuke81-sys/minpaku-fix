@@ -17,7 +17,7 @@ const CONFIG = {
   LEARNING_SHEET: '学習データ',
 
   // Google OAuth クライアントID（後で差し替え）
-  CLIENT_ID: 'YOUR_CLIENT_ID',
+  CLIENT_ID: '940875438438-5atfdoqk5fsjapgijfi40psk3motpsrt.apps.googleusercontent.com',
 
   // Google API スコープ
   SCOPES: [

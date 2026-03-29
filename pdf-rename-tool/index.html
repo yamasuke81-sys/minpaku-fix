@@ -498,6 +498,7 @@ function renderTable() {
 
     if (isNew) tr.style.background = '#FFFDE7';
     if (isDone) tr.style.opacity = '0.6';
+    if (row.checked && !isDone) tr.style.background = '#E3F2FD';
 
     // チェックボックス
     var tdCheck = document.createElement('td');

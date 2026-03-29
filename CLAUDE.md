@@ -227,3 +227,18 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 1. **デプロイ後の動作確認**: 過去の日付のスタッフ回答状況が正しく表示されるか確認
 2. **`募集` シートの重複エントリクリーンアップ**: 既存の重複を検出・統合するユーティリティ関数の作成（任意）
 3. **残りの `getLastRow()` off-by-one修正**: 補助関数にも展開（任意）
+
+## 12. PDFリネームツール（別リポジトリ）
+
+* **リポジトリ**: `yamasuke81-sys/pdf-rename-tool`（Private）
+* **GAS版**: `gas/` ディレクトリ（現在稼働中）
+* **Web版**: `web/` ディレクトリ（GitHub Pages版・開発中）
+* **GAS プロジェクトID**: `1xKZY6mX5s0Ar2dqYyYvA708OZ5rZX10F_YFchjHkJR3oRiuxn2xpUkkW`
+* **スプレッドシートID**: `17oV_2vPj33aZf7fl8A-NDgS0l4aYvsRrSJBw2JliAy0`
+* **OAuth クライアントID**: `940875438438-5atfdoqk5fsjapgijfi40psk3motpsrt.apps.googleusercontent.com`
+* **Web App URL**: `https://script.google.com/macros/s/AKfycbyRCwQGOJppWx-IVATc80z7ieQb8KQZrQ42JcLWC47YUSgErY0WpD4JO8ecvkngOIOL/exec`
+
+### 新規セッション開始時の注意
+* **新しいリポジトリ `pdf-rename-tool` で作業する場合**: GitHubにリポジトリを先に作成してから、そのリポジトリ用のClaude Codeセッションを新規開始する
+* **このセッション（minpaku-fix）からは `pdf-rename-tool` リポジトリにpushできない**
+* Web版（GitHub Pages）はPrivateリポジトリのため有料プラン（Pro: 月$4）が必要。GAS版が安定稼働中なので急がなくてOK

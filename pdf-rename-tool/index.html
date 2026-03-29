@@ -22,7 +22,8 @@
     .table-container { background: #fff; }
     .table { table-layout: fixed; }
     .table th { background: #1a73e8; color: #fff; font-size: 0.8rem; white-space: nowrap; position: sticky; top: 0; z-index: 10; overflow: hidden; text-overflow: ellipsis; }
-    .table td { overflow: hidden; text-overflow: ellipsis; }
+    .table td { text-overflow: ellipsis; }
+    .table td:not(.summary-cell) { overflow: hidden; }
     .col-resizer { position: absolute; right: 0; top: 0; width: 5px; height: 100%; cursor: col-resize; background: transparent; z-index: 11; }
     .th-wrap { position: relative; display: inline-block; width: 100%; }
     .col-resizer:hover, .col-resizer.active { background: rgba(255,255,255,0.4); }

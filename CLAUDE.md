@@ -199,7 +199,22 @@ cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f claude/revi
 #### `getRecruitmentStatusMap()` 内の `coToCurrentRow` も同日複数予約対応に修正
 - `coToCurrentRows`（配列）に変更し、使用済み行番号追跡で二重割り当て防止
 
-## 10. 既知の課題・バグ一覧
+## 10. デバッグ方針（必須ルール）
+
+### バグ修正時の調査ルール
+1. **1つ原因を見つけても調査を終わらせない** — 必ずその原因を除いて他にも原因がないか**5回調査を繰り返す**
+2. **CSSの問題は親要素を全て遡って確認** — overflow, position, z-index, table-layout等が親→子に影響する
+3. **同じプロパティの重複定義を検索** — 後から定義されたものが上書きする
+4. **GAS Web App固有の制約を考慮** — iframeサンドボックス、HtmlService制限
+5. **CSS position: absoluteよりfixedを優先** — スクロールコンテナ内ではabsoluteがクリップされやすい
+
+### 効果的なデバッグ方法
+- **HTMLにデバッグ用の色付きボーダーを追加** — 要素の表示範囲を視覚的に確認
+- **console.logをGAS側に追加** — 実行ログで動作確認
+- **段階的に変更をpush** — 1つの変更ごとにpushして原因を切り分け
+- **最小再現コードで検証** — 問題の要素だけを含むシンプルなHTMLで確認
+
+## 11. 既知の課題・バグ一覧
 
 | 課題 | 優先度 | 詳細 |
 |---|---|---|

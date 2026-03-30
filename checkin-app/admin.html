@@ -365,11 +365,12 @@ function renderCameraList() {
     var typeLabel = type === 'tapo' ? 'Tapo' : (type === 'ring' ? 'Ring' : 'カスタム');
     var url = getCameraUrl(cam);
 
+    var btnLabel = (type === 'custom') ? 'URLを開く' : typeLabel + 'アプリで開く';
     html += '<div class="camera-card">' +
       '<div class="camera-name"><i class="bi ' + icon + '"></i> ' + escapeHtml(cam.name || 'カメラ ' + (i + 1)) + '</div>' +
       '<div style="font-size:.75rem;color:#888;margin-bottom:.5rem;">' + typeLabel + '</div>' +
       '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="camera-btn ' + btnClass + '">' +
-      '<i class="bi bi-box-arrow-up-right"></i> ' + typeLabel + 'アプリで開く</a>' +
+      '<i class="bi bi-box-arrow-up-right"></i> ' + btnLabel + '</a>' +
       '</div>';
   }
   document.getElementById('cameraList').innerHTML = html;
@@ -380,20 +381,18 @@ function getCameraUrl(cam) {
   if (cam.customUrl) return cam.customUrl;
 
   var type = cam.type || 'custom';
+  var ua = navigator.userAgent.toLowerCase();
+  var isIOS = /iphone|ipad|ipod/.test(ua);
+  var isAndroid = /android/.test(ua);
+
   if (type === 'tapo') {
-    // Tapoアプリ: ユニバーサルリンクを試行、iOS/Androidのアプリストアにフォールバック
-    // tapo:// スキームはGASのiframeサンドボックスでは動作しにくいため、アプリストアURLを使用
-    var ua = navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(ua)) return 'https://apps.apple.com/app/tp-link-tapo/id1472718009';
-    if (/android/.test(ua)) return 'https://play.google.com/store/apps/details?id=com.tplink.iot';
+    if (isIOS) return 'https://apps.apple.com/app/tp-link-tapo/id1472718009';
+    if (isAndroid) return 'https://play.google.com/store/apps/details?id=com.tplink.iot';
     return 'https://www.tapo.com/';
   }
   if (type === 'ring') {
-    // RingはWebダッシュボードがあるのでそちらを優先
-    if (cam.webUrl) return cam.webUrl;
-    var ua2 = navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(ua2)) return 'https://apps.apple.com/app/ring-always-home/id926252661';
-    if (/android/.test(ua2)) return 'https://play.google.com/store/apps/details?id=com.ringapp';
+    if (isIOS) return 'https://apps.apple.com/app/ring-always-home/id926252661';
+    if (isAndroid) return 'https://play.google.com/store/apps/details?id=com.ringapp';
     return 'https://account.ring.com/';
   }
   return '#';

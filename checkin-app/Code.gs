@@ -926,7 +926,22 @@ function getAdminGuestList() {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    return JSON.stringify({ success: true, guests: merged });
+    // デバッグ: マージ前後の件数とcheckInParsedキーを返す
+    var debugCiKeys = {};
+    for (var di = 0; di < guests.length; di++) {
+      var dk = guests[di].checkInParsed || '(empty)';
+      if (!debugCiKeys[dk]) debugCiKeys[dk] = [];
+      debugCiKeys[dk].push(guests[di].guestName);
+    }
+    return JSON.stringify({
+      success: true,
+      guests: merged,
+      _debug: {
+        beforeMerge: guests.length,
+        afterMerge: merged.length,
+        ciKeys: debugCiKeys
+      }
+    });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });
   }

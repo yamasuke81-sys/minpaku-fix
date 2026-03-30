@@ -6,6 +6,13 @@
 // ===== エントリーポイント =====
 
 function doGet(e) {
+  var mode = (e && e.parameter && e.parameter.mode) || '';
+  if (mode === 'admin') {
+    return HtmlService.createHtmlOutputFromFile('admin')
+      .setTitle('管理者画面')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
   return HtmlService.createHtmlOutputFromFile('checkin')
     .setTitle('チェックイン')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -779,4 +786,85 @@ function notifyMeetCall(rowNumber) {
 function getCheckinLog() {
   var log = PropertiesService.getScriptProperties().getProperty('CHECKIN_LOG') || '[]';
   return log;
+}
+
+// ===== 管理者画面用API =====
+
+/** 今後の予約一覧を取得（チェックアウトが今日以降） */
+function getAdminGuestList() {
+  try {
+    var sheet = getSheet_();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return JSON.stringify({ success: true, guests: [] });
+
+    var data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+    var headers = data[0];
+    var map = buildCheckinColumnMap_(headers);
+
+    // チェックイン確認日時カラムを検索
+    var ciConfirmCol = -1;
+    for (var ci = 0; ci < headers.length; ci++) {
+      if (String(headers[ci] || '').trim() === 'チェックイン確認日時') { ciConfirmCol = ci; break; }
+    }
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    var guests = [];
+    for (var r = 1; r < data.length; r++) {
+      var row = data[r];
+
+      // チェックアウトが過去の予約はスキップ
+      if (map.checkOut >= 0) {
+        var coVal = row[map.checkOut];
+        if (coVal) {
+          var coDate = new Date(coVal);
+          if (!isNaN(coDate.getTime()) && coDate < today) continue;
+        }
+      }
+
+      var primaryName = '';
+      if (map.guestNameCols.length > 0) primaryName = String(row[map.guestNameCols[0]] || '').trim();
+      if (!primaryName) continue; // 名前がない行はスキップ
+
+      var ciStr = map.checkIn >= 0 ? formatDate_(row[map.checkIn]) : '';
+      var coStr = map.checkOut >= 0 ? formatDate_(row[map.checkOut]) : '';
+      var gc = map.guestCount >= 0 ? String(row[map.guestCount] || '').trim() : '';
+      var tel = map.telCols.length > 0 ? String(row[map.telCols[0]] || '').trim() : '';
+      var nat = map.nationalityCols.length > 0 ? String(row[map.nationalityCols[0]] || '').trim() : '';
+      var checkinAt = ciConfirmCol >= 0 ? String(row[ciConfirmCol] || '').trim() : '';
+
+      guests.push({
+        rowNumber: r + 1,
+        guestName: primaryName,
+        checkIn: ciStr,
+        checkOut: coStr,
+        guestCount: gc,
+        tel: tel,
+        nationality: nat,
+        checkinConfirmedAt: checkinAt
+      });
+    }
+
+    // チェックイン日でソート（昇順）
+    guests.sort(function(a, b) {
+      return (a.checkIn || '').localeCompare(b.checkIn || '');
+    });
+
+    return JSON.stringify({ success: true, guests: guests });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.message });
+  }
+}
+
+/** カメラ設定を取得 */
+function getCameraSettings() {
+  var json = PropertiesService.getScriptProperties().getProperty('CAMERA_LIST') || '[]';
+  return json;
+}
+
+/** カメラ設定を保存 */
+function saveCameraSettings(camerasJson) {
+  PropertiesService.getScriptProperties().setProperty('CAMERA_LIST', camerasJson);
+  return JSON.stringify({ success: true });
 }

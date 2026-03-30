@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>管理者画面</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f5f7fa; margin: 0; padding: 0; min-height: 100vh; }
+
+    /* PIN画面 */
+    #pinScreen { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--primary); padding: 2rem 1rem; }
+    .pin-card { background: #fff; border-radius: 1.2rem; padding: 2rem 1.5rem; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+    .pin-input { font-size: 2rem; text-align: center; letter-spacing: .5rem; border: 2px solid #ddd; border-radius: .8rem; padding: .5rem; width: 100%; }
+
+    /* メイン画面 */
+    #mainScreen { display: none; }
+    #mainScreen.active { display: block; }
+
+    /* ヘッダー */
+    .admin-header { background: var(--primary); color: #fff; padding: .8rem 1rem; position: sticky; top: 0; z-index: 100; }
+    .admin-header h1 { font-size: 1.1rem; margin: 0; font-weight: 700; }
+
+    /* タブ */
+    .admin-tabs { display: flex; background: #fff; border-bottom: 2px solid #e9ecef; position: sticky; top: 52px; z-index: 99; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .admin-tab { flex: 1; min-width: 0; padding: .7rem .3rem; text-align: center; font-size: .78rem; font-weight: 600; color: #888; border: none; background: none; border-bottom: 3px solid transparent; transition: all .2s; white-space: nowrap; }
+    .admin-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .admin-tab i { display: block; font-size: 1.2rem; margin-bottom: .2rem; }
+
+    /* タブコンテンツ */
+    .tab-content { display: none; padding: 1rem; }
+    .tab-content.active { display: block; }
+
+    /* カード */
+    .admin-card { background: #fff; border-radius: .8rem; padding: 1rem; margin-bottom: .8rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .admin-card h3 { font-size: .9rem; font-weight: 700; color: var(--primary); margin-bottom: .8rem; border-bottom: 2px solid #e8f0fe; padding-bottom: .4rem; }
+
+    /* 名簿テーブル */
+    .guest-table { width: 100%; font-size: .78rem; border-collapse: collapse; }
+    .guest-table th { background: #f8f9fa; padding: .5rem .4rem; text-align: left; font-weight: 700; color: #555; border-bottom: 2px solid #dee2e6; white-space: nowrap; position: sticky; top: 0; }
+    .guest-table td { padding: .5rem .4rem; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    .guest-table tr:hover { background: #f8f9fa; }
+    .guest-table .text-muted { color: #aaa !important; }
+    .checkin-badge { display: inline-block; padding: .15rem .4rem; border-radius: .3rem; font-size: .7rem; font-weight: 600; }
+    .checkin-badge.done { background: #d4edda; color: #155724; }
+    .checkin-badge.pending { background: #fff3cd; color: #856404; }
+
+    /* テーブル横スクロール */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -.5rem; padding: 0 .5rem; }
+
+    /* 監視カメラ */
+    .camera-card { background: #fff; border-radius: .8rem; padding: 1rem; margin-bottom: .8rem; box-shadow: 0 2px 8px rgba(0,0,0,.06); text-align: center; }
+    .camera-card .camera-name { font-size: .95rem; font-weight: 700; margin-bottom: .6rem; }
+    .camera-btn { display: inline-flex; align-items: center; gap: .4rem; padding: .6rem 1.2rem; border-radius: .6rem; font-size: .9rem; font-weight: 600; text-decoration: none; color: #fff; border: none; }
+    .camera-btn.tapo { background: #00b0a0; }
+    .camera-btn.ring { background: #1c9ad6; }
+    .camera-btn.custom { background: #6c757d; }
+    .camera-btn i { font-size: 1.1rem; }
+
+    /* カメラ設定 */
+    .camera-config { background: #f8f9fa; border-radius: .6rem; padding: .8rem; margin-bottom: .6rem; }
+    .camera-config .form-control, .camera-config .form-select { font-size: .85rem; }
+    .btn-add-camera { border: 2px dashed #ccc; border-radius: .6rem; padding: .8rem; width: 100%; background: none; color: #888; font-size: .85rem; font-weight: 600; }
+    .btn-add-camera:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* リフレッシュボタン */
+    .btn-refresh { background: var(--accent); color: #fff; border: none; border-radius: .5rem; padding: .4rem .8rem; font-size: .8rem; font-weight: 600; }
+
+    /* 共通 */
+    .spinner-sm { width: 1rem; height: 1rem; border-width: .15rem; }
+    .version-badge { position: fixed; bottom: 4px; left: 8px; font-size: 10px; color: rgba(0,0,0,0.15); z-index: 100; }
+    .empty-state { text-align: center; padding: 2rem 1rem; color: #aaa; }
+    .empty-state i { font-size: 2.5rem; }
+  </style>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+</head>
+<body>
+
+<div class="version-badge" id="deployVersion">v0330a</div>
+
+<!-- ===== PIN認証画面 ===== -->
+<div id="pinScreen">
+  <div class="pin-card">
+    <h3 class="mb-3"><i class="bi bi-shield-lock-fill" style="color:var(--primary);"></i> 管理者認証</h3>
+    <input type="password" class="pin-input" id="pinInput" maxlength="8" inputmode="numeric" placeholder="****">
+    <div id="pinError" class="text-danger mt-2" style="font-size:.85rem;display:none;"></div>
+    <button class="btn btn-dark w-100 mt-3" onclick="verifyPin()" style="border-radius:.8rem;padding:.7rem;">
+      <i class="bi bi-unlock-fill"></i> ログイン
+    </button>
+  </div>
+</div>
+
+<!-- ===== メイン管理画面 ===== -->
+<div id="mainScreen">
+  <!-- ヘッダー -->
+  <div class="admin-header">
+    <div class="d-flex align-items-center justify-content-between">
+      <h1><i class="bi bi-speedometer2"></i> 管理者画面</h1>
+      <button class="btn btn-sm btn-outline-light" onclick="location.href=location.pathname" style="font-size:.75rem;border-radius:.4rem;">
+        <i class="bi bi-box-arrow-left"></i> 戻る
+      </button>
+    </div>
+  </div>
+
+  <!-- タブ -->
+  <div class="admin-tabs">
+    <button class="admin-tab active" data-tab="guests" onclick="switchTab('guests')">
+      <i class="bi bi-people-fill"></i>名簿
+    </button>
+    <button class="admin-tab" data-tab="edits" onclick="switchTab('edits')">
+      <i class="bi bi-pencil-square"></i>変更履歴
+    </button>
+    <button class="admin-tab" data-tab="checkins" onclick="switchTab('checkins')">
+      <i class="bi bi-clock-history"></i>チェックイン
+    </button>
+    <button class="admin-tab" data-tab="cameras" onclick="switchTab('cameras')">
+      <i class="bi bi-camera-video-fill"></i>カメラ
+    </button>
+  </div>
+
+  <!-- ===== タブ1: 名簿 ===== -->
+  <div id="tab-guests" class="tab-content active">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 style="font-size:1rem;font-weight:700;margin:0;">予約名簿</h2>
+      <button class="btn-refresh" onclick="loadGuestList()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+    </div>
+    <div id="guestListArea">
+      <div class="text-center p-4"><span class="spinner-border"></span></div>
+    </div>
+  </div>
+
+  <!-- ===== タブ2: 変更履歴 ===== -->
+  <div id="tab-edits" class="tab-content">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 style="font-size:1rem;font-weight:700;margin:0;">ゲスト変更履歴</h2>
+      <button class="btn-refresh" onclick="loadEditLog()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+    </div>
+    <div id="editLogArea">
+      <div class="text-center p-4"><span class="spinner-border"></span></div>
+    </div>
+  </div>
+
+  <!-- ===== タブ3: チェックイン記録 ===== -->
+  <div id="tab-checkins" class="tab-content">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 style="font-size:1rem;font-weight:700;margin:0;">チェックイン記録</h2>
+      <button class="btn-refresh" onclick="loadCheckinLog()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+    </div>
+    <div id="checkinLogArea">
+      <div class="text-center p-4"><span class="spinner-border"></span></div>
+    </div>
+  </div>
+
+  <!-- ===== タブ4: 監視カメラ ===== -->
+  <div id="tab-cameras" class="tab-content">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 style="font-size:1rem;font-weight:700;margin:0;">監視カメラ</h2>
+      <button class="btn btn-sm btn-outline-secondary" onclick="toggleCameraSettings()" style="border-radius:.4rem;font-size:.75rem;">
+        <i class="bi bi-gear"></i> 設定
+      </button>
+    </div>
+
+    <!-- カメラボタン一覧 -->
+    <div id="cameraList"></div>
+
+    <!-- カメラ設定（デフォルト非表示） -->
+    <div id="cameraSettingsArea" style="display:none;">
+      <div class="admin-card mt-3">
+        <h3><i class="bi bi-gear"></i> カメラ設定</h3>
+        <div id="cameraConfigList"></div>
+        <button class="btn-add-camera mt-2" onclick="addCameraConfig()">
+          <i class="bi bi-plus-circle"></i> カメラを追加
+        </button>
+        <button class="btn btn-primary btn-sm w-100 mt-3" onclick="saveCameras()" style="border-radius:.5rem;font-weight:600;">
+          <i class="bi bi-check-lg"></i> カメラ設定を保存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== GAS通信 =====
+function callGAS(fn, args) {
+  return new Promise(function(resolve, reject) {
+    var runner = google.script.run.withSuccessHandler(function(json) {
+      try { resolve(JSON.parse(json)); } catch(e) { resolve(json); }
+    }).withFailureHandler(reject);
+    runner[fn].apply(runner, args || []);
+  });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ===== PIN認証 =====
+document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPin(); });
+
+function verifyPin() {
+  var pin = document.getElementById('pinInput').value;
+  callGAS('verifyPin', [pin]).then(function(res) {
+    if (res.valid) {
+      document.getElementById('pinScreen').style.display = 'none';
+      document.getElementById('mainScreen').classList.add('active');
+      loadGuestList();
+    } else {
+      var errEl = document.getElementById('pinError');
+      errEl.textContent = 'PINが正しくありません';
+      errEl.style.display = 'block';
+    }
+  });
+}
+
+// ===== タブ切替 =====
+var _loadedTabs = {};
+function switchTab(tabId) {
+  document.querySelectorAll('.admin-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelector('.admin-tab[data-tab="' + tabId + '"]').classList.add('active');
+  document.getElementById('tab-' + tabId).classList.add('active');
+
+  // 初回ロード
+  if (!_loadedTabs[tabId]) {
+    _loadedTabs[tabId] = true;
+    if (tabId === 'edits') loadEditLog();
+    if (tabId === 'checkins') loadCheckinLog();
+    if (tabId === 'cameras') loadCameras();
+  }
+}
+_loadedTabs['guests'] = true; // 名簿は初期表示時にロード
+
+// ===== タブ1: 名簿 =====
+function loadGuestList() {
+  document.getElementById('guestListArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
+  callGAS('getAdminGuestList').then(function(res) {
+    if (!res.success) {
+      document.getElementById('guestListArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(res.error) + '</div>';
+      return;
+    }
+    if (res.guests.length === 0) {
+      document.getElementById('guestListArea').innerHTML = '<div class="empty-state"><i class="bi bi-calendar-x"></i><p class="mt-2">今後の予約はありません</p></div>';
+      return;
+    }
+    renderGuestList(res.guests);
+  }).catch(function(err) {
+    document.getElementById('guestListArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(err.message) + '</div>';
+  });
+}
+
+function renderGuestList(guests) {
+  var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>' +
+    '<th>氏名</th><th>CI</th><th>CO</th><th>人数</th><th>国籍</th><th>電話</th><th>確認</th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < guests.length; i++) {
+    var g = guests[i];
+    var ciShort = g.checkIn ? g.checkIn.replace(/\s.*$/, '') : '-';
+    var coShort = g.checkOut ? g.checkOut.replace(/\s.*$/, '') : '-';
+    var badge = g.checkinConfirmedAt
+      ? '<span class="checkin-badge done"><i class="bi bi-check-circle-fill"></i> ' + escapeHtml(g.checkinConfirmedAt.replace(/^\d{4}\//, '')) + '</span>'
+      : '<span class="checkin-badge pending">未確認</span>';
+
+    html += '<tr>' +
+      '<td style="font-weight:600;">' + escapeHtml(g.guestName) + '</td>' +
+      '<td>' + escapeHtml(ciShort) + '</td>' +
+      '<td>' + escapeHtml(coShort) + '</td>' +
+      '<td class="text-center">' + escapeHtml(g.guestCount || '-') + '</td>' +
+      '<td>' + escapeHtml(g.nationality || '-') + '</td>' +
+      '<td style="font-size:.7rem;">' + escapeHtml(g.tel || '-') + '</td>' +
+      '<td>' + badge + '</td>' +
+      '</tr>';
+  }
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + guests.length + '件</div>';
+  document.getElementById('guestListArea').innerHTML = html;
+}
+
+// ===== タブ2: 変更履歴 =====
+function loadEditLog() {
+  document.getElementById('editLogArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
+  callGAS('getGuestEditLog').then(function(res) {
+    if (!res.success || !res.edits || res.edits.length === 0) {
+      document.getElementById('editLogArea').innerHTML = '<div class="empty-state"><i class="bi bi-pencil"></i><p class="mt-2">変更履歴はありません</p></div>';
+      return;
+    }
+    var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>' +
+      '<th>日時</th><th>行</th><th>フィールド</th><th>元の値</th><th>変更後</th>' +
+      '</tr></thead><tbody>';
+    for (var i = res.edits.length - 1; i >= 0; i--) {
+      var e = res.edits[i];
+      html += '<tr>' +
+        '<td style="white-space:nowrap;">' + escapeHtml(e.editedAt || '') + '</td>' +
+        '<td>' + e.rowNumber + '</td>' +
+        '<td>' + escapeHtml(e.fieldName || '') + '</td>' +
+        '<td style="color:#888;text-decoration:line-through;">' + escapeHtml(e.original || '(空)') + '</td>' +
+        '<td style="color:#e67e22;font-weight:600;">' + escapeHtml(e.edited || '(空)') + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table></div>';
+    document.getElementById('editLogArea').innerHTML = html;
+  }).catch(function(err) {
+    document.getElementById('editLogArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(err.message) + '</div>';
+  });
+}
+
+// ===== タブ3: チェックイン記録 =====
+function loadCheckinLog() {
+  document.getElementById('checkinLogArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
+  callGAS('getCheckinLog').then(function(log) {
+    var items = Array.isArray(log) ? log : (typeof log === 'string' ? JSON.parse(log) : []);
+    if (!items || items.length === 0) {
+      document.getElementById('checkinLogArea').innerHTML = '<div class="empty-state"><i class="bi bi-clock"></i><p class="mt-2">チェックイン記録はありません</p></div>';
+      return;
+    }
+    var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>' +
+      '<th>確認日時</th><th>ゲスト名</th>' +
+      '</tr></thead><tbody>';
+    for (var i = items.length - 1; i >= 0; i--) {
+      html += '<tr>' +
+        '<td style="white-space:nowrap;">' + escapeHtml(items[i].confirmedAt || '') + '</td>' +
+        '<td style="font-weight:600;">' + escapeHtml(items[i].guestName || '') + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table></div>';
+    html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + items.length + '件</div>';
+    document.getElementById('checkinLogArea').innerHTML = html;
+  }).catch(function(err) {
+    document.getElementById('checkinLogArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(err.message) + '</div>';
+  });
+}
+
+// ===== タブ4: 監視カメラ =====
+var _cameras = [];
+
+function loadCameras() {
+  callGAS('getCameraSettings').then(function(cameras) {
+    _cameras = Array.isArray(cameras) ? cameras : (typeof cameras === 'string' ? JSON.parse(cameras) : []);
+    renderCameraList();
+    renderCameraConfig();
+  }).catch(function() {
+    _cameras = [];
+    renderCameraList();
+    renderCameraConfig();
+  });
+}
+
+function renderCameraList() {
+  if (_cameras.length === 0) {
+    document.getElementById('cameraList').innerHTML =
+      '<div class="empty-state"><i class="bi bi-camera-video"></i><p class="mt-2">カメラが登録されていません</p>' +
+      '<p style="font-size:.8rem;">下の設定ボタンからカメラを追加してください</p></div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < _cameras.length; i++) {
+    var cam = _cameras[i];
+    var type = cam.type || 'custom';
+    var btnClass = type === 'tapo' ? 'tapo' : (type === 'ring' ? 'ring' : 'custom');
+    var icon = type === 'tapo' ? 'bi-camera-video-fill' : (type === 'ring' ? 'bi-doorbell' : 'bi-link-45deg');
+    var typeLabel = type === 'tapo' ? 'Tapo' : (type === 'ring' ? 'Ring' : 'カスタム');
+    var url = getCameraUrl(cam);
+
+    html += '<div class="camera-card">' +
+      '<div class="camera-name"><i class="bi ' + icon + '"></i> ' + escapeHtml(cam.name || 'カメラ ' + (i + 1)) + '</div>' +
+      '<div style="font-size:.75rem;color:#888;margin-bottom:.5rem;">' + typeLabel + '</div>' +
+      '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="camera-btn ' + btnClass + '">' +
+      '<i class="bi bi-box-arrow-up-right"></i> ' + typeLabel + 'アプリで開く</a>' +
+      '</div>';
+  }
+  document.getElementById('cameraList').innerHTML = html;
+}
+
+function getCameraUrl(cam) {
+  // カスタムURLが設定されていればそれを使う
+  if (cam.customUrl) return cam.customUrl;
+
+  var type = cam.type || 'custom';
+  if (type === 'tapo') {
+    // Tapoアプリ: ユニバーサルリンクを試行、iOS/Androidのアプリストアにフォールバック
+    // tapo:// スキームはGASのiframeサンドボックスでは動作しにくいため、アプリストアURLを使用
+    var ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua)) return 'https://apps.apple.com/app/tp-link-tapo/id1472718009';
+    if (/android/.test(ua)) return 'https://play.google.com/store/apps/details?id=com.tplink.iot';
+    return 'https://www.tapo.com/';
+  }
+  if (type === 'ring') {
+    // RingはWebダッシュボードがあるのでそちらを優先
+    if (cam.webUrl) return cam.webUrl;
+    var ua2 = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua2)) return 'https://apps.apple.com/app/ring-always-home/id926252661';
+    if (/android/.test(ua2)) return 'https://play.google.com/store/apps/details?id=com.ringapp';
+    return 'https://account.ring.com/';
+  }
+  return '#';
+}
+
+function toggleCameraSettings() {
+  var area = document.getElementById('cameraSettingsArea');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderCameraConfig() {
+  var html = '';
+  for (var i = 0; i < _cameras.length; i++) {
+    html += cameraConfigItem(i, _cameras[i]);
+  }
+  document.getElementById('cameraConfigList').innerHTML = html;
+}
+
+function cameraConfigItem(idx, cam) {
+  return '<div class="camera-config" id="camConfig_' + idx + '">' +
+    '<div class="d-flex justify-content-between align-items-center mb-2">' +
+    '<span style="font-weight:600;font-size:.85rem;">カメラ ' + (idx + 1) + '</span>' +
+    '<button class="btn btn-sm btn-outline-danger" onclick="removeCameraConfig(' + idx + ')" style="font-size:.7rem;border-radius:.3rem;padding:.15rem .4rem;">' +
+    '<i class="bi bi-trash"></i></button></div>' +
+    '<div class="mb-2">' +
+    '<label class="form-label" style="font-size:.75rem;font-weight:600;">カメラ名</label>' +
+    '<input type="text" class="form-control form-control-sm cam-name" data-idx="' + idx + '" value="' + escapeHtml(cam.name || '') + '" placeholder="例: 玄関カメラ">' +
+    '</div>' +
+    '<div class="mb-2">' +
+    '<label class="form-label" style="font-size:.75rem;font-weight:600;">種類</label>' +
+    '<select class="form-select form-select-sm cam-type" data-idx="' + idx + '">' +
+    '<option value="tapo"' + (cam.type === 'tapo' ? ' selected' : '') + '>TP-Link Tapo</option>' +
+    '<option value="ring"' + (cam.type === 'ring' ? ' selected' : '') + '>Amazon Ring</option>' +
+    '<option value="custom"' + (cam.type === 'custom' ? ' selected' : '') + '>その他（カスタムURL）</option>' +
+    '</select></div>' +
+    '<div class="mb-1">' +
+    '<label class="form-label" style="font-size:.75rem;font-weight:600;">カスタムURL（任意）</label>' +
+    '<input type="url" class="form-control form-control-sm cam-url" data-idx="' + idx + '" value="' + escapeHtml(cam.customUrl || '') + '" placeholder="アプリの代わりに開くURL">' +
+    '<div class="form-text" style="font-size:.7rem;">設定するとデフォルトのアプリ起動の代わりにこのURLを開きます</div>' +
+    '</div></div>';
+}
+
+function addCameraConfig() {
+  _cameras.push({ name: '', type: 'tapo', customUrl: '' });
+  renderCameraConfig();
+}
+
+function removeCameraConfig(idx) {
+  _cameras.splice(idx, 1);
+  renderCameraConfig();
+}
+
+function collectCameraConfigs() {
+  var configs = [];
+  var names = document.querySelectorAll('.cam-name');
+  var types = document.querySelectorAll('.cam-type');
+  var urls = document.querySelectorAll('.cam-url');
+  for (var i = 0; i < names.length; i++) {
+    configs.push({
+      name: names[i].value.trim(),
+      type: types[i].value,
+      customUrl: urls[i].value.trim()
+    });
+  }
+  return configs;
+}
+
+function saveCameras() {
+  _cameras = collectCameraConfigs();
+  callGAS('saveCameraSettings', [JSON.stringify(_cameras)]).then(function(res) {
+    if (res.success) {
+      renderCameraList();
+      alert('カメラ設定を保存しました');
+    }
+  }).catch(function(err) {
+    alert('保存エラー: ' + err.message);
+  });
+}
+</script>
+
+</body>
+</html>

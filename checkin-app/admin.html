@@ -238,10 +238,20 @@ function verifyPin() {
 }
 
 // ===== 宿泊者画面を開く =====
+var _appBaseUrl = '';
+// 初期化時にベースURLを取得
+google.script.run.withSuccessHandler(function(url) { _appBaseUrl = url || ''; }).getAppBaseUrl();
+
 function openGuestTop() {
-  // GASのWebアプリURLからmodeパラメータを除いたURLを開く
-  var url = location.href.replace(/[?&]mode=admin/i, '').replace(/[?&]$/, '');
-  window.open(url, '_blank');
+  if (_appBaseUrl) {
+    window.open(_appBaseUrl, '_blank');
+  } else {
+    // フォールバック: GAS関数で取得を試みる
+    google.script.run.withSuccessHandler(function(url) {
+      if (url) window.open(url, '_blank');
+      else alert('URLの取得に失敗しました');
+    }).getAppBaseUrl();
+  }
 }
 
 // ===== ログアウト =====

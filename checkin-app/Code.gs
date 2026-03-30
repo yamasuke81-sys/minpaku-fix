@@ -991,6 +991,11 @@ function mergeGuestEntry_(existing, b) {
   existing.mergedRowNumbers.push(b.rowNumber);
 }
 
+/** WebアプリのベースURLを取得 */
+function getAppBaseUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
 /** カメラ設定を取得 */
 function getCameraSettings() {
   var json = PropertiesService.getScriptProperties().getProperty('CAMERA_LIST') || '[]';

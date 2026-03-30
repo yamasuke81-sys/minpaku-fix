@@ -320,6 +320,17 @@ function sortAndRenderGuestList() {
       vb = parseInt(vb) || 0;
       return asc ? va - vb : vb - va;
     }
+    // 日付フィールド（yyyy/M/d形式をDate解析してソート）
+    if (col === 'checkIn' || col === 'checkOut') {
+      var da = parseDate_(va);
+      var db = parseDate_(vb);
+      // 日付なしは末尾に
+      if (!da && db) return 1;
+      if (da && !db) return -1;
+      if (!da && !db) return 0;
+      var diff = da.getTime() - db.getTime();
+      return asc ? diff : -diff;
+    }
     // チェックイン確認: 未確認を下に
     if (col === 'checkinConfirmedAt') {
       if (!va && vb) return asc ? 1 : -1;
@@ -426,6 +437,14 @@ function buildGuestDetail(g) {
   return html;
 }
 
+/** yyyy/M/d またはyyyy/M/d HH:mm形式の日付をDate解析 */
+function parseDate_(str) {
+  if (!str) return null;
+  var m = String(str).match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (!m) return null;
+  return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+}
+
 function detailItem(label, value) {
   return '<div class="detail-item"><div class="detail-label">' + escapeHtml(label) +
     '</div><div class="detail-value">' + escapeHtml(value || '-') + '</div></div>';
@@ -515,39 +534,66 @@ function renderCameraList() {
     var btnClass = type === 'tapo' ? 'tapo' : (type === 'ring' ? 'ring' : 'custom');
     var icon = type === 'tapo' ? 'bi-camera-video-fill' : (type === 'ring' ? 'bi-doorbell' : 'bi-link-45deg');
     var typeLabel = type === 'tapo' ? 'Tapo' : (type === 'ring' ? 'Ring' : 'カスタム');
-    var url = getCameraUrl(cam);
-
     var btnLabel = (type === 'custom') ? 'URLを開く' : typeLabel + 'アプリで開く';
     html += '<div class="camera-card">' +
       '<div class="camera-name"><i class="bi ' + icon + '"></i> ' + escapeHtml(cam.name || 'カメラ ' + (i + 1)) + '</div>' +
       '<div style="font-size:.75rem;color:#888;margin-bottom:.5rem;">' + typeLabel + '</div>' +
-      '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="camera-btn ' + btnClass + '">' +
-      '<i class="bi bi-box-arrow-up-right"></i> ' + btnLabel + '</a>' +
+      '<button onclick="openCamera(' + i + ')" class="camera-btn ' + btnClass + '">' +
+      '<i class="bi bi-box-arrow-up-right"></i> ' + btnLabel + '</button>' +
       '</div>';
   }
   document.getElementById('cameraList').innerHTML = html;
 }
 
-function getCameraUrl(cam) {
+/** カメラアプリを開く
+ *  Android: intent URLでアプリ起動（インストール済みなら直接開く）
+ *  iOS: URLスキームでアプリ起動を試みる
+ */
+function openCamera(idx) {
+  var cam = _cameras[idx];
+  if (!cam) return;
+
   // カスタムURLが設定されていればそれを使う
-  if (cam.customUrl) return cam.customUrl;
+  if (cam.customUrl) {
+    window.open(cam.customUrl, '_blank');
+    return;
+  }
 
   var type = cam.type || 'custom';
   var ua = navigator.userAgent.toLowerCase();
   var isIOS = /iphone|ipad|ipod/.test(ua);
   var isAndroid = /android/.test(ua);
 
-  if (type === 'tapo') {
-    if (isIOS) return 'https://apps.apple.com/app/tp-link-tapo/id1472718009';
-    if (isAndroid) return 'https://play.google.com/store/apps/details?id=com.tplink.iot';
-    return 'https://www.tapo.com/';
+  // アプリ起動用の設定
+  var apps = {
+    tapo: {
+      scheme: 'tapo://',
+      androidPackage: 'com.tplink.iot',
+      iosAppId: '1472718009',
+      name: 'Tapo'
+    },
+    ring: {
+      scheme: 'ring://',
+      androidPackage: 'com.ringapp',
+      iosAppId: '926252661',
+      name: 'Ring'
+    }
+  };
+
+  var app = apps[type];
+  if (!app) return;
+
+  if (isAndroid) {
+    // Android: intent URLでアプリ起動。インストール済みならアプリが開く
+    var intentUrl = 'intent://#Intent;package=' + app.androidPackage + ';end';
+    window.location.href = intentUrl;
+  } else if (isIOS) {
+    // iOS: URLスキームでアプリ起動を試みる
+    window.location.href = app.scheme;
+  } else {
+    // PC等: スキーム試行
+    window.open(app.scheme, '_blank');
   }
-  if (type === 'ring') {
-    if (isIOS) return 'https://apps.apple.com/app/ring-always-home/id926252661';
-    if (isAndroid) return 'https://play.google.com/store/apps/details?id=com.ringapp';
-    return 'https://account.ring.com/';
-  }
-  return '#';
 }
 
 function toggleCameraSettings() {

@@ -115,8 +115,8 @@
   <div class="admin-header">
     <div class="d-flex align-items-center justify-content-between">
       <h1><i class="bi bi-speedometer2"></i> 管理者画面</h1>
-      <button class="btn btn-sm btn-outline-light" onclick="location.href=location.pathname" style="font-size:.75rem;border-radius:.4rem;">
-        <i class="bi bi-box-arrow-left"></i> 戻る
+      <button class="btn btn-sm btn-outline-light" onclick="doLogout()" style="font-size:.75rem;border-radius:.4rem;">
+        <i class="bi bi-lock"></i> ログアウト
       </button>
     </div>
   </div>
@@ -230,6 +230,17 @@ function verifyPin() {
       errEl.style.display = 'block';
     }
   });
+}
+
+// ===== ログアウト =====
+function doLogout() {
+  document.getElementById('mainScreen').classList.remove('active');
+  document.getElementById('pinScreen').style.display = '';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinError').style.display = 'none';
+  _loadedTabs = {};
+  _guestListData = [];
+  _expandedRows = {};
 }
 
 // ===== タブ切替 =====

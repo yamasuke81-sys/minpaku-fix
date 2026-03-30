@@ -888,6 +888,7 @@ function getAdminGuestList() {
         guests: guestDetails,
         checkIn: ciStr,
         checkOut: coStr,
+        checkInParsed: ciStr.replace(/\s.*$/, ''), // ソート・マージ用の日付部分のみ
         guestCount: gc,
         guestCountInfants: gci,
         tel: tel1,
@@ -901,15 +902,78 @@ function getAdminGuestList() {
       });
     }
 
+    // 重複排除マージ（メインアプリindex.htmlのbuildCalendarEventsと同じロジック）
+    // マッチ条件: チェックイン日が同じなら常にマージ（同一物件で同日CIは1予約のみ）
+    var merged = [];
+    var ciKeyMap = {}; // checkInParsed → merged配列のindex
+    for (var mi = 0; mi < guests.length; mi++) {
+      var entry = guests[mi];
+      var ciKey = entry.checkInParsed;
+      if (!ciKey) { merged.push(entry); continue; }
+
+      if (ciKeyMap[ciKey] !== undefined) {
+        var existIdx = ciKeyMap[ciKey];
+        var existing = merged[existIdx];
+        mergeGuestEntry_(existing, entry);
+        continue;
+      }
+      ciKeyMap[ciKey] = merged.length;
+      merged.push(entry);
+    }
+
     // チェックイン日でソート（昇順）
-    guests.sort(function(a, b) {
+    merged.sort(function(a, b) {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    return JSON.stringify({ success: true, guests: guests });
+    return JSON.stringify({ success: true, guests: merged });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });
   }
+}
+
+/** プレースホルダ名判定（メインアプリindex.htmlのisPlaceholderNameと同じ） */
+function isPlaceholderName_(name) {
+  if (!name) return true;
+  return /^(Not available|Reserved|CLOSED|Blocked|Airbnb(予約)?|Booking\.com(予約)?|Rakuten|楽天)$/i.test(name.trim());
+}
+
+/** 同一CI予約のマージ（メインアプリindex.htmlのmergeBookingDataと同じパターン）
+ *  - プレースホルダ名より実名を優先
+ *  - 空フィールドを補完
+ *  - ゲスト詳細情報を統合
+ */
+function mergeGuestEntry_(existing, b) {
+  // guestName: プレースホルダ名より実名を優先
+  if (isPlaceholderName_(existing.guestName) && !isPlaceholderName_(b.guestName)) {
+    existing.guestName = b.guestName;
+  }
+  // 空フィールドを補完
+  var fields = ['guestCount', 'guestCountInfants', 'tel', 'tel2', 'email', 'prevStay', 'nextStay', 'nationality', 'checkinConfirmedAt'];
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    if (!existing[f] && b[f]) existing[f] = b[f];
+  }
+  // checkOut補完・不一致時の解決（メインアプリと同じ）
+  if (!existing.checkOut && b.checkOut) {
+    existing.checkOut = b.checkOut;
+  } else if (existing.checkOut && b.checkOut && existing.checkOut !== b.checkOut) {
+    // 両方にCOがある場合、後の日付を採用
+    if (b.checkOut > existing.checkOut) existing.checkOut = b.checkOut;
+  }
+  // ゲスト詳細: 実名ゲストの情報を優先
+  if (b.guests && b.guests.length > 0) {
+    if (!existing.guests || existing.guests.length === 0 ||
+        (existing.guests.length === 1 && isPlaceholderName_(existing.guests[0].name))) {
+      existing.guests = b.guests;
+      existing.guestNames = b.guestNames;
+    }
+  }
+  // 編集済みフラグ
+  if (b.hasEdits) existing.hasEdits = true;
+  // マージ元の行番号を記録
+  if (!existing.mergedRowNumbers) existing.mergedRowNumbers = [existing.rowNumber];
+  existing.mergedRowNumbers.push(b.rowNumber);
 }
 
 /** カメラ設定を取得 */

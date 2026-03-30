@@ -146,7 +146,12 @@
   <div id="tab-guests" class="tab-content active">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h2 style="font-size:1rem;font-weight:700;margin:0;">予約名簿</h2>
-      <button class="btn-refresh" onclick="loadGuestList()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-success" onclick="openSpreadsheet()" style="border-radius:.4rem;font-size:.75rem;font-weight:600;">
+          <i class="bi bi-table"></i> スプシ
+        </button>
+        <button class="btn-refresh" onclick="loadGuestList()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+      </div>
     </div>
     <div id="guestListArea">
       <div class="text-center p-4"><span class="spinner-border"></span></div>
@@ -237,6 +242,24 @@ function verifyPin() {
   });
 }
 
+// ===== スプレッドシートを開く =====
+function openSpreadsheet() {
+  callGAS('getSpreadsheetUrl').then(function(res) {
+    if (res.success && res.url) {
+      var a = document.createElement('a');
+      a.href = res.url;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      alert(res.error || 'URLの取得に失敗しました');
+    }
+  }).catch(function(err) {
+    alert('エラー: ' + err.message);
+  });
+}
+
 // ===== 宿泊者画面を開く =====
 // doGet()でサーバーサイドから埋め込まれたURL
 var _appBaseUrl = '<!--APP_BASE_URL-->';
@@ -290,7 +313,6 @@ var _guestListData = [];
 var _sortCol = 'checkIn';
 var _sortAsc = true;
 var _expandedRows = {}; // rowNumber → true
-var _debugHtml = ''; // デバッグパネルHTML（renderGuestList内で先頭に挿入）
 
 function loadGuestList() {
   document.getElementById('guestListArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
@@ -304,23 +326,6 @@ function loadGuestList() {
       return;
     }
     _guestListData = res.guests;
-    // デバッグ情報をグローバルに保存（renderGuestList内で先頭に挿入）
-    _debugHtml = '';
-    if (res._debug) {
-      var dbg = res._debug;
-      _debugHtml = '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:.5rem;padding:.6rem;margin-bottom:.8rem;font-size:.72rem;">' +
-        '<b>[DEBUG 重複排除]</b> マージ前: ' + dbg.beforeMerge + '件 → マージ後: ' + dbg.afterMerge + '件<br>';
-      for (var ciKey in dbg.ciKeys) {
-        if (dbg.ciKeys[ciKey].length > 1) {
-          _debugHtml += '<span style="color:red;">重複CI: "' + escapeHtml(ciKey) + '" → ' + dbg.ciKeys[ciKey].map(function(n){return escapeHtml(n);}).join(', ') + '</span><br>';
-        }
-      }
-      _debugHtml += '<details><summary>全CIキー一覧</summary>';
-      for (var ck in dbg.ciKeys) {
-        _debugHtml += '"' + escapeHtml(ck) + '": ' + dbg.ciKeys[ck].map(function(n){return escapeHtml(n);}).join(', ') + '<br>';
-      }
-      _debugHtml += '</details></div>';
-    }
     sortAndRenderGuestList();
   }).catch(function(err) {
     document.getElementById('guestListArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(err.message) + '</div>';
@@ -424,7 +429,7 @@ function renderGuestList(guests) {
   }
   html += '</tbody></table></div>';
   html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + guests.length + '件</div>';
-  document.getElementById('guestListArea').innerHTML = _debugHtml + html;
+  document.getElementById('guestListArea').innerHTML = html;
 }
 
 function toggleGuestDetail(rowNumber) {

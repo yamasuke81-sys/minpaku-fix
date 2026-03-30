@@ -846,10 +846,14 @@ function getAdminGuestList() {
         return String(v || '').trim();
       }
 
-      // 代表ゲスト名（1人目）— searchGuestと同じ
+      // 代表ゲスト名（1人目）
       var primaryName = '';
       if (map.guestNameCols.length > 0) primaryName = cellVal_(map.guestNameCols[0]);
-      if (!primaryName) continue; // 名前がない行はスキップ
+      // 名前もCI/COもない行のみスキップ（名前なしでも予約データがあれば表示）
+      if (!primaryName && !ciStr && !coStr) continue;
+
+      // 名前がなければ「(名前なし)」を表示
+      if (!primaryName) primaryName = '(名前なし)';
 
       // CI/CO（編集シートオーバーレイ適用）— getGuestDetailsと同じパターン
       var ciStr = map.checkIn >= 0
@@ -930,22 +934,7 @@ function getAdminGuestList() {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    // デバッグ: マージ前後の件数とcheckInParsedキーを返す
-    var debugCiKeys = {};
-    for (var di = 0; di < guests.length; di++) {
-      var dk = guests[di].checkInParsed || '(empty)';
-      if (!debugCiKeys[dk]) debugCiKeys[dk] = [];
-      debugCiKeys[dk].push(guests[di].guestName);
-    }
-    return JSON.stringify({
-      success: true,
-      guests: merged,
-      _debug: {
-        beforeMerge: guests.length,
-        afterMerge: merged.length,
-        ciKeys: debugCiKeys
-      }
-    });
+    return JSON.stringify({ success: true, guests: merged });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });
   }
@@ -998,6 +987,13 @@ function mergeGuestEntry_(existing, b) {
 /** WebアプリのベースURLを取得 */
 function getAppBaseUrl() {
   return ScriptApp.getService().getUrl();
+}
+
+/** スプレッドシートURLを取得 */
+function getSpreadsheetUrl() {
+  var ssId = getSpreadsheetId_();
+  if (!ssId) return JSON.stringify({ success: false, error: 'スプレッドシートIDが未設定です' });
+  return JSON.stringify({ success: true, url: 'https://docs.google.com/spreadsheets/d/' + ssId });
 }
 
 /** カメラ設定を取得 */

@@ -790,7 +790,13 @@ function getCheckinLog() {
 
 // ===== 管理者画面用API =====
 
-/** 今後の予約一覧を取得（チェックアウトが今日以降） */
+/** 今後の予約一覧を取得（チェックアウトが今日以降）
+ *  データ取得ロジックはgetGuestDetails/searchGuestに準拠:
+ *  - buildCheckinColumnMap_ でカラムマップ構築
+ *  - getEditsForRow_ で編集シートの差分をオーバーレイ
+ *  - formatDate_ で日付フォーマット
+ *  - 全ゲスト情報（名前・国籍・年齢・住所・旅券番号）を含む
+ */
 function getAdminGuestList() {
   try {
     var sheet = getSheet_();
@@ -813,8 +819,9 @@ function getAdminGuestList() {
     var guests = [];
     for (var r = 1; r < data.length; r++) {
       var row = data[r];
+      var rowNumber = r + 1;
 
-      // チェックアウトが過去の予約はスキップ
+      // チェックアウトが過去の予約はスキップ（searchGuestと同じロジック）
       if (map.checkOut >= 0) {
         var coVal = row[map.checkOut];
         if (coVal) {
@@ -823,26 +830,74 @@ function getAdminGuestList() {
         }
       }
 
+      // 編集シートから差分を取得（getGuestDetailsと同じパターン）
+      var edits = getEditsForRow_(rowNumber);
+
+      /** セル値を取得（編集があればそちらを優先）— getGuestDetailsのcellVal_と同じ */
+      function cellVal_(colIndex) {
+        if (colIndex < 0) return '';
+        if (edits[String(colIndex)]) return String(edits[String(colIndex)].edited || '');
+        var v = row[colIndex];
+        if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy/M/d HH:mm');
+        return String(v || '').trim();
+      }
+
+      // 代表ゲスト名（1人目）— searchGuestと同じ
       var primaryName = '';
-      if (map.guestNameCols.length > 0) primaryName = String(row[map.guestNameCols[0]] || '').trim();
+      if (map.guestNameCols.length > 0) primaryName = cellVal_(map.guestNameCols[0]);
       if (!primaryName) continue; // 名前がない行はスキップ
 
-      var ciStr = map.checkIn >= 0 ? formatDate_(row[map.checkIn]) : '';
-      var coStr = map.checkOut >= 0 ? formatDate_(row[map.checkOut]) : '';
-      var gc = map.guestCount >= 0 ? String(row[map.guestCount] || '').trim() : '';
-      var tel = map.telCols.length > 0 ? String(row[map.telCols[0]] || '').trim() : '';
-      var nat = map.nationalityCols.length > 0 ? String(row[map.nationalityCols[0]] || '').trim() : '';
+      // CI/CO（編集シートオーバーレイ適用）— getGuestDetailsと同じパターン
+      var ciStr = map.checkIn >= 0
+        ? (edits[String(map.checkIn)] ? cellVal_(map.checkIn) : formatDate_(row[map.checkIn]))
+        : '';
+      var coStr = map.checkOut >= 0
+        ? (edits[String(map.checkOut)] ? cellVal_(map.checkOut) : formatDate_(row[map.checkOut]))
+        : '';
+
+      // 基本情報
+      var gc = cellVal_(map.guestCount);
+      var gci = cellVal_(map.guestCountInfants);
+      var tel1 = map.telCols.length > 0 ? cellVal_(map.telCols[0]) : '';
+      var tel2 = map.telCols.length > 1 ? cellVal_(map.telCols[1]) : '';
+      var email = (map.emailCols && map.emailCols.length > 0) ? cellVal_(map.emailCols[0]) : '';
+      var prevStay = cellVal_(map.prevStay);
+      var nextStay = cellVal_(map.nextStay);
       var checkinAt = ciConfirmCol >= 0 ? String(row[ciConfirmCol] || '').trim() : '';
 
+      // 全ゲスト情報（getGuestDetailsと同じパターン）
+      var guestNames = [];
+      var guestDetails = [];
+      for (var g = 0; g < map.guestNameCols.length; g++) {
+        var gName = cellVal_(map.guestNameCols[g]);
+        if (!gName && g > 0) continue; // 2人目以降は名前がなければスキップ
+        guestNames.push(gName);
+        guestDetails.push({
+          name: gName,
+          nationality: g < map.nationalityCols.length ? cellVal_(map.nationalityCols[g]) : '',
+          age: g < map.ageCols.length ? cellVal_(map.ageCols[g]) : '',
+          address: g < map.addressCols.length ? cellVal_(map.addressCols[g]) : '',
+          passportNumber: g < map.passportNumberCols.length ? cellVal_(map.passportNumberCols[g]) : ''
+        });
+      }
+
       guests.push({
-        rowNumber: r + 1,
+        rowNumber: rowNumber,
         guestName: primaryName,
+        guestNames: guestNames,
+        guests: guestDetails,
         checkIn: ciStr,
         checkOut: coStr,
         guestCount: gc,
-        tel: tel,
-        nationality: nat,
-        checkinConfirmedAt: checkinAt
+        guestCountInfants: gci,
+        tel: tel1,
+        tel2: tel2,
+        email: email,
+        prevStay: prevStay,
+        nextStay: nextStay,
+        nationality: guestDetails.length > 0 ? guestDetails[0].nationality : '',
+        checkinConfirmedAt: checkinAt,
+        hasEdits: Object.keys(edits).length > 0
       });
     }
 

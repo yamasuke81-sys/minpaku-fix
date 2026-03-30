@@ -68,6 +68,23 @@
     /* リフレッシュボタン */
     .btn-refresh { background: var(--accent); color: #fff; border: none; border-radius: .5rem; padding: .4rem .8rem; font-size: .8rem; font-weight: 600; }
 
+    /* ソート */
+    .guest-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .guest-table th.sortable:hover { background: #e9ecef; }
+    .sort-icon { font-size: .65rem; margin-left: .2rem; opacity: .4; }
+    .sort-icon.active { opacity: 1; color: var(--accent); }
+
+    /* 詳細展開行 */
+    .guest-table tr.expandable { cursor: pointer; }
+    .guest-table tr.expandable:hover { background: #eef3f8; }
+    .detail-expand { background: #f8fafc; }
+    .detail-expand td { padding: .6rem .8rem; font-size: .75rem; }
+    .detail-expand .detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .4rem .8rem; }
+    .detail-expand .detail-item { }
+    .detail-expand .detail-label { font-size: .65rem; color: #888; font-weight: 600; }
+    .detail-expand .detail-value { font-size: .8rem; }
+    .edited-mark { color: #e67e22; font-size: .65rem; font-weight: 600; }
+
     /* 共通 */
     .spinner-sm { width: 1rem; height: 1rem; border-width: .15rem; }
     .version-badge { position: fixed; bottom: 4px; left: 8px; font-size: 10px; color: rgba(0,0,0,0.15); z-index: 100; }
@@ -78,7 +95,7 @@
 </head>
 <body>
 
-<div class="version-badge" id="deployVersion">v0330a</div>
+<div class="version-badge" id="deployVersion">v0330b</div>
 
 <!-- ===== PIN認証画面 ===== -->
 <div id="pinScreen">
@@ -234,6 +251,11 @@ function switchTab(tabId) {
 _loadedTabs['guests'] = true; // 名簿は初期表示時にロード
 
 // ===== タブ1: 名簿 =====
+var _guestListData = [];
+var _sortCol = 'checkIn';
+var _sortAsc = true;
+var _expandedRows = {}; // rowNumber → true
+
 function loadGuestList() {
   document.getElementById('guestListArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
   callGAS('getAdminGuestList').then(function(res) {
@@ -245,16 +267,71 @@ function loadGuestList() {
       document.getElementById('guestListArea').innerHTML = '<div class="empty-state"><i class="bi bi-calendar-x"></i><p class="mt-2">今後の予約はありません</p></div>';
       return;
     }
-    renderGuestList(res.guests);
+    _guestListData = res.guests;
+    sortAndRenderGuestList();
   }).catch(function(err) {
     document.getElementById('guestListArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(err.message) + '</div>';
   });
 }
 
+function toggleSort(col) {
+  if (_sortCol === col) {
+    _sortAsc = !_sortAsc;
+  } else {
+    _sortCol = col;
+    _sortAsc = true;
+  }
+  sortAndRenderGuestList();
+}
+
+function sortAndRenderGuestList() {
+  var sorted = _guestListData.slice();
+  var col = _sortCol;
+  var asc = _sortAsc;
+  sorted.sort(function(a, b) {
+    var va = a[col] || '';
+    var vb = b[col] || '';
+    // 数値フィールド
+    if (col === 'guestCount') {
+      va = parseInt(va) || 0;
+      vb = parseInt(vb) || 0;
+      return asc ? va - vb : vb - va;
+    }
+    // チェックイン確認: 未確認を下に
+    if (col === 'checkinConfirmedAt') {
+      if (!va && vb) return asc ? 1 : -1;
+      if (va && !vb) return asc ? -1 : 1;
+    }
+    var cmp = String(va).localeCompare(String(vb));
+    return asc ? cmp : -cmp;
+  });
+  renderGuestList(sorted);
+}
+
+function sortIcon(col) {
+  if (_sortCol !== col) return '<i class="bi bi-arrow-down-up sort-icon"></i>';
+  return _sortAsc
+    ? '<i class="bi bi-sort-down sort-icon active"></i>'
+    : '<i class="bi bi-sort-up sort-icon active"></i>';
+}
+
 function renderGuestList(guests) {
-  var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>' +
-    '<th>氏名</th><th>CI</th><th>CO</th><th>人数</th><th>国籍</th><th>電話</th><th>確認</th>' +
-    '</tr></thead><tbody>';
+  var cols = [
+    { key: 'guestName', label: '氏名' },
+    { key: 'checkIn', label: 'CI' },
+    { key: 'checkOut', label: 'CO' },
+    { key: 'guestCount', label: '人数' },
+    { key: 'nationality', label: '国籍' },
+    { key: 'tel', label: '電話' },
+    { key: 'checkinConfirmedAt', label: '確認' }
+  ];
+
+  var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>';
+  for (var c = 0; c < cols.length; c++) {
+    html += '<th class="sortable" onclick="toggleSort(\'' + cols[c].key + '\')">' +
+      cols[c].label + sortIcon(cols[c].key) + '</th>';
+  }
+  html += '</tr></thead><tbody>';
 
   for (var i = 0; i < guests.length; i++) {
     var g = guests[i];
@@ -263,9 +340,11 @@ function renderGuestList(guests) {
     var badge = g.checkinConfirmedAt
       ? '<span class="checkin-badge done"><i class="bi bi-check-circle-fill"></i> ' + escapeHtml(g.checkinConfirmedAt.replace(/^\d{4}\//, '')) + '</span>'
       : '<span class="checkin-badge pending">未確認</span>';
+    var editMark = g.hasEdits ? ' <span class="edited-mark">(編集済)</span>' : '';
+    var expanded = _expandedRows[g.rowNumber];
 
-    html += '<tr>' +
-      '<td style="font-weight:600;">' + escapeHtml(g.guestName) + '</td>' +
+    html += '<tr class="expandable" onclick="toggleGuestDetail(' + g.rowNumber + ')">' +
+      '<td style="font-weight:600;">' + escapeHtml(g.guestName) + editMark + '</td>' +
       '<td>' + escapeHtml(ciShort) + '</td>' +
       '<td>' + escapeHtml(coShort) + '</td>' +
       '<td class="text-center">' + escapeHtml(g.guestCount || '-') + '</td>' +
@@ -273,10 +352,60 @@ function renderGuestList(guests) {
       '<td style="font-size:.7rem;">' + escapeHtml(g.tel || '-') + '</td>' +
       '<td>' + badge + '</td>' +
       '</tr>';
+
+    // 展開行
+    if (expanded) {
+      html += '<tr class="detail-expand"><td colspan="7">' + buildGuestDetail(g) + '</td></tr>';
+    }
   }
   html += '</tbody></table></div>';
   html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + guests.length + '件</div>';
   document.getElementById('guestListArea').innerHTML = html;
+}
+
+function toggleGuestDetail(rowNumber) {
+  if (_expandedRows[rowNumber]) {
+    delete _expandedRows[rowNumber];
+  } else {
+    _expandedRows[rowNumber] = true;
+  }
+  sortAndRenderGuestList();
+}
+
+function buildGuestDetail(g) {
+  var html = '<div class="detail-grid">';
+  html += detailItem('チェックイン', g.checkIn);
+  html += detailItem('チェックアウト', g.checkOut);
+  html += detailItem('宿泊人数', g.guestCount);
+  if (g.guestCountInfants) html += detailItem('乳幼児', g.guestCountInfants);
+  html += detailItem('電話番号1', g.tel);
+  if (g.tel2) html += detailItem('電話番号2', g.tel2);
+  if (g.email) html += detailItem('メール', g.email);
+  if (g.prevStay) html += detailItem('前泊地', g.prevStay);
+  if (g.nextStay) html += detailItem('行先地', g.nextStay);
+  html += '</div>';
+
+  // 全ゲスト情報
+  if (g.guests && g.guests.length > 0) {
+    for (var gi = 0; gi < g.guests.length; gi++) {
+      var gg = g.guests[gi];
+      html += '<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px dashed #ddd;">' +
+        '<div style="font-weight:600;font-size:.8rem;margin-bottom:.3rem;">' +
+        '<i class="bi bi-person"></i> 宿泊者' + (gi + 1) + ': ' + escapeHtml(gg.name || '(未入力)') + '</div>' +
+        '<div class="detail-grid">';
+      if (gg.nationality) html += detailItem('国籍', gg.nationality);
+      if (gg.age) html += detailItem('年齢', gg.age);
+      if (gg.address) html += detailItem('住所', gg.address);
+      if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
+      html += '</div></div>';
+    }
+  }
+  return html;
+}
+
+function detailItem(label, value) {
+  return '<div class="detail-item"><div class="detail-label">' + escapeHtml(label) +
+    '</div><div class="detail-value">' + escapeHtml(value || '-') + '</div></div>';
 }
 
 // ===== タブ2: 変更履歴 =====

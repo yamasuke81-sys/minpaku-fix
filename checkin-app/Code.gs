@@ -8,7 +8,11 @@
 function doGet(e) {
   var mode = (e && e.parameter && e.parameter.mode) || '';
   if (mode === 'admin') {
-    return HtmlService.createHtmlOutputFromFile('admin')
+    var adminHtml = HtmlService.createHtmlOutputFromFile('admin').getContent();
+    // ベースURLを埋め込む（宿泊者画面リンク用）
+    var baseUrl = ScriptApp.getService().getUrl();
+    adminHtml = adminHtml.replace('<!--APP_BASE_URL-->', baseUrl || '');
+    return HtmlService.createHtmlOutput(adminHtml)
       .setTitle('管理者画面')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');

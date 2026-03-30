@@ -238,19 +238,21 @@ function verifyPin() {
 }
 
 // ===== 宿泊者画面を開く =====
-var _appBaseUrl = '';
-// 初期化時にベースURLを取得
-google.script.run.withSuccessHandler(function(url) { _appBaseUrl = url || ''; }).getAppBaseUrl();
+// doGet()でサーバーサイドから埋め込まれたURL
+var _appBaseUrl = '<!--APP_BASE_URL-->';
 
 function openGuestTop() {
-  if (_appBaseUrl) {
-    window.open(_appBaseUrl, '_blank');
+  if (_appBaseUrl && _appBaseUrl.indexOf('http') === 0) {
+    // GASのiframe内からはtarget=_topでトップフレームを遷移させる
+    var a = document.createElement('a');
+    a.href = _appBaseUrl;
+    a.target = '_top';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   } else {
-    // フォールバック: GAS関数で取得を試みる
-    google.script.run.withSuccessHandler(function(url) {
-      if (url) window.open(url, '_blank');
-      else alert('URLの取得に失敗しました');
-    }).getAppBaseUrl();
+    alert('宿泊者画面のURLが取得できませんでした');
   }
 }
 

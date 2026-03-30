@@ -288,6 +288,7 @@ var _guestListData = [];
 var _sortCol = 'checkIn';
 var _sortAsc = true;
 var _expandedRows = {}; // rowNumber → true
+var _debugHtml = ''; // デバッグパネルHTML（renderGuestList内で先頭に挿入）
 
 function loadGuestList() {
   document.getElementById('guestListArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
@@ -301,23 +302,22 @@ function loadGuestList() {
       return;
     }
     _guestListData = res.guests;
-    // デバッグ: マージ結果を表示
+    // デバッグ情報をグローバルに保存（renderGuestList内で先頭に挿入）
+    _debugHtml = '';
     if (res._debug) {
       var dbg = res._debug;
-      var dbgHtml = '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:.5rem;padding:.6rem;margin-bottom:.8rem;font-size:.72rem;">' +
+      _debugHtml = '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:.5rem;padding:.6rem;margin-bottom:.8rem;font-size:.72rem;">' +
         '<b>[DEBUG 重複排除]</b> マージ前: ' + dbg.beforeMerge + '件 → マージ後: ' + dbg.afterMerge + '件<br>';
       for (var ciKey in dbg.ciKeys) {
         if (dbg.ciKeys[ciKey].length > 1) {
-          dbgHtml += '<span style="color:red;">重複CI: "' + escapeHtml(ciKey) + '" → ' + dbg.ciKeys[ciKey].map(function(n){return escapeHtml(n);}).join(', ') + '</span><br>';
+          _debugHtml += '<span style="color:red;">重複CI: "' + escapeHtml(ciKey) + '" → ' + dbg.ciKeys[ciKey].map(function(n){return escapeHtml(n);}).join(', ') + '</span><br>';
         }
       }
-      // 全キー表示
-      dbgHtml += '<details><summary>全CIキー一覧</summary>';
+      _debugHtml += '<details><summary>全CIキー一覧</summary>';
       for (var ck in dbg.ciKeys) {
-        dbgHtml += '"' + escapeHtml(ck) + '": ' + dbg.ciKeys[ck].map(function(n){return escapeHtml(n);}).join(', ') + '<br>';
+        _debugHtml += '"' + escapeHtml(ck) + '": ' + dbg.ciKeys[ck].map(function(n){return escapeHtml(n);}).join(', ') + '<br>';
       }
-      dbgHtml += '</details></div>';
-      document.getElementById('guestListArea').innerHTML = dbgHtml;
+      _debugHtml += '</details></div>';
     }
     sortAndRenderGuestList();
   }).catch(function(err) {
@@ -422,7 +422,7 @@ function renderGuestList(guests) {
   }
   html += '</tbody></table></div>';
   html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + guests.length + '件</div>';
-  document.getElementById('guestListArea').innerHTML = html;
+  document.getElementById('guestListArea').innerHTML = _debugHtml + html;
 }
 
 function toggleGuestDetail(rowNumber) {

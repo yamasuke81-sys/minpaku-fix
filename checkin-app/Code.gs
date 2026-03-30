@@ -825,11 +825,11 @@ function getAdminGuestList() {
       var row = data[r];
       var rowNumber = r + 1;
 
-      // チェックアウトが過去の予約はスキップ（searchGuestと同じロジック）
+      // チェックアウトが過去の予約はスキップ（メインアプリgetData()と同じ: CO < 今日）
       if (map.checkOut >= 0) {
         var coVal = row[map.checkOut];
         if (coVal) {
-          var coDate = new Date(coVal);
+          var coDate = coVal instanceof Date ? coVal : new Date(coVal);
           if (!isNaN(coDate.getTime()) && coDate < today) continue;
         }
       }
@@ -846,14 +846,9 @@ function getAdminGuestList() {
         return String(v || '').trim();
       }
 
-      // 代表ゲスト名（1人目）
+      // 代表ゲスト名（1人目）— メインアプリgetData()と同じくフィルタしない
       var primaryName = '';
       if (map.guestNameCols.length > 0) primaryName = cellVal_(map.guestNameCols[0]);
-      // 名前もCI/COもない行のみスキップ（名前なしでも予約データがあれば表示）
-      if (!primaryName && !ciStr && !coStr) continue;
-
-      // 名前がなければ「(名前なし)」を表示
-      if (!primaryName) primaryName = '(名前なし)';
 
       // CI/CO（編集シートオーバーレイ適用）— getGuestDetailsと同じパターン
       var ciStr = map.checkIn >= 0
@@ -862,6 +857,9 @@ function getAdminGuestList() {
       var coStr = map.checkOut >= 0
         ? (edits[String(map.checkOut)] ? cellVal_(map.checkOut) : formatDate_(row[map.checkOut]))
         : '';
+
+      // CI/COが両方ない完全な空行のみスキップ（メインアプリgetData()準拠）
+      if (!ciStr && !coStr) continue;
 
       // 基本情報
       var gc = cellVal_(map.guestCount);

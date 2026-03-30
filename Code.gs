@@ -13016,7 +13016,30 @@ function getAdminLinks() {
   var sp = PropertiesService.getScriptProperties();
   var saved = sp.getProperty('ADMIN_LINKS');
   if (saved) {
-    try { return JSON.parse(saved); } catch(e) {}
+    try {
+      var parsed = JSON.parse(saved);
+      // マイグレーション: チェックインアプリカテゴリに管理者画面リンクがなければ追加
+      var checkinUrl = sp.getProperty('CHECKIN_APP_URL') || '';
+      if (checkinUrl) {
+        for (var ci = 0; ci < parsed.length; ci++) {
+          if (parsed[ci].name === 'チェックインアプリ') {
+            var hasAdmin = parsed[ci].links.some(function(lk) { return lk.title === '管理者画面'; });
+            if (!hasAdmin) {
+              var adminUrl = checkinUrl + (checkinUrl.indexOf('?') >= 0 ? '&' : '?') + 'mode=admin';
+              // 「アプリ」の次に挿入
+              var insertIdx = 1;
+              for (var li = 0; li < parsed[ci].links.length; li++) {
+                if (parsed[ci].links[li].title === 'アプリ') { insertIdx = li + 1; break; }
+              }
+              parsed[ci].links.splice(insertIdx, 0, { title: '管理者画面', url: adminUrl, type: 'app' });
+              sp.setProperty('ADMIN_LINKS', JSON.stringify(parsed));
+            }
+            break;
+          }
+        }
+      }
+      return parsed;
+    } catch(e) {}
   }
   // 初回: デフォルトデータを自動生成
   var dp = PropertiesService.getDocumentProperties();
@@ -13048,6 +13071,7 @@ function getAdminLinks() {
     ]},
     { name: 'チェックインアプリ', color: '#fdcb6e', links: [
       { title: 'アプリ', url: checkinUrl, type: 'app' },
+      { title: '管理者画面', url: checkinUrl ? checkinUrl + (checkinUrl.indexOf('?') >= 0 ? '&' : '?') + 'mode=admin' : '', type: 'app' },
       { title: 'Apps Script', url: gasBase + '1HL-Rm5kU7koC9_rW3ZQrblh5Jw_nQU_4fuvAD6eUPqrZCU5DTp-CWkV9/edit', type: 'gas' }
     ]},
     { name: 'アラームアプリ', color: '#e17055', links: [

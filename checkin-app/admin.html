@@ -234,13 +234,30 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ===== PIN認証 =====
+// ===== PIN認証（20分間セッション維持） =====
+var ADMIN_SESSION_KEY = 'adminPinVerified';
+var ADMIN_SESSION_DURATION = 20 * 60 * 1000; // 20分
+
 document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyPin(); });
+
+// ページ読込時: セッションが有効なら即解除
+(function checkSession() {
+  try {
+    var ts = parseInt(sessionStorage.getItem(ADMIN_SESSION_KEY) || '0');
+    if (ts && (Date.now() - ts) < ADMIN_SESSION_DURATION) {
+      document.getElementById('pinScreen').style.display = 'none';
+      document.getElementById('mainScreen').classList.add('active');
+      loadGuestList();
+      return;
+    }
+  } catch (e) {}
+})();
 
 function verifyPin() {
   var pin = document.getElementById('pinInput').value;
   callGAS('verifyPin', [pin]).then(function(res) {
     if (res.valid) {
+      try { sessionStorage.setItem(ADMIN_SESSION_KEY, String(Date.now())); } catch (e) {}
       document.getElementById('pinScreen').style.display = 'none';
       document.getElementById('mainScreen').classList.add('active');
       loadGuestList();
@@ -298,6 +315,7 @@ function openGuestTop() {
 
 // ===== ログアウト =====
 function doLogout() {
+  try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
   document.getElementById('mainScreen').classList.remove('active');
   document.getElementById('pinScreen').style.display = '';
   document.getElementById('pinInput').value = '';

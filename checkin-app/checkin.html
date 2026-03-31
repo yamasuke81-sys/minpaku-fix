@@ -573,7 +573,7 @@ function renderDetail() {
       var thumbUrl = guest.passportPhotoUrl;
       if (thumbUrl.indexOf('drive.google.com') > -1) {
         var fileId = extractDriveFileId_(thumbUrl);
-        if (fileId) thumbUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+        if (fileId) thumbUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w300';
       }
       html += '<img src="' + escapeHtml(thumbUrl) + '" class="passport-thumb" onclick="showPassport(\'' + escapeHtml(guest.passportPhotoUrl) + '\')" onerror="this.style.display=\'none\'">';
       html += '</div>';
@@ -818,7 +818,7 @@ function showPassport(url) {
   var fullUrl = url;
   if (url.indexOf('drive.google.com') > -1) {
     var fileId = extractDriveFileId_(url);
-    if (fileId) fullUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    if (fileId) fullUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
   }
   document.getElementById('passportFullImg').src = fullUrl;
   document.getElementById('passportOverlay').classList.add('show');

@@ -301,9 +301,80 @@ function normalizeName_(name) {
   return s;
 }
 
+// ===== テスト予約（実スプシに影響なし） =====
+var TEST_ROW_NUMBER_ = -1; // テスト予約の識別用行番号
+var TEST_GUEST_ = {
+  name: '西山恭介',
+  phone: '09075009595',
+  checkIn: (function() { var d = new Date(); return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/M/d') + ' 15:00'; })(),
+  checkOut: (function() { var d = new Date(); d.setDate(d.getDate() + 1); return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/M/d') + ' 10:00'; })(),
+  guestCount: '2',
+  guestCountInfants: '1',
+  nationality: '日本 / Japan（テスト）',
+  age: '35',
+  address: '東京都渋谷区テスト1-2-3',
+  passportNumber: 'TK1234567',
+  passportPhotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Golde33443.jpg/220px-Golde33443.jpg',
+  prevStay: '東京（テスト）',
+  nextStay: '大阪（テスト）',
+  tel2: '08012345678',
+  email: 'test@example.com'
+};
+
+function isTestSearch_(name, phone) {
+  return normalizeName_(name) === normalizeName_(TEST_GUEST_.name)
+    && normalizePhone_(phone) === normalizePhone_(TEST_GUEST_.phone);
+}
+
+function getTestSearchResult_() {
+  return {
+    rowNumber: TEST_ROW_NUMBER_,
+    guestName: TEST_GUEST_.name,
+    checkIn: TEST_GUEST_.checkIn,
+    checkOut: TEST_GUEST_.checkOut,
+    guestCount: TEST_GUEST_.guestCount
+  };
+}
+
+function getTestGuestDetails_() {
+  return {
+    rowNumber: TEST_ROW_NUMBER_,
+    checkIn: TEST_GUEST_.checkIn,
+    checkOut: TEST_GUEST_.checkOut,
+    guestCount: TEST_GUEST_.guestCount,
+    guestCountInfants: TEST_GUEST_.guestCountInfants,
+    prevStay: TEST_GUEST_.prevStay,
+    nextStay: TEST_GUEST_.nextStay,
+    guests: [{
+      index: 0,
+      name: TEST_GUEST_.name,
+      address: TEST_GUEST_.address,
+      age: TEST_GUEST_.age,
+      nationality: TEST_GUEST_.nationality,
+      passportNumber: TEST_GUEST_.passportNumber,
+      passportPhotoUrl: TEST_GUEST_.passportPhotoUrl
+    }],
+    tel1: TEST_GUEST_.phone,
+    tel2: TEST_GUEST_.tel2,
+    hasEdits: false,
+    editedCols: {},
+    colMap: {
+      checkIn: 0, checkOut: 1, guestCount: 2, guestCountInfants: 3,
+      prevStay: 4, nextStay: 5, telCols: [6, 7],
+      guestNameCols: [8], addressCols: [9], ageCols: [10],
+      nationalityCols: [11], passportNumberCols: [12], passportPhotoCols: [13]
+    }
+  };
+}
+
 /** ゲストを名前・電話番号で検索 */
 function searchGuest(name, phone) {
   try {
+    // テスト予約チェック
+    if (isTestSearch_(name, phone)) {
+      return JSON.stringify({ success: true, results: [getTestSearchResult_()], ciFutureMatched: 0 });
+    }
+
     var sheet = getSheet_();
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return JSON.stringify({ success: true, results: [] });
@@ -417,6 +488,11 @@ function formatDate_(val) {
 /** ゲスト詳細を取得（編集シートの差分をオーバーレイ） */
 function getGuestDetails(rowNumber) {
   try {
+    // テスト予約
+    if (rowNumber === TEST_ROW_NUMBER_) {
+      return JSON.stringify({ success: true, data: getTestGuestDetails_() });
+    }
+
     var sheet = getSheet_();
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var map = buildCheckinColumnMap_(headers);
@@ -507,6 +583,11 @@ function getGuestDetails(rowNumber) {
 /** 単一セルを編集シートに記録（フォームの回答1は変更しない） */
 function updateGuestField(rowNumber, colIndex, value) {
   try {
+    // テスト予約は保存しない（UIの動作確認のみ）
+    if (rowNumber === TEST_ROW_NUMBER_) {
+      return JSON.stringify({ success: true });
+    }
+
     var sheet = getSheet_();
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var originalValue = sheet.getRange(rowNumber, colIndex + 1).getValue();
@@ -556,6 +637,10 @@ function updateGuestField(rowNumber, colIndex, value) {
 /** ゲスト編集をリセット（編集シートから該当行の全エントリを削除） */
 function resetGuestEdits(rowNumber) {
   try {
+    if (rowNumber === TEST_ROW_NUMBER_) {
+      return JSON.stringify({ success: true, deleted: 0 });
+    }
+
     var editSheet = getEditSheet_();
     var lastRow = editSheet.getLastRow();
     if (lastRow < 2) return JSON.stringify({ success: true, deleted: 0 });
@@ -605,6 +690,11 @@ function getGuestEditLog() {
 /** チェックイン確認を記録 */
 function confirmCheckin(rowNumber) {
   try {
+    // テスト予約は記録しない
+    if (rowNumber === TEST_ROW_NUMBER_) {
+      return JSON.stringify({ success: true });
+    }
+
     var sheet = getSheet_();
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     var map = buildCheckinColumnMap_(headers);
@@ -647,6 +737,11 @@ function confirmCheckin(rowNumber) {
 /** Google Meet通話開始時にオーナーへメール通知 */
 function notifyMeetCall(rowNumber) {
   try {
+    // テスト予約はメール通知しない
+    if (rowNumber === TEST_ROW_NUMBER_) {
+      return JSON.stringify({ success: true });
+    }
+
     var props = PropertiesService.getScriptProperties();
     var notifyEmailRaw = props.getProperty('NOTIFY_EMAIL') || '';
     if (!notifyEmailRaw) return JSON.stringify({ success: false, error: '通知先メールアドレスが未設定です' });

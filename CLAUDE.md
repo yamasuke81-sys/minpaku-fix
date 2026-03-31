@@ -59,9 +59,10 @@
 2. **メインapp**: https://script.google.com/macros/s/AKfycbzfOEVVpybSZLZe-htulSn-j4wL0pYhyLyAk-Vmz0j9N_3LtAshQiq8GRP0BSDsS8eHdw/exec
 3. **管理者リンク一覧**: https://script.google.com/macros/s/AKfycbzfOEVVpybSZLZe-htulSn-j4wL0pYhyLyAk-Vmz0j9N_3LtAshQiq8GRP0BSDsS8eHdw/exec?action=admin
 
-- pushすればGitHub Actionsで自動デプロイされるため、手動デプロイコマンドは原則不要
-- ユーザーが「デプロイして」と言わなくても、コード変更をプッシュしたら毎回上記リンクを出す
-- 手動デプロイが必要な場合のコマンド:
+- pushすればGitHub Actionsで自動デプロイされるため、**手動デプロイコマンドをユーザーに実行させてはならない**
+- ユーザーが「デプロイして」と言った場合も、git pushで自動デプロイされることを伝えるだけでよい
+- コード変更をプッシュしたら毎回上記リンクを出す（デプロイコマンドは出さない）
+- 手動デプロイが必要な場合（GitHub Actions障害時など例外のみ）のコマンド:
   ```
   cd C:\Users\yamas\minpaku-fix && git fetch origin && git checkout -f <ブランチ名> && git reset --hard origin/<ブランチ名> && node deploy-all.js
   ```
@@ -1008,8 +1009,8 @@ GAS(doPost) → Webhookで受信
 
 ## チャット移行時の必須ルール
 
-### ルール1: 変更プッシュ後は毎回デプロイ手順を表示すること
-上記「必須ルール: 修正後のデプロイコマンド出力」に記載のとおり。
+### ルール1: 変更プッシュ後は毎回リンクを表示すること（手動デプロイコマンドは出さない）
+上記「必須ルール: 修正後のリンク出力」に記載のとおり。pushで自動デプロイされるため、手動デプロイコマンドをユーザーに実行させない。
 
 ### ルール2: 以下の条件を満たしたら新チャットへ移行を**自主的に**提案すること
 

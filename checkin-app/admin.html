@@ -535,18 +535,22 @@ function buildGuestDetail(g) {
       if (gg.address) html += detailItem('住所', gg.address);
       if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
       html += '</div>';
-      // パスポート写真（thumbnail形式 — 管理者はGoogleログイン前提）
+      // パスポート写真（Drive形式はthumbnail、それ以外はURLをそのまま使用）
       if (gg.passportPhotoUrl) {
         var ppFid = (gg.passportPhotoUrl.match(/[-\w]{25,}/) || [])[0] || '';
+        var ppThumb, ppFull;
         if (ppFid) {
-          var ppThumb = 'https://drive.google.com/thumbnail?id=' + ppFid + '&sz=w300';
-          var ppFull = 'https://drive.google.com/thumbnail?id=' + ppFid + '&sz=w800';
-          html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-            '<img src="' + ppThumb + '" ' +
-            'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
-            'onclick="event.stopPropagation();showPassport(\'' + ppFull + '\')" ' +
-            'onerror="this.outerHTML=\'<span style=\\\'font-size:.7rem;color:#aaa;\\\'>(Googleログインが必要です)</span>\'"></div>';
+          ppThumb = 'https://drive.google.com/thumbnail?id=' + ppFid + '&sz=w300';
+          ppFull = 'https://drive.google.com/thumbnail?id=' + ppFid + '&sz=w800';
+        } else {
+          ppThumb = gg.passportPhotoUrl;
+          ppFull = gg.passportPhotoUrl;
         }
+        html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+          '<img src="' + ppThumb + '" ' +
+          'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
+          'onclick="event.stopPropagation();showPassport(\'' + ppFull + '\')" ' +
+          'onerror="this.outerHTML=\'<span style=\\\'font-size:.7rem;color:#aaa;\\\'>(Googleログインが必要です)</span>\'"></div>';
       }
       html += '</div>';
     }

@@ -1896,7 +1896,7 @@
     // DOMベースのモーダルで完全に代替する（全プラットフォーム共通）
 
     /** カスタム確認モーダル（confirm()代替）- Promise版 */
-    var _ratingLabels = ['未評価', 'とても汚い', '汚い', '普通', 'きれい', 'とてもきれい', '完璧'];
+    var _ratingLabels = ['未評価', 'とても汚い', '汚い', '普通', 'きれい', 'とてもきれい'];
 
     function showRatingModal() {
       return new Promise(function(resolve) {
@@ -1913,7 +1913,7 @@
             var v = parseInt(s.getAttribute('data-val'));
             s.style.color = v <= val ? '#f39c12' : '#ddd';
           });
-          label.textContent = '★' + val + ': ' + (_ratingLabels[val + 1] || '');
+          label.textContent = '★' + val + ': ' + (_ratingLabels[val] || '');
         }
 
         // 初期状態: ★0
@@ -7362,7 +7362,6 @@
       <div style="font-size:15px;font-weight:600;color:#333;margin-bottom:4px;">利用状態の評価</div>
       <div style="font-size:12px;color:#888;margin-bottom:14px;">ゲストの利用状態を★で評価してください</div>
       <div id="ratingStars" style="display:flex;justify-content:center;gap:6px;margin-bottom:6px;">
-        <span class="rating-star" data-val="0" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
         <span class="rating-star" data-val="1" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
         <span class="rating-star" data-val="2" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
         <span class="rating-star" data-val="3" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>

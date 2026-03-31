@@ -1868,12 +1868,12 @@ function notifyCleaningComplete(checkoutDate, staffName, rating) {
     body += 'チェックアウト日: ' + fmtCODate + '\n';
     body += '清掃担当: ' + (staffName || '不明') + '\n';
     body += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '\n';
-    var ratingLabels = ['未評価', 'とても汚い', '汚い', '普通', 'きれい', 'とてもきれい', '完璧'];
+    var ratingLabels = ['未評価', 'とても汚い', '汚い', '普通', 'きれい', 'とてもきれい'];
     var ratingNum = parseInt(rating) || 0;
     var ratingStars = '';
     for (var ri = 0; ri < ratingNum; ri++) ratingStars += '★';
     for (var rj = ratingNum; rj < 5; rj++) ratingStars += '☆';
-    body += '利用状態: ' + ratingStars + ' ' + (ratingLabels[ratingNum + 1] || '') + '\n\n';
+    body += '利用状態: ' + ratingStars + ' ' + (ratingLabels[ratingNum] || '') + '\n\n';
 
     if (supplyList.length > 0) {
       body += '【要補充項目】\n';
@@ -1913,7 +1913,7 @@ function notifyCleaningComplete(checkoutDate, staffName, rating) {
     htmlBody += '<p>チェックアウト日: ' + fmtCODate + '<br>';
     htmlBody += '清掃担当: ' + (staffName || '不明') + '<br>';
     htmlBody += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '<br>';
-    htmlBody += '利用状態: ' + ratingStars + ' ' + (ratingLabels[ratingNum + 1] || '') + '</p>';
+    htmlBody += '利用状態: ' + ratingStars + ' ' + (ratingLabels[ratingNum] || '') + '</p>';
 
     if (supplyList.length > 0) {
       htmlBody += '<p><strong>【要補充項目】</strong></p><ul>';
@@ -1960,7 +1960,7 @@ function notifyCleaningComplete(checkoutDate, staffName, rating) {
             line += '(' + m.by + ')';
             return line;
           }).join('\n') : '';
-          var ratingText = ratingStars + ' ' + (ratingLabels[ratingNum + 1] || '');
+          var ratingText = ratingStars + ' ' + (ratingLabels[ratingNum] || '');
           var lineMsg = tmpl
             .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
             .replace(/\{担当者\}/g, staffName || '不明')

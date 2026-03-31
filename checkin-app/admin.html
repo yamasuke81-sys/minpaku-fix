@@ -547,10 +547,13 @@ function buildGuestDetail(g) {
           }
         }
         html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+          '<div style="font-size:.55rem;color:#aaa;word-break:break-all;">[DEBUG] 元URL: ' + escapeHtml(gg.passportPhotoUrl) + '<br>サムネURL: ' + escapeHtml(ppThumbUrl) + '</div>' +
           '<img src="' + escapeHtml(ppThumbUrl) + '" ' +
           'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
           'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(ppFullUrl).replace(/'/g, "\\'") + '\')" ' +
           'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'"></div>';
+      } else {
+        html += '<div style="margin-top:.3rem;font-size:.6rem;color:#aaa;">[DEBUG] passportPhotoUrl: (空)</div>';
       }
       html += '</div>';
     }

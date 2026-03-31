@@ -46,6 +46,10 @@
     .checkin-badge { display: inline-block; padding: .15rem .4rem; border-radius: .3rem; font-size: .7rem; font-weight: 600; }
     .checkin-badge.done { background: #d4edda; color: #155724; }
     .checkin-badge.pending { background: #fff3cd; color: #856404; }
+    .guest-table tr.today-row { background: #e8f4fd !important; }
+    .guest-table tr.today-row:hover { background: #d6ecf8 !important; }
+    .guest-table tr.past-row { opacity: .55; }
+    .btn-today { background: #e74c3c; color: #fff; border: none; border-radius: .5rem; padding: .3rem .7rem; font-size: .75rem; font-weight: 700; }
 
     /* テーブル横スクロール */
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -.5rem; padding: 0 .5rem; }
@@ -95,7 +99,7 @@
 </head>
 <body>
 
-<div class="version-badge" id="deployVersion">v0330b</div>
+<div class="version-badge" id="deployVersion">v0331a</div>
 
 <!-- ===== PIN認証画面 ===== -->
 <div id="pinScreen">
@@ -147,6 +151,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h2 style="font-size:1rem;font-weight:700;margin:0;">予約名簿</h2>
       <div class="d-flex gap-2">
+        <button class="btn-today" onclick="scrollToToday()"><i class="bi bi-calendar-event"></i> 今日</button>
         <button class="btn btn-sm btn-outline-success" onclick="openSpreadsheet()" style="border-radius:.4rem;font-size:.75rem;font-weight:600;">
           <i class="bi bi-table"></i> スプシ
         </button>
@@ -313,8 +318,10 @@ var _guestListData = [];
 var _sortCol = 'checkIn';
 var _sortAsc = true;
 var _expandedRows = {}; // rowNumber → true
+var _shouldScrollToToday = true; // 初回ロード時に当日行へスクロール
 
 function loadGuestList() {
+  _shouldScrollToToday = true;
   document.getElementById('guestListArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
   callGAS('getAdminGuestList').then(function(res) {
     if (!res.success) {
@@ -395,13 +402,18 @@ function renderGuestList(guests) {
     { key: 'checkinConfirmedAt', label: '確認' }
   ];
 
-  var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>';
+  // 今日の日付文字列（比較用）
+  var now = new Date();
+  var todayStr = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+
+  var html = '<div class="table-wrap" id="guestTableWrap"><table class="guest-table"><thead><tr>';
   for (var c = 0; c < cols.length; c++) {
     html += '<th class="sortable" onclick="toggleSort(\'' + cols[c].key + '\')">' +
       cols[c].label + sortIcon(cols[c].key) + '</th>';
   }
   html += '</tr></thead><tbody>';
 
+  var _firstTodayIdx = -1;
   for (var i = 0; i < guests.length; i++) {
     var g = guests[i];
     var ciShort = g.checkIn ? g.checkIn.replace(/\s.*$/, '') : '-';
@@ -412,7 +424,30 @@ function renderGuestList(guests) {
     var editMark = g.hasEdits ? ' <span class="edited-mark">(編集済)</span>' : '';
     var expanded = _expandedRows[g.rowNumber];
 
-    html += '<tr class="expandable" onclick="toggleGuestDetail(' + g.rowNumber + ')">' +
+    // 当日判定: CIまたはCOが今日
+    var ciDate = parseDate_(g.checkIn);
+    var coDate = parseDate_(g.checkOut);
+    var isToday = false;
+    var isPast = false;
+    if (ciDate || coDate) {
+      var ciStr2 = ciDate ? ciDate.getFullYear() + '/' + (ciDate.getMonth() + 1) + '/' + ciDate.getDate() : '';
+      var coStr2 = coDate ? coDate.getFullYear() + '/' + (coDate.getMonth() + 1) + '/' + coDate.getDate() : '';
+      isToday = (ciStr2 === todayStr || coStr2 === todayStr);
+      // 滞在中（CI <= 今日 <= CO）も当日扱い
+      if (!isToday && ciDate && coDate) {
+        var todayTime = now.getTime();
+        isToday = ciDate.getTime() <= todayTime && coDate.getTime() >= todayTime;
+      }
+      isPast = coDate && coDate < now && !isToday;
+    }
+
+    var rowClass = 'expandable';
+    if (isToday) rowClass += ' today-row';
+    if (isPast) rowClass += ' past-row';
+    var todayId = (isToday && _firstTodayIdx < 0) ? ' id="todayRow"' : '';
+    if (isToday && _firstTodayIdx < 0) _firstTodayIdx = i;
+
+    html += '<tr class="' + rowClass + '"' + todayId + ' onclick="toggleGuestDetail(' + g.rowNumber + ')">' +
       '<td style="font-weight:600;">' + escapeHtml(g.guestName) + editMark + '</td>' +
       '<td>' + escapeHtml(ciShort) + '</td>' +
       '<td>' + escapeHtml(coShort) + '</td>' +
@@ -430,6 +465,19 @@ function renderGuestList(guests) {
   html += '</tbody></table></div>';
   html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + guests.length + '件</div>';
   document.getElementById('guestListArea').innerHTML = html;
+
+  // 初回ロード時は当日行にスクロール
+  if (_shouldScrollToToday) {
+    _shouldScrollToToday = false;
+    setTimeout(scrollToToday, 100);
+  }
+}
+
+function scrollToToday() {
+  var el = document.getElementById('todayRow');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function toggleGuestDetail(rowNumber) {

@@ -820,17 +820,21 @@ function getAdminGuestList() {
     var today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // 90日以上前のチェックアウトをスキップ（メインアプリgetData()と同じ）
+    var cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+
     var guests = [];
     for (var r = 1; r < data.length; r++) {
       var row = data[r];
       var rowNumber = r + 1;
 
-      // チェックアウトが過去の予約はスキップ（メインアプリgetData()と同じ: CO < 今日）
+      // 90日以上前の予約はスキップ（メインアプリgetData()と同じ）
       if (map.checkOut >= 0) {
         var coVal = row[map.checkOut];
         if (coVal) {
           var coDate = coVal instanceof Date ? coVal : new Date(coVal);
-          if (!isNaN(coDate.getTime()) && coDate < today) continue;
+          if (!isNaN(coDate.getTime()) && coDate < cutoffDate) continue;
         }
       }
 

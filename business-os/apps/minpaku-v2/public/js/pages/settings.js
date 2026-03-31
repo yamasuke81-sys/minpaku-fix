@@ -64,6 +64,32 @@ const SettingsPage = {
         </div>
       </div>
 
+      <!-- データ整形セクション -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="bi bi-magic"></i> データ整形（インポート済みデータ → 新アプリ用に変換）</h5>
+        </div>
+        <div class="card-body">
+          <p class="text-muted">
+            インポート済みのスプレッドシート生データを、新アプリの正式コレクション（スタッフ・予約・シフト等）に自動変換します。
+          </p>
+          <ul class="text-muted small">
+            <li>清掃スタッフ → <code>staff/</code></li>
+            <li>フォームの回答 → <code>bookings/</code></li>
+            <li>募集 → <code>shifts/</code>（清掃スケジュール）</li>
+            <li>スタッフ報酬 → <code>rewards/</code> + <code>laundry/</code></li>
+            <li>チェックリストマスタ → <code>checklistTemplates/</code></li>
+            <li>デフォルト物件を自動作成 → <code>properties/</code></li>
+          </ul>
+          <button class="btn btn-success btn-lg w-100" id="btnTransform">
+            <i class="bi bi-magic"></i> データ整形を実行
+          </button>
+          <div class="mt-3 d-none" id="transformResult">
+            <div class="alert" id="transformAlert"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- BEDS24設定 -->
       <div class="card mb-4">
         <div class="card-header">
@@ -99,6 +125,36 @@ const SettingsPage = {
   bindEvents() {
     // 自動取込ボタン
     document.getElementById("btnAutoImport").addEventListener("click", () => this.autoImportAll());
+
+    // データ整形ボタン
+    document.getElementById("btnTransform").addEventListener("click", async () => {
+      const resultEl = document.getElementById("transformResult");
+      const alertEl = document.getElementById("transformAlert");
+      resultEl.classList.remove("d-none");
+      alertEl.className = "alert alert-info";
+      alertEl.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>データ整形中...';
+
+      try {
+        const results = await DataTransformer.transformAll();
+        const lines = Object.entries(results)
+          .filter(([, v]) => v > 0)
+          .map(([k, v]) => `<li>${k}: <strong>${v}件</strong></li>`);
+
+        if (lines.length === 0) {
+          alertEl.className = "alert alert-warning";
+          alertEl.textContent = "変換対象のデータが見つかりませんでした。先に「全データ一括取込」を実行してください。";
+        } else {
+          alertEl.className = "alert alert-success";
+          alertEl.innerHTML = `<strong>データ整形完了!</strong><ul class="mb-0 mt-2">${lines.join("")}</ul>
+            <br><small>スタッフ管理・物件管理ページで確認できます。</small>`;
+          showToast("完了", "データ整形が完了しました", "success");
+        }
+      } catch (e) {
+        alertEl.className = "alert alert-danger";
+        alertEl.textContent = `エラー: ${e.message}`;
+        console.error("Transform error:", e);
+      }
+    });
 
     // 手動JSONインポート
     document.getElementById("btnMigrate").addEventListener("click", () => this.importJson());

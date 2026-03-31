@@ -344,6 +344,18 @@ var TEST_COL_MAP_ = {
   nationalityCols: [11, 20, 21], passportNumberCols: [12, 22, 23], passportPhotoCols: [13, 24, 25]
 };
 
+/** テスト予約のカラム番号→フィールド名の逆引き */
+function getTestFieldName_(colIndex) {
+  var ci = parseInt(colIndex);
+  var revMap = {};
+  for (var k in TEST_COL_MAP_) {
+    var v = TEST_COL_MAP_[k];
+    if (Array.isArray(v)) { for (var i = 0; i < v.length; i++) revMap[v[i]] = k + '[' + i + ']'; }
+    else revMap[v] = k;
+  }
+  return revMap[ci] || 'col_' + ci;
+}
+
 /** テスト予約のデフォルトゲストデータ */
 var TEST_GUESTS_DEFAULT_ = [
   {
@@ -638,8 +650,15 @@ function updateGuestField(rowNumber, colIndex, value) {
     // テスト予約はScriptPropertiesに保存
     if (rowNumber === TEST_ROW_NUMBER_) {
       var testEdits = JSON.parse(PropertiesService.getScriptProperties().getProperty('TEST_EDITS') || '{}');
+      var origVal = testEdits[String(colIndex)] || '';
       testEdits[String(colIndex)] = value;
       PropertiesService.getScriptProperties().setProperty('TEST_EDITS', JSON.stringify(testEdits));
+      // 変更履歴も保存
+      var testLog = JSON.parse(PropertiesService.getScriptProperties().getProperty('TEST_EDIT_LOG') || '[]');
+      var testFieldName = getTestFieldName_(colIndex);
+      var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+      testLog.push({ rowNumber: 'テスト', colIndex: colIndex, fieldName: testFieldName, original: origVal, edited: value, editedAt: now });
+      PropertiesService.getScriptProperties().setProperty('TEST_EDIT_LOG', JSON.stringify(testLog));
       return JSON.stringify({ success: true });
     }
 
@@ -723,18 +742,24 @@ function getGuestEditLog() {
     var lastRow = editSheet.getLastRow();
     if (lastRow < 2) return JSON.stringify({ success: true, edits: [] });
 
-    var data = editSheet.getRange(2, 1, lastRow - 1, EDIT_HEADERS_.length).getValues();
+    var data = lastRow >= 2 ? editSheet.getRange(2, 1, lastRow - 1, EDIT_HEADERS_.length).getValues() : [];
     var edits = [];
     for (var i = 0; i < data.length; i++) {
+      var eat = data[i][5];
       edits.push({
         rowNumber: data[i][0],
         colIndex: data[i][1],
         fieldName: data[i][2],
         original: String(data[i][3] || ''),
         edited: String(data[i][4] || ''),
-        editedAt: data[i][5]
+        editedAt: (eat instanceof Date) ? Utilities.formatDate(eat, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss') : String(eat || '')
       });
     }
+    // テスト予約の編集ログもマージ
+    try {
+      var testLog = JSON.parse(PropertiesService.getScriptProperties().getProperty('TEST_EDIT_LOG') || '[]');
+      for (var t = 0; t < testLog.length; t++) edits.push(testLog[t]);
+    } catch (te) {}
     return JSON.stringify({ success: true, edits: edits });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });

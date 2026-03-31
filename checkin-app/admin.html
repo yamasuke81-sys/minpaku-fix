@@ -600,29 +600,64 @@ function loadEditLog() {
 }
 
 // ===== タブ3: チェックイン記録 =====
+var _checkinLogData = [];
+var _checkinSortCol = 'confirmedAt';
+var _checkinSortAsc = false; // デフォルト: 新しい順
+
 function loadCheckinLog() {
   document.getElementById('checkinLogArea').innerHTML = '<div class="text-center p-4"><span class="spinner-border"></span></div>';
   callGAS('getCheckinLog').then(function(log) {
     var items = Array.isArray(log) ? log : (typeof log === 'string' ? JSON.parse(log) : []);
-    if (!items || items.length === 0) {
-      document.getElementById('checkinLogArea').innerHTML = '<div class="empty-state"><i class="bi bi-clock"></i><p class="mt-2">チェックイン記録はありません</p></div>';
-      return;
-    }
-    var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>' +
-      '<th>確認日時</th><th>ゲスト名</th>' +
-      '</tr></thead><tbody>';
-    for (var i = items.length - 1; i >= 0; i--) {
-      html += '<tr>' +
-        '<td style="white-space:nowrap;">' + escapeHtml(items[i].confirmedAt || '') + '</td>' +
-        '<td style="font-weight:600;">' + escapeHtml(items[i].guestName || '') + '</td>' +
-        '</tr>';
-    }
-    html += '</tbody></table></div>';
-    html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + items.length + '件</div>';
-    document.getElementById('checkinLogArea').innerHTML = html;
+    _checkinLogData = items || [];
+    renderCheckinLog();
   }).catch(function(err) {
     document.getElementById('checkinLogArea').innerHTML = '<div class="text-danger p-3">' + escapeHtml(err.message) + '</div>';
   });
+}
+
+function toggleCheckinSort(col) {
+  if (_checkinSortCol === col) {
+    _checkinSortAsc = !_checkinSortAsc;
+  } else {
+    _checkinSortCol = col;
+    _checkinSortAsc = true;
+  }
+  renderCheckinLog();
+}
+
+function renderCheckinLog() {
+  if (!_checkinLogData || _checkinLogData.length === 0) {
+    document.getElementById('checkinLogArea').innerHTML = '<div class="empty-state"><i class="bi bi-clock"></i><p class="mt-2">チェックイン記録はありません</p></div>';
+    return;
+  }
+  var sorted = _checkinLogData.slice();
+  var col = _checkinSortCol;
+  var asc = _checkinSortAsc;
+  sorted.sort(function(a, b) {
+    var va = a[col] || '', vb = b[col] || '';
+    if (va < vb) return asc ? -1 : 1;
+    if (va > vb) return asc ? 1 : -1;
+    return 0;
+  });
+  var cols = [
+    { key: 'confirmedAt', label: '確認日時' },
+    { key: 'guestName', label: 'ゲスト名' }
+  ];
+  var html = '<div class="table-wrap"><table class="guest-table"><thead><tr>';
+  for (var c = 0; c < cols.length; c++) {
+    var arrow = (cols[c].key === _checkinSortCol) ? (_checkinSortAsc ? ' ▲' : ' ▼') : '';
+    html += '<th class="sortable" onclick="toggleCheckinSort(\'' + cols[c].key + '\')">' + cols[c].label + arrow + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+  for (var i = 0; i < sorted.length; i++) {
+    html += '<tr>' +
+      '<td style="white-space:nowrap;">' + escapeHtml(sorted[i].confirmedAt || '') + '</td>' +
+      '<td style="font-weight:600;">' + escapeHtml(sorted[i].guestName || '') + '</td>' +
+      '</tr>';
+  }
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + _checkinLogData.length + '件</div>';
+  document.getElementById('checkinLogArea').innerHTML = html;
 }
 
 // ===== タブ4: 監視カメラ =====

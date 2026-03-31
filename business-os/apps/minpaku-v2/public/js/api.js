@@ -1,95 +1,209 @@
 /**
- * API クライアント
- * Cloud Functions への REST API 呼び出し
+ * API クライアント（Firestore直接接続版）
+ * テストモード中はCloud Functionsを経由せず、直接Firestoreに読み書き
  */
+const db = firebase.firestore();
+
 const API = {
-  baseUrl: "/api",
-
-  async request(method, path, body = null) {
-    const token = await Auth.getIdToken();
-    if (!token) throw new Error("未認証です");
-
-    const options = {
-      method,
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    };
-
-    if (body) {
-      options.body = JSON.stringify(body);
-    }
-
-    const res = await fetch(`${this.baseUrl}${path}`, options);
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || `APIエラー (${res.status})`);
-    }
-
-    return data;
-  },
-
   // スタッフ API
   staff: {
-    list(activeOnly = true) { return API.request("GET", `/staff?active=${activeOnly}`); },
-    get(id) { return API.request("GET", `/staff/${id}`); },
-    create(data) { return API.request("POST", "/staff", data); },
-    update(id, data) { return API.request("PUT", `/staff/${id}`, data); },
-    delete(id) { return API.request("DELETE", `/staff/${id}`); },
+    async list(activeOnly = true) {
+      let query = db.collection("staff").orderBy("displayOrder", "asc");
+      if (activeOnly) {
+        query = query.where("active", "==", true);
+      }
+      const snap = await query.get();
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async get(id) {
+      const doc = await db.collection("staff").doc(id).get();
+      if (!doc.exists) throw new Error("スタッフが見つかりません");
+      return { id: doc.id, ...doc.data() };
+    },
+
+    async create(data) {
+      data.active = data.active !== false;
+      data.displayOrder = data.displayOrder || 0;
+      data.skills = data.skills || [];
+      data.availableDays = data.availableDays || [];
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection("staff").add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async update(id, data) {
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("staff").doc(id).update(data);
+      return { id, ...data };
+    },
+
+    async delete(id) {
+      await db.collection("staff").doc(id).update({
+        active: false,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    },
   },
 
   // 物件 API
   properties: {
-    list(activeOnly = true) { return API.request("GET", `/properties?active=${activeOnly}`); },
-    get(id) { return API.request("GET", `/properties/${id}`); },
-    create(data) { return API.request("POST", "/properties", data); },
-    update(id, data) { return API.request("PUT", `/properties/${id}`, data); },
-    delete(id) { return API.request("DELETE", `/properties/${id}`); },
+    async list(activeOnly = true) {
+      let query = db.collection("properties").orderBy("name", "asc");
+      if (activeOnly) {
+        query = query.where("active", "==", true);
+      }
+      const snap = await query.get();
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async get(id) {
+      const doc = await db.collection("properties").doc(id).get();
+      if (!doc.exists) throw new Error("物件が見つかりません");
+      return { id: doc.id, ...doc.data() };
+    },
+
+    async create(data) {
+      data.active = data.active !== false;
+      data.type = data.type || "minpaku";
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection("properties").add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async update(id, data) {
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("properties").doc(id).update(data);
+      return { id, ...data };
+    },
+
+    async delete(id) {
+      await db.collection("properties").doc(id).update({
+        active: false,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    },
   },
 
   // シフト API
   shifts: {
-    list(params = {}) {
-      const query = new URLSearchParams(params).toString();
-      return API.request("GET", `/shifts?${query}`);
+    async list(params = {}) {
+      let query = db.collection("shifts").orderBy("date", "asc");
+      if (params.from) query = query.where("date", ">=", new Date(params.from));
+      if (params.to) query = query.where("date", "<=", new Date(params.to));
+      const snap = await query.get();
+      let shifts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (params.staffId) shifts = shifts.filter(s => s.staffId === params.staffId);
+      if (params.propertyId) shifts = shifts.filter(s => s.propertyId === params.propertyId);
+      return shifts;
     },
-    create(data) { return API.request("POST", "/shifts", data); },
-    update(id, data) { return API.request("PUT", `/shifts/${id}`, data); },
-    delete(id) { return API.request("DELETE", `/shifts/${id}`); },
+
+    async create(data) {
+      data.date = new Date(data.date);
+      data.status = data.staffId ? "assigned" : "unassigned";
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection("shifts").add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async update(id, data) {
+      if (data.date) data.date = new Date(data.date);
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("shifts").doc(id).update(data);
+      return { id, ...data };
+    },
+
+    async delete(id) {
+      await db.collection("shifts").doc(id).delete();
+    },
   },
 
   // ランドリー API
   laundry: {
-    list(params = {}) {
-      const query = new URLSearchParams(params).toString();
-      return API.request("GET", `/laundry?${query}`);
+    async list(params = {}) {
+      let query = db.collection("laundry").orderBy("date", "desc");
+      if (params.staffId) {
+        query = db.collection("laundry").where("staffId", "==", params.staffId).orderBy("date", "desc");
+      }
+      const snap = await query.get();
+      let records = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (params.yearMonth) {
+        records = records.filter(r => {
+          const d = r.date.toDate ? r.date.toDate() : new Date(r.date);
+          const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          return ym === params.yearMonth;
+        });
+      }
+      return records;
     },
-    create(data) { return API.request("POST", "/laundry", data); },
-    delete(id) { return API.request("DELETE", `/laundry/${id}`); },
+
+    async create(data) {
+      data.date = new Date(data.date);
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection("laundry").add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async delete(id) {
+      await db.collection("laundry").doc(id).delete();
+    },
   },
 
   // 請求書 API
   invoices: {
-    list(params = {}) {
-      const query = new URLSearchParams(params).toString();
-      return API.request("GET", `/invoices?${query}`);
+    async list(params = {}) {
+      const snap = await db.collection("invoices").orderBy("yearMonth", "desc").get();
+      let invoices = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (params.yearMonth) invoices = invoices.filter(i => i.yearMonth === params.yearMonth);
+      if (params.staffId) invoices = invoices.filter(i => i.staffId === params.staffId);
+      return invoices;
     },
-    get(id) { return API.request("GET", `/invoices/${id}`); },
-    generate(yearMonth) { return API.request("POST", "/invoices/generate", { yearMonth }); },
-    confirm(id) { return API.request("PUT", `/invoices/${id}/confirm`); },
+
+    async get(id) {
+      const doc = await db.collection("invoices").doc(id).get();
+      if (!doc.exists) throw new Error("請求書が見つかりません");
+      return { id: doc.id, ...doc.data() };
+    },
+
+    async confirm(id) {
+      await db.collection("invoices").doc(id).update({
+        status: "confirmed",
+        confirmedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    },
   },
 
   // チェックリスト API
   checklist: {
-    templates() { return API.request("GET", "/checklist/templates"); },
-    saveTemplate(data) { return API.request("POST", "/checklist/templates", data); },
-    records(params = {}) {
-      const query = new URLSearchParams(params).toString();
-      return API.request("GET", `/checklist/records?${query}`);
+    async templates() {
+      const snap = await db.collection("checklistTemplates").get();
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
-    start(shiftId, propertyId) { return API.request("POST", "/checklist/records", { shiftId, propertyId }); },
-    update(id, data) { return API.request("PUT", `/checklist/records/${id}`, data); },
+
+    async saveTemplate(data) {
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      if (data.id) {
+        await db.collection("checklistTemplates").doc(data.id).update(data);
+        return data;
+      }
+      const ref = await db.collection("checklistTemplates").add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async records(params = {}) {
+      let query = db.collection("checklists");
+      if (params.shiftId) query = query.where("shiftId", "==", params.shiftId);
+      if (params.staffId) query = query.where("staffId", "==", params.staffId);
+      const snap = await query.get();
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async update(id, data) {
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("checklists").doc(id).update(data);
+      return { id, ...data };
+    },
   },
 };

@@ -105,7 +105,7 @@
 
 
 <!-- ===== バージョンバッジ ===== -->
-<div class="version-badge" id="deployVersion">v0330b</div>
+<div class="version-badge" id="deployVersion">v0331b</div>
 
 <!-- ===== 設定ギアボタン ===== -->
 <button class="settings-gear" onclick="showPinScreen()" title="設定"><i class="bi bi-gear-fill"></i></button>
@@ -569,13 +569,20 @@ function renderDetail() {
 
     if (isFieldVisible('passportPhoto') && guest.passportPhotoUrl) {
       html += '<div class="field-row"><div class="field-label">' + getFieldLabel('passportPhoto', 'パスポートの写真をアップロードしてください / Please upload a photo of your passport.') + '</div>';
-      // Google Driveの画像をサムネイル表示
-      var thumbUrl = guest.passportPhotoUrl;
-      if (thumbUrl.indexOf('drive.google.com') > -1) {
-        var fileId = extractDriveFileId_(thumbUrl);
-        if (fileId) thumbUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w300';
+      var ppGuestImgId = 'ppGuest_' + g;
+      if (guest.passportPhotoUrl.indexOf('drive.google.com') > -1) {
+        // Google Drive: サーバー経由プロキシ
+        var ppGuestFileId = extractDriveFileId_(guest.passportPhotoUrl);
+        html += '<div id="' + ppGuestImgId + '"><span class="spinner-border spinner-sm"></span></div>';
+        if (ppGuestFileId) {
+          (function(imgId, fileId, origUrl) {
+            setTimeout(function() { loadPassportProxy_(imgId, fileId, origUrl); }, 0);
+          })(ppGuestImgId, ppGuestFileId, guest.passportPhotoUrl);
+        }
+      } else {
+        // Drive以外: 直接表示
+        html += '<img src="' + escapeHtml(guest.passportPhotoUrl) + '" class="passport-thumb" onclick="showPassport(\'' + escapeHtml(guest.passportPhotoUrl) + '\')" onerror="this.style.display=\'none\'">';
       }
-      html += '<img src="' + escapeHtml(thumbUrl) + '" class="passport-thumb" onclick="showPassport(\'' + escapeHtml(guest.passportPhotoUrl) + '\')" onerror="this.style.display=\'none\'">';
       html += '</div>';
     }
 
@@ -813,14 +820,34 @@ function startAlarmRedirectTimer() {
   }, 10 * 60 * 1000); // 10分
 }
 
-// ===== パスポート拡大 =====
-function showPassport(url) {
-  var fullUrl = url;
-  if (url.indexOf('drive.google.com') > -1) {
-    var fileId = extractDriveFileId_(url);
-    if (fileId) fullUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
-  }
-  document.getElementById('passportFullImg').src = fullUrl;
+// ===== パスポート写真（サーバー経由プロキシ） =====
+function loadPassportProxy_(imgId, fileId, origUrl) {
+  callGAS('getPassportThumbnail', [fileId, 300]).then(function(res) {
+    var el = document.getElementById(imgId);
+    if (!el) return;
+    if (res.success && res.dataUrl) {
+      el.innerHTML = '<img src="' + res.dataUrl + '" class="passport-thumb" onclick="showPassportFull_(\'' + fileId + '\')">';
+    } else {
+      el.innerHTML = '<span style="font-size:.75rem;color:#888;">(写真の読み込みに失敗しました)</span>';
+    }
+  }).catch(function() {
+    var el = document.getElementById(imgId);
+    if (el) el.innerHTML = '<span style="font-size:.75rem;color:#888;">(写真の読み込みエラー)</span>';
+  });
+}
+
+function showPassportFull_(fileId) {
+  var overlay = document.getElementById('passportOverlay');
+  var img = document.getElementById('passportFullImg');
+  img.src = '';
+  overlay.classList.add('show');
+  callGAS('getPassportThumbnail', [fileId, 800]).then(function(res) {
+    if (res.success && res.dataUrl) img.src = res.dataUrl;
+  });
+}
+
+function showPassport(dataUrl) {
+  document.getElementById('passportFullImg').src = dataUrl;
   document.getElementById('passportOverlay').classList.add('show');
 }
 

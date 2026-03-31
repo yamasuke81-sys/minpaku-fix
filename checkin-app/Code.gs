@@ -1039,6 +1039,28 @@ function getAdminGuestList() {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
+    // テスト予約を先頭に追加（管理者画面の名簿でもテストデータを確認可能）
+    var testDetail = getTestGuestDetails_();
+    merged.unshift({
+      rowNumber: TEST_ROW_NUMBER_,
+      guestName: TEST_GUEST_.name + '（テスト）',
+      guestNames: [TEST_GUEST_.name],
+      guests: testDetail.guests,
+      checkIn: TEST_GUEST_.checkIn,
+      checkOut: TEST_GUEST_.checkOut,
+      checkInParsed: TEST_GUEST_.checkIn.replace(/\s.*$/, ''),
+      guestCount: TEST_GUEST_.guestCount,
+      guestCountInfants: TEST_GUEST_.guestCountInfants,
+      tel: TEST_GUEST_.phone,
+      tel2: TEST_GUEST_.tel2,
+      email: TEST_GUEST_.email,
+      prevStay: TEST_GUEST_.prevStay,
+      nextStay: TEST_GUEST_.nextStay,
+      nationality: TEST_GUEST_.nationality,
+      checkinConfirmedAt: '',
+      hasEdits: false
+    });
+
     return JSON.stringify({ success: true, guests: merged });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.message });

@@ -213,6 +213,11 @@
   </div>
 </div>
 
+<!-- パスポート写真拡大オーバーレイ -->
+<div id="passportOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:none;align-items:center;justify-content:center;padding:1rem;" onclick="this.style.display='none'">
+  <img id="passportFullImg" src="" alt="パスポート" style="max-width:100%;max-height:90vh;border-radius:.5rem;">
+</div>
+
 <script>
 // ===== GAS通信 =====
 function callGAS(fn, args) {
@@ -245,6 +250,14 @@ function verifyPin() {
       errEl.style.display = 'block';
     }
   });
+}
+
+// ===== パスポート写真拡大表示 =====
+function showPassport(url) {
+  var overlay = document.getElementById('passportOverlay');
+  var img = document.getElementById('passportFullImg');
+  img.src = url;
+  overlay.style.display = 'flex';
 }
 
 // ===== スプレッドシートを開く =====
@@ -292,7 +305,7 @@ function doLogout() {
   document.getElementById('pinError').style.display = 'none';
   _loadedTabs = {};
   _guestListData = [];
-  _expandedRows = {};
+  _expandedRow = null;
 }
 
 // ===== タブ切替 =====
@@ -317,7 +330,7 @@ _loadedTabs['guests'] = true; // 名簿は初期表示時にロード
 var _guestListData = [];
 var _sortCol = 'checkIn';
 var _sortAsc = true;
-var _expandedRows = {}; // rowNumber → true
+var _expandedRow = null; // 展開中の行番号（1つのみ）
 var _shouldScrollToToday = true; // 初回ロード時に当日行へスクロール
 
 function loadGuestList() {
@@ -436,7 +449,7 @@ function renderGuestList(guests) {
       ? '<span class="checkin-badge done"><i class="bi bi-check-circle-fill"></i> ' + escapeHtml(g.checkinConfirmedAt.replace(/^\d{4}\//, '')) + '</span>'
       : '<span class="checkin-badge pending">未確認</span>';
     var editMark = g.hasEdits ? ' <span class="edited-mark">(編集済)</span>' : '';
-    var expanded = _expandedRows[g.rowNumber];
+    var expanded = (_expandedRow === g.rowNumber);
 
     // 当日/滞在中判定
     var ciDate = parseDate_(g.checkIn);
@@ -493,11 +506,7 @@ function scrollToNearest() {
 }
 
 function toggleGuestDetail(rowNumber) {
-  if (_expandedRows[rowNumber]) {
-    delete _expandedRows[rowNumber];
-  } else {
-    _expandedRows[rowNumber] = true;
-  }
+  _expandedRow = (_expandedRow === rowNumber) ? null : rowNumber;
   sortAndRenderGuestList();
 }
 
@@ -527,17 +536,23 @@ function buildGuestDetail(g) {
       if (gg.address) html += detailItem('住所', gg.address);
       if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
       html += '</div>';
-      // パスポート写真（getGuestDetailsと同じ表示）
+      // パスポート写真（サムネイル + タップで拡大オーバーレイ）
       if (gg.passportPhotoUrl) {
         var thumbUrl = gg.passportPhotoUrl;
+        var fullUrl = gg.passportPhotoUrl;
         if (thumbUrl.indexOf('drive.google.com') > -1) {
-          var m = thumbUrl.match(/[-\w]{25,}/);
-          if (m) thumbUrl = 'https://drive.google.com/thumbnail?id=' + m[0] + '&sz=w300';
+          var fid = thumbUrl.match(/[-\w]{25,}/);
+          if (fid) {
+            thumbUrl = 'https://drive.google.com/thumbnail?id=' + fid[0] + '&sz=w300';
+            fullUrl = 'https://drive.google.com/thumbnail?id=' + fid[0] + '&sz=w800';
+          }
         }
         html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-          '<a href="' + escapeHtml(gg.passportPhotoUrl) + '" target="_blank">' +
-          '<img src="' + escapeHtml(thumbUrl) + '" style="max-width:120px;border-radius:.4rem;margin-top:.2rem;" onerror="this.style.display=\'none\'">' +
-          '</a></div>';
+          '<img src="' + escapeHtml(thumbUrl) + '" ' +
+          'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
+          'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(fullUrl).replace(/'/g, "\\'") + '\')" ' +
+          'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'">' +
+          '</div>';
       }
       html += '</div>';
     }

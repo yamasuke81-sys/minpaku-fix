@@ -1003,14 +1003,14 @@ function getAdminGuestList() {
           age: g < map.ageCols.length ? cellVal_(map.ageCols[g]) : '',
           address: g < map.addressCols.length ? cellVal_(map.addressCols[g]) : '',
           passportNumber: g < map.passportNumberCols.length ? cellVal_(map.passportNumberCols[g]) : '',
-          passportPhotoUrl: (function() {
-            // パスポート写真URL（getGuestDetailsと同じパターン）
-            if (g < map.passportPhotoCols.length && map.passportPhotoCols[g] >= 0) {
-              var pVal = String(row[map.passportPhotoCols[g]] || '').trim();
+          passportPhotoUrl: (function(gIdx) {
+            // パスポート写真URL（getGuestDetailsと同じ: 編集対象外なので元の行データから直接取得）
+            if (gIdx < map.passportPhotoCols.length && map.passportPhotoCols[gIdx] >= 0) {
+              var pVal = String(row[map.passportPhotoCols[gIdx]] || '').trim();
               if (pVal && pVal.indexOf('http') === 0) return pVal;
             }
             return '';
-          })()
+          })(g)
         });
       }
 

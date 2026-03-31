@@ -1176,37 +1176,6 @@ function getAppBaseUrl() {
   return ScriptApp.getService().getUrl();
 }
 
-/** Google DriveファイルのサムネイルをBase64で返す */
-function getPassportThumbnail(fileId, size) {
-  try {
-    var file = DriveApp.getFileById(fileId);
-    var blob = file.getBlob();
-    // サイズが大きすぎる場合はサムネイルAPIを使う
-    var bytes = blob.getBytes();
-    if (bytes.length > 500000) {
-      // 500KB超はサムネイルAPIで縮小を試みる
-      try {
-        var sz = parseInt(size) || 300;
-        var thumbUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + sz;
-        var token = ScriptApp.getOAuthToken();
-        var response = UrlFetchApp.fetch(thumbUrl, {
-          headers: { 'Authorization': 'Bearer ' + token },
-          muteHttpExceptions: true
-        });
-        if (response.getResponseCode() === 200) {
-          blob = response.getBlob();
-          bytes = blob.getBytes();
-        }
-      } catch(e2) { /* フォールバック: 元のblobを使う */ }
-    }
-    var base64 = Utilities.base64Encode(bytes);
-    var contentType = blob.getContentType() || 'image/jpeg';
-    return JSON.stringify({ success: true, dataUrl: 'data:' + contentType + ';base64,' + base64 });
-  } catch (e) {
-    return JSON.stringify({ success: false, error: e.message });
-  }
-}
-
 /** スプレッドシートURLを取得 */
 function getSpreadsheetUrl() {
   var ssId = getSpreadsheetId_();

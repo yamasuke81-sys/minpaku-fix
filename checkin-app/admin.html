@@ -252,43 +252,7 @@ function verifyPin() {
   });
 }
 
-// ===== パスポート写真（サーバー経由プロキシ） =====
-function loadPassportImg(imgId, fileId) {
-  callGAS('getPassportThumbnail', [fileId, 300]).then(function(res) {
-    var el = document.getElementById(imgId);
-    if (!el) return;
-    if (res.success && res.dataUrl) {
-      el.innerHTML = '<img src="' + res.dataUrl + '" ' +
-        'style="max-width:120px;border-radius:.4rem;cursor:pointer;" ' +
-        'onclick="event.stopPropagation();loadAndShowPassportFull(\'' + fileId + '\')">';
-    } else {
-      el.innerHTML = '<span style="font-size:.75rem;color:#aaa;">(読込失敗: ' + escapeHtml(res.error || '') + ')</span>';
-    }
-  }).catch(function(err) {
-    var el = document.getElementById(imgId);
-    if (el) el.innerHTML = '<span style="font-size:.75rem;color:#aaa;">(読込エラー)</span>';
-  });
-}
-
-function loadAndShowPassportFull(fileId) {
-  var overlay = document.getElementById('passportOverlay');
-  var img = document.getElementById('passportFullImg');
-  img.src = '';
-  overlay.style.display = 'flex';
-  img.alt = '読み込み中...';
-  callGAS('getPassportThumbnail', [fileId, 800]).then(function(res) {
-    if (res.success && res.dataUrl) {
-      img.src = res.dataUrl;
-      img.alt = 'パスポート';
-    } else {
-      img.alt = '読込失敗';
-    }
-  }).catch(function() {
-    img.alt = '読込エラー';
-  });
-}
-
-function showPassport(dataUrl) {
+function showPassport(url) {
   var overlay = document.getElementById('passportOverlay');
   var img = document.getElementById('passportFullImg');
   img.src = dataUrl;
@@ -571,31 +535,22 @@ function buildGuestDetail(g) {
       if (gg.address) html += detailItem('住所', gg.address);
       if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
       html += '</div>';
-      // パスポート写真
+      // パスポート写真（直接thumbnail URL方式）
       if (gg.passportPhotoUrl) {
-        var ppImgId = 'pp_' + gi + '_' + (g.rowNumber || 0);
-        var isDriveUrl = gg.passportPhotoUrl.indexOf('drive.google.com') > -1;
-        if (isDriveUrl) {
-          // Google Drive: サーバー経由プロキシ（iframe内からthumbnail APIへ直接アクセス不可）
-          var ppFileId = '';
-          var ppM = gg.passportPhotoUrl.match(/[-\w]{25,}/);
-          if (ppM) ppFileId = ppM[0];
-          html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-            '<div id="' + ppImgId + '" style="margin-top:.2rem;">' +
-            '<span class="spinner-border spinner-border-sm"></span> <span style="font-size:.75rem;color:#888;">読み込み中...</span></div></div>';
-          if (ppFileId) {
-            (function(imgId, fileId) {
-              setTimeout(function() { loadPassportImg(imgId, fileId); }, 0);
-            })(ppImgId, ppFileId);
+        var ppThumbUrl = gg.passportPhotoUrl;
+        var ppFullUrl = gg.passportPhotoUrl;
+        if (ppThumbUrl.indexOf('drive.google.com') > -1) {
+          var ppFid = ppThumbUrl.match(/[-\w]{25,}/);
+          if (ppFid) {
+            ppThumbUrl = 'https://drive.google.com/thumbnail?id=' + ppFid[0] + '&sz=w300';
+            ppFullUrl = 'https://drive.google.com/thumbnail?id=' + ppFid[0] + '&sz=w800';
           }
-        } else {
-          // Drive以外のURL（テスト用等）: 直接表示
-          html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-            '<img src="' + escapeHtml(gg.passportPhotoUrl) + '" ' +
-            'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
-            'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(gg.passportPhotoUrl).replace(/'/g, "\\'") + '\')" ' +
-            'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'"></div>';
         }
+        html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+          '<img src="' + escapeHtml(ppThumbUrl) + '" ' +
+          'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
+          'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(ppFullUrl).replace(/'/g, "\\'") + '\')" ' +
+          'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'"></div>';
       }
       html += '</div>';
     }

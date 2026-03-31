@@ -345,15 +345,35 @@ function getTestGuestDetails_() {
     guestCountInfants: TEST_GUEST_.guestCountInfants,
     prevStay: TEST_GUEST_.prevStay,
     nextStay: TEST_GUEST_.nextStay,
-    guests: [{
-      index: 0,
-      name: TEST_GUEST_.name,
-      address: TEST_GUEST_.address,
-      age: TEST_GUEST_.age,
-      nationality: TEST_GUEST_.nationality,
-      passportNumber: TEST_GUEST_.passportNumber,
-      passportPhotoUrl: TEST_GUEST_.passportPhotoUrl
-    }],
+    guests: [
+      {
+        index: 0,
+        name: TEST_GUEST_.name,
+        address: TEST_GUEST_.address,
+        age: TEST_GUEST_.age,
+        nationality: TEST_GUEST_.nationality,
+        passportNumber: TEST_GUEST_.passportNumber,
+        passportPhotoUrl: TEST_GUEST_.passportPhotoUrl
+      },
+      {
+        index: 1,
+        name: '西山花子',
+        address: '東京都渋谷区テスト1-2-3',
+        age: '32',
+        nationality: 'アメリカ / USA（テスト）',
+        passportNumber: 'US9876543',
+        passportPhotoUrl: 'https://placehold.co/300x400/d4edda/155724?text=PASSPORT%0APHOTO+2%0A(TEST)'
+      },
+      {
+        index: 2,
+        name: '西山太郎',
+        address: '東京都渋谷区テスト1-2-3',
+        age: '5',
+        nationality: '日本 / Japan（テスト）',
+        passportNumber: 'TK7654321',
+        passportPhotoUrl: 'https://placehold.co/300x400/cce5ff/004085?text=PASSPORT%0APHOTO+3%0A(TEST)'
+      }
+    ],
     tel1: TEST_GUEST_.phone,
     tel2: TEST_GUEST_.tel2,
     hasEdits: false,
@@ -361,8 +381,8 @@ function getTestGuestDetails_() {
     colMap: {
       checkIn: 0, checkOut: 1, guestCount: 2, guestCountInfants: 3,
       prevStay: 4, nextStay: 5, telCols: [6, 7],
-      guestNameCols: [8], addressCols: [9], ageCols: [10],
-      nationalityCols: [11], passportNumberCols: [12], passportPhotoCols: [13]
+      guestNameCols: [8, 14, 15], addressCols: [9, 16, 17], ageCols: [10, 18, 19],
+      nationalityCols: [11, 20, 21], passportNumberCols: [12, 22, 23], passportPhotoCols: [13, 24, 25]
     }
   };
 }

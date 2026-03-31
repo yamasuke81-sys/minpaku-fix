@@ -1819,9 +1819,8 @@ function uploadMemoPhoto(checkoutDate, base64Data, staffName) {
  */
 function notifyCleaningComplete(checkoutDate, staffName, rating) {
   try {
-    // 重複送信防止: 同じチェックアウト日の完了通知を本日送信済みならスキップ
-    var ccTodayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
-    var ccPropKey = 'clCleanComplete_' + String(checkoutDate || '').trim() + '_' + ccTodayStr;
+    // 重複送信防止: 同じチェックアウト日の完了通知を送信済みならスキップ
+    var ccPropKey = 'clCleanComplete_' + String(checkoutDate || '').trim();
     var ccProps = PropertiesService.getScriptProperties();
     if (ccProps.getProperty(ccPropKey)) return JSON.stringify({ success: true, message: '既に清掃完了通知を送信済みです。' });
 

@@ -99,7 +99,7 @@
 </head>
 <body>
 
-<div class="version-badge" id="deployVersion">v0331a</div>
+<div class="version-badge" id="deployVersion">v0331d</div>
 
 <!-- ===== PIN認証画面 ===== -->
 <div id="pinScreen">
@@ -255,7 +255,7 @@ function verifyPin() {
 function showPassport(url) {
   var overlay = document.getElementById('passportOverlay');
   var img = document.getElementById('passportFullImg');
-  img.src = dataUrl;
+  img.src = url;
   overlay.style.display = 'flex';
 }
 

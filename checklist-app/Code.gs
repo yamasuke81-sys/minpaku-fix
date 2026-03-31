@@ -1819,10 +1819,11 @@ function uploadMemoPhoto(checkoutDate, base64Data, staffName) {
  */
 function notifyCleaningComplete(checkoutDate, staffName, rating) {
   try {
-    // 重複送信防止: 同じチェックアウト日の完了通知を送信済みならスキップ
-    var ccPropKey = 'clCleanComplete_' + String(checkoutDate || '').trim();
     var ccProps = PropertiesService.getScriptProperties();
-    if (ccProps.getProperty(ccPropKey)) return JSON.stringify({ success: true, message: '既に清掃完了通知を送信済みです。' });
+
+    // 評価を保存
+    var ratingKey = 'clRating_' + String(checkoutDate || '').trim();
+    ccProps.setProperty(ratingKey, String(parseInt(rating) || 0));
 
     var bookingSs = getBookingSpreadsheet_();
     var ownerSheet = bookingSs.getSheetByName(CL_OWNER_SHEET);
@@ -1940,8 +1941,6 @@ function notifyCleaningComplete(checkoutDate, staffName, rating) {
     }
     htmlBody += '<p style="color:#888;font-size:12px;">詳細はチェックリストをご確認ください。</p></div>';
 
-    ccProps.setProperty(ccPropKey, '1');
-
     // チャンネル設定に従って送信
     var clMap = clGetRecruitSettingsMap_();
     var cleanEnabled = clMap['CL_LINE_清掃完了有効'] !== 'false';
@@ -2028,7 +2027,30 @@ function getCleaningCompletionStatus(checkoutDate) {
         } catch (pe) {}
       }
     }
-    return JSON.stringify({ success: true, completedAt: completedAt, completedBy: completedBy });
+    // 評価を取得
+    var ratingVal = 0;
+    try {
+      var rk = 'clRating_' + dateKey;
+      ratingVal = parseInt(PropertiesService.getScriptProperties().getProperty(rk)) || 0;
+    } catch (re) {}
+    return JSON.stringify({ success: true, completedAt: completedAt, completedBy: completedBy, rating: ratingVal });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.toString() });
+  }
+}
+
+/**
+ * 利用状態評価を保存（清掃完了後にインラインで変更可能）
+ */
+function saveCleaningRating(checkoutDate, rating) {
+  try {
+    var dateKey = normDateStr_(checkoutDate);
+    var rk = 'clRating_' + dateKey;
+    var ratingNum = parseInt(rating) || 0;
+    if (ratingNum < 0) ratingNum = 0;
+    if (ratingNum > 5) ratingNum = 5;
+    PropertiesService.getScriptProperties().setProperty(rk, String(ratingNum));
+    return JSON.stringify({ success: true, rating: ratingNum });
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }

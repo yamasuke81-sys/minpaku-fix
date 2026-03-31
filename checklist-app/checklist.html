@@ -1594,6 +1594,11 @@
         <div id="completeMsg" class="complete-msg"></div>
         <button id="btnComplete" class="btn-complete" onclick="completeChecklist()">清掃完了</button>
         <div id="completionInfo" style="display:none;margin-top:8px;padding:8px 10px;background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;font-size:13px;color:#155724;text-align:center;"></div>
+        <div id="inlineRatingArea" style="display:none;margin-top:8px;padding:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;text-align:center;">
+          <div style="font-size:12px;color:#888;margin-bottom:4px;">利用状態の評価（タップで変更可）</div>
+          <div id="inlineRatingStars" style="display:flex;justify-content:center;gap:8px;margin-bottom:2px;"></div>
+          <div id="inlineRatingLabel" style="font-size:12px;color:#666;min-height:16px;"></div>
+        </div>
       </div>
 
     </div>
@@ -7334,14 +7339,43 @@
     function loadCompletionStatus() {
       callGAS('getCleaningCompletionStatus', [checkoutDate]).then(function(res) {
         var el = document.getElementById('completionInfo');
+        var ratingArea = document.getElementById('inlineRatingArea');
         if (!el) return;
         if (res.success && res.completedAt) {
           el.textContent = '清掃完了済み: ' + formatCompletionDate(res.completedAt) + (res.completedBy ? '（' + res.completedBy + '）' : '');
           el.style.display = 'block';
+          // インライン評価を表示
+          if (ratingArea) {
+            ratingArea.style.display = 'block';
+            renderInlineRating(res.rating || 0);
+          }
         } else {
           el.style.display = 'none';
+          if (ratingArea) ratingArea.style.display = 'none';
         }
       }).catch(function() {});
+    }
+
+    function renderInlineRating(currentRating) {
+      var container = document.getElementById('inlineRatingStars');
+      var label = document.getElementById('inlineRatingLabel');
+      if (!container) return;
+      container.innerHTML = '';
+      for (var i = 1; i <= 5; i++) {
+        var star = document.createElement('span');
+        star.textContent = '\u2605';
+        star.setAttribute('data-val', i);
+        star.style.cssText = 'font-size:32px;cursor:pointer;transition:color 0.15s;color:' + (i <= currentRating ? '#f39c12' : '#ddd');
+        (function(val) {
+          star.onclick = function() {
+            var newRating = (val === currentRating) ? 0 : val;
+            renderInlineRating(newRating);
+            callGAS('saveCleaningRating', [checkoutDate, newRating]);
+          };
+        })(i);
+        container.appendChild(star);
+      }
+      label.textContent = '★' + currentRating + ': ' + (_ratingLabels[currentRating] || '');
     }
   </script>
 

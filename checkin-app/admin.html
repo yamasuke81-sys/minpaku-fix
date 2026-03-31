@@ -151,7 +151,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h2 style="font-size:1rem;font-weight:700;margin:0;">予約名簿</h2>
       <div class="d-flex gap-2">
-        <button class="btn-today" onclick="scrollToToday()"><i class="bi bi-calendar-event"></i> 今日</button>
+        <button class="btn-today" onclick="scrollToNearest()"><i class="bi bi-calendar-event"></i> 直近</button>
         <button class="btn btn-sm btn-outline-success" onclick="openSpreadsheet()" style="border-radius:.4rem;font-size:.75rem;font-weight:600;">
           <i class="bi bi-table"></i> スプシ
         </button>
@@ -413,7 +413,21 @@ function renderGuestList(guests) {
   }
   html += '</tr></thead><tbody>';
 
-  var _firstTodayIdx = -1;
+  // 直近の予約を特定（CO >= 今日 で最もCIが早い行）
+  var nowTime = now.getTime();
+  var nearestIdx = -1;
+  var nearestCi = null;
+  for (var pi = 0; pi < guests.length; pi++) {
+    var pCo = parseDate_(guests[pi].checkOut);
+    if (pCo && pCo.getTime() >= nowTime) {
+      var pCi = parseDate_(guests[pi].checkIn);
+      if (nearestIdx < 0 || (pCi && (!nearestCi || pCi < nearestCi))) {
+        nearestIdx = pi;
+        nearestCi = pCi;
+      }
+    }
+  }
+
   for (var i = 0; i < guests.length; i++) {
     var g = guests[i];
     var ciShort = g.checkIn ? g.checkIn.replace(/\s.*$/, '') : '-';
@@ -424,7 +438,7 @@ function renderGuestList(guests) {
     var editMark = g.hasEdits ? ' <span class="edited-mark">(編集済)</span>' : '';
     var expanded = _expandedRows[g.rowNumber];
 
-    // 当日判定: CIまたはCOが今日
+    // 当日/滞在中判定
     var ciDate = parseDate_(g.checkIn);
     var coDate = parseDate_(g.checkOut);
     var isToday = false;
@@ -433,21 +447,19 @@ function renderGuestList(guests) {
       var ciStr2 = ciDate ? ciDate.getFullYear() + '/' + (ciDate.getMonth() + 1) + '/' + ciDate.getDate() : '';
       var coStr2 = coDate ? coDate.getFullYear() + '/' + (coDate.getMonth() + 1) + '/' + coDate.getDate() : '';
       isToday = (ciStr2 === todayStr || coStr2 === todayStr);
-      // 滞在中（CI <= 今日 <= CO）も当日扱い
       if (!isToday && ciDate && coDate) {
-        var todayTime = now.getTime();
-        isToday = ciDate.getTime() <= todayTime && coDate.getTime() >= todayTime;
+        isToday = ciDate.getTime() <= nowTime && coDate.getTime() >= nowTime;
       }
-      isPast = coDate && coDate < now && !isToday;
+      isPast = coDate && coDate.getTime() < nowTime && !isToday;
     }
 
     var rowClass = 'expandable';
     if (isToday) rowClass += ' today-row';
     if (isPast) rowClass += ' past-row';
-    var todayId = (isToday && _firstTodayIdx < 0) ? ' id="todayRow"' : '';
-    if (isToday && _firstTodayIdx < 0) _firstTodayIdx = i;
+    // 直近の予約行にid付与（スクロール先）
+    var nearestId = (i === nearestIdx) ? ' id="nearestRow"' : '';
 
-    html += '<tr class="' + rowClass + '"' + todayId + ' onclick="toggleGuestDetail(' + g.rowNumber + ')">' +
+    html += '<tr class="' + rowClass + '"' + nearestId + ' onclick="toggleGuestDetail(' + g.rowNumber + ')">' +
       '<td style="font-weight:600;">' + escapeHtml(g.guestName) + editMark + '</td>' +
       '<td>' + escapeHtml(ciShort) + '</td>' +
       '<td>' + escapeHtml(coShort) + '</td>' +
@@ -466,15 +478,15 @@ function renderGuestList(guests) {
   html += '<div style="font-size:.7rem;color:#aaa;text-align:right;margin-top:.3rem;">' + guests.length + '件</div>';
   document.getElementById('guestListArea').innerHTML = html;
 
-  // 初回ロード時は当日行にスクロール
+  // 初回ロード時は直近の予約行にスクロール
   if (_shouldScrollToToday) {
     _shouldScrollToToday = false;
-    setTimeout(scrollToToday, 100);
+    setTimeout(scrollToNearest, 100);
   }
 }
 
-function scrollToToday() {
-  var el = document.getElementById('todayRow');
+function scrollToNearest() {
+  var el = document.getElementById('nearestRow');
   if (el) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }

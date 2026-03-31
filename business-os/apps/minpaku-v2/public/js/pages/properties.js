@@ -58,21 +58,32 @@ const PropertiesPage = {
       return;
     }
 
+    const typeLabel = { minpaku: "民泊", rental: "収益不動産", other: "その他" };
+    const typeColor = { minpaku: "primary", rental: "info", other: "secondary" };
+
     container.innerHTML = this.propertyList.map((p) => `
       <div class="col-md-6 col-lg-4">
         <div class="card h-100 ${p.active ? "" : "border-secondary opacity-50"}">
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start">
-              <h5 class="card-title">${this.escapeHtml(p.name)}</h5>
-              <span class="badge ${p.active ? "bg-success" : "bg-secondary"}">${p.active ? "有効" : "無効"}</span>
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <h5 class="card-title mb-0">${this.escapeHtml(p.name)}</h5>
+              <div>
+                <span class="badge bg-${typeColor[p.type] || "secondary"} me-1">${typeLabel[p.type] || "不明"}</span>
+                <span class="badge ${p.active ? "bg-success" : "bg-secondary"}">${p.active ? "有効" : "無効"}</span>
+              </div>
             </div>
-            ${p.address ? `<p class="card-text text-muted small"><i class="bi bi-geo-alt"></i> ${this.escapeHtml(p.address)}</p>` : ""}
+            ${p.area ? `<small class="text-muted"><i class="bi bi-pin-map"></i> ${this.escapeHtml(p.area)}</small><br>` : ""}
+            ${p.address ? `<p class="card-text text-muted small mb-1"><i class="bi bi-geo-alt"></i> ${this.escapeHtml(p.address)}</p>` : ""}
             <div class="mb-2">
               <small class="text-muted">
+                ${p.capacity ? `<i class="bi bi-people"></i> ${p.type === "rental" ? p.capacity + "戸" : "定員" + p.capacity + "名"} | ` : ""}
                 <i class="bi bi-clock"></i> 清掃 ${p.cleaningDuration || 90}分
-                ${p.beds24PropertyId ? ` | <i class="bi bi-link-45deg"></i> BEDS24: ${this.escapeHtml(p.beds24PropertyId)}` : ' | <span class="text-warning">BEDS24未連携</span>'}
+                ${p.cleaningFee ? ` (${formatCurrency(p.cleaningFee)})` : ""}
+                ${p.beds24PropertyId ? ` | <i class="bi bi-link-45deg"></i> BEDS24連携済` : ""}
               </small>
             </div>
+            ${p.monthlyFixedCost ? `<div class="mb-1"><small class="text-muted"><i class="bi bi-cash-stack"></i> 月額固定費: ${formatCurrency(p.monthlyFixedCost)}</small></div>` : ""}
+            ${p.purchasePrice ? `<div class="mb-1"><small class="text-muted"><i class="bi bi-building"></i> 取得: ${formatCurrency(p.purchasePrice)}</small></div>` : ""}
             ${p.requiredSkills && p.requiredSkills.length
               ? `<div class="mb-2">${p.requiredSkills.map((s) => `<span class="badge bg-light text-dark me-1">${this.escapeHtml(s)}</span>`).join("")}</div>`
               : ""}
@@ -112,9 +123,18 @@ const PropertiesPage = {
     document.getElementById("propertyEditId").value = isEdit ? property.id : "";
 
     document.getElementById("propertyName").value = property?.name || "";
+    document.getElementById("propertyType").value = property?.type || "minpaku";
+    document.getElementById("propertyCapacity").value = property?.capacity || 0;
     document.getElementById("propertyBeds24Id").value = property?.beds24PropertyId || "";
+    document.getElementById("propertyArea").value = property?.area || "";
     document.getElementById("propertyAddress").value = property?.address || "";
     document.getElementById("propertyCleaningDuration").value = property?.cleaningDuration || 90;
+    document.getElementById("propertyCleaningFee").value = property?.cleaningFee || 0;
+    document.getElementById("propertyMonthlyCost").value = property?.monthlyFixedCost || 0;
+    document.getElementById("propertyPurchasePrice").value = property?.purchasePrice || 0;
+    document.getElementById("propertyPurchaseDate").value = property?.purchaseDate
+      ? new Date(property.purchaseDate.seconds ? property.purchaseDate.seconds * 1000 : property.purchaseDate).toISOString().split("T")[0]
+      : "";
     document.getElementById("propertySkills").value = (property?.requiredSkills || []).join(",");
     document.getElementById("propertyNotes").value = property?.notes || "";
 
@@ -135,9 +155,16 @@ const PropertiesPage = {
 
     const data = {
       name,
+      type: document.getElementById("propertyType").value,
+      capacity: Number(document.getElementById("propertyCapacity").value) || 0,
       beds24PropertyId: document.getElementById("propertyBeds24Id").value.trim(),
+      area: document.getElementById("propertyArea").value.trim(),
       address: document.getElementById("propertyAddress").value.trim(),
       cleaningDuration: Number(document.getElementById("propertyCleaningDuration").value) || 90,
+      cleaningFee: Number(document.getElementById("propertyCleaningFee").value) || 0,
+      monthlyFixedCost: Number(document.getElementById("propertyMonthlyCost").value) || 0,
+      purchasePrice: Number(document.getElementById("propertyPurchasePrice").value) || 0,
+      purchaseDate: document.getElementById("propertyPurchaseDate").value || null,
       requiredSkills,
       notes: document.getElementById("propertyNotes").value.trim(),
     };

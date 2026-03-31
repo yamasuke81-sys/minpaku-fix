@@ -3,6 +3,13 @@
 ## 概要
 **BEDS24 + Firebase** ベースの民泊管理アプリ。
 BEDS24を予約管理の中核に据え、清掃管理・スタッフ管理・請求書をFirebaseで自動化する。
+**複数物件を管理** — 物件ごとにデータを分離し、比較・累計・統計を出せる構造。
+
+### 物件管理の基本方針
+- 全データに `propertyId` を付与 — 予約、シフト、ランドリー、請求書、チェックリスト全て
+- 物件ごとの収支・稼働率・清掃回数・評価を集計可能な構造
+- 物件種別（民泊/収益不動産）で将来的に統合管理
+- 物件比較ダッシュボード（将来Phase）: 稼働率、売上、清掃コスト、利益率を横並び比較
 
 ## 技術スタック
 
@@ -122,16 +129,25 @@ firestore/
 │       ├── createdAt: timestamp
 │       └── updatedAt: timestamp
 │
-├── properties/               # 物件マスタ
+├── properties/               # 物件マスタ（民泊+収益不動産を統合管理）
 │   └── {propertyId}/
 │       ├── name: string
-│       ├── beds24PropertyId: string      # BEDS24の物件ID
+│       ├── type: string                  # "minpaku" | "rental" | "other"
+│       ├── beds24PropertyId: string      # BEDS24の物件ID（民泊のみ）
 │       ├── address: string
+│       ├── area: string                  # エリア（例: "大阪市中央区"）
+│       ├── capacity: number              # 定員（民泊）or 戸数（賃貸）
 │       ├── cleaningDuration: number      # 清掃所要時間（分）
+│       ├── cleaningFee: number           # 清掃1回あたりの費用（円）
 │       ├── requiredSkills: string[]
 │       ├── checklistTemplateId: string
+│       ├── monthlyFixedCost: number      # 月額固定費（管理費、ローン等）
+│       ├── purchasePrice: number         # 取得価格（統計用）
+│       ├── purchaseDate: timestamp       # 取得日
 │       ├── notes: string
-│       └── active: boolean
+│       ├── active: boolean
+│       ├── createdAt: timestamp
+│       └── updatedAt: timestamp
 │
 ├── bookings/                 # 予約（BEDS24から同期）
 │   └── {bookingId}/

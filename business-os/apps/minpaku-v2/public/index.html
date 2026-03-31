@@ -216,17 +216,50 @@
               <label class="form-label">物件名 <span class="text-danger">*</span></label>
               <input type="text" class="form-control" id="propertyName" required>
             </div>
+            <div class="col-md-3">
+              <label class="form-label">種別 <span class="text-danger">*</span></label>
+              <select class="form-select" id="propertyType">
+                <option value="minpaku">民泊</option>
+                <option value="rental">収益不動産</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">定員/戸数</label>
+              <input type="number" class="form-control" id="propertyCapacity" value="0">
+            </div>
             <div class="col-md-6">
               <label class="form-label">BEDS24 物件ID</label>
               <input type="text" class="form-control" id="propertyBeds24Id" placeholder="BEDS24登録後に設定">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">エリア</label>
+              <input type="text" class="form-control" id="propertyArea" placeholder="例: 大阪市中央区">
             </div>
             <div class="col-12">
               <label class="form-label">住所</label>
               <input type="text" class="form-control" id="propertyAddress">
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label">清掃所要時間（分）</label>
               <input type="number" class="form-control" id="propertyCleaningDuration" value="90">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">清掃費用（円/回）</label>
+              <input type="number" class="form-control" id="propertyCleaningFee" value="0">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">月額固定費（円）</label>
+              <input type="number" class="form-control" id="propertyMonthlyCost" value="0">
+            </div>
+            <div class="col-12"><hr><h6>投資情報（統計用）</h6></div>
+            <div class="col-md-6">
+              <label class="form-label">取得価格（円）</label>
+              <input type="number" class="form-control" id="propertyPurchasePrice" value="0">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">取得日</label>
+              <input type="date" class="form-control" id="propertyPurchaseDate">
             </div>
             <div class="col-md-6">
               <label class="form-label">必要スキル（カンマ区切り）</label>

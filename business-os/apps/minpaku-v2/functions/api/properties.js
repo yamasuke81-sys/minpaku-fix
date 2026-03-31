@@ -54,11 +54,18 @@ module.exports = function propertiesApi(db) {
 
       const data = {
         name: String(body.name).trim(),
+        type: ["minpaku", "rental", "other"].includes(body.type) ? body.type : "minpaku",
         beds24PropertyId: body.beds24PropertyId ? String(body.beds24PropertyId).trim() : "",
         address: body.address ? String(body.address).trim() : "",
+        area: body.area ? String(body.area).trim() : "",
+        capacity: Number(body.capacity) || 0,
         cleaningDuration: Number(body.cleaningDuration) || 90,
+        cleaningFee: Number(body.cleaningFee) || 0,
         requiredSkills: Array.isArray(body.requiredSkills) ? body.requiredSkills : [],
         checklistTemplateId: body.checklistTemplateId || "",
+        monthlyFixedCost: Number(body.monthlyFixedCost) || 0,
+        purchasePrice: Number(body.purchasePrice) || 0,
+        purchaseDate: body.purchaseDate || null,
         notes: body.notes ? String(body.notes).trim() : "",
         active: body.active !== false,
         createdAt: FieldValue.serverTimestamp(),
@@ -89,10 +96,17 @@ module.exports = function propertiesApi(db) {
       const { body } = req;
       const data = {};
       if (body.name !== undefined) data.name = String(body.name).trim();
+      if (body.type !== undefined && ["minpaku", "rental", "other"].includes(body.type)) data.type = body.type;
       if (body.beds24PropertyId !== undefined) data.beds24PropertyId = String(body.beds24PropertyId).trim();
       if (body.address !== undefined) data.address = String(body.address).trim();
+      if (body.area !== undefined) data.area = String(body.area).trim();
+      if (body.capacity !== undefined) data.capacity = Number(body.capacity) || 0;
       if (body.cleaningDuration !== undefined) data.cleaningDuration = Number(body.cleaningDuration) || 90;
+      if (body.cleaningFee !== undefined) data.cleaningFee = Number(body.cleaningFee) || 0;
       if (body.requiredSkills !== undefined) data.requiredSkills = Array.isArray(body.requiredSkills) ? body.requiredSkills : [];
+      if (body.monthlyFixedCost !== undefined) data.monthlyFixedCost = Number(body.monthlyFixedCost) || 0;
+      if (body.purchasePrice !== undefined) data.purchasePrice = Number(body.purchasePrice) || 0;
+      if (body.purchaseDate !== undefined) data.purchaseDate = body.purchaseDate;
       if (body.checklistTemplateId !== undefined) data.checklistTemplateId = body.checklistTemplateId;
       if (body.notes !== undefined) data.notes = String(body.notes).trim();
       if (body.active !== undefined) data.active = Boolean(body.active);

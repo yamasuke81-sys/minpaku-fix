@@ -19,8 +19,8 @@ const SettingsPage = {
           </p>
 
           <div class="alert alert-info">
-            <strong>スプレッドシートのURLを貼るだけ!</strong><br>
-            各アプリのスプレッドシートURLを入力して「一括取込」を押すだけで全データを自動インポートします。
+            <strong>ボタン1つで全データ取込!</strong><br>
+            スプレッドシートのデータを自動で読み取り、Firestoreにインポートします。
           </div>
 
           <div class="alert alert-warning small">
@@ -28,35 +28,25 @@ const SettingsPage = {
             インポート完了後に共有を戻してOKです。
           </div>
 
-          <!-- スプレッドシートURL入力 -->
-          <div class="mb-3">
-            <label class="form-label fw-bold"><i class="bi bi-house-door"></i> 民泊メイン</label>
-            <input type="text" class="form-control" id="urlMain" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
-            <small class="text-muted">予約、スタッフ、募集、報酬データ</small>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold"><i class="bi bi-check2-square"></i> 清掃チェックリスト</label>
-            <input type="text" class="form-control" id="urlChecklist" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
-            <small class="text-muted">チェックリストマスタ、記録、写真</small>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold"><i class="bi bi-door-open"></i> チェックイン</label>
-            <input type="text" class="form-control" id="urlCheckin" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
-            <small class="text-muted">チェックイン情報</small>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold"><i class="bi bi-bell"></i> アラーム</label>
-            <input type="text" class="form-control" id="urlAlarm" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
-            <small class="text-muted">アラーム設定、通知履歴</small>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-bold"><i class="bi bi-file-earmark-pdf"></i> PDFリネーム</label>
-            <input type="text" class="form-control" id="urlPdf" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
-            <small class="text-muted">リネームルール、処理履歴</small>
-          </div>
+          <!-- プリセットURL表示 -->
+          <table class="table table-sm mb-3">
+            <thead><tr><th>アプリ</th><th>スプレッドシート</th><th>状態</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><i class="bi bi-house-door"></i> 民泊メイン<br><small class="text-muted">予約・スタッフ・募集・報酬・チェックリスト</small></td>
+                <td><small class="font-monospace">1Kk8VZ...HnHgCs</small></td>
+                <td><span class="badge bg-secondary" id="statusMain">待機中</span></td>
+              </tr>
+              <tr>
+                <td><i class="bi bi-file-earmark-pdf"></i> PDFリネーム<br><small class="text-muted">リネームルール・処理履歴</small></td>
+                <td><small class="font-monospace">17oV_2...liAy0</small></td>
+                <td><span class="badge bg-secondary" id="statusPdf">待機中</span></td>
+              </tr>
+            </tbody>
+          </table>
 
           <button class="btn btn-warning btn-lg w-100" id="btnAutoImport">
-            <i class="bi bi-cloud-download"></i> 一括取込（全自動）
+            <i class="bi bi-cloud-download"></i> 全データ一括取込
           </button>
 
           <div class="mt-3 d-none" id="migrationResult">
@@ -100,12 +90,10 @@ const SettingsPage = {
 
   SHEETS_API_KEY: firebaseConfig.apiKey, // Firebase APIキーでSheets APIも使える
 
-  urlFields: [
-    { id: "urlMain", label: "民泊メイン" },
-    { id: "urlChecklist", label: "チェックリスト" },
-    { id: "urlCheckin", label: "チェックイン" },
-    { id: "urlAlarm", label: "アラーム" },
-    { id: "urlPdf", label: "PDFリネーム" },
+  // プリセットのスプレッドシートID
+  presetSheets: [
+    { id: "1Kk8VZrMQoJwmNk4OZKVQ9riufiCEcVPi_xmYHHnHgCs", label: "民泊メイン", statusId: "statusMain" },
+    { id: "17oV_2vPj33aZf7fl8A-NDgS0l4aYvsRrSJBw2JliAy0", label: "PDFリネーム", statusId: "statusPdf" },
   ],
 
   bindEvents() {
@@ -196,53 +184,62 @@ const SettingsPage = {
     let appsDone = 0;
 
     try {
-      for (const field of this.urlFields) {
-        const url = document.getElementById(field.id).value.trim();
-        if (!url) continue;
+      for (const preset of this.presetSheets) {
+        const statusEl = document.getElementById(preset.statusId);
+        if (statusEl) { statusEl.className = "badge bg-info"; statusEl.textContent = "取得中..."; }
 
-        const sheetId = this.extractSheetId(url);
-        if (!sheetId) continue;
+        alertEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${preset.label}を取得中...`;
 
-        alertEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${field.label}を取得中...`;
+        let data;
+        try {
+          data = await this.fetchSpreadsheet(preset.id);
+        } catch (e) {
+          if (statusEl) { statusEl.className = "badge bg-danger"; statusEl.textContent = "エラー"; }
+          console.error(`${preset.label} fetch error:`, e);
+          totalCounts[`${preset.label} (エラー)`] = e.message;
+          continue;
+        }
 
-        const data = await this.fetchSpreadsheet(sheetId);
+        if (statusEl) { statusEl.className = "badge bg-primary"; statusEl.textContent = "保存中..."; }
+        alertEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${preset.label}をFirestoreに保存中...`;
 
-        alertEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${field.label}をFirestoreに保存中...`;
-
+        let sheetsDone = 0;
         for (const [sheetName, rows] of Object.entries(data.sheets)) {
           if (!rows || rows.length === 0) continue;
 
-          const collectionName = this.resolveCollectionName(field.label, sheetName);
+          const collectionName = this.resolveCollectionName(preset.label, sheetName);
           let count = 0;
 
-          for (const row of rows) {
-            await db.collection(collectionName).add({
-              ...row,
-              _appSource: field.label,
-              _sheetSource: sheetName,
-              _spreadsheetTitle: data.title,
-              _migratedAt: ts,
-            });
-            count++;
+          // バッチ書き込み（高速化）
+          const batchSize = 500;
+          for (let i = 0; i < rows.length; i += batchSize) {
+            const batch = db.batch();
+            const chunk = rows.slice(i, i + batchSize);
+            for (const row of chunk) {
+              const ref = db.collection(collectionName).doc();
+              batch.set(ref, {
+                ...row,
+                _appSource: preset.label,
+                _sheetSource: sheetName,
+                _migratedAt: ts,
+              });
+              count++;
+            }
+            await batch.commit();
           }
 
           if (count > 0) {
-            totalCounts[`${field.label} / ${sheetName}`] = count;
+            totalCounts[`${preset.label} / ${sheetName}`] = count;
+            sheetsDone++;
           }
         }
 
+        if (statusEl) { statusEl.className = "badge bg-success"; statusEl.textContent = `完了 (${sheetsDone}シート)`; }
         appsDone++;
       }
 
-      if (appsDone === 0) {
-        alertEl.className = "alert alert-warning";
-        alertEl.textContent = "URLが入力されていません。少なくとも1つのスプレッドシートURLを入力してください。";
-        return;
-      }
-
       const lines = Object.entries(totalCounts)
-        .filter(([, v]) => v > 0)
-        .map(([k, v]) => `<li>${k}: <strong>${v}件</strong></li>`);
+        .map(([k, v]) => typeof v === "number" ? `<li>${k}: <strong>${v}件</strong></li>` : `<li class="text-danger">${k}: ${v}</li>`);
 
       alertEl.className = "alert alert-success";
       alertEl.innerHTML = `<strong>${appsDone}アプリのインポート完了!</strong><ul class="mb-0 mt-2">${lines.join("")}</ul>`;

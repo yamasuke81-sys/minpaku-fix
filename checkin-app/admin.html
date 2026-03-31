@@ -740,9 +740,8 @@ function openCamera(idx) {
   if (!app) return;
 
   if (isAndroid) {
-    // Android: intent URLでアプリ起動。インストール済みならアプリが開く
-    var intentUrl = 'intent://#Intent;package=' + app.androidPackage + ';end';
-    window.location.href = intentUrl;
+    // Android: schemeで直接アプリ起動。Play Storeへのフォールバックを無効化
+    window.location.href = app.scheme;
   } else if (isIOS) {
     // iOS: URLスキームでアプリ起動を試みる
     window.location.href = app.scheme;

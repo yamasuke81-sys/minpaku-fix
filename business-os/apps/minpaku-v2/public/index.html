@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>民泊管理v2</title>
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- FullCalendar（ダッシュボード用） -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+  <!-- ナビバー -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top" id="mainNav">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#/">
+        <i class="bi bi-house-door"></i> 民泊管理v2
+        <span class="badge bg-secondary ms-2" id="appVersion">v0331a</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navContent">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navContent">
+        <!-- オーナー用メニュー -->
+        <ul class="navbar-nav me-auto" id="ownerNav">
+          <li class="nav-item">
+            <a class="nav-link" href="#/" data-page="dashboard">
+              <i class="bi bi-speedometer2"></i> ダッシュボード
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#/staff" data-page="staff">
+              <i class="bi bi-people"></i> スタッフ管理
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#/properties" data-page="properties">
+              <i class="bi bi-buildings"></i> 物件管理
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#/shifts" data-page="shifts">
+              <i class="bi bi-calendar-week"></i> シフト管理
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#/invoices" data-page="invoices">
+              <i class="bi bi-receipt"></i> 請求書
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#/settings" data-page="settings">
+              <i class="bi bi-gear"></i> 設定
+            </a>
+          </li>
+        </ul>
+        <!-- ユーザー情報 -->
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" id="userMenu">
+              <i class="bi bi-person-circle"></i> <span id="userName">未ログイン</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#" id="btnLogout"><i class="bi bi-box-arrow-right"></i> ログアウト</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- メインコンテンツ -->
+  <main class="container-fluid mt-5 pt-3" id="mainContent">
+    <!-- ページがここに動的に読み込まれる -->
+    <div id="pageContainer">
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">読み込み中...</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ログイン画面（未認証時に表示） -->
+  <div class="modal fade" id="loginModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title"><i class="bi bi-house-door"></i> 民泊管理v2 ログイン</h5>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">メールアドレス</label>
+            <input type="email" class="form-control" id="loginEmail" placeholder="email@example.com">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">パスワード</label>
+            <input type="password" class="form-control" id="loginPassword" placeholder="パスワード">
+          </div>
+          <div class="alert alert-danger d-none" id="loginError"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary w-100" id="btnLogin">
+            <i class="bi bi-box-arrow-in-right"></i> ログイン
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- スタッフ登録/編集モーダル -->
+  <div class="modal fade" id="staffModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="staffModalTitle">スタッフ登録</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="staffEditId">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">名前 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="staffName" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">メールアドレス</label>
+              <input type="email" class="form-control" id="staffEmail">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">電話番号</label>
+              <input type="tel" class="form-control" id="staffPhone">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">報酬単価（円/回）</label>
+              <input type="number" class="form-control" id="staffRate" value="0">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">交通費（円/回）</label>
+              <input type="number" class="form-control" id="staffTransport" value="0">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">契約開始日</label>
+              <input type="date" class="form-control" id="staffContractDate">
+            </div>
+            <div class="col-12">
+              <label class="form-label">稼働可能曜日</label>
+              <div id="staffDays" class="d-flex flex-wrap gap-2">
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="月" id="day_mon"><label class="form-check-label" for="day_mon">月</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="火" id="day_tue"><label class="form-check-label" for="day_tue">火</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="水" id="day_wed"><label class="form-check-label" for="day_wed">水</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="木" id="day_thu"><label class="form-check-label" for="day_thu">木</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="金" id="day_fri"><label class="form-check-label" for="day_fri">金</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="土" id="day_sat"><label class="form-check-label" for="day_sat">土</label></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" value="日" id="day_sun"><label class="form-check-label" for="day_sun">日</label></div>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">スキル（カンマ区切り）</label>
+              <input type="text" class="form-control" id="staffSkills" placeholder="清掃,ベッドメイク,BBQ片付け">
+            </div>
+            <div class="col-12"><hr><h6>銀行口座情報</h6></div>
+            <div class="col-md-4">
+              <label class="form-label">銀行名</label>
+              <input type="text" class="form-control" id="staffBankName">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">支店名</label>
+              <input type="text" class="form-control" id="staffBranchName">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">口座種別</label>
+              <select class="form-select" id="staffAccountType">
+                <option value="普通">普通</option>
+                <option value="当座">当座</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">口座番号</label>
+              <input type="text" class="form-control" id="staffAccountNumber">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">口座名義</label>
+              <input type="text" class="form-control" id="staffAccountHolder">
+            </div>
+            <div class="col-12">
+              <label class="form-label">メモ</label>
+              <textarea class="form-control" id="staffMemo" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary" id="btnSaveStaff">
+            <i class="bi bi-check-lg"></i> 保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 物件登録/編集モーダル -->
+  <div class="modal fade" id="propertyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="propertyModalTitle">物件登録</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="propertyEditId">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">物件名 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="propertyName" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">BEDS24 物件ID</label>
+              <input type="text" class="form-control" id="propertyBeds24Id" placeholder="BEDS24登録後に設定">
+            </div>
+            <div class="col-12">
+              <label class="form-label">住所</label>
+              <input type="text" class="form-control" id="propertyAddress">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">清掃所要時間（分）</label>
+              <input type="number" class="form-control" id="propertyCleaningDuration" value="90">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">必要スキル（カンマ区切り）</label>
+              <input type="text" class="form-control" id="propertySkills" placeholder="清掃,BBQ片付け">
+            </div>
+            <div class="col-12">
+              <label class="form-label">メモ</label>
+              <textarea class="form-control" id="propertyNotes" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" class="btn btn-primary" id="btnSaveProperty">
+            <i class="bi bi-check-lg"></i> 保存
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="appToast" class="toast" role="alert">
+      <div class="toast-header">
+        <strong class="me-auto" id="toastTitle">通知</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+      </div>
+      <div class="toast-body" id="toastBody"></div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore-compat.js"></script>
+  <!-- App -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/pages/dashboard.js"></script>
+  <script src="js/pages/staff.js"></script>
+  <script src="js/pages/properties.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

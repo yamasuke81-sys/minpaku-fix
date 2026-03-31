@@ -1,0 +1,98 @@
+/* 民泊管理v2 カスタムCSS */
+
+/* レイアウト */
+body {
+  padding-top: 56px;
+  background-color: #f8f9fa;
+}
+
+/* ページヘッダー */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #dee2e6;
+}
+.page-header h2 {
+  margin-bottom: 0;
+  font-size: 1.5rem;
+}
+
+/* カード */
+.card-stat {
+  border-left: 4px solid;
+  transition: transform 0.15s;
+}
+.card-stat:hover {
+  transform: translateY(-2px);
+}
+.card-stat.primary { border-left-color: #0d6efd; }
+.card-stat.success { border-left-color: #198754; }
+.card-stat.warning { border-left-color: #ffc107; }
+.card-stat.danger  { border-left-color: #dc3545; }
+
+/* テーブル */
+.table-hover tbody tr {
+  cursor: pointer;
+}
+
+/* スタッフ一覧 */
+.staff-status-badge {
+  font-size: 0.75rem;
+}
+
+/* 曜日チップ */
+.day-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  background-color: #e9ecef;
+  margin: 1px;
+}
+.day-chip.active {
+  background-color: #0d6efd;
+  color: white;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .page-header .btn {
+    width: 100%;
+  }
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+}
+
+/* ローディング */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* 空状態 */
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #6c757d;
+}
+.empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}

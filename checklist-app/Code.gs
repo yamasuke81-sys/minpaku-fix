@@ -1817,7 +1817,7 @@ function uploadMemoPhoto(checkoutDate, base64Data, staffName) {
 /**
  * 清掃完了通知をオーナーに送信
  */
-function notifyCleaningComplete(checkoutDate, staffName) {
+function notifyCleaningComplete(checkoutDate, staffName, rating) {
   try {
     // 重複送信防止: 同じチェックアウト日の完了通知を本日送信済みならスキップ
     var ccTodayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
@@ -1867,7 +1867,13 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     var body = '清掃が完了しました。\n\n';
     body += 'チェックアウト日: ' + fmtCODate + '\n';
     body += '清掃担当: ' + (staffName || '不明') + '\n';
-    body += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '\n\n';
+    body += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '\n';
+    var ratingLabels = ['未評価', 'とても汚い', '汚い', '普通', 'きれい', 'とてもきれい', '完璧'];
+    var ratingNum = parseInt(rating) || 0;
+    var ratingStars = '';
+    for (var ri = 0; ri < ratingNum; ri++) ratingStars += '★';
+    for (var rj = ratingNum; rj < 5; rj++) ratingStars += '☆';
+    body += '利用状態: ' + ratingStars + ' ' + (ratingLabels[ratingNum + 1] || '') + '\n\n';
 
     if (supplyList.length > 0) {
       body += '【要補充項目】\n';
@@ -1906,7 +1912,8 @@ function notifyCleaningComplete(checkoutDate, staffName) {
     htmlBody += '<p>清掃が完了しました。</p>';
     htmlBody += '<p>チェックアウト日: ' + fmtCODate + '<br>';
     htmlBody += '清掃担当: ' + (staffName || '不明') + '<br>';
-    htmlBody += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '</p>';
+    htmlBody += '完了時刻: ' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm') + '<br>';
+    htmlBody += '利用状態: ' + ratingStars + ' ' + (ratingLabels[ratingNum + 1] || '') + '</p>';
 
     if (supplyList.length > 0) {
       htmlBody += '<p><strong>【要補充項目】</strong></p><ul>';
@@ -1944,7 +1951,7 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       // LINE送信
       try {
         if (ch.owner_line || ch.group_line || ch.staff_line) {
-          var tmpl = clMap['CL_LINE_清掃完了メッセージ'] || '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
+          var tmpl = clMap['CL_LINE_清掃完了メッセージ'] || '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n利用状態: {利用状態}\n-------------------\n{要補充}\n{メモ}';
           var nowTime = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'HH:mm');
           var supplyText = supplyList.length > 0 ? '【要補充】\n' + supplyList.map(function(s) { return '・' + s; }).join('\n') : '';
           var memoText = memoList.length > 0 ? '【メモ】\n' + memoList.map(function(m) {
@@ -1953,10 +1960,12 @@ function notifyCleaningComplete(checkoutDate, staffName) {
             line += '(' + m.by + ')';
             return line;
           }).join('\n') : '';
+          var ratingText = ratingStars + ' ' + (ratingLabels[ratingNum + 1] || '');
           var lineMsg = tmpl
             .replace(/\{チェックアウト日\}/g, clFormatDateForNotif_(checkoutDate))
             .replace(/\{担当者\}/g, staffName || '不明')
             .replace(/\{完了時刻\}/g, nowTime)
+            .replace(/\{利用状態\}/g, ratingText)
             .replace(/\{要補充\}/g, supplyText)
             .replace(/\{メモ\}/g, memoText);
           lineMsg = lineMsg.replace(/\n{3,}/g, '\n\n').trim();
@@ -1980,9 +1989,9 @@ function notifyCleaningComplete(checkoutDate, staffName) {
       var notifSheet = bookingSs.getSheetByName('通知履歴');
       if (notifSheet) {
         var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
-        var notifMsg = '清掃完了: ' + checkoutDate + ' 担当: ' + (staffName || '不明');
+        var notifMsg = '清掃完了: ' + checkoutDate + ' 担当: ' + (staffName || '不明') + ' / 利用状態: ' + ratingStars;
         if (supplyList.length > 0) notifMsg += ' / 要補充: ' + supplyList.join(', ');
-        var notifData = JSON.stringify({ type: 'cleaningComplete', checkoutDate: checkoutDate, staff: staffName });
+        var notifData = JSON.stringify({ type: 'cleaningComplete', checkoutDate: checkoutDate, staff: staffName, rating: ratingNum });
         var nRow = notifSheet.getLastRow() + 1;
         var nCols = Math.max(notifSheet.getLastColumn(), 5);
         if (nCols < 5) nCols = 5;

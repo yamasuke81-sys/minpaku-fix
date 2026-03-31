@@ -1525,7 +1525,7 @@
   <div class="header">
     <div class="header-top">
       <div class="header-left">
-        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0328a</span></div>
+        <div class="header-title">清掃チェックリスト <span style="font-size:9px;font-weight:normal;opacity:0.6;">v0331d</span></div>
         <div class="header-date" id="headerDate"></div>
       </div>
       <div class="date-nav">
@@ -1812,8 +1812,8 @@
                 <label style="font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;"><input type="checkbox" data-ch="group_line"> LINEグループ</label>
               </div>
             </div>
-            <textarea id="clLineCleanCompleteMsg" rows="5" placeholder="デフォルト:&#10;清掃完了通知&#10;{チェックアウト日}&#10;{完了時刻}&#10;{担当者}&#10;-------------------&#10;{要補充}&#10;{メモ}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;margin-top:6px;"></textarea>
-            <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {チェックアウト日} {完了時刻} {担当者} {要補充} {メモ}</p>
+            <textarea id="clLineCleanCompleteMsg" rows="5" placeholder="デフォルト:&#10;清掃完了通知&#10;{チェックアウト日}&#10;{完了時刻}&#10;{担当者}&#10;利用状態: {利用状態}&#10;-------------------&#10;{要補充}&#10;{メモ}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:12px;resize:vertical;box-sizing:border-box;margin-top:6px;"></textarea>
+            <p style="font-size:11px;color:#999;margin-top:4px;">プレースホルダー: {チェックアウト日} {完了時刻} {担当者} {利用状態} {要補充} {メモ}</p>
           </div>
 
           <!-- クリーニング状況通知 -->
@@ -1896,6 +1896,50 @@
     // DOMベースのモーダルで完全に代替する（全プラットフォーム共通）
 
     /** カスタム確認モーダル（confirm()代替）- Promise版 */
+    var _ratingLabels = ['未評価', 'とても汚い', '汚い', '普通', 'きれい', 'とてもきれい', '完璧'];
+
+    function showRatingModal() {
+      return new Promise(function(resolve) {
+        var ov = document.getElementById('ratingOverlay');
+        var stars = ov.querySelectorAll('.rating-star');
+        var label = document.getElementById('ratingLabel');
+        var okBtn = document.getElementById('ratingOk');
+        var cancelBtn = document.getElementById('ratingCancel');
+        var selected = 0;
+
+        function updateStars(val) {
+          selected = val;
+          stars.forEach(function(s) {
+            var v = parseInt(s.getAttribute('data-val'));
+            s.style.color = v <= val ? '#f39c12' : '#ddd';
+          });
+          label.textContent = '★' + val + ': ' + (_ratingLabels[val + 1] || '');
+        }
+
+        // 初期状態: ★0
+        updateStars(0);
+
+        stars.forEach(function(s) {
+          s.onclick = function() {
+            var v = parseInt(s.getAttribute('data-val'));
+            // 同じ星をタップで★0に戻す
+            updateStars(v === selected ? 0 : v);
+          };
+        });
+
+        ov.style.display = 'flex';
+
+        function cleanup() {
+          ov.style.display = 'none';
+          okBtn.onclick = null;
+          cancelBtn.onclick = null;
+          stars.forEach(function(s) { s.onclick = null; });
+        }
+        okBtn.onclick = function() { cleanup(); resolve(selected); };
+        cancelBtn.onclick = function() { cleanup(); resolve(null); };
+      });
+    }
+
     function customConfirm(msg) {
       return new Promise(function(resolve) {
         var ov = document.getElementById('customConfirmOverlay');
@@ -2347,7 +2391,7 @@
     // === LINE通知設定 ===
     var _clLineTargets = [];
 
-    var _CL_DEFAULT_CLEAN_COMPLETE_MSG = '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n-------------------\n{要補充}\n{メモ}';
+    var _CL_DEFAULT_CLEAN_COMPLETE_MSG = '清掃完了通知\n{チェックアウト日}\n{完了時刻}\n{担当者}\n利用状態: {利用状態}\n-------------------\n{要補充}\n{メモ}';
     var _CL_DEFAULT_LAUNDRY_MSG = '{ステップ}\n{チェックアウト日}\n{時刻}\n{担当者}';
 
     // チャンネルデフォルト値（メインappと同じ5フラグ形式: owner_email,owner_line,staff_email,staff_line,group_line）
@@ -5214,7 +5258,10 @@
 
       customConfirm(confirmMsg).then(function(ok) {
         if (!ok) return;
-        callGAS('notifyCleaningComplete', [checkoutDate, who]).then(function(res) {
+        return showRatingModal();
+      }).then(function(rating) {
+        if (rating === null || rating === undefined) return;
+        callGAS('notifyCleaningComplete', [checkoutDate, who, rating]).then(function(res) {
           if (res.success) {
             alert('清掃完了通知を送信しました！お疲れ様でした！');
             loadCompletionStatus();
@@ -7305,6 +7352,27 @@
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button id="customConfirmCancel" style="padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>
         <button id="customConfirmOk" style="padding:8px 16px;border:none;border-radius:6px;background:#0d6efd;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 利用状態評価モーダル -->
+  <div id="ratingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:20px 20px 16px;max-width:85vw;min-width:280px;box-shadow:0 8px 32px rgba(0,0,0,0.3);text-align:center;">
+      <div style="font-size:15px;font-weight:600;color:#333;margin-bottom:4px;">利用状態の評価</div>
+      <div style="font-size:12px;color:#888;margin-bottom:14px;">ゲストの利用状態を★で評価してください</div>
+      <div id="ratingStars" style="display:flex;justify-content:center;gap:6px;margin-bottom:6px;">
+        <span class="rating-star" data-val="0" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
+        <span class="rating-star" data-val="1" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
+        <span class="rating-star" data-val="2" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
+        <span class="rating-star" data-val="3" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
+        <span class="rating-star" data-val="4" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
+        <span class="rating-star" data-val="5" style="font-size:36px;cursor:pointer;color:#ddd;transition:color 0.15s;">&#9733;</span>
+      </div>
+      <div id="ratingLabel" style="font-size:13px;color:#666;margin-bottom:14px;min-height:20px;">★0: 未評価</div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button id="ratingCancel" style="padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#666;font-size:14px;cursor:pointer;">キャンセル</button>
+        <button id="ratingOk" style="padding:8px 20px;border:none;border-radius:6px;background:#27ae60;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">評価して完了送信</button>
       </div>
     </div>
   </div>

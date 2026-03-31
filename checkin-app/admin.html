@@ -535,23 +535,25 @@ function buildGuestDetail(g) {
       if (gg.address) html += detailItem('住所', gg.address);
       if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
       html += '</div>';
-      // パスポート写真（直接thumbnail URL方式）
+      // パスポート写真 — 3形式を同時テスト
       if (gg.passportPhotoUrl) {
-        var ppThumbUrl = gg.passportPhotoUrl;
-        var ppFullUrl = gg.passportPhotoUrl;
-        if (ppThumbUrl.indexOf('drive.google.com') > -1) {
-          var ppFid = ppThumbUrl.match(/[-\w]{25,}/);
-          if (ppFid) {
-            // thumbnail形式はiframe内で認証エラーになるため、uc?export=view形式を使用
-            ppThumbUrl = 'https://drive.google.com/uc?export=view&id=' + ppFid[0];
-            ppFullUrl = 'https://drive.google.com/uc?export=view&id=' + ppFid[0];
-          }
-        }
+        var ppFid = (gg.passportPhotoUrl.match(/[-\w]{25,}/) || [])[0] || '';
         html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-          '<img src="' + escapeHtml(ppThumbUrl) + '" ' +
-          'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
-          'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(ppFullUrl).replace(/'/g, "\\'") + '\')" ' +
-          'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'"></div>';
+          '<div style="font-size:.55rem;color:#aaa;word-break:break-all;">[DEBUG] fileId: ' + escapeHtml(ppFid) + '</div>';
+        if (ppFid) {
+          html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.3rem;">';
+          // 形式1: lh3.googleusercontent.com
+          html += '<div><div style="font-size:.5rem;color:#888;">lh3</div>' +
+            '<img src="https://lh3.googleusercontent.com/d/' + ppFid + '=w300" style="max-width:80px;border-radius:.3rem;" onerror="this.alt=\'×lh3\';this.style.cssText=\'border:1px solid red;padding:4px;font-size:10px;\'"></div>';
+          // 形式2: drive.google.com/thumbnail
+          html += '<div><div style="font-size:.5rem;color:#888;">thumbnail</div>' +
+            '<img src="https://drive.google.com/thumbnail?id=' + ppFid + '&sz=w300" style="max-width:80px;border-radius:.3rem;" onerror="this.alt=\'×thumb\';this.style.cssText=\'border:1px solid red;padding:4px;font-size:10px;\'"></div>';
+          // 形式3: drive.google.com/uc?export=view
+          html += '<div><div style="font-size:.5rem;color:#888;">uc export</div>' +
+            '<img src="https://drive.google.com/uc?export=view&id=' + ppFid + '" style="max-width:80px;border-radius:.3rem;" onerror="this.alt=\'×uc\';this.style.cssText=\'border:1px solid red;padding:4px;font-size:10px;\'"></div>';
+          html += '</div>';
+        }
+        html += '</div>';
       } else {
         html += '<div style="margin-top:.3rem;font-size:.6rem;color:#aaa;">[DEBUG] passportPhotoUrl: (空)</div>';
       }

@@ -548,6 +548,7 @@ function buildGuestDetail(g) {
           }
         }
         html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+          '<div style="font-size:.6rem;color:#aaa;word-break:break-all;margin-bottom:.2rem;">[DEBUG URL] ' + escapeHtml(gg.passportPhotoUrl) + '</div>' +
           '<img src="' + escapeHtml(thumbUrl) + '" ' +
           'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
           'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(fullUrl).replace(/'/g, "\\'") + '\')" ' +

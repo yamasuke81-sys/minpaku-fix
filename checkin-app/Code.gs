@@ -336,54 +336,86 @@ function getTestSearchResult_() {
   };
 }
 
+/** テスト予約のカラムマップ（colIndex → フィールドへの対応） */
+var TEST_COL_MAP_ = {
+  checkIn: 0, checkOut: 1, guestCount: 2, guestCountInfants: 3,
+  prevStay: 4, nextStay: 5, telCols: [6, 7],
+  guestNameCols: [8, 14, 15], addressCols: [9, 16, 17], ageCols: [10, 18, 19],
+  nationalityCols: [11, 20, 21], passportNumberCols: [12, 22, 23], passportPhotoCols: [13, 24, 25]
+};
+
+/** テスト予約のデフォルトゲストデータ */
+var TEST_GUESTS_DEFAULT_ = [
+  {
+    name: null, // TEST_GUEST_.nameを使う
+    address: null, age: null, nationality: null, passportNumber: null, passportPhotoUrl: null
+  },
+  {
+    name: '西山花子',
+    address: '東京都渋谷区テスト1-2-3',
+    age: '32',
+    nationality: 'アメリカ / USA（テスト）',
+    passportNumber: 'US9876543',
+    passportPhotoUrl: 'https://placehold.co/300x400/d4edda/155724?text=PASSPORT%0APHOTO+2%0A(TEST)'
+  },
+  {
+    name: '西山太郎',
+    address: '東京都渋谷区テスト1-2-3',
+    age: '5',
+    nationality: '日本 / Japan（テスト）',
+    passportNumber: 'TK7654321',
+    passportPhotoUrl: 'https://placehold.co/300x400/cce5ff/004085?text=PASSPORT%0APHOTO+3%0A(TEST)'
+  }
+];
+
 function getTestGuestDetails_() {
+  // ScriptPropertiesから編集データを取得
+  var testEdits = JSON.parse(PropertiesService.getScriptProperties().getProperty('TEST_EDITS') || '{}');
+  var hasEdits = Object.keys(testEdits).length > 0;
+  var editedCols = {};
+  for (var k in testEdits) editedCols[k] = true;
+
+  /** 編集があればそちらを優先 */
+  function tv_(colIndex, defaultVal) {
+    if (testEdits[String(colIndex)]) return testEdits[String(colIndex)];
+    return defaultVal || '';
+  }
+
+  var cm = TEST_COL_MAP_;
+  var guests = [];
+  var defaults = [
+    { name: TEST_GUEST_.name, address: TEST_GUEST_.address, age: TEST_GUEST_.age, nationality: TEST_GUEST_.nationality, passportNumber: TEST_GUEST_.passportNumber, passportPhotoUrl: TEST_GUEST_.passportPhotoUrl },
+    TEST_GUESTS_DEFAULT_[1],
+    TEST_GUESTS_DEFAULT_[2]
+  ];
+
+  for (var gi = 0; gi < cm.guestNameCols.length; gi++) {
+    var d = defaults[gi];
+    guests.push({
+      index: gi,
+      name: tv_(cm.guestNameCols[gi], d.name),
+      address: tv_(cm.addressCols[gi], d.address),
+      age: tv_(cm.ageCols[gi], d.age),
+      nationality: tv_(cm.nationalityCols[gi], d.nationality),
+      passportNumber: tv_(cm.passportNumberCols[gi], d.passportNumber),
+      passportPhotoUrl: d.passportPhotoUrl // 写真URLは編集対象外
+    });
+  }
+
   return {
     rowNumber: TEST_ROW_NUMBER_,
-    checkIn: TEST_GUEST_.checkIn,
-    checkOut: TEST_GUEST_.checkOut,
-    guestCount: TEST_GUEST_.guestCount,
-    guestCountInfants: TEST_GUEST_.guestCountInfants,
-    prevStay: TEST_GUEST_.prevStay,
-    nextStay: TEST_GUEST_.nextStay,
-    guests: [
-      {
-        index: 0,
-        name: TEST_GUEST_.name,
-        address: TEST_GUEST_.address,
-        age: TEST_GUEST_.age,
-        nationality: TEST_GUEST_.nationality,
-        passportNumber: TEST_GUEST_.passportNumber,
-        passportPhotoUrl: TEST_GUEST_.passportPhotoUrl
-      },
-      {
-        index: 1,
-        name: '西山花子',
-        address: '東京都渋谷区テスト1-2-3',
-        age: '32',
-        nationality: 'アメリカ / USA（テスト）',
-        passportNumber: 'US9876543',
-        passportPhotoUrl: 'https://placehold.co/300x400/d4edda/155724?text=PASSPORT%0APHOTO+2%0A(TEST)'
-      },
-      {
-        index: 2,
-        name: '西山太郎',
-        address: '東京都渋谷区テスト1-2-3',
-        age: '5',
-        nationality: '日本 / Japan（テスト）',
-        passportNumber: 'TK7654321',
-        passportPhotoUrl: 'https://placehold.co/300x400/cce5ff/004085?text=PASSPORT%0APHOTO+3%0A(TEST)'
-      }
-    ],
-    tel1: TEST_GUEST_.phone,
-    tel2: TEST_GUEST_.tel2,
-    hasEdits: false,
-    editedCols: {},
-    colMap: {
-      checkIn: 0, checkOut: 1, guestCount: 2, guestCountInfants: 3,
-      prevStay: 4, nextStay: 5, telCols: [6, 7],
-      guestNameCols: [8, 14, 15], addressCols: [9, 16, 17], ageCols: [10, 18, 19],
-      nationalityCols: [11, 20, 21], passportNumberCols: [12, 22, 23], passportPhotoCols: [13, 24, 25]
-    }
+    checkIn: tv_(cm.checkIn, TEST_GUEST_.checkIn),
+    checkOut: tv_(cm.checkOut, TEST_GUEST_.checkOut),
+    guestCount: tv_(cm.guestCount, TEST_GUEST_.guestCount),
+    guestCountInfants: tv_(cm.guestCountInfants, TEST_GUEST_.guestCountInfants),
+    prevStay: tv_(cm.prevStay, TEST_GUEST_.prevStay),
+    nextStay: tv_(cm.nextStay, TEST_GUEST_.nextStay),
+    guests: guests,
+    tel1: tv_(cm.telCols[0], TEST_GUEST_.phone),
+    tel2: tv_(cm.telCols[1], TEST_GUEST_.tel2),
+    hasEdits: hasEdits,
+    editedCols: editedCols,
+    colMap: cm
   };
 }
 
@@ -603,8 +635,11 @@ function getGuestDetails(rowNumber) {
 /** 単一セルを編集シートに記録（フォームの回答1は変更しない） */
 function updateGuestField(rowNumber, colIndex, value) {
   try {
-    // テスト予約は保存しない（UIの動作確認のみ）
+    // テスト予約はScriptPropertiesに保存
     if (rowNumber === TEST_ROW_NUMBER_) {
+      var testEdits = JSON.parse(PropertiesService.getScriptProperties().getProperty('TEST_EDITS') || '{}');
+      testEdits[String(colIndex)] = value;
+      PropertiesService.getScriptProperties().setProperty('TEST_EDITS', JSON.stringify(testEdits));
       return JSON.stringify({ success: true });
     }
 
@@ -658,7 +693,8 @@ function updateGuestField(rowNumber, colIndex, value) {
 function resetGuestEdits(rowNumber) {
   try {
     if (rowNumber === TEST_ROW_NUMBER_) {
-      return JSON.stringify({ success: true, deleted: 0 });
+      PropertiesService.getScriptProperties().deleteProperty('TEST_EDITS');
+      return JSON.stringify({ success: true, deleted: 1 });
     }
 
     var editSheet = getEditSheet_();
@@ -1059,26 +1095,30 @@ function getAdminGuestList() {
       return (a.checkIn || '').localeCompare(b.checkIn || '');
     });
 
-    // テスト予約を先頭に追加（管理者画面の名簿でもテストデータを確認可能）
+    // テスト予約を先頭に追加（編集データも反映）
     var testDetail = getTestGuestDetails_();
+    var testGuestNames = [];
+    for (var tgi = 0; tgi < testDetail.guests.length; tgi++) {
+      testGuestNames.push(testDetail.guests[tgi].name);
+    }
     merged.unshift({
       rowNumber: TEST_ROW_NUMBER_,
-      guestName: TEST_GUEST_.name + '（テスト）',
-      guestNames: [TEST_GUEST_.name],
+      guestName: (testDetail.guests.length > 0 ? testDetail.guests[0].name : TEST_GUEST_.name) + '（テスト）',
+      guestNames: testGuestNames,
       guests: testDetail.guests,
-      checkIn: TEST_GUEST_.checkIn,
-      checkOut: TEST_GUEST_.checkOut,
-      checkInParsed: TEST_GUEST_.checkIn.replace(/\s.*$/, ''),
-      guestCount: TEST_GUEST_.guestCount,
-      guestCountInfants: TEST_GUEST_.guestCountInfants,
-      tel: TEST_GUEST_.phone,
-      tel2: TEST_GUEST_.tel2,
+      checkIn: testDetail.checkIn,
+      checkOut: testDetail.checkOut,
+      checkInParsed: testDetail.checkIn.replace(/\s.*$/, ''),
+      guestCount: testDetail.guestCount,
+      guestCountInfants: testDetail.guestCountInfants,
+      tel: testDetail.tel1,
+      tel2: testDetail.tel2,
       email: TEST_GUEST_.email,
-      prevStay: TEST_GUEST_.prevStay,
-      nextStay: TEST_GUEST_.nextStay,
-      nationality: TEST_GUEST_.nationality,
+      prevStay: testDetail.prevStay,
+      nextStay: testDetail.nextStay,
+      nationality: testDetail.guests.length > 0 ? testDetail.guests[0].nationality : '',
       checkinConfirmedAt: '',
-      hasEdits: false
+      hasEdits: testDetail.hasEdits
     });
 
     return JSON.stringify({ success: true, guests: merged });

@@ -883,7 +883,15 @@ function getAdminGuestList() {
           nationality: g < map.nationalityCols.length ? cellVal_(map.nationalityCols[g]) : '',
           age: g < map.ageCols.length ? cellVal_(map.ageCols[g]) : '',
           address: g < map.addressCols.length ? cellVal_(map.addressCols[g]) : '',
-          passportNumber: g < map.passportNumberCols.length ? cellVal_(map.passportNumberCols[g]) : ''
+          passportNumber: g < map.passportNumberCols.length ? cellVal_(map.passportNumberCols[g]) : '',
+          passportPhotoUrl: (function() {
+            // パスポート写真URL（getGuestDetailsと同じパターン）
+            if (g < map.passportPhotoCols.length && map.passportPhotoCols[g] >= 0) {
+              var pVal = String(row[map.passportPhotoCols[g]] || '').trim();
+              if (pVal && pVal.indexOf('http') === 0) return pVal;
+            }
+            return '';
+          })()
         });
       }
 

@@ -466,7 +466,20 @@ function buildGuestDetail(g) {
       if (gg.age) html += detailItem('年齢', gg.age);
       if (gg.address) html += detailItem('住所', gg.address);
       if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
-      html += '</div></div>';
+      html += '</div>';
+      // パスポート写真（getGuestDetailsと同じ表示）
+      if (gg.passportPhotoUrl) {
+        var thumbUrl = gg.passportPhotoUrl;
+        if (thumbUrl.indexOf('drive.google.com') > -1) {
+          var m = thumbUrl.match(/[-\w]{25,}/);
+          if (m) thumbUrl = 'https://drive.google.com/thumbnail?id=' + m[0] + '&sz=w300';
+        }
+        html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+          '<a href="' + escapeHtml(gg.passportPhotoUrl) + '" target="_blank">' +
+          '<img src="' + escapeHtml(thumbUrl) + '" style="max-width:120px;border-radius:.4rem;margin-top:.2rem;" onerror="this.style.display=\'none\'">' +
+          '</a></div>';
+      }
+      html += '</div>';
     }
   }
   return html;

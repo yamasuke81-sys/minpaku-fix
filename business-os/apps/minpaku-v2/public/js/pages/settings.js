@@ -19,98 +19,44 @@ const SettingsPage = {
           </p>
 
           <div class="alert alert-info">
-            <strong>手順:</strong>
-            <ol class="mb-0">
-              <li>各GASプロジェクトのエディタを開く</li>
-              <li>新規スクリプト「migration」を作成、<strong>汎用エクスポートスクリプト</strong>を貼り付け</li>
-              <li><code>exportAll</code> を実行 → ログのJSONをコピー</li>
-              <li>下の対応アプリ欄に貼り付け → 「一括インポート」</li>
-            </ol>
+            <strong>スプレッドシートのURLを貼るだけ!</strong><br>
+            各アプリのスプレッドシートURLを入力して「一括取込」を押すだけで全データを自動インポートします。
           </div>
 
-          <!-- 各アプリのJSON入力欄 -->
-          <div class="accordion mb-3" id="migrationAccordion">
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#app1">
-                  <i class="bi bi-house-door me-2"></i> 民泊メイン
-                  <span class="badge bg-secondary ms-2" id="badge-main">未入力</span>
-                </button>
-              </h2>
-              <div id="app1" class="accordion-collapse collapse show" data-bs-parent="#migrationAccordion">
-                <div class="accordion-body">
-                  <small class="text-muted">予約、スタッフ、募集、報酬、設定データ</small>
-                  <textarea class="form-control font-monospace mt-2" id="jsonMain" rows="4" placeholder="民泊メインのJSON"></textarea>
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#app2">
-                  <i class="bi bi-check2-square me-2"></i> 清掃チェックリスト
-                  <span class="badge bg-secondary ms-2" id="badge-checklist">未入力</span>
-                </button>
-              </h2>
-              <div id="app2" class="accordion-collapse collapse" data-bs-parent="#migrationAccordion">
-                <div class="accordion-body">
-                  <small class="text-muted">チェックリストマスタ、記録、写真、補充記録</small>
-                  <textarea class="form-control font-monospace mt-2" id="jsonChecklist" rows="4" placeholder="チェックリストのJSON"></textarea>
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#app3">
-                  <i class="bi bi-door-open me-2"></i> チェックイン
-                  <span class="badge bg-secondary ms-2" id="badge-checkin">未入力</span>
-                </button>
-              </h2>
-              <div id="app3" class="accordion-collapse collapse" data-bs-parent="#migrationAccordion">
-                <div class="accordion-body">
-                  <small class="text-muted">チェックイン情報、ゲスト案内データ</small>
-                  <textarea class="form-control font-monospace mt-2" id="jsonCheckin" rows="4" placeholder="チェックインのJSON"></textarea>
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#app4">
-                  <i class="bi bi-bell me-2"></i> アラーム
-                  <span class="badge bg-secondary ms-2" id="badge-alarm">未入力</span>
-                </button>
-              </h2>
-              <div id="app4" class="accordion-collapse collapse" data-bs-parent="#migrationAccordion">
-                <div class="accordion-body">
-                  <small class="text-muted">アラーム設定、通知履歴</small>
-                  <textarea class="form-control font-monospace mt-2" id="jsonAlarm" rows="4" placeholder="アラームのJSON"></textarea>
-                </div>
-              </div>
-            </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#app5">
-                  <i class="bi bi-file-earmark-pdf me-2"></i> PDFリネーム
-                  <span class="badge bg-secondary ms-2" id="badge-pdf">未入力</span>
-                </button>
-              </h2>
-              <div id="app5" class="accordion-collapse collapse" data-bs-parent="#migrationAccordion">
-                <div class="accordion-body">
-                  <small class="text-muted">リネームルール、処理履歴</small>
-                  <textarea class="form-control font-monospace mt-2" id="jsonPdf" rows="4" placeholder="PDFリネームのJSON"></textarea>
-                </div>
-              </div>
-            </div>
+          <div class="alert alert-warning small">
+            <strong>事前準備（1回だけ）:</strong> 各スプレッドシートの共有設定を「リンクを知っている全員 → 閲覧者」にしてください。<br>
+            インポート完了後に共有を戻してOKです。
           </div>
 
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="migrationConfirm">
-            <label class="form-check-label" for="migrationConfirm">
-              インポートすることを確認しました（既存データがあっても追加されます）
-            </label>
+          <!-- スプレッドシートURL入力 -->
+          <div class="mb-3">
+            <label class="form-label fw-bold"><i class="bi bi-house-door"></i> 民泊メイン</label>
+            <input type="text" class="form-control" id="urlMain" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
+            <small class="text-muted">予約、スタッフ、募集、報酬データ</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold"><i class="bi bi-check2-square"></i> 清掃チェックリスト</label>
+            <input type="text" class="form-control" id="urlChecklist" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
+            <small class="text-muted">チェックリストマスタ、記録、写真</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold"><i class="bi bi-door-open"></i> チェックイン</label>
+            <input type="text" class="form-control" id="urlCheckin" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
+            <small class="text-muted">チェックイン情報</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold"><i class="bi bi-bell"></i> アラーム</label>
+            <input type="text" class="form-control" id="urlAlarm" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
+            <small class="text-muted">アラーム設定、通知履歴</small>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold"><i class="bi bi-file-earmark-pdf"></i> PDFリネーム</label>
+            <input type="text" class="form-control" id="urlPdf" placeholder="https://docs.google.com/spreadsheets/d/xxxxx/edit">
+            <small class="text-muted">リネームルール、処理履歴</small>
           </div>
 
-          <button class="btn btn-warning btn-lg w-100" id="btnMigrate" disabled>
-            <i class="bi bi-upload"></i> 一括インポート実行
+          <button class="btn btn-warning btn-lg w-100" id="btnAutoImport">
+            <i class="bi bi-cloud-download"></i> 一括取込（全自動）
           </button>
 
           <div class="mt-3 d-none" id="migrationResult">
@@ -118,18 +64,13 @@ const SettingsPage = {
           </div>
 
           <hr>
-
-          <!-- 簡易入力 -->
-          <h6><i class="bi bi-lightning"></i> 簡易入力（スプレッドシートからコピペ）</h6>
-          <p class="text-muted small">
-            スタッフデータをタブ区切りでコピペ。列順: 名前, 住所, メール, 銀行名, 支店名, 口座種別, 口座番号, 口座名義, 有効(Y/N)
-          </p>
-          <textarea class="form-control font-monospace mb-2" id="tsvStaffData" rows="4"
-            placeholder="田中太郎&#9;東京都...&#9;tanaka@example.com&#9;三菱UFJ&#9;渋谷支店&#9;普通&#9;1234567&#9;タナカタロウ&#9;Y"></textarea>
-          <button class="btn btn-outline-primary" id="btnImportTsv">
-            <i class="bi bi-table"></i> スタッフをインポート
-          </button>
-          <div class="mt-3 d-none" id="tsvResult"><div class="alert" id="tsvAlert"></div></div>
+          <details>
+            <summary class="text-muted small">手動インポート（JSON貼り付け）</summary>
+            <div class="mt-2">
+              <textarea class="form-control font-monospace mb-2" id="migrationJson" rows="4" placeholder="JSON"></textarea>
+              <button class="btn btn-outline-warning btn-sm" id="btnMigrate"><i class="bi bi-upload"></i> JSONインポート</button>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -157,127 +98,159 @@ const SettingsPage = {
     this.bindEvents();
   },
 
-  appFields: [
-    { id: "jsonMain", badge: "badge-main", label: "民泊メイン" },
-    { id: "jsonChecklist", badge: "badge-checklist", label: "チェックリスト" },
-    { id: "jsonCheckin", badge: "badge-checkin", label: "チェックイン" },
-    { id: "jsonAlarm", badge: "badge-alarm", label: "アラーム" },
-    { id: "jsonPdf", badge: "badge-pdf", label: "PDFリネーム" },
+  SHEETS_API_KEY: firebaseConfig.apiKey, // Firebase APIキーでSheets APIも使える
+
+  urlFields: [
+    { id: "urlMain", label: "民泊メイン" },
+    { id: "urlChecklist", label: "チェックリスト" },
+    { id: "urlCheckin", label: "チェックイン" },
+    { id: "urlAlarm", label: "アラーム" },
+    { id: "urlPdf", label: "PDFリネーム" },
   ],
 
   bindEvents() {
-    // 各テキストエリアの入力検知→バッジ更新
-    for (const field of this.appFields) {
-      const el = document.getElementById(field.id);
-      const badge = document.getElementById(field.badge);
-      if (el && badge) {
-        el.addEventListener("input", () => {
-          const val = el.value.trim();
-          if (val) {
-            try {
-              const data = JSON.parse(val);
-              const sheetCount = data.sheets ? Object.keys(data.sheets).length : 0;
-              badge.className = "badge bg-success ms-2";
-              badge.textContent = `${data.appName || "不明"} (${sheetCount}シート)`;
-            } catch {
-              badge.className = "badge bg-danger ms-2";
-              badge.textContent = "JSON不正";
-            }
-          } else {
-            badge.className = "badge bg-secondary ms-2";
-            badge.textContent = "未入力";
-          }
-        });
-      }
-    }
+    // 自動取込ボタン
+    document.getElementById("btnAutoImport").addEventListener("click", () => this.autoImportAll());
 
-    // チェックボックスで移行ボタン有効化
-    document.getElementById("migrationConfirm").addEventListener("change", (e) => {
-      document.getElementById("btnMigrate").disabled = !e.target.checked;
-    });
-
-    // 一括インポート
-    document.getElementById("btnMigrate").addEventListener("click", () => this.importAllApps());
+    // 手動JSONインポート
+    document.getElementById("btnMigrate").addEventListener("click", () => this.importJson());
 
     // TSVインポート
     document.getElementById("btnImportTsv").addEventListener("click", () => this.importTsv());
   },
 
   /**
-   * 全アプリの一括インポート
-   * 各テキストエリアのJSONを順番にFirestoreへ投入
+   * スプレッドシートURLからIDを抽出
    */
-  async importAllApps() {
+  extractSheetId(url) {
+    if (!url) return null;
+    const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : url.trim(); // URLじゃなければIDそのままとして扱う
+  },
+
+  /**
+   * Google Sheets API v4 でスプレッドシートの全データを取得
+   */
+  async fetchSpreadsheet(sheetId) {
+    // まずシート名一覧を取得
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?key=${this.SHEETS_API_KEY}`;
+    const metaRes = await fetch(metaUrl);
+    if (!metaRes.ok) {
+      const err = await metaRes.json();
+      throw new Error(`Sheets API: ${err.error?.message || metaRes.statusText}`);
+    }
+    const meta = await metaRes.json();
+    const sheetNames = meta.sheets.map(s => s.properties.title);
+
+    // 全シートのデータを一括取得（batchGet）
+    const ranges = sheetNames.map(n => encodeURIComponent(n));
+    const dataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchGet?key=${this.SHEETS_API_KEY}&${ranges.map(r => `ranges=${r}`).join("&")}`;
+    const dataRes = await fetch(dataUrl);
+    if (!dataRes.ok) {
+      const err = await dataRes.json();
+      throw new Error(`Sheets API batchGet: ${err.error?.message || dataRes.statusText}`);
+    }
+    const batchData = await dataRes.json();
+
+    // シートごとにヘッダー+データ行に変換
+    const result = {};
+    for (let i = 0; i < sheetNames.length; i++) {
+      const sheetName = sheetNames[i];
+      const values = batchData.valueRanges?.[i]?.values || [];
+      if (values.length === 0) {
+        result[sheetName] = [];
+        continue;
+      }
+
+      const headers = values[0];
+      const rows = [];
+      for (let r = 1; r < values.length; r++) {
+        const row = values[r];
+        // 全空行スキップ
+        if (!row || row.every(v => v === "" || v === undefined || v === null)) continue;
+        const obj = {};
+        for (let c = 0; c < headers.length; c++) {
+          obj[headers[c] || `col_${c + 1}`] = (row[c] !== undefined ? row[c] : "");
+        }
+        rows.push(obj);
+      }
+      result[sheetName] = rows;
+    }
+
+    return { title: meta.properties.title, sheets: result };
+  },
+
+  /**
+   * 全アプリの一括自動取込
+   * スプレッドシートURLからGoogle Sheets APIで直接データ取得→Firestoreに投入
+   */
+  async autoImportAll() {
     const resultEl = document.getElementById("migrationResult");
     const alertEl = document.getElementById("migrationAlert");
     resultEl.classList.remove("d-none");
     alertEl.className = "alert alert-info";
-    alertEl.textContent = "一括インポート中...";
+    alertEl.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>取込中...';
 
     const ts = firebase.firestore.FieldValue.serverTimestamp();
     const totalCounts = {};
     let appsDone = 0;
 
     try {
-      for (const field of this.appFields) {
-        const json = document.getElementById(field.id).value.trim();
-        if (!json) continue;
+      for (const field of this.urlFields) {
+        const url = document.getElementById(field.id).value.trim();
+        if (!url) continue;
 
-        const data = JSON.parse(json);
-        const appName = data.appName || field.label;
-        alertEl.textContent = `インポート中: ${appName}...`;
+        const sheetId = this.extractSheetId(url);
+        if (!sheetId) continue;
 
-        // 汎用エクスポート形式: data.sheets にシートごとのデータ
-        if (data.sheets) {
-          for (const [sheetName, sheetData] of Object.entries(data.sheets)) {
-            if (!sheetData.rows || sheetData.rows.length === 0) continue;
+        alertEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${field.label}を取得中...`;
 
-            // コレクション名を決定
-            const collectionName = this.resolveCollectionName(appName, sheetName);
+        const data = await this.fetchSpreadsheet(sheetId);
 
-            let count = 0;
-            for (const row of sheetData.rows) {
-              await db.collection(collectionName).add({
-                ...row,
-                _appSource: appName,
-                _sheetSource: sheetName,
-                _migratedAt: ts,
-              });
-              count++;
-            }
+        alertEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${field.label}をFirestoreに保存中...`;
 
-            const key = `${appName}/${sheetName}`;
-            totalCounts[key] = count;
+        for (const [sheetName, rows] of Object.entries(data.sheets)) {
+          if (!rows || rows.length === 0) continue;
+
+          const collectionName = this.resolveCollectionName(field.label, sheetName);
+          let count = 0;
+
+          for (const row of rows) {
+            await db.collection(collectionName).add({
+              ...row,
+              _appSource: field.label,
+              _sheetSource: sheetName,
+              _spreadsheetTitle: data.title,
+              _migratedAt: ts,
+            });
+            count++;
           }
-        }
 
-        // 旧形式（exportDataForMigration形式）にも対応
-        if (data.staff) {
-          await this.importJson();
-          totalCounts["staff(legacy)"] = data.staff.length;
+          if (count > 0) {
+            totalCounts[`${field.label} / ${sheetName}`] = count;
+          }
         }
 
         appsDone++;
       }
 
-      // 結果表示
       if (appsDone === 0) {
         alertEl.className = "alert alert-warning";
-        alertEl.textContent = "JSONが入力されていません。少なくとも1つのアプリのJSONを貼り付けてください。";
+        alertEl.textContent = "URLが入力されていません。少なくとも1つのスプレッドシートURLを入力してください。";
         return;
       }
 
       const lines = Object.entries(totalCounts)
         .filter(([, v]) => v > 0)
-        .map(([k, v]) => `${k}: ${v}件`);
+        .map(([k, v]) => `<li>${k}: <strong>${v}件</strong></li>`);
 
       alertEl.className = "alert alert-success";
-      alertEl.innerHTML = `<strong>${appsDone}アプリのインポート完了!</strong><br><br>${lines.join("<br>")}`;
+      alertEl.innerHTML = `<strong>${appsDone}アプリのインポート完了!</strong><ul class="mb-0 mt-2">${lines.join("")}</ul>`;
       showToast("完了", `${appsDone}アプリのデータをインポートしました`, "success");
     } catch (e) {
       alertEl.className = "alert alert-danger";
       alertEl.textContent = `エラー: ${e.message}`;
-      console.error("Migration error:", e);
+      console.error("Auto import error:", e);
     }
   },
 

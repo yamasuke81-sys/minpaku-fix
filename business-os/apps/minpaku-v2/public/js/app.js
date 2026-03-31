@@ -9,9 +9,9 @@ const App = {
     dashboard: DashboardPage,
     staff: StaffPage,
     properties: PropertiesPage,
+    settings: SettingsPage,
     // shifts: ShiftsPage,       // 次フェーズで実装
     // invoices: InvoicesPage,   // 次フェーズで実装
-    // settings: SettingsPage,   // 次フェーズで実装
   },
 
   init() {

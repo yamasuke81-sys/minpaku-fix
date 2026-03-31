@@ -314,7 +314,7 @@ var TEST_GUEST_ = {
   age: '35',
   address: '東京都渋谷区テスト1-2-3',
   passportNumber: 'TK1234567',
-  passportPhotoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Golde33443.jpg/220px-Golde33443.jpg',
+  passportPhotoUrl: 'https://placehold.co/300x400/e8e8e8/555?text=PASSPORT%0APHOTO%0A(TEST)',
   prevStay: '東京（テスト）',
   nextStay: '大阪（テスト）',
   tel2: '08012345678',

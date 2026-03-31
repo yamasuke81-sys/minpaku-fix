@@ -3,12 +3,13 @@
  * Firebase Console → プロジェクト設定 → マイアプリ から値を取得して設定
  */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyAtQQwLOK9iL1W7hypXHIf0D_xTaxiYRqs",
+  authDomain: "minpaku-v2.firebaseapp.com",
+  projectId: "minpaku-v2",
+  storageBucket: "minpaku-v2.firebasestorage.app",
+  messagingSenderId: "418111574543",
+  appId: "1:418111574543:web:6b2f386281e39f4d23c97a",
+  measurementId: "G-B1NWL65MDX",
 };
 
 // エミュレータ使用時の設定

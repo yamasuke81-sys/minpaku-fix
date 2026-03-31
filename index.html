@@ -1189,7 +1189,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0327a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0331e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -1912,6 +1912,12 @@
         </div>
         <p class="small text-muted mt-1">オーナー宛に【テスト】プレフィックス付きでテスト送信します。</p>
         <div id="invoiceRequestResult" class="small mt-2" style="display:none;"></div>
+        <!-- DEBUG: 請求書要請の診断パネル -->
+        <div id="invoiceDebugPanel" style="margin-top:12px;padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;font-size:12px;">
+          <strong>[DEBUG] 請求書要請 診断</strong>
+          <button class="btn btn-sm btn-warning ms-2" onclick="runInvoiceDebug()">診断実行</button>
+          <pre id="invoiceDebugOutput" style="margin-top:6px;white-space:pre-wrap;max-height:300px;overflow-y:auto;background:#fff;padding:8px;border-radius:4px;border:1px solid #ddd;">（診断ボタンを押してください）</pre>
+        </div>
       </div>
 
       <div id="settingsConfirmTemplate" style="display:none;">
@@ -9676,6 +9682,40 @@
         subject: '【民泊清掃】{対象年月}分の請求書をご提出ください',
         body: '{スタッフ名} さん\n\nお疲れ様です。\n{対象年月}分の請求書のご提出をお願いいたします。\n\n締切: {締切日}\n\nWebアプリ: {アプリURL}\n\nよろしくお願いいたします。'
       };
+
+      // DEBUG: 請求書要請の診断
+      function runInvoiceDebug() {
+        var out = document.getElementById('invoiceDebugOutput');
+        out.textContent = '診断中...';
+        var result = '';
+        // 1. 設定値を表示
+        var en = document.getElementById('invoiceRequestEnabled');
+        var daySel = document.getElementById('invoiceRequestDay');
+        var timeSel = document.getElementById('invoiceRequestTime');
+        result += '--- フロントエンド設定 ---\n';
+        result += '有効: ' + (en ? en.checked : '要素なし') + '\n';
+        result += '配信日: ' + (daySel ? daySel.value : '要素なし') + '日\n';
+        result += '配信時刻: ' + (timeSel ? timeSel.value : '要素なし') + '\n';
+        result += '今日: ' + new Date().getDate() + '日\n\n';
+        // 2. トリガー一覧を取得
+        google.script.run.withSuccessHandler(function(jsonStr) {
+          try {
+            var res = JSON.parse(jsonStr);
+            result += '--- トリガー一覧 ---\n';
+            if (res.triggers && res.triggers.length > 0) {
+              res.triggers.forEach(function(t) {
+                result += '  ' + t.handler + ' (' + t.type + ')\n';
+              });
+            } else {
+              result += '  （トリガーなし）\n';
+            }
+            result += '\n※ Logger.logの確認: GASエディタ→実行→実行ログ で [DEBUG-INVOICE] を検索';
+            out.textContent = result;
+          } catch (e) { out.textContent = result + '\nトリガー取得エラー: ' + e; }
+        }).withFailureHandler(function(e) {
+          out.textContent = result + '\nトリガー取得失敗: ' + e;
+        }).diagTriggers();
+      }
 
       function loadInvoiceRequestSettings() {
         showTabLoading_('settingsInvoiceRequest');

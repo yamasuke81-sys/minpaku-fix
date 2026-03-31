@@ -6013,7 +6013,7 @@ function checkAndSendInvoiceRequest() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_RECRUIT_SETTINGS);
-    if (!sheet) return;
+    if (!sheet) { Logger.log('[DEBUG-INVOICE] 募集設定シートが見つかりません'); return; }
     var lastRow = Math.max(sheet.getLastRow(), 1);
     var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
     var map = {};
@@ -6022,14 +6022,30 @@ function checkAndSendInvoiceRequest() {
       if (key) map[key] = row[1];
     });
     var enabledVal = map[INVOICE_REQ_KEYS_.enabled];
-    if (!(enabledVal === true || String(enabledVal || '').trim() === 'true')) return;
     var day = parseInt(map[INVOICE_REQ_KEYS_.day], 10) || 25;
+    var timeVal = map[INVOICE_REQ_KEYS_.time];
     var now = new Date();
     var today = now.getDate();
-    // 月末調整: 設定日が今月の日数を超える場合は月末日に送信
     var lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     var effectiveDay = Math.min(day, lastDayOfMonth);
-    if (today !== effectiveDay) return;
+
+    // デバッグログ: 全判定要素を記録
+    Logger.log('[DEBUG-INVOICE] now=' + Utilities.formatDate(now, 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss')
+      + ' enabled=' + JSON.stringify(enabledVal)
+      + ' day=' + day + ' today=' + today + ' effectiveDay=' + effectiveDay
+      + ' timeVal=' + JSON.stringify(timeVal)
+      + ' subject=' + JSON.stringify(map[INVOICE_REQ_KEYS_.subject] || '(未設定)')
+      + ' body=' + (map[INVOICE_REQ_KEYS_.body] ? '(設定あり)' : '(未設定)'));
+
+    if (!(enabledVal === true || String(enabledVal || '').trim() === 'true')) {
+      Logger.log('[DEBUG-INVOICE] スキップ: enabled=' + JSON.stringify(enabledVal));
+      return;
+    }
+    if (today !== effectiveDay) {
+      Logger.log('[DEBUG-INVOICE] スキップ: today=' + today + ' !== effectiveDay=' + effectiveDay);
+      return;
+    }
+    Logger.log('[DEBUG-INVOICE] 条件OK → sendInvoiceRequestEmails() を実行');
     sendInvoiceRequestEmails();
   } catch (e) {
     Logger.log('請求書要請トリガーエラー: ' + e.toString());
@@ -6076,6 +6092,19 @@ function setupInvoiceRequestTrigger() {
   } catch (e) {
     return JSON.stringify({ success: false, error: e.toString() });
   }
+}
+
+/** [DEBUG] 現在のトリガー一覧を返す */
+function diagTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var list = triggers.map(function(t) {
+    return {
+      handler: t.getHandlerFunction(),
+      type: t.getEventType().toString(),
+      uid: t.getUniqueId()
+    };
+  });
+  return JSON.stringify({ success: true, triggers: list });
 }
 
 /**********************************************

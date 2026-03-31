@@ -252,11 +252,46 @@ function verifyPin() {
   });
 }
 
-// ===== パスポート写真拡大表示 =====
-function showPassport(url) {
+// ===== パスポート写真（サーバー経由プロキシ） =====
+function loadPassportImg(imgId, fileId) {
+  callGAS('getPassportThumbnail', [fileId, 300]).then(function(res) {
+    var el = document.getElementById(imgId);
+    if (!el) return;
+    if (res.success && res.dataUrl) {
+      el.innerHTML = '<img src="' + res.dataUrl + '" ' +
+        'style="max-width:120px;border-radius:.4rem;cursor:pointer;" ' +
+        'onclick="event.stopPropagation();loadAndShowPassportFull(\'' + fileId + '\')">';
+    } else {
+      el.innerHTML = '<span style="font-size:.75rem;color:#aaa;">(読込失敗: ' + escapeHtml(res.error || '') + ')</span>';
+    }
+  }).catch(function(err) {
+    var el = document.getElementById(imgId);
+    if (el) el.innerHTML = '<span style="font-size:.75rem;color:#aaa;">(読込エラー)</span>';
+  });
+}
+
+function loadAndShowPassportFull(fileId) {
   var overlay = document.getElementById('passportOverlay');
   var img = document.getElementById('passportFullImg');
-  img.src = url;
+  img.src = '';
+  overlay.style.display = 'flex';
+  img.alt = '読み込み中...';
+  callGAS('getPassportThumbnail', [fileId, 800]).then(function(res) {
+    if (res.success && res.dataUrl) {
+      img.src = res.dataUrl;
+      img.alt = 'パスポート';
+    } else {
+      img.alt = '読込失敗';
+    }
+  }).catch(function() {
+    img.alt = '読込エラー';
+  });
+}
+
+function showPassport(dataUrl) {
+  var overlay = document.getElementById('passportOverlay');
+  var img = document.getElementById('passportFullImg');
+  img.src = dataUrl;
   overlay.style.display = 'flex';
 }
 
@@ -536,24 +571,31 @@ function buildGuestDetail(g) {
       if (gg.address) html += detailItem('住所', gg.address);
       if (gg.passportNumber) html += detailItem('旅券番号', gg.passportNumber);
       html += '</div>';
-      // パスポート写真（サムネイル + タップで拡大オーバーレイ）
+      // パスポート写真
       if (gg.passportPhotoUrl) {
-        var thumbUrl = gg.passportPhotoUrl;
-        var fullUrl = gg.passportPhotoUrl;
-        if (thumbUrl.indexOf('drive.google.com') > -1) {
-          var fid = thumbUrl.match(/[-\w]{25,}/);
-          if (fid) {
-            thumbUrl = 'https://drive.google.com/thumbnail?id=' + fid[0] + '&sz=w300';
-            fullUrl = 'https://drive.google.com/thumbnail?id=' + fid[0] + '&sz=w800';
+        var ppImgId = 'pp_' + gi + '_' + (g.rowNumber || 0);
+        var isDriveUrl = gg.passportPhotoUrl.indexOf('drive.google.com') > -1;
+        if (isDriveUrl) {
+          // Google Drive: サーバー経由プロキシ（iframe内からthumbnail APIへ直接アクセス不可）
+          var ppFileId = '';
+          var ppM = gg.passportPhotoUrl.match(/[-\w]{25,}/);
+          if (ppM) ppFileId = ppM[0];
+          html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+            '<div id="' + ppImgId + '" style="margin-top:.2rem;">' +
+            '<span class="spinner-border spinner-border-sm"></span> <span style="font-size:.75rem;color:#888;">読み込み中...</span></div></div>';
+          if (ppFileId) {
+            (function(imgId, fileId) {
+              setTimeout(function() { loadPassportImg(imgId, fileId); }, 0);
+            })(ppImgId, ppFileId);
           }
+        } else {
+          // Drive以外のURL（テスト用等）: 直接表示
+          html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
+            '<img src="' + escapeHtml(gg.passportPhotoUrl) + '" ' +
+            'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
+            'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(gg.passportPhotoUrl).replace(/'/g, "\\'") + '\')" ' +
+            'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'"></div>';
         }
-        html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-          '<div style="font-size:.6rem;color:#aaa;word-break:break-all;margin-bottom:.2rem;">[DEBUG URL] ' + escapeHtml(gg.passportPhotoUrl) + '</div>' +
-          '<img src="' + escapeHtml(thumbUrl) + '" ' +
-          'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
-          'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(fullUrl).replace(/'/g, "\\'") + '\')" ' +
-          'onerror="this.outerHTML=\'<span style=\\\'font-size:.75rem;color:#aaa;\\\'>(読込失敗)</span>\'">' +
-          '</div>';
       }
       html += '</div>';
     }

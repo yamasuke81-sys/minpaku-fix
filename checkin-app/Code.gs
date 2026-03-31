@@ -1176,6 +1176,24 @@ function getAppBaseUrl() {
   return ScriptApp.getService().getUrl();
 }
 
+/** Google DriveファイルのサムネイルをBase64で返す */
+function getPassportThumbnail(fileId, size) {
+  try {
+    var sz = parseInt(size) || 300;
+    var url = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + sz;
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (response.getResponseCode() !== 200) {
+      return JSON.stringify({ success: false, error: 'HTTP ' + response.getResponseCode() });
+    }
+    var blob = response.getBlob();
+    var base64 = Utilities.base64Encode(blob.getBytes());
+    var contentType = blob.getContentType() || 'image/jpeg';
+    return JSON.stringify({ success: true, dataUrl: 'data:' + contentType + ';base64,' + base64 });
+  } catch (e) {
+    return JSON.stringify({ success: false, error: e.message });
+  }
+}
+
 /** スプレッドシートURLを取得 */
 function getSpreadsheetUrl() {
   var ssId = getSpreadsheetId_();

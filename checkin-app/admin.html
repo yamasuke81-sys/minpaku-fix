@@ -542,12 +542,12 @@ function buildGuestDetail(g) {
         if (ppThumbUrl.indexOf('drive.google.com') > -1) {
           var ppFid = ppThumbUrl.match(/[-\w]{25,}/);
           if (ppFid) {
-            ppThumbUrl = 'https://drive.google.com/thumbnail?id=' + ppFid[0] + '&sz=w300';
-            ppFullUrl = 'https://drive.google.com/thumbnail?id=' + ppFid[0] + '&sz=w800';
+            // thumbnail形式はiframe内で認証エラーになるため、uc?export=view形式を使用
+            ppThumbUrl = 'https://drive.google.com/uc?export=view&id=' + ppFid[0];
+            ppFullUrl = 'https://drive.google.com/uc?export=view&id=' + ppFid[0];
           }
         }
         html += '<div style="margin-top:.3rem;"><div class="detail-label">パスポート写真</div>' +
-          '<div style="font-size:.55rem;color:#aaa;word-break:break-all;">[DEBUG] 元URL: ' + escapeHtml(gg.passportPhotoUrl) + '<br>サムネURL: ' + escapeHtml(ppThumbUrl) + '</div>' +
           '<img src="' + escapeHtml(ppThumbUrl) + '" ' +
           'style="max-width:120px;border-radius:.4rem;margin-top:.2rem;cursor:pointer;" ' +
           'onclick="event.stopPropagation();showPassport(\'' + escapeHtml(ppFullUrl).replace(/'/g, "\\'") + '\')" ' +

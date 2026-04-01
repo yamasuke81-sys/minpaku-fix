@@ -8,12 +8,14 @@ const API = {
   // スタッフ API
   staff: {
     async list(activeOnly = true) {
-      let query = db.collection("staff").orderBy("displayOrder", "asc");
+      // インデックス不要のシンプルクエリ
+      const snap = await db.collection("staff").get();
+      let staff = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (activeOnly) {
-        query = query.where("active", "==", true);
+        staff = staff.filter(s => s.active !== false);
       }
-      const snap = await query.get();
-      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      staff.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+      return staff;
     },
 
     async get(id) {
@@ -50,12 +52,13 @@ const API = {
   // 物件 API
   properties: {
     async list(activeOnly = true) {
-      let query = db.collection("properties").orderBy("name", "asc");
+      const snap = await db.collection("properties").get();
+      let properties = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (activeOnly) {
-        query = query.where("active", "==", true);
+        properties = properties.filter(p => p.active !== false);
       }
-      const snap = await query.get();
-      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      properties.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      return properties;
     },
 
     async get(id) {

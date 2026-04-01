@@ -63,6 +63,10 @@ app.use("/laundry", laundryApi(db));
 const invoicesApi = require("./api/invoices");
 app.use("/invoices", invoicesApi(db));
 
+// ========== 募集管理 API ==========
+const recruitmentApi = require("./api/recruitment");
+app.use("/recruitment", recruitmentApi(db));
+
 // ========== チェックリスト API ==========
 const checklistApi = require("./api/checklist");
 app.use("/checklist", checklistApi(db));

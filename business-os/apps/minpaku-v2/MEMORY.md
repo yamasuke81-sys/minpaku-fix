@@ -8,14 +8,25 @@
 - 全データ移行完了（民泊メイン24シート + PDFリネーム8シート → Firestore）
 - Firestore REST APIでの自動デバッグ確立
 
+## 今回セッション（2026-04-01）の成果
+- 募集管理機能を全実装（UI + API）
+  - Firestoreコレクション: `recruitments/{id}` + サブコレクション `responses/{id}`
+  - フロントエンド: `recruitment.js`（一覧・作成・詳細・回答管理・選定・確定・再開・削除）
+  - バックエンドAPI: `functions/api/recruitment.js`（CRUD + respond + select + confirm + reopen）
+  - Firestoreルール: 募集+回答サブコレクションのアクセス制御追加
+  - Firestoreインデックス: status+checkoutDate複合インデックス追加
+  - ナビバーに「募集管理」メニュー追加
+  - バージョン: v0401a
+
 ## 現在の課題
 1. migrated_* コレクションのデータが正式コレクションに未変換（staffのみ手動変換済み）
-2. 募集管理・通知・請求書の170+機能が未実装
+2. 通知・請求書の機能が未実装
+3. 募集データの移行（旧GASの募集データ→Firestore recruitmentsコレクション）は未実施
 
 ## 次にやること
-1. 募集管理UI（最優先★★★）— スタッフ募集・立候補・選定・確定の全フロー
-2. 通知/LINE連携（★★★）
-3. 請求書/報酬（★★★）
+1. 通知/LINE連携（★★★）
+2. 請求書/報酬（★★★）
+3. 旧募集データの移行（任意）
 
 ## 開発ルール
 - コード変更 → `mcp__github__push_files` でGitHub APIに直接push

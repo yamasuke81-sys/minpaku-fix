@@ -96,3 +96,32 @@ body {
   font-size: 3rem;
   margin-bottom: 1rem;
 }
+
+/* 募集管理 */
+.recruitment-card {
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+  border-left: 4px solid #0d6efd;
+}
+.recruitment-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+.recruitment-card .badge {
+  font-size: 0.75rem;
+}
+.response-summary .badge {
+  font-size: 0.8rem;
+}
+#responseTableBody .btn-respond {
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+#staffSelectContainer .form-check {
+  padding: 0.4rem 0.4rem 0.4rem 1.75rem;
+  border-radius: 4px;
+}
+#staffSelectContainer .form-check:hover {
+  background-color: #f8f9fa;
+}

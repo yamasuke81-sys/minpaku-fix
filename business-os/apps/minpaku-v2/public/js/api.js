@@ -222,6 +222,122 @@ const API = {
     },
   },
 
+  // 募集管理 API
+  recruitments: {
+    async list(statusFilter = null) {
+      const snap = await db.collection("recruitments").get();
+      let list = [];
+      for (const doc of snap.docs) {
+        const data = { id: doc.id, ...doc.data() };
+        const respSnap = await db.collection("recruitments").doc(doc.id).collection("responses").get();
+        data.responses = respSnap.docs.map(r => ({ id: r.id, ...r.data() }));
+        list.push(data);
+      }
+      if (statusFilter) {
+        list = list.filter(r => r.status === statusFilter);
+      }
+      list.sort((a, b) => (b.checkoutDate || "").localeCompare(a.checkoutDate || ""));
+      return list;
+    },
+
+    async get(id) {
+      const doc = await db.collection("recruitments").doc(id).get();
+      if (!doc.exists) throw new Error("募集が見つかりません");
+      const data = { id: doc.id, ...doc.data() };
+      const respSnap = await db.collection("recruitments").doc(id).collection("responses").get();
+      data.responses = respSnap.docs.map(r => ({ id: r.id, ...r.data() }));
+      return data;
+    },
+
+    async create(data) {
+      data.status = data.status || "募集中";
+      data.notifyMethod = data.notifyMethod || "メール";
+      data.selectedStaff = data.selectedStaff || "";
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection("recruitments").add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async update(id, data) {
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("recruitments").doc(id).update(data);
+      return { id, ...data };
+    },
+
+    async delete(id) {
+      const respSnap = await db.collection("recruitments").doc(id).collection("responses").get();
+      const batch = db.batch();
+      respSnap.docs.forEach(r => batch.delete(r.ref));
+      batch.delete(db.collection("recruitments").doc(id));
+      await batch.commit();
+    },
+
+    async respond(recruitmentId, responseData) {
+      const recruitRef = db.collection("recruitments").doc(recruitmentId);
+      const recruitDoc = await recruitRef.get();
+      if (!recruitDoc.exists) throw new Error("募集が見つかりません");
+      if (recruitDoc.data().status === "スタッフ確定済み") {
+        throw new Error("この募集はスタッフ確定済みです");
+      }
+      if (!["◎", "△", "×"].includes(responseData.response)) {
+        throw new Error("無効な回答です。◎/△/×で回答してください");
+      }
+      const respColl = recruitRef.collection("responses");
+      let existingDoc = null;
+      if (responseData.staffId) {
+        const byId = await respColl.where("staffId", "==", responseData.staffId).get();
+        if (!byId.empty) existingDoc = byId.docs[0];
+      }
+      if (!existingDoc && responseData.staffEmail) {
+        const byEmail = await respColl.where("staffEmail", "==", responseData.staffEmail).get();
+        if (!byEmail.empty) existingDoc = byEmail.docs[0];
+      }
+      const data = {
+        ...responseData,
+        respondedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      if (existingDoc) {
+        await existingDoc.ref.update(data);
+        return { id: existingDoc.id, updated: true, ...data };
+      }
+      const ref = await respColl.add(data);
+      return { id: ref.id, ...data };
+    },
+
+    async cancelResponse(recruitmentId, responseId) {
+      await db.collection("recruitments").doc(recruitmentId)
+        .collection("responses").doc(responseId).delete();
+    },
+
+    async selectStaff(recruitmentId, selectedStaff) {
+      await db.collection("recruitments").doc(recruitmentId).update({
+        selectedStaff: selectedStaff || "",
+        status: "選定済",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    },
+
+    async confirm(recruitmentId) {
+      const doc = await db.collection("recruitments").doc(recruitmentId).get();
+      if (!doc.exists) throw new Error("募集が見つかりません");
+      if (!doc.data().selectedStaff) throw new Error("スタッフが選定されていません");
+      await db.collection("recruitments").doc(recruitmentId).update({
+        status: "スタッフ確定済み",
+        confirmedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    },
+
+    async reopen(recruitmentId) {
+      await db.collection("recruitments").doc(recruitmentId).update({
+        status: "募集中",
+        confirmedAt: null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    },
+  },
+
   // チェックリスト API
   checklist: {
     async templates() {

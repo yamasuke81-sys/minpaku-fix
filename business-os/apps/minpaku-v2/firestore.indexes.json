@@ -39,6 +39,14 @@
         { "fieldPath": "staffId", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "recruitments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "checkoutDate", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

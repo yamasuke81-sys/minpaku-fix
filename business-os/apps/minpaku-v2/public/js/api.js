@@ -44,7 +44,7 @@ const API = {
     async get(id) {
       const doc = await db.collection("staff").doc(id).get();
       if (!doc.exists) throw new Error("スタッフが見つかりません");
-      return { id: doc.id, ...doc.data() };
+      return API._normalizeStaff({ id: doc.id, ...doc.data() });
     },
 
     async create(data) {
@@ -116,13 +116,29 @@ const API = {
   // シフト API
   shifts: {
     async list(params = {}) {
-      let query = db.collection("shifts").orderBy("date", "asc");
-      if (params.from) query = query.where("date", ">=", new Date(params.from));
-      if (params.to) query = query.where("date", "<=", new Date(params.to));
-      const snap = await query.get();
+      const snap = await db.collection("shifts").get();
       let shifts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (params.from) {
+        const fromDate = new Date(params.from);
+        shifts = shifts.filter(s => {
+          const d = s.date && s.date.toDate ? s.date.toDate() : new Date(s.date);
+          return d >= fromDate;
+        });
+      }
+      if (params.to) {
+        const toDate = new Date(params.to);
+        shifts = shifts.filter(s => {
+          const d = s.date && s.date.toDate ? s.date.toDate() : new Date(s.date);
+          return d <= toDate;
+        });
+      }
       if (params.staffId) shifts = shifts.filter(s => s.staffId === params.staffId);
       if (params.propertyId) shifts = shifts.filter(s => s.propertyId === params.propertyId);
+      shifts.sort((a, b) => {
+        const da = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const db2 = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return da - db2;
+      });
       return shifts;
     },
 
@@ -149,19 +165,23 @@ const API = {
   // ランドリー API
   laundry: {
     async list(params = {}) {
-      let query = db.collection("laundry").orderBy("date", "desc");
-      if (params.staffId) {
-        query = db.collection("laundry").where("staffId", "==", params.staffId).orderBy("date", "desc");
-      }
-      const snap = await query.get();
+      const snap = await db.collection("laundry").get();
       let records = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (params.staffId) {
+        records = records.filter(r => r.staffId === params.staffId);
+      }
       if (params.yearMonth) {
         records = records.filter(r => {
-          const d = r.date.toDate ? r.date.toDate() : new Date(r.date);
+          const d = r.date && r.date.toDate ? r.date.toDate() : new Date(r.date);
           const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           return ym === params.yearMonth;
         });
       }
+      records.sort((a, b) => {
+        const da = a.date && a.date.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const db2 = b.date && b.date.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return db2 - da;
+      });
       return records;
     },
 
@@ -180,10 +200,11 @@ const API = {
   // 請求書 API
   invoices: {
     async list(params = {}) {
-      const snap = await db.collection("invoices").orderBy("yearMonth", "desc").get();
+      const snap = await db.collection("invoices").get();
       let invoices = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (params.yearMonth) invoices = invoices.filter(i => i.yearMonth === params.yearMonth);
       if (params.staffId) invoices = invoices.filter(i => i.staffId === params.staffId);
+      invoices.sort((a, b) => (b.yearMonth || "").localeCompare(a.yearMonth || ""));
       return invoices;
     },
 

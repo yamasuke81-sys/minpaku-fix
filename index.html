@@ -9683,8 +9683,8 @@
         body: '{スタッフ名} さん\n\nお疲れ様です。\n{対象年月}分の請求書のご提出をお願いいたします。\n\n締切: {締切日}\n\nWebアプリ: {アプリURL}\n\nよろしくお願いいたします。'
       };
 
-      // DEBUG: 請求書要請の診断
-      function runInvoiceDebug() {
+      // DEBUG: 請求書要請の診断（onclickから呼べるようwindowに公開）
+      window.runInvoiceDebug = function() {
         var out = document.getElementById('invoiceDebugOutput');
         out.textContent = '診断中...';
         var result = '';
@@ -9715,7 +9715,7 @@
         }).withFailureHandler(function(e) {
           out.textContent = result + '\nトリガー取得失敗: ' + e;
         }).diagTriggers();
-      }
+      };
 
       function loadInvoiceRequestSettings() {
         showTabLoading_('settingsInvoiceRequest');

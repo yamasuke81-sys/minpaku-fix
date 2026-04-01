@@ -273,8 +273,10 @@ const SettingsPage = {
             const chunk = rows.slice(i, i + batchSize);
             for (const row of chunk) {
               const ref = db.collection(collectionName).doc();
+              // フィールド名を正規化（日本語→英語）
+              const normalized = this.normalizeFields(collectionName, row);
               batch.set(ref, {
-                ...row,
+                ...normalized,
                 _appSource: preset.label,
                 _sheetSource: sheetName,
                 _migratedAt: ts,
@@ -339,16 +341,86 @@ const SettingsPage = {
       "要補充記録": "supplyRecords",
     };
 
-    if (appName === "minpaku-main" && mainMapping[sheetName]) {
+    if ((appName === "minpaku-main" || appName === "民泊メイン") && mainMapping[sheetName]) {
       return mainMapping[sheetName];
     }
-    if (appName === "checklist" && checklistMapping[sheetName]) {
+    if ((appName === "checklist" || appName === "チェックリスト") && checklistMapping[sheetName]) {
       return checklistMapping[sheetName];
+    }
+    // 民泊メインにもチェックリスト系シートがある
+    if (checklistMapping[sheetName]) {
+      return checklistMapping[sheetName];
+    }
+    if (mainMapping[sheetName]) {
+      return mainMapping[sheetName];
     }
 
     // その他: appName_sheetName形式でコレクションを作成
     const safeName = sheetName.replace(/[\/\s]/g, "_").replace(/[^a-zA-Z0-9_\u3000-\u9FFF]/g, "");
     return `migrated_${appName}_${safeName}`;
+  },
+
+  /**
+   * フィールド名を日本語→英語に正規化
+   */
+  normalizeFields(collectionName, row) {
+    if (collectionName === "staff") {
+      return {
+        name: (row["名前"] || row["name"] || "").trim(),
+        email: (row["メール"] || row["email"] || "").trim(),
+        phone: (row["電話"] || row["phone"] || "").trim(),
+        bankName: (row["金融機関名"] || row["bankName"] || "").trim(),
+        branchName: (row["支店名"] || row["branchName"] || "").trim(),
+        accountType: (row["口座種類"] || row["accountType"] || "普通").trim(),
+        accountNumber: String(row["口座番号"] || row["accountNumber"] || "").trim(),
+        accountHolder: (row["口座名義"] || row["accountHolder"] || "").trim(),
+        memo: (row["住所"] || row["memo"] || "").trim(),
+        active: (row["有効"] || row["active"] || "Y") !== "N",
+        skills: [],
+        availableDays: [],
+        ratePerJob: 0,
+        transportationFee: 0,
+        displayOrder: 0,
+      };
+    }
+    if (collectionName === "bookings") {
+      return {
+        propertyId: "",
+        beds24BookingId: "",
+        guestName: (row["氏名"] || row["お名前"] || row["guestName"] || "").trim(),
+        guestCount: Number(row["宿泊人数"] || row["人数"] || 0),
+        checkIn: row["チェックイン"] || row["checkIn"] || "",
+        checkOut: row["チェックアウト"] || row["checkOut"] || "",
+        source: "migrated",
+        status: "completed",
+        bbq: String(row["BBQ"] || "").includes("あり"),
+        parking: String(row["駐車場"] || "").includes("あり"),
+        notes: (row["メモ"] || row["notes"] || "").trim(),
+        cleaningStaff: (row["清掃担当"] || "").trim(),
+        nationality: (row["国籍"] || "").trim(),
+      };
+    }
+    if (collectionName === "recruitments") {
+      return {
+        checkOutDate: row["チェックアウト日"] || "",
+        bookingRowNum: Number(row["予約行番号"] || 0),
+        status: (row["ステータス"] || "").trim(),
+        selectedStaff: (row["選定スタッフ"] || "").trim(),
+        notifyDate: row["告知日"] || "",
+        createdDate: row["作成日"] || "",
+        memo: (row["メモ"] || "").trim(),
+      };
+    }
+    if (collectionName === "rewards") {
+      return {
+        staffName: (row["スタッフ名"] || "").trim(),
+        jobType: (row["仕事内容名"] || "").trim(),
+        amount: Number(row["報酬額"] || 0),
+        memo: (row["備考"] || "").trim(),
+      };
+    }
+    // その他のコレクションはそのまま
+    return row;
   },
 
   async importJson() {

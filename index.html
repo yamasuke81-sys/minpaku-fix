@@ -1192,7 +1192,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0424d</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0424e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5810,8 +5810,13 @@
             var isConfirmed = false;
             var selectedStaff = (recruit.selectedStaff || '').trim();
             if (selectedStaff && (recruit.status === '選定済' || recruit.status === 'スタッフ確定済み')) {
-              var confirmedNames = selectedStaff.split(/[,、\s]+/).map(function(s) { return s.trim(); });
-              isConfirmed = confirmedNames.indexOf(staffName) >= 0;
+              // 名前ゆらぎ対策: スペース除去+小文字化で比較、かつ接頭辞ユニーク一致も許容
+              var normalizeKey_ = function(n) { return String(n || '').replace(/[\s\u3000]+/g, '').toLowerCase(); };
+              var staffKey = normalizeKey_(staffName);
+              var confirmedKeys = selectedStaff.split(/[,、]/).map(function(s) { return normalizeKey_(s); }).filter(Boolean);
+              isConfirmed = confirmedKeys.some(function(k) {
+                return k === staffKey || staffKey.indexOf(k) === 0 || k.indexOf(staffKey) === 0;
+              });
             }
             var cellBg = isConfirmed ? C.confirmedBg : (isToday ? C.todayBg : (!dd.isCurrentMonth ? C.monthSepBg : C.cellBg));
             var cellBorder = 'border:1px solid ' + C.tableBorder + ';';

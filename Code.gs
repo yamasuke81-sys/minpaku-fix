@@ -9931,30 +9931,73 @@ function getRecruitmentForBooking(bookingRowNumber) {
       var recruitRowIndex = matchIdx + 2;
       var checkoutDate = rows[matchIdx][0] ? (rows[matchIdx][0] instanceof Date ? Utilities.formatDate(rows[matchIdx][0], 'Asia/Tokyo', 'yyyy-MM-dd') : String(rows[matchIdx][0])) : '';
       var status = String(rows[matchIdx][3] || '').trim() || '募集中';
-      // 全スタッフと回答をマージ
+      // 全スタッフと回答をマージ（v0424a/c: canonicalKey解決+同日別ridフォールバック）
       var allStaff = getAllActiveStaff_(ss);
+      var staffLookupTable = {};
+      var canonicalKeyByStaff = {};
+      allStaff.forEach(function(s) {
+        var emailKey = s.email ? String(s.email).toLowerCase() : '';
+        var nameKey = normalizeStaffNameKey_(s.staffName);
+        var canonicalKey = emailKey || nameKey;
+        if (!canonicalKey) return;
+        canonicalKeyByStaff[s.staffName] = canonicalKey;
+        if (emailKey) staffLookupTable[emailKey] = canonicalKey;
+        if (nameKey && !staffLookupTable[nameKey]) staffLookupTable[nameKey] = canonicalKey;
+      });
+      // 対象募集行のCO日を取得し、同じCO日の別rid（キャンセル済み含む）も収集
+      var targetCoKey = checkoutDate || '';
+      var targetRids = {};
+      targetRids['r' + recruitRowIndex] = true;
+      if (targetCoKey) {
+        for (var ri = 0; ri < rows.length; ri++) {
+          var rCoRaw = rows[ri][0];
+          var rCoStr = rCoRaw ? (rCoRaw instanceof Date ? Utilities.formatDate(rCoRaw, 'Asia/Tokyo', 'yyyy-MM-dd') : (toDateKeySafe_(rCoRaw) || String(rCoRaw).trim())) : '';
+          if (rCoStr === targetCoKey) targetRids['r' + (ri + 2)] = true;
+        }
+      }
+      function resolveVolCanonicalKey_(email, name) {
+        var nameKey = normalizeStaffNameKey_(name);
+        if (email && staffLookupTable[email]) return staffLookupTable[email];
+        if (nameKey && staffLookupTable[nameKey]) return staffLookupTable[nameKey];
+        if (nameKey) {
+          var uniq = {};
+          Object.keys(staffLookupTable).forEach(function(sk) {
+            if (sk.indexOf('@') >= 0) return;
+            if (sk.indexOf(nameKey) === 0 || nameKey.indexOf(sk) === 0) uniq[staffLookupTable[sk]] = true;
+          });
+          var uniqList = Object.keys(uniq);
+          if (uniqList.length === 1) return uniqList[0];
+        }
+        return email || nameKey;
+      }
       var responsesByKey = {};
       if (volSheet && volSheet.getLastRow() >= 2) {
         ensureVolunteerStatusColumns_();
         var volLastCol = Math.max(volSheet.getLastColumn(), 7);
         var volRows = volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues();
-        var rid = 'r' + recruitRowIndex;
+        var primaryRid = 'r' + recruitRowIndex;
         volRows.forEach(function(vr) {
-          if (String(vr[0] || '').trim() === rid) {
-            var email = String(vr[2] || '').trim().toLowerCase();
-            var name = String(vr[1] || '').trim().toLowerCase();
-            var key = email || name;
-            responsesByKey[key] = {
-              response: normalizeVolStatus_(String(vr[5] || '').trim()),
-              memo: String(vr[4] || '').trim(),
-              respondedAt: String(vr[3] || '').trim()
-            };
+          var vrRid = String(vr[0] || '').trim();
+          if (!targetRids[vrRid]) return;
+          var email = String(vr[2] || '').trim().toLowerCase();
+          var canonicalKey = resolveVolCanonicalKey_(email, String(vr[1] || '').trim());
+          if (!canonicalKey) return;
+          var incoming = {
+            response: normalizeVolStatus_(String(vr[5] || '').trim()),
+            memo: String(vr[4] || '').trim(),
+            respondedAt: String(vr[3] || '').trim(),
+            _isPrimary: (vrRid === primaryRid)
+          };
+          var existing = responsesByKey[canonicalKey];
+          // primary rid優先、それ以外は後勝ち
+          if (!existing || (!existing._isPrimary && incoming._isPrimary) || (existing._isPrimary === incoming._isPrimary)) {
+            responsesByKey[canonicalKey] = incoming;
           }
         });
       }
       var volunteers = allStaff.map(function(s) {
-        var key = s.email ? s.email.toLowerCase() : s.staffName.toLowerCase();
-        var resp = responsesByKey[key] || responsesByKey[s.staffName.toLowerCase()];
+        var canonicalKey = canonicalKeyByStaff[s.staffName];
+        var resp = canonicalKey ? responsesByKey[canonicalKey] : null;
         return {
           staffName: s.staffName,
           email: s.email,

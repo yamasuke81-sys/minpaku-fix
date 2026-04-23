@@ -1192,7 +1192,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0424a</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0424b</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5730,9 +5730,10 @@
               var bkSite = (cev.extendedProps.data && cev.extendedProps.data.bookingSite) ? String(cev.extendedProps.data.bookingSite).toLowerCase() : '';
               var plat = bkSite.indexOf('airbnb') >= 0 ? 'airbnb' : (bkSite.indexOf('booking') >= 0 ? 'booking' : '');
               var bkRosterAnswered = !!cev.extendedProps.rosterAnswered;
+              var bkCancelled = !!(cev.extendedProps.data && cev.extendedProps.data.cancelledAt);
               for (var bi = 0; bi < bkDays.length; bi++) {
                 var pos = bkDays.length === 1 ? 'only' : (bi === 0 ? 'start' : (bi === bkDays.length - 1 ? 'end' : 'mid'));
-                bookingDates[bkDays[bi]] = { pos: pos, platform: plat, rosterAnswered: bkRosterAnswered };
+                bookingDates[bkDays[bi]] = { pos: pos, platform: plat, rosterAnswered: bkRosterAnswered, cancelled: bkCancelled };
               }
             }
           }
@@ -5755,7 +5756,7 @@
           var barHtml = '';
           var thOverflow = '';
           if (bkInfo) {
-            var barColor = bkInfo.platform === 'airbnb' ? '#FF5A5F' : (bkInfo.platform === 'booking' ? '#003580' : '#6c757d');
+            var barColor = bkInfo.cancelled ? '#9e9e9e' : (bkInfo.platform === 'airbnb' ? '#FF5A5F' : (bkInfo.platform === 'booking' ? '#003580' : '#6c757d'));
             var barPos = '';
             if (bkInfo.pos === 'only') barPos = 'left:3px;right:3px;border-radius:3px;';
             else if (bkInfo.pos === 'start') barPos = 'left:3px;right:-1px;border-radius:3px 0 0 3px;';

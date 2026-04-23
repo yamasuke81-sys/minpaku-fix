@@ -1192,7 +1192,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0424e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0424f</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -5641,13 +5641,19 @@
         }
 
         // 募集データを日付→募集情報にマッピング
+        // 同日に複数エントリがある場合は優先度: スタッフ確定済み/選定済 > 募集中 > キャンセル系
         var recruitByDate = {};
+        var _recruitPriority = function(s) {
+          if (s === 'スタッフ確定済み' || s === '選定済') return 3;
+          if (s === '募集中' || !s) return 2;
+          if (s === 'キャンセル' || s === 'キャンセル済み') return 1;
+          return 0;
+        };
         list.forEach(function(r) {
-          if (r.status === 'キャンセル済み') return;
           var d = (r.checkoutDate || '').slice(0, 10);
-          if (recruitByDate[d]) {
-            if (recruitByDate[d].status === 'キャンセル済み') recruitByDate[d] = r;
-          } else {
+          if (!d) return;
+          var existing = recruitByDate[d];
+          if (!existing || _recruitPriority(r.status) > _recruitPriority(existing.status)) {
             recruitByDate[d] = r;
           }
         });

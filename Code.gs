@@ -6395,15 +6395,43 @@ function getRecruitmentList() {
     var volLastCol = (volSheet && volSheet.getLastColumn()) ? Math.max(volSheet.getLastColumn(), 7) : 7;
     ensureVolunteerStatusColumns_();
     var allVolRows = (volSheet && volSheet.getLastRow() >= 2) ? volSheet.getRange(2, 1, volSheet.getLastRow() - 1, volLastCol).getValues() : [];
+    // スタッフのカノニカルキー解決テーブル（email/正規化名 → canonicalKey）
+    var staffLookupTable = {};
+    var canonicalKeyByStaff = {};
+    allStaff.forEach(function(s) {
+      var emailKey = s.email ? String(s.email).toLowerCase() : '';
+      var nameKey = normalizeStaffNameKey_(s.staffName);
+      var canonicalKey = emailKey || nameKey;
+      if (!canonicalKey) return;
+      canonicalKeyByStaff[s.staffName] = canonicalKey;
+      if (emailKey) staffLookupTable[emailKey] = canonicalKey;
+      if (nameKey && !staffLookupTable[nameKey]) staffLookupTable[nameKey] = canonicalKey;
+    });
+    // 立候補行 → canonicalKey で保存（名前ゆらぎ吸収）
     var responsesByRid = {};
     allVolRows.forEach(function(vr) {
       var rid = String(vr[0] || '').trim();
       if (!rid) return;
       if (!responsesByRid[rid]) responsesByRid[rid] = {};
       var email = String(vr[2] || '').trim().toLowerCase();
-      var name = String(vr[1] || '').trim().toLowerCase();
-      var key = email || name;
-      responsesByRid[rid][key] = {
+      var nameKey = normalizeStaffNameKey_(String(vr[1] || '').trim());
+      // スタッフ解決: email → 正規化名完全一致 → 名前の接頭辞ユニーク一致
+      var canonicalKey = null;
+      if (email && staffLookupTable[email]) canonicalKey = staffLookupTable[email];
+      else if (nameKey && staffLookupTable[nameKey]) canonicalKey = staffLookupTable[nameKey];
+      else if (nameKey) {
+        var uniq = {};
+        Object.keys(staffLookupTable).forEach(function(sk) {
+          if (sk.indexOf('@') >= 0) return;
+          if (sk.indexOf(nameKey) === 0 || nameKey.indexOf(sk) === 0) {
+            uniq[staffLookupTable[sk]] = true;
+          }
+        });
+        var uniqList = Object.keys(uniq);
+        if (uniqList.length === 1) canonicalKey = uniqList[0];
+      }
+      if (!canonicalKey) canonicalKey = email || nameKey; // 解決失敗時は従来キー
+      responsesByRid[rid][canonicalKey] = {
         response: normalizeVolStatus_(String(vr[5] || '').trim()),
         memo: String(vr[4] || '').trim(),
         respondedAt: String(vr[3] || '').trim()
@@ -6443,11 +6471,28 @@ function getRecruitmentList() {
         }
       });
     }
+    // 同日別ridフォールバック: 募集シートで行の挿入/重複により rid がズレた場合でも
+    // 同じチェックアウト日の別rid（旧キャンセル済み含む）から回答を引ける
+    var responsesByDate = {};
+    list.forEach(function(it) {
+      var date = it.checkoutDate;
+      if (!date) return;
+      var rResp = responsesByRid[it.id];
+      if (!rResp) return;
+      if (!responsesByDate[date]) responsesByDate[date] = {};
+      Object.keys(rResp).forEach(function(k) {
+        responsesByDate[date][k] = rResp[k]; // 後勝ち（後方の行が新しい）
+      });
+    });
     list.forEach(function(item) {
       var ridResponses = responsesByRid[item.id] || {};
+      var dateResponses = item.checkoutDate ? (responsesByDate[item.checkoutDate] || {}) : {};
       item.volunteers = allStaff.map(function(s) {
-        var key = s.email ? s.email.toLowerCase() : s.staffName.toLowerCase();
-        var resp = ridResponses[key] || ridResponses[s.staffName.toLowerCase()];
+        var canonicalKey = canonicalKeyByStaff[s.staffName];
+        var resp = null;
+        if (canonicalKey) {
+          resp = ridResponses[canonicalKey] || dateResponses[canonicalKey];
+        }
         return {
           staffName: s.staffName,
           email: s.email,
@@ -9290,6 +9335,15 @@ function normalizeVolStatus_(rawStatus) {
   if (rawStatus === 'volunteered') return '◎';
   if (rawStatus === 'hold') return '△';
   return '未回答';
+}
+
+/**
+ * スタッフ名の正規化キー生成: 全角/半角スペース除去+小文字化
+ * 立候補シートの名前（例:「梶本」）と清掃スタッフシートの名前（例:「梶本　里奈」）の照合用
+ */
+function normalizeStaffNameKey_(name) {
+  if (!name) return '';
+  return String(name).replace(/[\s\u3000]+/g, '').toLowerCase();
 }
 
 /**

@@ -3,6 +3,12 @@
  * スプレッドシート「フォームの回答 1」をバックエンドとして使用
  */
 
+// ★最上部に配置: ドロップダウンで探しやすくする一時関数
+function AAA_セットアップ_WidgetApiToken() {
+  PropertiesService.getScriptProperties().setProperty('WIDGET_API_TOKEN', 'mp_widget_a8f2k9x3nq7r4tw1bv5jz6');
+  Logger.log('保存完了: ' + PropertiesService.getScriptProperties().getProperty('WIDGET_API_TOKEN'));
+}
+
 const SHEET_NAME = 'フォームの回答 1';
 
 /**********************************************
@@ -292,6 +298,10 @@ function doGet(e) {
   if (params.type === 'json') {
     return handleJsonApi_(params);
   }
+  // 日付範囲予約API: v2差分比較用
+  if (params.type === 'bookings_range') {
+    return handleBookingsRangeApi_(params);
+  }
   // 管理者リンクページ
   if (action === 'admin') {
     return buildAdminPage_();
@@ -553,6 +563,105 @@ function handleJsonApi_(params) {
   try {
     var data = buildWidgetData_();
     return jsonResponse_(data, 200);
+  } catch(e) {
+    return jsonResponse_({ error: e.message || 'Internal error' }, 500);
+  }
+}
+
+/**
+ * 日付範囲予約API — v2との差分比較用
+ * クエリ: ?type=bookings_range&token=XXX&from=2026-04-01&to=2026-05-31
+ * レスポンス: { ok: true, bookings: [{ propertyName, checkIn, checkOut, guestName, source, bookingId }] }
+ */
+function handleBookingsRangeApi_(params) {
+  // トークン認証（既存の WIDGET_API_TOKEN を再利用）
+  var storedToken = '';
+  try { storedToken = PropertiesService.getScriptProperties().getProperty('WIDGET_API_TOKEN') || ''; } catch(e) {}
+  if (!storedToken) {
+    return jsonResponse_({ error: 'API token not configured.' }, 403);
+  }
+  if (String(params.token || '') !== storedToken) {
+    return jsonResponse_({ error: 'Invalid token' }, 401);
+  }
+
+  // from / to パラメータ（YYYY-MM-DD形式）
+  var fromStr = String(params.from || '');
+  var toStr = String(params.to || '');
+  if (!fromStr || !toStr) {
+    return jsonResponse_({ error: 'from and to parameters are required (YYYY-MM-DD)' }, 400);
+  }
+
+  try {
+    var fromDate = new Date(fromStr);
+    var toDate = new Date(toStr);
+    // toDate は当日末まで含めるために翌日0時にする
+    toDate.setDate(toDate.getDate() + 1);
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('フォームの回答 1');
+    if (!sheet) return jsonResponse_({ error: 'シートが見つかりません' }, 500);
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return jsonResponse_({ ok: true, bookings: [] }, 200);
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var cm = buildColumnMap(headers);
+
+    // checkIn / checkOut 列が見つからない場合は空返却
+    if (cm.checkIn < 0 || cm.checkOut < 0) {
+      return jsonResponse_({ ok: true, bookings: [] }, 200);
+    }
+
+    var data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+    var bookings = [];
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var rawCI = row[cm.checkIn];
+      var rawCO = row[cm.checkOut];
+      if (!rawCI || !rawCO) continue;
+
+      var ciDate = (rawCI instanceof Date) ? rawCI : new Date(rawCI);
+      var coDate = (rawCO instanceof Date) ? rawCO : new Date(rawCO);
+      if (isNaN(ciDate.getTime()) || isNaN(coDate.getTime())) continue;
+
+      // キャンセル行はスキップ
+      if (cm.cancelledAt >= 0 && row[cm.cancelledAt]) continue;
+
+      // チェックアウト日が from〜to の範囲内に含まれる予約を返す
+      // （チェックアウト日で絞ることで清掃スケジュールの突合に適した範囲を取得）
+      if (coDate < fromDate || coDate >= toDate) continue;
+
+      var guestName = (cm.guestName >= 0) ? String(row[cm.guestName] || '') : '';
+      var source = (cm.bookingSite >= 0) ? String(row[cm.bookingSite] || '') : '';
+      var bookingId = String(i + 2); // 行番号をIDとして使用
+
+      // iCal同期フラグがある行のゲスト名を guestNameCols から優先取得
+      if (cm.icalSync >= 0 && row[cm.icalSync]) {
+        for (var k = 0; k < cm.guestNameCols.length; k++) {
+          var n = String(row[cm.guestNameCols[k]] || '').trim();
+          if (n && !/not available/i.test(n) && n !== '') { guestName = n; break; }
+        }
+      }
+
+      // フォーマット（YYYY-MM-DD文字列）
+      var fmtDate = function(d) {
+        return d.getFullYear() + '-' +
+          String(d.getMonth() + 1).padStart(2, '0') + '-' +
+          String(d.getDate()).padStart(2, '0');
+      };
+
+      bookings.push({
+        propertyName: 'the Terrace 長浜', // GAS版は1物件固定
+        checkIn: fmtDate(ciDate),
+        checkOut: fmtDate(coDate),
+        guestName: guestName,
+        source: source,
+        bookingId: bookingId
+      });
+    }
+
+    return jsonResponse_({ ok: true, bookings: bookings }, 200);
   } catch(e) {
     return jsonResponse_({ error: e.message || 'Internal error' }, 500);
   }

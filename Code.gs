@@ -390,6 +390,12 @@ function doPost(e) {
       return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
     }
     var body = JSON.parse(e.postData.contents);
+
+    // v2→GASスプシ自動転記
+    if (body.action === 'appendGuestFromV2') {
+      return handleAppendGuestFromV2_(body);
+    }
+
     var events = body.events || [];
     if (events.length === 0) {
       // LINE Webhook検証リクエスト（events空配列）→ 200 OK を返す
@@ -459,6 +465,92 @@ function doPost(e) {
   }
   // LINE Webhookには常に200を返す必要がある
   return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+}
+
+/**
+ * v2から宿泊者名簿を受け取り「フォームの回答 1」シートに行追加する
+ * POST body: { action: "appendGuestFromV2", token: "...", guest: { ... } }
+ */
+function handleAppendGuestFromV2_(body) {
+  // トークン認証
+  var storedToken = '';
+  try { storedToken = PropertiesService.getScriptProperties().getProperty('WIDGET_API_TOKEN') || ''; } catch(e) {}
+  if (!storedToken || String(body.token || '') !== storedToken) {
+    return jsonResponse_({ error: 'Unauthorized' }, 401);
+  }
+
+  var guest = body.guest;
+  if (!guest) return jsonResponse_({ error: 'guest data is required' }, 400);
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('フォームの回答 1');
+    if (!sheet) return jsonResponse_({ error: 'シートが見つかりません' }, 500);
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var cm = buildColumnMap(headers);
+
+    // 列数に合わせた空行を作成
+    var newRow = new Array(headers.length).fill('');
+
+    // 代表者フィールド
+    if (cm.checkIn >= 0)  newRow[cm.checkIn]  = guest.checkIn  || '';
+    if (cm.checkOut >= 0) newRow[cm.checkOut] = guest.checkOut || '';
+    if (cm.guestName >= 0)         newRow[cm.guestName]         = guest.guestName     || '';
+    if (cm.nationality >= 0)       newRow[cm.nationality]       = guest.nationality   || '';
+    if (cm.guestCount >= 0)        newRow[cm.guestCount]        = guest.guestCount    || '';
+    if (cm.guestCountInfants >= 0) newRow[cm.guestCountInfants] = guest.guestCountInfants || 0;
+    if (cm.bookingSite >= 0)       newRow[cm.bookingSite]       = guest.bookingSite   || '';
+    if (cm.purpose >= 0)           newRow[cm.purpose]           = guest.purpose       || '';
+    if (cm.memo >= 0)              newRow[cm.memo]              = guest.memo          || '';
+    if (cm.bbq >= 0)               newRow[cm.bbq]               = guest.bbq           || '';
+    if (cm.parking >= 0)           newRow[cm.parking]           = guest.parking       || '';
+    // tel1/tel2
+    if (cm.tel1 >= 0) newRow[cm.tel1] = guest.phone || '';
+    // email
+    if (cm.email >= 0) newRow[cm.email] = guest.email || '';
+    // 代表者住所（addressCols[0]）
+    if (cm.addressCols && cm.addressCols.length > 0) {
+      newRow[cm.addressCols[0]] = guest.address || '';
+    }
+    // 代表者旅券番号（passportNumberCols[0]）
+    if (cm.passportNumberCols && cm.passportNumberCols.length > 0) {
+      newRow[cm.passportNumberCols[0]] = guest.passportNumber || '';
+    }
+
+    // 同行者（guests[0]〜guests[8] = 同行者1〜9人目）
+    var companions = guest.guests || [];
+    for (var i = 0; i < companions.length && i < 9; i++) {
+      var c = companions[i];
+      // 氏名: guestNameCols[i+1]（0番目は代表者）
+      if (cm.guestNameCols && cm.guestNameCols[i + 1] != null) {
+        newRow[cm.guestNameCols[i + 1]] = c.name || '';
+      }
+      // 年齢: ageCols[i+1]
+      if (cm.ageCols && cm.ageCols[i + 1] != null) {
+        newRow[cm.ageCols[i + 1]] = c.age || '';
+      }
+      // 住所: addressCols[i+1]
+      if (cm.addressCols && cm.addressCols[i + 1] != null) {
+        newRow[cm.addressCols[i + 1]] = c.address || '';
+      }
+      // 国籍: nationalityCols[i+1]
+      if (cm.nationalityCols && cm.nationalityCols[i + 1] != null) {
+        newRow[cm.nationalityCols[i + 1]] = c.nationality || '';
+      }
+      // 旅券番号: passportNumberCols[i+1]
+      if (cm.passportNumberCols && cm.passportNumberCols[i + 1] != null) {
+        newRow[cm.passportNumberCols[i + 1]] = c.passportNumber || '';
+      }
+    }
+
+    sheet.appendRow(newRow);
+    Logger.log('[appendGuestFromV2] 追加完了: ' + (guest.guestName || '') + ' CI=' + (guest.checkIn || ''));
+    return jsonResponse_({ ok: true }, 200);
+  } catch(e) {
+    Logger.log('[appendGuestFromV2] エラー: ' + e.toString());
+    return jsonResponse_({ error: e.message }, 500);
+  }
 }
 
 /**

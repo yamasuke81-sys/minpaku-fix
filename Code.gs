@@ -8848,7 +8848,27 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
             var invSendAllStaff = getAllActiveStaff_(ss);
             invSendAllStaff.forEach(function(s) { if (s.email) try { GmailApp.sendEmail(s.email, subject, bodyText); } catch (e) {} });
           }
-          sendResult = '送信済み：' + ownerEmail;
+          // 送信本人（スタッフ）にもPDF控えを自動送信
+          var staffSentTo = '';
+          if (staffInfo && staffInfo.email && /@/.test(staffInfo.email)) {
+            try {
+              var staffSubject = '【控え】' + ymText + ' 請求書を送信しました';
+              var staffBody = staffName + ' 様\n\n'
+                + ymText + 'の請求書をオーナーへ送信しました。控えとして本メールに同じPDFを添付しています。\n\n'
+                + '合計金額: ¥' + total.toLocaleString('ja-JP') + '\n'
+                + '対象期間: ' + periodText + '\n'
+                + 'PDF: ' + pdfFile.getUrl() + '\n\n'
+                + '※このメールは自動送信です。';
+              GmailApp.sendEmail(staffInfo.email, staffSubject, staffBody, {
+                attachments: [pdfBlob],
+                name: '請求書（自動送信）'
+              });
+              staffSentTo = staffInfo.email;
+            } catch (staffMailErr) {
+              Logger.log('スタッフ控えメール送信失敗: ' + staffMailErr);
+            }
+          }
+          sendResult = '送信済み：' + ownerEmail + (staffSentTo ? ' / 本人控え：' + staffSentTo : '');
         }
         // LINE送信（チャンネル制御のみ — isEmailNotifyEnabled_ に依存しない）
         if (_ch_invoice.owner_line) { try { sendLineMessage_(invoiceLineText, false, 'owner'); } catch (lineErr) {} }

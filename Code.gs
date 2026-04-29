@@ -10,12 +10,10 @@ function AAA_セットアップ_WidgetApiToken() {
 }
 
 // ★Gmail権限承認用の一時関数（実行→権限承認→承認後は削除）
-// 実際のメール送信はせず、GmailApp APIを呼んで権限ダイアログを発火させるだけ
+// gmail.send スコープを使って自分宛にテストメールを送信
 function AAA_GmailScope承認() {
-  var draft = GmailApp.createDraft('yamasuke81@gmail.com', '権限承認テスト', 'これはGmailスコープ承認用の下書きです。承認確認後に削除してください。');
-  Logger.log('下書き作成完了: ' + draft.getId());
-  draft.deleteDraft();
-  Logger.log('下書き削除完了。権限承認OK。');
+  GmailApp.sendEmail('yamasuke81@gmail.com', '【テスト】Gmailスコープ承認確認', 'これはGmailスコープ承認用のテストメールです。届けば認証OKです。');
+  Logger.log('送信完了: yamasuke81@gmail.com 宛');
 }
 
 const SHEET_NAME = 'フォームの回答 1';

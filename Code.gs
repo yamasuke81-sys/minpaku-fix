@@ -8619,6 +8619,9 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
     var allItems = [];
     var total = 0;
 
+    // 金額オーバーライド（画面で手入力された金額。スタッフ報酬未登録時のフォールバック）
+    var amtOverrides = getAutoAmountOverrides_(staffName, ym);
+
     // 清掃実績（自動）
     for (var si2 = 0; si2 < scheduleList.length; si2++) {
       var sItem = scheduleList[si2];
@@ -8631,6 +8634,11 @@ function createAndSendInvoice(yearMonth, staffIdentifier, manualItems, remarks, 
       if (amount === 0 && cleanJobMap2[staffCount]) {
         var fb2 = staffCount + '名で清掃';
         amount = lookupComp2_(staffName + '-' + fb2) || lookupComp2_('共通-' + fb2) || 0;
+      }
+      // オーバーライド適用（画面と挙動を揃える）
+      if (amount === 0) {
+        var ovKey = (sItem.checkoutDate || '') + '_' + jobName;
+        if (amtOverrides[ovKey]) amount = Number(amtOverrides[ovKey]) || 0;
       }
 
       if (amount > 0) {

@@ -1192,7 +1192,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0430d</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0430e</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -8365,6 +8365,23 @@
         var btn = this;
 
         if (!staffId) { alert('スタッフを選択してください。'); return; }
+        // 金額未設定（0円）の自動算出項目チェック
+        var zeroItems = (window._invoiceAutoItems || []).filter(function(it) {
+          var excluded = invoiceExcludedAuto.indexOf(it.date) !== -1;
+          return !excluded && (!it.amount || it.amount <= 0);
+        });
+        if (zeroItems.length > 0) {
+          var lines = zeroItems.map(function(it) { return '・' + (it.dateDisplay || it.date) + ' ' + it.jobName; }).join('\n');
+          var msg = '以下の自動算出項目は金額が未設定のため、請求書PDFに反映されません:\n\n' + lines + '\n\nスタッフ報酬シートに単価を登録するか、各行の「未設定」をクリックして金額を入力してください。\n\nこのまま送信しますか？';
+          if (!confirm(msg)) {
+            // 確認状態をリセット
+            btn._confirmReady = false;
+            btn.textContent = btn._origText || '請求書を送信';
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-primary');
+            return;
+          }
+        }
         // confirm()はiOS Safariでブロックされるため2タップ方式
         if (!btn._confirmReady) {
           btn._confirmReady = true;

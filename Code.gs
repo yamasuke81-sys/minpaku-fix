@@ -9343,6 +9343,7 @@ function saveMyBankInfo(staffIdentifier, info) {
         var rowNum = r + 2;
         if (colMap['名前']) sheet.getRange(rowNum, colMap['名前']).setValue(info.name || '');
         if (colMap['住所']) sheet.getRange(rowNum, colMap['住所']).setValue(info.address || '');
+        if (colMap['メール'] && info.email != null) sheet.getRange(rowNum, colMap['メール']).setValue(info.email || '');
         if (colMap['携帯電話番号']) {
           var phoneCell = sheet.getRange(rowNum, colMap['携帯電話番号']);
           phoneCell.setNumberFormat('@'); // テキスト形式で保存（先頭ゼロ保持）

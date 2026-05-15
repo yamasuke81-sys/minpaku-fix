@@ -1192,7 +1192,7 @@
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
       <div class="d-flex align-items-center gap-2">
         <h5 class="mb-0">民泊予約・清掃管理</h5>
-        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0430e</span>
+        <span class="badge bg-light text-muted" style="font-size:0.6rem;" id="deployVersion">v0516a</span>
         <span id="currentAccountBadge" class="badge bg-secondary" style="font-size:0.7rem; font-weight:normal; display:none;" title="ログイン中のアカウント"></span>
         <span id="staffDisplayName" class="small fw-bold" style="display:none;"></span>
         <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="btnStaffChange" style="display:none;">変更</button>
@@ -2992,7 +2992,11 @@
           if (b.guestNames && b.guestNames.length && (!existing.guestNames || !existing.guestNames.length)) {
             existing.guestNames = b.guestNames;
           }
-          if (!existing.cancelledAt && b.cancelledAt) existing.cancelledAt = b.cancelledAt;
+          // 非キャンセル優先: 同一CIで重複マージ時、どちらかが非キャンセルならマージ結果も非キャンセル
+          // （Booking→Airbnb再予約等で旧キャンセル行のキャンセル日時が新行に引き継がれる問題を回避）
+          if (!existing.cancelledAt || !b.cancelledAt) {
+            existing.cancelledAt = '';
+          }
           if (!existing.mergedRowNumbers) existing.mergedRowNumbers = [existing.rowNumber];
           existing.mergedRowNumbers.push(b.rowNumber);
         }

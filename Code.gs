@@ -2570,14 +2570,45 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
     var headers = formSheet.getRange(1, 1, 1, formSheet.getLastColumn()).getValues()[0];
     var newMap = buildColumnMap(headers);
     if (newMap.cancelledAt < 0) return false;
-    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
-    formSheet.getRange(rowNumber, newMap.cancelledAt + 1).setValue(now);
 
     // 予約情報を取得
     var guestName = newMap.guestName >= 0 ? String(formSheet.getRange(rowNumber, newMap.guestName + 1).getValue() || '').trim() : '';
     var cleaningStaff = newMap.cleaningStaff >= 0 ? String(formSheet.getRange(rowNumber, newMap.cleaningStaff + 1).getValue() || '').trim() : '';
     var ciVal = newMap.checkIn >= 0 ? formSheet.getRange(rowNumber, newMap.checkIn + 1).getValue() : '';
     var coVal = newMap.checkOut >= 0 ? formSheet.getRange(rowNumber, newMap.checkOut + 1).getValue() : '';
+
+    // === リブッキング検出 ===
+    // 同じCI/CO日付で非キャンセルの別行がフォームの回答 1 シートに存在する場合は
+    // Booking↔Airbnb の再予約とみなして通知をスキップ（キャンセルマーク自体は付ける）
+    var isRebook = false;
+    try {
+      var curCiKey = toDateKeySafe_(ciVal);
+      var curCoKey = toDateKeySafe_(coVal);
+      if (curCiKey && curCoKey) {
+        var lastRowRb = formSheet.getLastRow();
+        if (lastRowRb >= 2) {
+          var allDataRb = formSheet.getRange(2, 1, lastRowRb - 1, formSheet.getLastColumn()).getValues();
+          for (var arb = 0; arb < allDataRb.length; arb++) {
+            var rnRb = arb + 2;
+            if (rnRb === rowNumber) continue;
+            var cancelledRb = newMap.cancelledAt >= 0 ? String(allDataRb[arb][newMap.cancelledAt] || '').trim() : '';
+            if (cancelledRb) continue;
+            var otherCi = toDateKeySafe_(allDataRb[arb][newMap.checkIn]);
+            var otherCo = toDateKeySafe_(allDataRb[arb][newMap.checkOut]);
+            if (otherCi === curCiKey && otherCo === curCoKey) {
+              isRebook = true;
+              Logger.log('[REBOOK] 同日付の非キャンセル行を検出 → 通知スキップ: row=' + rowNumber + ' 別行=' + rnRb + ' CI=' + curCiKey + ' CO=' + curCoKey + ' platform=' + platformName);
+              break;
+            }
+          }
+        }
+      }
+    } catch (rbErr) {
+      Logger.log('[REBOOK] 検出エラー: ' + rbErr);
+    }
+
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm');
+    formSheet.getRange(rowNumber, newMap.cancelledAt + 1).setValue(now);
     var ciRaw = ciVal ? (ciVal instanceof Date ? Utilities.formatDate(ciVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(ciVal).trim()) : '';
     var coRaw = coVal ? (coVal instanceof Date ? Utilities.formatDate(coVal, 'Asia/Tokyo', 'yyyy-MM-dd') : String(coVal).trim()) : '';
     var ciStr = formatDateForNotif_(ciRaw) || ciRaw;
@@ -2595,6 +2626,11 @@ function cancelBookingFromICal_(formSheet, rowNumber, colMap, platformName) {
           recruitSheet.getRange(ri + 2, 4).setValue('キャンセル');
         }
       }
+    }
+
+    // リブッキング検出時は通知をスキップ（キャンセルマーク・募集ステータス更新のみで終了）
+    if (isRebook) {
+      return true;
     }
 
     // オーナーに通知

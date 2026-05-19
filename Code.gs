@@ -13437,6 +13437,24 @@ function getAdminLinks() {
           }
         }
       }
+      // マイグレーション: AI_Workspace ツール一覧カテゴリを追加
+      var hasWorkspaceTools = parsed.some(function(c) { return c.name === 'AI_Workspace ツール一覧'; });
+      if (!hasWorkspaceTools) {
+        parsed.push({
+          name: 'AI_Workspace ツール一覧',
+          color: '#6c5ce7',
+          links: [
+            { title: '民泊管理 v2 (メイン)', url: 'https://minpaku-v2.web.app', type: 'app' },
+            { title: '事業ダッシュボード', url: 'https://dashboard-minpaku-v2.web.app', type: 'app' },
+            { title: '事業本部 (HQ)', url: 'https://hq-minpaku-v2.web.app', type: 'app' },
+            { title: '不動産物件レーダー', url: 'https://property-radar-minpaku-v2.web.app', type: 'app' },
+            { title: 'AI秘書', url: 'https://ai-secretary-minpaku-v2.web.app', type: 'app' },
+            { title: '宿泊者向けミニゲーム', url: 'https://mini-games-minpaku-v2.web.app', type: 'app' },
+            { title: '宿小町ガイド', url: 'https://yado-komachi-guide.web.app', type: 'app' }
+          ]
+        });
+        sp.setProperty('ADMIN_LINKS', JSON.stringify(parsed));
+      }
       return parsed;
     } catch(e) {}
   }
@@ -13480,6 +13498,15 @@ function getAdminLinks() {
     { name: 'GitHub', color: '#2d3436', links: [
       { title: 'リポジトリ', url: 'https://github.com/yamasuke81-sys/minpaku-fix', type: 'github' },
       { title: 'Actions（自動デプロイ）', url: 'https://github.com/yamasuke81-sys/minpaku-fix/actions', type: 'github' }
+    ]},
+    { name: 'AI_Workspace ツール一覧', color: '#6c5ce7', links: [
+      { title: '民泊管理 v2 (メイン)', url: 'https://minpaku-v2.web.app', type: 'app' },
+      { title: '事業ダッシュボード', url: 'https://dashboard-minpaku-v2.web.app', type: 'app' },
+      { title: '事業本部 (HQ)', url: 'https://hq-minpaku-v2.web.app', type: 'app' },
+      { title: '不動産物件レーダー', url: 'https://property-radar-minpaku-v2.web.app', type: 'app' },
+      { title: 'AI秘書', url: 'https://ai-secretary-minpaku-v2.web.app', type: 'app' },
+      { title: '宿泊者向けミニゲーム', url: 'https://mini-games-minpaku-v2.web.app', type: 'app' },
+      { title: '宿小町ガイド', url: 'https://yado-komachi-guide.web.app', type: 'app' }
     ]}
   ];
   // 空URLの項目を除外
